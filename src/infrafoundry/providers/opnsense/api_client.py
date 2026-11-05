@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import quote
 
 import httpx
+from opnsense_openapi import APIResponseError
 from opnsense_openapi import OPNsenseClient as OpenAPIOPNsenseClient
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -13,6 +14,8 @@ if TYPE_CHECKING:  # pragma: no cover
     pass
 
 from infrafoundry.core.exceptions import APIError, AuthenticationError
+
+from . import endpoints
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +53,28 @@ class OPNsenseClient:
             verify_ssl=verify_ssl,
             timeout=timeout,
             proxy=proxy,
+            # Strict endpoint validation stays off (#1239): it needs a known box
+            # version and cannot exempt the in-tree assign_settings extension. The
+            # version is read explicitly by ``detect_version`` for the plan/doctor check.
             auto_detect_version=False,
         )
+
+    def detect_version(self) -> str:
+        """Read the OPNsense version through opnsense-openapi.
+
+        Returns:
+            The version string reported by the box (e.g. ``"26.1.6_2"``).
+
+        Raises:
+            APIError: If the library cannot determine the version.
+        """
+        try:
+            return self.client.detect_version()
+        except APIResponseError as e:
+            raise APIError(
+                f"Could not detect the OPNsense version: {e}",
+                provider="opnsense",
+            ) from e
 
     @property
     def base_url(self) -> str:
@@ -150,8 +173,8 @@ class KeaClient:
         Returns:
             List of resource dictionaries from the 'rows' field
         """
-        endpoint = f"kea/{api_version}/search{resource_type}"
-        response = self.client.request("GET", endpoint)
+        ep = endpoints.KEA_CRUD[(api_version, resource_type)].search
+        response = self.client.request(ep.method, ep.path())
         return cast(list[dict[str, Any]], response.get("rows", []))
 
     def _crud_get(self, api_version: str, resource_type: str, uuid: str) -> dict[str, Any]:
@@ -165,8 +188,8 @@ class KeaClient:
         Returns:
             Resource configuration dictionary
         """
-        endpoint = f"kea/{api_version}/get{resource_type}/{uuid}"
-        return self.client.request("GET", endpoint)
+        ep = endpoints.KEA_CRUD[(api_version, resource_type)].read
+        return self.client.request(ep.method, ep.path(uuid=uuid))
 
     def _crud_add(
         self, api_version: str, resource_type: str, resource_key: str, data: dict[str, Any]
@@ -182,9 +205,9 @@ class KeaClient:
         Returns:
             Response with 'result' field (uuid is NOT included in add responses)
         """
-        endpoint = f"kea/{api_version}/add{resource_type}"
+        ep = endpoints.KEA_CRUD[(api_version, resource_type)].add
         request_data = {resource_key: data}
-        return self.client.request("POST", endpoint, data=request_data)
+        return self.client.request(ep.method, ep.path(), data=request_data)
 
     def _crud_update(
         self,
@@ -206,9 +229,9 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        endpoint = f"kea/{api_version}/set{resource_type}/{uuid}"
+        ep = endpoints.KEA_CRUD[(api_version, resource_type)].update
         request_data = {resource_key: data}
-        return self.client.request("POST", endpoint, data=request_data)
+        return self.client.request(ep.method, ep.path(uuid=uuid), data=request_data)
 
     def _crud_delete(self, api_version: str, resource_type: str, uuid: str) -> dict[str, Any]:
         """Generic delete operation for a Kea DHCP resource.
@@ -221,8 +244,8 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        endpoint = f"kea/{api_version}/del{resource_type}/{uuid}"
-        return self.client.request("POST", endpoint)
+        ep = endpoints.KEA_CRUD[(api_version, resource_type)].delete
+        return self.client.request(ep.method, ep.path(uuid=uuid))
 
     # DHCPv4 Subnet operations
 
@@ -359,7 +382,7 @@ class KeaClient:
             General settings dictionary with 'dhcpv4' key containing
             'general' (with 'enabled', 'interfaces', etc.).
         """
-        return self.client.request("GET", "kea/dhcpv4/get")
+        return self.client.request(endpoints.KEA_DHCPV4_GET.method, endpoints.KEA_DHCPV4_GET.path())
 
     def set_dhcp4_general(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Update Kea DHCPv4 general settings.
@@ -371,7 +394,9 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        return self.client.request("POST", "kea/dhcpv4/set", data=settings)
+        return self.client.request(
+            endpoints.KEA_DHCPV4_SET.method, endpoints.KEA_DHCPV4_SET.path(), data=settings
+        )
 
     def ensure_dhcp4_enabled(self, interfaces: list[str]) -> None:
         """Ensure Kea DHCPv4 is enabled with the specified interfaces selected.
@@ -567,7 +592,7 @@ class KeaClient:
             General settings dictionary with 'dhcpv6' key containing
             'enabled', 'interfaces', and other configuration.
         """
-        return self.client.request("GET", "kea/dhcpv6/get")
+        return self.client.request(endpoints.KEA_DHCPV6_GET.method, endpoints.KEA_DHCPV6_GET.path())
 
     def set_dhcp6_general(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Update Kea DHCPv6 general settings.
@@ -579,7 +604,9 @@ class KeaClient:
         Returns:
             Response with 'result' field
         """
-        return self.client.request("POST", "kea/dhcpv6/set", data=settings)
+        return self.client.request(
+            endpoints.KEA_DHCPV6_SET.method, endpoints.KEA_DHCPV6_SET.path(), data=settings
+        )
 
     def ensure_dhcp6_enabled(self, interfaces: list[str]) -> None:
         """Ensure Kea DHCPv6 is enabled with the specified interfaces selected.
@@ -656,7 +683,9 @@ class KeaClient:
         Returns:
             Response with 'status' field (should be 'ok')
         """
-        return self.client.request("POST", "kea/service/reconfigure")
+        return self.client.request(
+            endpoints.KEA_RECONFIGURE.method, endpoints.KEA_RECONFIGURE.path()
+        )
 
 
 class SystemClient:
@@ -696,7 +725,9 @@ class SystemClient:
             ``{"general": {...}}`` or ``{"system": {"general": {...}}}`` —
             services normalize either shape via ``extract_*_fields``.
         """
-        return self.client.request("GET", "system/general/get")
+        return self.client.request(
+            endpoints.SYSTEM_GENERAL_GET.method, endpoints.SYSTEM_GENERAL_GET.path()
+        )
 
     def set_general_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Update OPNsense system general settings.
@@ -710,7 +741,9 @@ class SystemClient:
         Returns:
             Response with ``result`` field (e.g., ``"saved"``).
         """
-        return self.client.request("POST", "system/general/set", data=settings)
+        return self.client.request(
+            endpoints.SYSTEM_GENERAL_SET.method, endpoints.SYSTEM_GENERAL_SET.path(), data=settings
+        )
 
     # ------------------------------------------------------------------
     # system.ssh / system.webgui (shared system/settings controller)
@@ -725,7 +758,9 @@ class SystemClient:
             Raw API response. Subkeys ``ssh`` and ``webgui`` are read by
             the per-surface services.
         """
-        return self.client.request("GET", "system/settings/get")
+        return self.client.request(
+            endpoints.SYSTEM_SETTINGS_GET.method, endpoints.SYSTEM_SETTINGS_GET.path()
+        )
 
     def set_system_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Update OPNsense system settings.
@@ -739,7 +774,11 @@ class SystemClient:
         Returns:
             Response with ``result`` field.
         """
-        return self.client.request("POST", "system/settings/set", data=settings)
+        return self.client.request(
+            endpoints.SYSTEM_SETTINGS_SET.method,
+            endpoints.SYSTEM_SETTINGS_SET.path(),
+            data=settings,
+        )
 
     # ------------------------------------------------------------------
     # system.firmware
@@ -754,7 +793,7 @@ class SystemClient:
             Raw API response; the ``package`` / ``plugin`` lists carry an
             ``installed`` flag (string ``"0"``/``"1"``).
         """
-        return self.client.request("GET", "core/firmware/info")
+        return self.client.request(endpoints.FIRMWARE_INFO.method, endpoints.FIRMWARE_INFO.path())
 
     def get_firmware_settings(self) -> dict[str, Any]:
         """Fetch firmware settings (mirror, flavour, type, ...).
@@ -764,7 +803,7 @@ class SystemClient:
         Returns:
             Raw response; settings live under the ``firmware`` key.
         """
-        return self.client.request("GET", "core/firmware/get")
+        return self.client.request(endpoints.FIRMWARE_GET.method, endpoints.FIRMWARE_GET.path())
 
     def set_firmware_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Update firmware settings.
@@ -779,7 +818,9 @@ class SystemClient:
         Returns:
             Response with ``result`` field.
         """
-        return self.client.request("POST", "core/firmware/set", data=payload)
+        return self.client.request(
+            endpoints.FIRMWARE_SET.method, endpoints.FIRMWARE_SET.path(), data=payload
+        )
 
     def install_plugin(self, name: str) -> dict[str, Any]:
         """Install a single OPNsense plugin (e.g., ``os-acme-client``).
@@ -796,7 +837,10 @@ class SystemClient:
         Returns:
             API response (typically a job-acknowledgement payload).
         """
-        return self.client.request("POST", f"core/firmware/install/{quote(name, safe='')}")
+        return self.client.request(
+            endpoints.FIRMWARE_INSTALL.method,
+            endpoints.FIRMWARE_INSTALL.path(name=quote(name, safe="")),
+        )
 
     def get_upgrade_status(self) -> dict[str, Any]:
         """Fetch the status of the running or last firmware background job.
@@ -809,7 +853,9 @@ class SystemClient:
         Returns:
             Raw API response.
         """
-        return self.client.request("GET", "core/firmware/upgradestatus")
+        return self.client.request(
+            endpoints.FIRMWARE_UPGRADESTATUS.method, endpoints.FIRMWARE_UPGRADESTATUS.path()
+        )
 
     def remove_plugin(self, name: str) -> dict[str, Any]:
         """Remove an OPNsense plugin (unverified; apply never calls this).
@@ -820,7 +866,10 @@ class SystemClient:
         Returns:
             API response.
         """
-        return self.client.request("POST", f"core/firmware/remove/{quote(name, safe='')}")
+        return self.client.request(
+            endpoints.FIRMWARE_REMOVE.method,
+            endpoints.FIRMWARE_REMOVE.path(name=quote(name, safe="")),
+        )
 
     def lock_plugin(self, name: str) -> dict[str, Any]:
         """Pin a plugin to its current version (unverified; apply never calls this).
@@ -831,7 +880,9 @@ class SystemClient:
         Returns:
             API response.
         """
-        return self.client.request("POST", f"core/firmware/lock/{quote(name, safe='')}")
+        return self.client.request(
+            endpoints.FIRMWARE_LOCK.method, endpoints.FIRMWARE_LOCK.path(name=quote(name, safe=""))
+        )
 
     # ------------------------------------------------------------------
     # system.remotebackup (gdrivebackup MVC)
@@ -847,7 +898,9 @@ class SystemClient:
             ``{"gdrivebackup": {"general": {...}}}`` (modern MVC) or
             ``{"general": {...}}`` — services normalize either shape.
         """
-        return self.client.request("GET", "gdrivebackup/settings/get")
+        return self.client.request(
+            endpoints.GDRIVEBACKUP_GET.method, endpoints.GDRIVEBACKUP_GET.path()
+        )
 
     def set_remotebackup_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Update OPNsense remote-backup (Google Drive) settings.
@@ -860,7 +913,9 @@ class SystemClient:
         Returns:
             Response with ``result`` field.
         """
-        return self.client.request("POST", "gdrivebackup/settings/set", data=settings)
+        return self.client.request(
+            endpoints.GDRIVEBACKUP_SET.method, endpoints.GDRIVEBACKUP_SET.path(), data=settings
+        )
 
     # ------------------------------------------------------------------
     # system.tuning (sysctl tunables)
@@ -874,7 +929,7 @@ class SystemClient:
         Returns:
             Raw response; items live under ``sysctl.item``, keyed by uuid.
         """
-        return self.client.request("GET", "core/tunables/get")
+        return self.client.request(endpoints.TUNABLES_GET.method, endpoints.TUNABLES_GET.path())
 
     def add_tunable(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Add a tunable. Verified live on 26.1.6_2 (58 -> 59 entries, #1238).
@@ -885,7 +940,9 @@ class SystemClient:
         Returns:
             Response with ``result`` field.
         """
-        return self.client.request("POST", "core/tunables/addItem", data=payload)
+        return self.client.request(
+            endpoints.TUNABLES_ADD.method, endpoints.TUNABLES_ADD.path(), data=payload
+        )
 
     def set_tunable(self, uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Update a tunable by uuid. Verified live on 26.1.6_2 (changed, then reverted).
@@ -898,7 +955,9 @@ class SystemClient:
             Response with ``result`` field.
         """
         return self.client.request(
-            "POST", f"core/tunables/setItem/{quote(uuid, safe='')}", data=payload
+            endpoints.TUNABLES_SET.method,
+            endpoints.TUNABLES_SET.path(uuid=quote(uuid, safe="")),
+            data=payload,
         )
 
     def del_tunable(self, uuid: str) -> dict[str, Any]:
@@ -910,7 +969,9 @@ class SystemClient:
         Returns:
             Response with ``result`` field.
         """
-        return self.client.request("POST", f"core/tunables/delItem/{quote(uuid, safe='')}")
+        return self.client.request(
+            endpoints.TUNABLES_DEL.method, endpoints.TUNABLES_DEL.path(uuid=quote(uuid, safe=""))
+        )
 
     def reconfigure_tunables(self) -> dict[str, Any]:
         """Apply pending tunable changes. Verified live on 26.1.6_2 (re-plan stable).
@@ -918,7 +979,9 @@ class SystemClient:
         Returns:
             Response with ``status`` field.
         """
-        return self.client.request("POST", "core/tunables/reconfigure")
+        return self.client.request(
+            endpoints.TUNABLES_RECONFIGURE.method, endpoints.TUNABLES_RECONFIGURE.path()
+        )
 
 
 class RadvdClient:
@@ -953,7 +1016,7 @@ class RadvdClient:
             List of entry dictionaries (each carrying ``uuid`` plus the
             wire schema fields). Empty list when no entries exist.
         """
-        response = self.client.request("POST", "radvd/settings/searchEntry")
+        response = self.client.request(endpoints.RADVD.search.method, endpoints.RADVD.search.path())
         return cast(list[dict[str, Any]], response.get("rows", []))
 
     def get_record(self, uuid: str) -> dict[str, Any]:
@@ -965,7 +1028,9 @@ class RadvdClient:
         Returns:
             Entry configuration dictionary (wire envelope).
         """
-        return self.client.request("GET", f"radvd/settings/getEntry/{uuid}")
+        return self.client.request(
+            endpoints.RADVD.read.method, endpoints.RADVD.read.path(uuid=uuid)
+        )
 
     def add_record(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Create a new radvd entry.
@@ -976,7 +1041,9 @@ class RadvdClient:
         Returns:
             API response (typically ``{"result": "saved", "uuid": "..."}``).
         """
-        return self.client.request("POST", "radvd/settings/addEntry", data=payload)
+        return self.client.request(
+            endpoints.RADVD.add.method, endpoints.RADVD.add.path(), data=payload
+        )
 
     def set_record(self, uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Update an existing radvd entry.
@@ -988,7 +1055,9 @@ class RadvdClient:
         Returns:
             API response (typically ``{"result": "saved"}``).
         """
-        return self.client.request("POST", f"radvd/settings/setEntry/{uuid}", data=payload)
+        return self.client.request(
+            endpoints.RADVD.update.method, endpoints.RADVD.update.path(uuid=uuid), data=payload
+        )
 
     def del_record(self, uuid: str) -> dict[str, Any]:
         """Delete a radvd entry.
@@ -999,7 +1068,9 @@ class RadvdClient:
         Returns:
             API response.
         """
-        return self.client.request("POST", f"radvd/settings/delEntry/{uuid}")
+        return self.client.request(
+            endpoints.RADVD.delete.method, endpoints.RADVD.delete.path(uuid=uuid)
+        )
 
     def reconfigure(self) -> dict[str, Any]:
         """Reconfigure the radvd daemon to apply pending changes.
@@ -1007,7 +1078,9 @@ class RadvdClient:
         Returns:
             API response (typically ``{"status": "ok"}``).
         """
-        return self.client.request("POST", "radvd/service/reconfigure")
+        return self.client.request(
+            endpoints.RADVD_RECONFIGURE.method, endpoints.RADVD_RECONFIGURE.path()
+        )
 
     def get_service_status(self) -> dict[str, Any]:
         """Fetch radvd daemon status.
@@ -1015,7 +1088,7 @@ class RadvdClient:
         Returns:
             API response (typically ``{"status": "running" | "stopped" | "unknown"}``).
         """
-        return self.client.request("GET", "radvd/service/status")
+        return self.client.request(endpoints.RADVD_STATUS.method, endpoints.RADVD_STATUS.path())
 
     def get_settings(self) -> dict[str, Any]:
         """Bulk read of all radvd entries via the settings/get endpoint.
@@ -1023,7 +1096,9 @@ class RadvdClient:
         Returns:
             ``{"radvd": {"entries": [...]}}`` envelope.
         """
-        return self.client.request("GET", "radvd/settings/get")
+        return self.client.request(
+            endpoints.RADVD_SETTINGS_GET.method, endpoints.RADVD_SETTINGS_GET.path()
+        )
 
 
 class CronClient:
@@ -1047,13 +1122,6 @@ class CronClient:
         client: ``OPNsenseClient`` instance for making authenticated requests.
     """
 
-    _SEARCH = "cron/settings/searchJobs"
-    _GET = "cron/settings/getJob/{uuid}"
-    _ADD = "cron/settings/addJob"
-    _SET = "cron/settings/setJob/{uuid}"
-    _DEL = "cron/settings/delJob/{uuid}"
-    _RECONFIGURE = "cron/service/reconfigure"
-
     def __init__(self, client: OPNsenseClient) -> None:
         """Initialize CronClient with an OPNsense client wrapper."""
         self.client = client
@@ -1065,7 +1133,7 @@ class CronClient:
             List of job dictionaries (each carrying ``uuid`` plus the
             wire schema fields). Empty list when no jobs exist.
         """
-        response = self.client.request("POST", self._SEARCH)
+        response = self.client.request(endpoints.CRON.search.method, endpoints.CRON.search.path())
         return cast(list[dict[str, Any]], response.get("rows", []))
 
     def get_job(self, uuid: str) -> dict[str, Any]:
@@ -1077,7 +1145,7 @@ class CronClient:
         Returns:
             Job configuration dictionary (wire envelope).
         """
-        return self.client.request("GET", self._GET.format(uuid=uuid))
+        return self.client.request(endpoints.CRON.read.method, endpoints.CRON.read.path(uuid=uuid))
 
     def add_job(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Create a new cron job.
@@ -1088,7 +1156,9 @@ class CronClient:
         Returns:
             API response (typically ``{"result": "saved", "uuid": "..."}``).
         """
-        return self.client.request("POST", self._ADD, data=payload)
+        return self.client.request(
+            endpoints.CRON.add.method, endpoints.CRON.add.path(), data=payload
+        )
 
     def set_job(self, uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Update an existing cron job.
@@ -1100,7 +1170,9 @@ class CronClient:
         Returns:
             API response (typically ``{"result": "saved"}``).
         """
-        return self.client.request("POST", self._SET.format(uuid=uuid), data=payload)
+        return self.client.request(
+            endpoints.CRON.update.method, endpoints.CRON.update.path(uuid=uuid), data=payload
+        )
 
     def del_job(self, uuid: str) -> dict[str, Any]:
         """Delete a cron job.
@@ -1111,7 +1183,9 @@ class CronClient:
         Returns:
             API response.
         """
-        return self.client.request("POST", self._DEL.format(uuid=uuid))
+        return self.client.request(
+            endpoints.CRON.delete.method, endpoints.CRON.delete.path(uuid=uuid)
+        )
 
     def reconfigure(self) -> dict[str, Any]:
         """Reconfigure the cron service to apply pending changes.
@@ -1119,4 +1193,6 @@ class CronClient:
         Returns:
             API response (typically ``{"status": "ok"}``).
         """
-        return self.client.request("POST", self._RECONFIGURE)
+        return self.client.request(
+            endpoints.CRON_RECONFIGURE.method, endpoints.CRON_RECONFIGURE.path()
+        )

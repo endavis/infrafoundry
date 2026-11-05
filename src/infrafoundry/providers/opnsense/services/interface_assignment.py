@@ -37,17 +37,13 @@ from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
 
+from .. import endpoints
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 # ---------------------------------------------------------------------------
 # Module-level constants
 # ---------------------------------------------------------------------------
-
-# OPNsense's MVC URL routing converts ``AssignSettingsController`` to
-# ``assign_settings`` (snake_case). The live REST path therefore has the
-# underscore.
-_ASSIGN_ENDPOINT_PREFIX = "interfaces/assign_settings"
 
 # Closed sets of supported IPv4/IPv6 modes (the fork's PHP controller
 # rejects anything outside this set with a server-side 400).
@@ -820,7 +816,10 @@ class InterfaceAssignmentService(BaseService):
         Returns:
             Raw response dict from the controller.
         """
-        return self.client.request("GET", f"{_ASSIGN_ENDPOINT_PREFIX}/getItem/{identifier}")
+        return self.client.request(
+            endpoints.ASSIGN_SETTINGS.read.method,
+            endpoints.ASSIGN_SETTINGS.read.path(uuid=identifier),
+        )
 
     # ------------------------------------------------------------------
     # Write paths
@@ -837,7 +836,9 @@ class InterfaceAssignmentService(BaseService):
             ``{"result": "saved", "ifname": "opt5"}``).
         """
         return self.client.request(
-            "POST", f"{_ASSIGN_ENDPOINT_PREFIX}/addItem", data=config.to_payload()
+            endpoints.ASSIGN_SETTINGS.add.method,
+            endpoints.ASSIGN_SETTINGS.add.path(),
+            data=config.to_payload(),
         )
 
     def update(self, identifier: str, config: InterfaceAssignmentConfig) -> dict[str, Any]:
@@ -851,8 +852,8 @@ class InterfaceAssignmentService(BaseService):
             API response dict.
         """
         return self.client.request(
-            "POST",
-            f"{_ASSIGN_ENDPOINT_PREFIX}/setItem/{identifier}",
+            endpoints.ASSIGN_SETTINGS.update.method,
+            endpoints.ASSIGN_SETTINGS.update.path(uuid=identifier),
             data=config.to_payload(),
         )
 
@@ -865,7 +866,10 @@ class InterfaceAssignmentService(BaseService):
         Returns:
             API response dict.
         """
-        return self.client.request("POST", f"{_ASSIGN_ENDPOINT_PREFIX}/delItem/{identifier}")
+        return self.client.request(
+            endpoints.ASSIGN_SETTINGS.delete.method,
+            endpoints.ASSIGN_SETTINGS.delete.path(uuid=identifier),
+        )
 
     # ------------------------------------------------------------------
     # Diff + apply orchestration
@@ -989,7 +993,9 @@ class InterfaceAssignmentService(BaseService):
             ``LiveInterfaceAssignment`` entries normalized from the
             ``interfacesInfo`` API.
         """
-        response = self.client.request("GET", "interfaces/overview/interfacesInfo")
+        response = self.client.request(
+            endpoints.INTERFACES_INFO.method, endpoints.INTERFACES_INFO.path()
+        )
 
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):

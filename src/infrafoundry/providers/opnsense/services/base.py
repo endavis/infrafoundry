@@ -25,6 +25,46 @@ class BaseService(ABC):  # noqa: B024
         """
         self.client = client
 
+    @staticmethod
+    def client_from_environment(
+        env_name: str,
+        provider_name: str,
+        config_dir: Path,
+    ) -> OPNsenseClient:
+        """Build an authenticated API client from environment configuration.
+
+        Args:
+            env_name: Environment name (e.g., 'prod', 'dev')
+            provider_name: Provider name (e.g., 'opnsense')
+            config_dir: Path to configuration directory
+
+        Returns:
+            Configured :class:`OPNsenseClient`
+
+        Raises:
+            ValueError: If provider settings not found
+        """
+        from infrafoundry.core.config import ConfigManager
+
+        config_manager = ConfigManager(config_dir)
+        env_config = config_manager.load_environment(env_name)
+        provider_settings = env_config.get_provider_settings(provider_name)
+
+        if not provider_settings:
+            raise ValueError(
+                f"No {provider_name} provider settings found for environment {env_name}"
+            )
+
+        api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(provider_settings)
+        client = OPNsenseClient(
+            api_key=api_key,
+            api_secret=api_secret,
+            base_url=api_url,
+            verify_ssl=verify_ssl,
+            proxy=proxy,
+        )
+        return client
+
     @classmethod
     def from_environment(
         cls,
@@ -53,27 +93,7 @@ class BaseService(ABC):  # noqa: B024
         Raises:
             ValueError: If provider settings not found
         """
-        from infrafoundry.core.config import ConfigManager
-
-        config_manager = ConfigManager(config_dir)
-        env_config = config_manager.load_environment(env_name)
-        provider_settings = env_config.get_provider_settings(provider_name)
-
-        if not provider_settings:
-            raise ValueError(
-                f"No {provider_name} provider settings found for environment {env_name}"
-            )
-
-        api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(provider_settings)
-        client = OPNsenseClient(
-            api_key=api_key,
-            api_secret=api_secret,
-            base_url=api_url,
-            verify_ssl=verify_ssl,
-            proxy=proxy,
-        )
-
-        return cls(client)
+        return cls(cls.client_from_environment(env_name, provider_name, config_dir))
 
 
 def raise_on_failed_write(response: Any, action: str) -> Any:

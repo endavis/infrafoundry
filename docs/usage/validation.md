@@ -32,7 +32,7 @@ InfraFoundry validation is organized into three levels, each checking a differen
 |-------|---------|----------------|
 | **System** | `foundry doctor` | Binary dependencies (Terraform, OpenTofu, Ansible, SOPS, Age) |
 | **Config** | `foundry config doctor [--deep]` | Config repo structure, environments, state backend, SOPS keys, state/filesystem consistency, blueprint validation |
-| **Infrastructure** | `foundry infra doctor --env <env>` | Provider API connectivity, nodes/hosts, storage pools, network bridges, templates, resource IDs, MAC conflicts, and the jumphost of packages that set one |
+| **Infrastructure** | `foundry infra doctor --env <env>` | Provider API connectivity, OPNsense endpoint support for the box version ([details](../development/opnsense-resource-coverage.md#endpoint-registry-and-version-check-1239)), nodes/hosts, storage pools, network bridges, templates, resource IDs, MAC conflicts, and the jumphost of packages that set one |
 
 ## Quick Start
 

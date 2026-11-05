@@ -1171,7 +1171,7 @@ requires-dist = [
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'dev'", specifier = ">=1.0.8" },
     { name = "mutmut", marker = "extra == 'dev'", specifier = ">=3.8.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=2.4.0" },
-    { name = "opnsense-openapi", specifier = ">=0.5.0" },
+    { name = "opnsense-openapi", specifier = ">=0.8.1" },
     { name = "packaging", specifier = ">=24.0" },
     { name = "pip", marker = "extra == 'security'", specifier = ">=26.2.2" },
     { name = "pip-audit", marker = "extra == 'security'", specifier = ">=2.10.1" },
@@ -2023,16 +2023,16 @@ wheels = [
 
 [[package]]
 name = "opnsense-openapi"
-version = "0.5.0"
+version = "0.8.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "jsonschema" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/ca/a9fd7329ded21cdc8e726e97ad22b93df899b50da804c05606be489543c5/opnsense_openapi-0.5.0.tar.gz", hash = "sha256:aef96d96d88e9ec71165c8cf662cc297947e5c458c4ad3c27bd7ab3851e7680a", size = 2719037, upload-time = "2026-06-04T12:54:48.446Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/bb/d1/4465c72cc4dc4b8d27d473fb3be6513ba53cd21714fd2df72fad9043ff58/opnsense_openapi-0.8.1.tar.gz", hash = "sha256:3a8b0f4ef393de39de07d5842997023d14bd181a7a2c2b27af278e3fc7796e7a", size = 4617355, upload-time = "2026-11-05T11:00:05.157Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/29/31/be405c9f9a6489a66d6d46460427f243a558ec26f595f56921f2767041df/opnsense_openapi-0.5.0-py3-none-any.whl", hash = "sha256:fb300b81874b17785672339e3d2910b5f4f200e141970420a1b2c962e76dc929", size = 2237306, upload-time = "2026-06-04T12:54:46.373Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/ec/51f3d781f426b1212bd83ed39dbc3c07e16bece69adbeeb5047d9d0bf8d8/opnsense_openapi-0.8.1-py3-none-any.whl", hash = "sha256:416dc18bf1af5cd89b84185aa10912d21992ecfbb367cec202653557ce691179", size = 3756600, upload-time = "2026-11-05T11:00:03.076Z" },
 ]
 
 [[package]]

@@ -74,12 +74,9 @@ from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
 
+from .. import endpoints
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService, raise_on_failed_write
-
-# Controller base for all static-route CRUD + reconfigure endpoints.
-_ROUTE_BASE = "routes/routes"
-
 
 # ---------------------------------------------------------------------------
 # Domain model
@@ -406,7 +403,9 @@ class StaticRouteService(BaseService):
         Returns:
             ``LiveStaticRoute`` instances normalized from the search rows.
         """
-        response = self.client.request("POST", f"{_ROUTE_BASE}/searchroute")
+        response = self.client.request(
+            endpoints.STATIC_ROUTE.search.method, endpoints.STATIC_ROUTE.search.path()
+        )
 
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):
@@ -423,7 +422,9 @@ class StaticRouteService(BaseService):
         that ``searchroute`` doesn't expose. Returns the raw envelope
         ``{"route": {...}}``.
         """
-        return self.client.request("GET", f"{_ROUTE_BASE}/getroute/{uuid}")
+        return self.client.request(
+            endpoints.STATIC_ROUTE.read.method, endpoints.STATIC_ROUTE.read.path(uuid=uuid)
+        )
 
     def add(self, route: StaticRouteConfig) -> dict[str, Any]:
         """Create a static route.
@@ -435,8 +436,8 @@ class StaticRouteService(BaseService):
             API response dict (typically ``{"result": "saved", "uuid": ...}``).
         """
         return self.client.request(
-            "POST",
-            f"{_ROUTE_BASE}/addroute",
+            endpoints.STATIC_ROUTE.add.method,
+            endpoints.STATIC_ROUTE.add.path(),
             data=route.to_payload(),
         )
 
@@ -451,8 +452,8 @@ class StaticRouteService(BaseService):
             API response dict.
         """
         return self.client.request(
-            "POST",
-            f"{_ROUTE_BASE}/setroute/{uuid}",
+            endpoints.STATIC_ROUTE.update.method,
+            endpoints.STATIC_ROUTE.update.path(uuid=uuid),
             data=route.to_payload(),
         )
 
@@ -465,7 +466,9 @@ class StaticRouteService(BaseService):
         Returns:
             API response dict (typically ``{"result": "deleted"}``).
         """
-        return self.client.request("POST", f"{_ROUTE_BASE}/delroute/{uuid}")
+        return self.client.request(
+            endpoints.STATIC_ROUTE.delete.method, endpoints.STATIC_ROUTE.delete.path(uuid=uuid)
+        )
 
     def reconfigure(self) -> dict[str, Any]:
         """Apply pending route changes (commit staged config to running system).
@@ -473,7 +476,9 @@ class StaticRouteService(BaseService):
         Must be called after add/update/delete operations to activate them.
         Response shape per the OpenAPI spec is ``{"status": "ok" | "failed"}``.
         """
-        return self.client.request("POST", f"{_ROUTE_BASE}/reconfigure")
+        return self.client.request(
+            endpoints.STATIC_ROUTE.apply.method, endpoints.STATIC_ROUTE.apply.path()
+        )
 
     # ------------------------------------------------------------------
     # Diff + apply orchestration

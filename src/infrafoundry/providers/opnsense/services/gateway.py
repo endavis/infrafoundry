@@ -58,15 +58,13 @@ from typing import Any, Literal
 
 from infrafoundry.core.provider import ResourceConfig
 
+from .. import endpoints
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService, raise_on_failed_write
 
 # Allowed values for the ``ipprotocol`` discriminator.
 GatewayProtocol = Literal["inet", "inet6"]
 ALLOWED_PROTOCOLS: tuple[GatewayProtocol, ...] = ("inet", "inet6")
-
-# Controller base for all gateway CRUD + reconfigure endpoints.
-_GATEWAY_BASE = "routing/settings"
 
 # OPNsense schema defaults — mirror the GUI's "Gateways: Add" form so
 # operator-omitted fields land in the same place an interactive add would.
@@ -483,7 +481,9 @@ class GatewayService(BaseService):
             Includes both managed and dynamic gateways; the diff engine
             filters dynamics out.
         """
-        response = self.client.request("POST", f"{_GATEWAY_BASE}/searchGateway")
+        response = self.client.request(
+            endpoints.GATEWAY.search.method, endpoints.GATEWAY.search.path()
+        )
 
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):
@@ -500,7 +500,9 @@ class GatewayService(BaseService):
         that ``searchGateway`` doesn't expose. Returns the raw envelope
         ``{"gateway_item": {...}}``.
         """
-        return self.client.request("GET", f"{_GATEWAY_BASE}/getGateway/{uuid}")
+        return self.client.request(
+            endpoints.GATEWAY.read.method, endpoints.GATEWAY.read.path(uuid=uuid)
+        )
 
     def add(self, gateway: GatewayConfig) -> dict[str, Any]:
         """Create a gateway.
@@ -512,8 +514,8 @@ class GatewayService(BaseService):
             API response dict (typically ``{"result": "saved", "uuid": ...}``).
         """
         return self.client.request(
-            "POST",
-            f"{_GATEWAY_BASE}/addGateway",
+            endpoints.GATEWAY.add.method,
+            endpoints.GATEWAY.add.path(),
             data=gateway.to_payload(),
         )
 
@@ -528,8 +530,8 @@ class GatewayService(BaseService):
             API response dict.
         """
         return self.client.request(
-            "POST",
-            f"{_GATEWAY_BASE}/setGateway/{uuid}",
+            endpoints.GATEWAY.update.method,
+            endpoints.GATEWAY.update.path(uuid=uuid),
             data=gateway.to_payload(),
         )
 
@@ -542,7 +544,9 @@ class GatewayService(BaseService):
         Returns:
             API response dict (typically ``{"result": "deleted"}``).
         """
-        return self.client.request("POST", f"{_GATEWAY_BASE}/delGateway/{uuid}")
+        return self.client.request(
+            endpoints.GATEWAY.delete.method, endpoints.GATEWAY.delete.path(uuid=uuid)
+        )
 
     def reconfigure(self) -> dict[str, Any]:
         """Apply pending gateway changes (commit staged config to running system).
@@ -550,7 +554,7 @@ class GatewayService(BaseService):
         Must be called after add/update/delete operations to activate them.
         Response shape per the OpenAPI spec is ``{"status": "ok" | "failed"}``.
         """
-        return self.client.request("POST", f"{_GATEWAY_BASE}/reconfigure")
+        return self.client.request(endpoints.GATEWAY.apply.method, endpoints.GATEWAY.apply.path())
 
     # ------------------------------------------------------------------
     # Diff + apply orchestration

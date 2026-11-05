@@ -77,19 +77,9 @@ from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
 
+from .. import endpoints
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
-
-# Controller base for all host-override endpoints (shared with host-alias
-# parent UUID resolution and validator cross-references).
-_HOST_OVERRIDE_BASE = "unbound/settings"
-
-# The Unbound service's reconfigure verb is shared across every
-# Unbound-managed component (host overrides / aliases / forwards). The
-# runner coalesces all three managers' reconfigure calls via the
-# ``unbound_reconfigure`` finalization hook so a multi-unbound apply
-# fires a single reconfigure call (#776).
-_RECONFIGURE_PATH = "unbound/service/reconfigure"
 
 # Default record type. ``A`` is the most common shape and is also what
 # OPNsense assigns when the operator leaves the ``rr`` field unset in
@@ -458,7 +448,10 @@ class UnboundHostOverrideService(BaseService):
             ``searchHostOverride`` rows. Defensive against non-dict
             responses and missing ``rows`` key — both yield ``[]``.
         """
-        response = self.client.request("POST", f"{_HOST_OVERRIDE_BASE}/searchHostOverride")
+        response = self.client.request(
+            endpoints.UNBOUND_HOST_OVERRIDE.search.method,
+            endpoints.UNBOUND_HOST_OVERRIDE.search.path(),
+        )
 
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):
@@ -479,7 +472,10 @@ class UnboundHostOverrideService(BaseService):
         Returns:
             API response dict.
         """
-        return self.client.request("GET", f"{_HOST_OVERRIDE_BASE}/getHostOverride/{uuid}")
+        return self.client.request(
+            endpoints.UNBOUND_HOST_OVERRIDE.read.method,
+            endpoints.UNBOUND_HOST_OVERRIDE.read.path(uuid=uuid),
+        )
 
     def add(self, override: UnboundHostOverrideConfig) -> dict[str, Any]:
         """Create a host override.
@@ -491,8 +487,8 @@ class UnboundHostOverrideService(BaseService):
             API response dict (typically ``{"result": "saved", "uuid": ...}``).
         """
         return self.client.request(
-            "POST",
-            f"{_HOST_OVERRIDE_BASE}/addHostOverride",
+            endpoints.UNBOUND_HOST_OVERRIDE.add.method,
+            endpoints.UNBOUND_HOST_OVERRIDE.add.path(),
             data=override.to_payload(),
         )
 
@@ -507,8 +503,8 @@ class UnboundHostOverrideService(BaseService):
             API response dict.
         """
         return self.client.request(
-            "POST",
-            f"{_HOST_OVERRIDE_BASE}/setHostOverride/{uuid}",
+            endpoints.UNBOUND_HOST_OVERRIDE.update.method,
+            endpoints.UNBOUND_HOST_OVERRIDE.update.path(uuid=uuid),
             data=override.to_payload(),
         )
 
@@ -521,7 +517,10 @@ class UnboundHostOverrideService(BaseService):
         Returns:
             API response dict (typically ``{"result": "deleted"}``).
         """
-        return self.client.request("POST", f"{_HOST_OVERRIDE_BASE}/delHostOverride/{uuid}")
+        return self.client.request(
+            endpoints.UNBOUND_HOST_OVERRIDE.delete.method,
+            endpoints.UNBOUND_HOST_OVERRIDE.delete.path(uuid=uuid),
+        )
 
     def reconfigure(self) -> dict[str, Any]:
         """Apply pending Unbound changes (commit staged config to running system).
@@ -538,7 +537,9 @@ class UnboundHostOverrideService(BaseService):
             that bypass the manager (e.g., manual operator scripts) can
             still invoke ``reconfigure()`` directly.
         """
-        return self.client.request("POST", _RECONFIGURE_PATH)
+        return self.client.request(
+            endpoints.UNBOUND_RECONFIGURE.method, endpoints.UNBOUND_RECONFIGURE.path()
+        )
 
     # ------------------------------------------------------------------
     # Diff + apply orchestration

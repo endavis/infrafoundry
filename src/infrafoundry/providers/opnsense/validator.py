@@ -15,6 +15,8 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import OPNsenseProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.opnsense import endpoints
+from infrafoundry.providers.opnsense.api_client import OPNsenseClient
 from infrafoundry.providers.opnsense.validators import (
     CronJobsValidator,
     FirewallRuleValidator,
@@ -103,6 +105,52 @@ class OPNsenseValidator:
         self.system_firmware_validator = SystemFirmwareValidator(report)
         self.system_tuning_validator = SystemTuningValidator(report)
 
+    def validate_endpoint_support(self, resources: list[ResourceConfig]) -> None:
+        """Check the in-scope resource types' endpoints against the box's version (#1239).
+
+        Returns silently when credentials are missing; ``validate_connectivity``
+        already reports that.
+
+        Args:
+            resources: Resources in scope; their types select the endpoints checked.
+        """
+        from .endpoint_support import check_box
+        from .services._credentials import resolve_credentials
+
+        types = sorted({r.type for r in resources})
+        if not types:
+            return
+        provider_settings = self.env_config.get_provider_settings("opnsense")
+        if not provider_settings:
+            return
+        try:
+            api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(provider_settings)
+        except (ValueError, KeyError):
+            return
+        client = OPNsenseClient(
+            api_key=api_key,
+            api_secret=api_secret,
+            base_url=api_url,
+            verify_ssl=verify_ssl,
+            proxy=proxy,
+        )
+        result = check_box(client, types)
+        for index, message in enumerate(result.errors, start=1):
+            self.api_validator.add_error(
+                check_name=f"opnsense_endpoint_support_{index}", message=message
+            )
+        for index, message in enumerate(result.warnings, start=1):
+            self.api_validator.add_error(
+                check_name=f"opnsense_endpoint_support_warning_{index}",
+                message=message,
+                level=ValidationLevel.WARNING,
+            )
+        if not result.errors and not result.warnings:
+            self.api_validator.add_success(
+                check_name="opnsense_endpoint_support",
+                message=f"OPNsense {result.version}: endpoints for {', '.join(types)} are served",
+            )
+
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
 
@@ -128,7 +176,7 @@ class OPNsenseValidator:
         api_secret = credentials["api_secret"]
 
         response = self.api_validator.api_request(
-            url=f"{api_url}/api/core/system/status",
+            url=f"{api_url}/api/{endpoints.CORE_SYSTEM_STATUS.path()}",
             auth=(api_key, api_secret),
             verify_ssl=False,
             timeout=10,
@@ -406,7 +454,7 @@ class OPNsenseValidator:
             Dict of existing alias names
         """
         data = self.api_validator.fetch_json(
-            url=f"{api_url}/api/firewall/alias/searchItem",
+            url=f"{api_url}/api/{endpoints.ALIAS_SEARCH_GET.path()}",
             auth=(api_key, api_secret),
             verify_ssl=False,
             timeout=10,
@@ -506,7 +554,7 @@ class OPNsenseValidator:
         data = cast(
             Any,
             self.api_validator.fetch_json(
-                url=f"{api_url}/api/interfaces/overview/export",
+                url=f"{api_url}/api/{endpoints.INTERFACES_EXPORT.path()}",
                 auth=(api_key, api_secret),
                 verify_ssl=False,
                 timeout=10,
@@ -546,7 +594,7 @@ class OPNsenseValidator:
             Set of gateway names; empty if the API call fails.
         """
         data = self.api_validator.fetch_json(
-            url=f"{api_url}/api/routing/settings/searchGateway",
+            url=f"{api_url}/api/{endpoints.GATEWAY.search.path()}",
             auth=(api_key, api_secret),
             verify_ssl=False,
             timeout=10,
@@ -585,7 +633,7 @@ class OPNsenseValidator:
             Set of host-override names; empty if the API call fails.
         """
         data = self.api_validator.fetch_json(
-            url=f"{api_url}/api/unbound/settings/searchHostOverride",
+            url=f"{api_url}/api/{endpoints.UNBOUND_HOST_OVERRIDE.search.path()}",
             auth=(api_key, api_secret),
             verify_ssl=False,
             timeout=10,

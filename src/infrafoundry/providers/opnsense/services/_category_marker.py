@@ -55,6 +55,8 @@ from typing import Any
 
 from infrafoundry.core.exceptions import InfraFoundryError
 
+from .. import endpoints
+
 # Name of the OPNsense category created/used as the fleet-wide marker
 # for InfraFoundry-managed rules. Both ``FirewallRuleService`` and
 # ``NATRuleService`` reference this value.
@@ -131,7 +133,9 @@ def ensure_infrafoundry_category(client: Any) -> str:
         if cached is not None:
             return cached
 
-        search_response = client.request("POST", "firewall/category/searchItem")
+        search_response = client.request(
+            endpoints.CATEGORY_SEARCH.method, endpoints.CATEGORY_SEARCH.path()
+        )
         rows: list[dict[str, Any]] = []
         if isinstance(search_response, dict):
             raw_rows = search_response.get("rows")
@@ -145,8 +149,8 @@ def ensure_infrafoundry_category(client: Any) -> str:
                     return uuid
 
         add_response = client.request(
-            "POST",
-            "firewall/category/addItem",
+            endpoints.CATEGORY_ADD.method,
+            endpoints.CATEGORY_ADD.path(),
             data={
                 "category": {
                     "name": INFRAFOUNDRY_CATEGORY_NAME,

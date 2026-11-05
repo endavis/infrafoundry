@@ -22,6 +22,7 @@ the helpers below normalize the live shape so change-detection matches what
 import logging
 from typing import Any, Final
 
+from .. import endpoints
 from ..api_client import KeaClient, OPNsenseClient
 from ._nested_emit import emit_nested_multi_yaml
 from .base import BaseService
@@ -778,7 +779,7 @@ class KeaDHCPService(BaseService):
     # Service Control
     def reconfigure(self) -> None:
         """Reconfigure Kea DHCP service to apply changes."""
-        self.client.request("POST", "kea/service/reconfigure")
+        self.client.request(endpoints.KEA_RECONFIGURE.method, endpoints.KEA_RECONFIGURE.path())
 
     # Export Operations
     def export_to_yaml(self) -> str:

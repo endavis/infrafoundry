@@ -3,7 +3,7 @@
 import base64
 import logging
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any, ClassVar, override
 
@@ -354,6 +354,36 @@ class OPNsenseProvider(
             "tunables_reconfigure": self._reconfigure_tunables,
         }
 
+    def check_endpoint_support(
+        self, env_name: str, resource_types: Iterable[str]
+    ) -> dict[str, list[str]]:
+        """Check the resource types' endpoints against the box's OPNsense version (#1239).
+
+        Duck-typed hook read by ``OPNsenseDirectRunner.plan``: the runner never
+        imports this provider.
+
+        Args:
+            env_name: Environment whose OPNsense settings identify the box.
+            resource_types: Resource types about to be planned.
+
+        Returns:
+            ``{"errors": [...], "warnings": [...]}``. Unreadable settings or an
+            unknown box version yield a warning, never an error.
+        """
+        from .endpoint_support import check_box
+        from .services.base import BaseService
+
+        types = list(resource_types)
+        try:
+            client = BaseService.client_from_environment(env_name, self.name, self.config_dir)
+        except ValueError as exc:
+            return {
+                "errors": [],
+                "warnings": [f"opnsense endpoint check skipped: {exc}"],
+            }
+        result = check_box(client, types)
+        return {"errors": result.errors, "warnings": result.warnings}
+
     def _reconfigure_kea(self, env_name: str) -> None:
         """Reconfigure the Kea DHCP service after a DHCPv4 or DHCPv6 mutation.
 
@@ -553,6 +583,7 @@ class OPNsenseProvider(
         """Validate that referenced OPNsense resources exist."""
         validator = OPNsenseValidator(env_config, report)
         validator.validate_references(resources)
+        validator.validate_endpoint_support(resources)
 
     def validate_references_in_context(
         self,
@@ -564,6 +595,7 @@ class OPNsenseProvider(
         """Validate *resources*, resolving names against *reference_resources* (#1133)."""
         validator = OPNsenseValidator(env_config, report)
         validator.validate_references(resources, reference_resources)
+        validator.validate_endpoint_support(resources)
 
     def reset_kea_dhcpv4(self, env_name: str) -> None:
         """Reset (delete) all Kea DHCPv4 configuration.

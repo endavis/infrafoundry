@@ -72,6 +72,7 @@ from typing import Any, Literal
 
 from infrafoundry.core.provider import ResourceConfig
 
+from .. import endpoints
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
@@ -80,9 +81,6 @@ from .base import BaseService
 # authoritative.
 VirtualIPMode = Literal["ipalias", "carp", "proxyarp"]
 ALLOWED_MODES: tuple[VirtualIPMode, ...] = ("ipalias", "carp", "proxyarp")
-
-# Controller base for all virtual-IP CRUD + reconfigure endpoints.
-_VIP_BASE = "interfaces/vip_settings"
 
 # Default values for optional CARP fields (per probe).
 _DEFAULT_ADVBASE = "1"
@@ -556,7 +554,7 @@ class VirtualIPService(BaseService):
         Returns:
             ``LiveVirtualIP`` instances normalized from the search rows.
         """
-        response = self.client.request("POST", f"{_VIP_BASE}/searchItem")
+        response = self.client.request(endpoints.VIP.search.method, endpoints.VIP.search.path())
 
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):
@@ -573,7 +571,7 @@ class VirtualIPService(BaseService):
         fields that ``searchItem`` doesn't expose. Returns the raw
         envelope ``{"vip": {...}}``.
         """
-        return self.client.request("GET", f"{_VIP_BASE}/getItem/{uuid}")
+        return self.client.request(endpoints.VIP.read.method, endpoints.VIP.read.path(uuid=uuid))
 
     def add(self, vip: VirtualIPConfig) -> dict[str, Any]:
         """Create a virtual IP.
@@ -585,8 +583,8 @@ class VirtualIPService(BaseService):
             API response dict (typically ``{"result": "saved", "uuid": ...}``).
         """
         return self.client.request(
-            "POST",
-            f"{_VIP_BASE}/addItem",
+            endpoints.VIP.add.method,
+            endpoints.VIP.add.path(),
             data=vip.to_payload(),
         )
 
@@ -601,8 +599,8 @@ class VirtualIPService(BaseService):
             API response dict.
         """
         return self.client.request(
-            "POST",
-            f"{_VIP_BASE}/setItem/{uuid}",
+            endpoints.VIP.update.method,
+            endpoints.VIP.update.path(uuid=uuid),
             data=vip.to_payload(),
         )
 
@@ -615,7 +613,9 @@ class VirtualIPService(BaseService):
         Returns:
             API response dict (typically ``{"result": "deleted"}``).
         """
-        return self.client.request("POST", f"{_VIP_BASE}/delItem/{uuid}")
+        return self.client.request(
+            endpoints.VIP.delete.method, endpoints.VIP.delete.path(uuid=uuid)
+        )
 
     def reconfigure(self) -> dict[str, Any]:
         """Apply pending virtual-IP changes (commit staged config).
@@ -624,7 +624,7 @@ class VirtualIPService(BaseService):
         them. Response shape per the OpenAPI spec is
         ``{"status": "ok" | "failed"}``.
         """
-        return self.client.request("POST", f"{_VIP_BASE}/reconfigure")
+        return self.client.request(endpoints.VIP.apply.method, endpoints.VIP.apply.path())
 
     # ------------------------------------------------------------------
     # Diff + apply orchestration

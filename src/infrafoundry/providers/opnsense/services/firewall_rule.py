@@ -53,6 +53,7 @@ from typing import Any, Literal
 from infrafoundry.core.exceptions import APIError, InfraFoundryError
 from infrafoundry.core.provider import ResourceConfig
 
+from .. import endpoints
 from ._category_marker import INFRAFOUNDRY_CATEGORY_NAME as _SHARED_CATEGORY_NAME
 from ._category_marker import ensure_infrafoundry_category
 from ._nested_emit import emit_nested_list_yaml
@@ -68,9 +69,6 @@ logger = logging.getLogger(__name__)
 # that contain the tag in any position).
 _IDENTITY_PATTERN = re.compile(r"^(?:(.+?)\s+)?\[infrafoundry:([a-z0-9-]+)\]\s*$")
 _IDENTITY_PROBE = re.compile(r"\[infrafoundry:[^\]]*\]")
-
-# MVC stateful filter base (single controller, all rules go through here).
-_FILTER_BASE = "firewall/filter"
 
 # Default sequence for new rules — matches the OPNsense schema default.
 DEFAULT_SEQUENCE = 100
@@ -963,7 +961,9 @@ class FirewallRuleService(BaseService):
         Raises:
             OpnsenseDriftError: If any row has a malformed identity tag.
         """
-        response = self.client.request("POST", f"{_FILTER_BASE}/searchRule")
+        response = self.client.request(
+            endpoints.FILTER.search.method, endpoints.FILTER.search.path()
+        )
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):
             raw_rows = response.get("rows")
@@ -996,8 +996,8 @@ class FirewallRuleService(BaseService):
             if exc.status_code == 404:
                 logger.warning(
                     "OPNsense firewall filter controller is not available "
-                    "(HTTP 404 on %s/searchRule); skipping during migrate.",
-                    _FILTER_BASE,
+                    "(HTTP 404 on %s); skipping during migrate.",
+                    endpoints.FILTER.search.template,
                 )
                 return []
             raise
@@ -1012,26 +1012,28 @@ class FirewallRuleService(BaseService):
             API response dict.
         """
         return self.client.request(
-            "POST",
-            f"{_FILTER_BASE}/addRule",
+            endpoints.FILTER.add.method,
+            endpoints.FILTER.add.path(),
             data=self._payload_with_category(rule),
         )
 
     def update(self, uuid: str, rule: FirewallRuleConfig) -> dict[str, Any]:
         """Update an existing firewall rule by UUID."""
         return self.client.request(
-            "POST",
-            f"{_FILTER_BASE}/setRule/{uuid}",
+            endpoints.FILTER.update.method,
+            endpoints.FILTER.update.path(uuid=uuid),
             data=self._payload_with_category(rule),
         )
 
     def delete(self, uuid: str) -> dict[str, Any]:
         """Delete a firewall rule by UUID."""
-        return self.client.request("POST", f"{_FILTER_BASE}/delRule/{uuid}")
+        return self.client.request(
+            endpoints.FILTER.delete.method, endpoints.FILTER.delete.path(uuid=uuid)
+        )
 
     def apply_changes(self) -> dict[str, Any]:
         """Apply pending firewall changes (commit staged config to running system)."""
-        return self.client.request("POST", f"{_FILTER_BASE}/apply")
+        return self.client.request(endpoints.FILTER.apply.method, endpoints.FILTER.apply.path())
 
     def savepoint(self) -> dict[str, Any]:
         """Create a transactional rollback savepoint.
@@ -1041,7 +1043,9 @@ class FirewallRuleService(BaseService):
         per-call server-side validation; OPNsense's auto-snapshot is
         the residual safety net).
         """
-        return self.client.request("POST", f"{_FILTER_BASE}/savepoint")
+        return self.client.request(
+            endpoints.FILTER_SAVEPOINT.method, endpoints.FILTER_SAVEPOINT.path()
+        )
 
     # ------------------------------------------------------------------
     # Diff + apply orchestration

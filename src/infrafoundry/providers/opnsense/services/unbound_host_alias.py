@@ -67,15 +67,9 @@ from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
 
+from .. import endpoints
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
-
-# Controller base for all host-alias CRUD endpoints.
-_HOST_ALIAS_BASE = "unbound/settings"
-# The Unbound service's reconfigure verb is shared across every
-# Unbound-managed component (host overrides / aliases / forwards).
-_RECONFIGURE_PATH = "unbound/service/reconfigure"
-
 
 # ---------------------------------------------------------------------------
 # Domain model
@@ -435,7 +429,9 @@ class UnboundHostAliasService(BaseService):
         Returns:
             ``LiveUnboundHostAlias`` instances normalized from the search rows.
         """
-        response = self.client.request("POST", f"{_HOST_ALIAS_BASE}/searchHostAlias")
+        response = self.client.request(
+            endpoints.UNBOUND_HOST_ALIAS.search.method, endpoints.UNBOUND_HOST_ALIAS.search.path()
+        )
 
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):
@@ -452,7 +448,10 @@ class UnboundHostAliasService(BaseService):
         field that ``searchHostAlias`` doesn't expose. Returns the raw
         envelope ``{"alias": {...}}``.
         """
-        return self.client.request("GET", f"{_HOST_ALIAS_BASE}/getHostAlias/{uuid}")
+        return self.client.request(
+            endpoints.UNBOUND_HOST_ALIAS.read.method,
+            endpoints.UNBOUND_HOST_ALIAS.read.path(uuid=uuid),
+        )
 
     def add(self, alias: UnboundHostAliasConfig) -> dict[str, Any]:
         """Create a host alias.
@@ -465,8 +464,8 @@ class UnboundHostAliasService(BaseService):
             API response dict (typically ``{"result": "saved", "uuid": ...}``).
         """
         return self.client.request(
-            "POST",
-            f"{_HOST_ALIAS_BASE}/addHostAlias",
+            endpoints.UNBOUND_HOST_ALIAS.add.method,
+            endpoints.UNBOUND_HOST_ALIAS.add.path(),
             data=alias.to_payload(),
         )
 
@@ -482,8 +481,8 @@ class UnboundHostAliasService(BaseService):
             API response dict.
         """
         return self.client.request(
-            "POST",
-            f"{_HOST_ALIAS_BASE}/setHostAlias/{uuid}",
+            endpoints.UNBOUND_HOST_ALIAS.update.method,
+            endpoints.UNBOUND_HOST_ALIAS.update.path(uuid=uuid),
             data=alias.to_payload(),
         )
 
@@ -496,7 +495,10 @@ class UnboundHostAliasService(BaseService):
         Returns:
             API response dict (typically ``{"result": "deleted"}``).
         """
-        return self.client.request("POST", f"{_HOST_ALIAS_BASE}/delHostAlias/{uuid}")
+        return self.client.request(
+            endpoints.UNBOUND_HOST_ALIAS.delete.method,
+            endpoints.UNBOUND_HOST_ALIAS.delete.path(uuid=uuid),
+        )
 
     def reconfigure(self) -> dict[str, Any]:
         """Apply pending Unbound changes (commit staged config to running system).
@@ -504,7 +506,9 @@ class UnboundHostAliasService(BaseService):
         Must be called after add/update/delete operations to activate them.
         Response shape per the OpenAPI spec is ``{"status": "ok" | "failed"}``.
         """
-        return self.client.request("POST", _RECONFIGURE_PATH)
+        return self.client.request(
+            endpoints.UNBOUND_RECONFIGURE.method, endpoints.UNBOUND_RECONFIGURE.path()
+        )
 
     def search_host_overrides(self) -> list[dict[str, Any]]:
         """Fetch the live host-override rows for ``host_name`` → UUID resolution.
@@ -513,7 +517,10 @@ class UnboundHostAliasService(BaseService):
             Raw ``searchHostOverride`` rows; each carries at least a
             ``uuid``, ``hostname``, and ``domain`` column.
         """
-        response = self.client.request("POST", f"{_HOST_ALIAS_BASE}/searchHostOverride")
+        response = self.client.request(
+            endpoints.UNBOUND_HOST_OVERRIDE.search.method,
+            endpoints.UNBOUND_HOST_OVERRIDE.search.path(),
+        )
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):
             raw_rows = response.get("rows")

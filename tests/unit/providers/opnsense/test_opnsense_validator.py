@@ -590,3 +590,62 @@ class TestExtractInterfaceName:
     def test_no_fields_returns_none(self, validator: OPNsenseValidator) -> None:
         """Returns None when no recognized fields."""
         assert validator._extract_interface_name({"type": "ethernet"}) is None
+
+
+class TestValidateEndpointSupport:
+    """``validate_endpoint_support`` reports the box-version endpoint check (#1239)."""
+
+    _CHECK = "infrafoundry.providers.opnsense.endpoint_support.check_box"
+    _CLIENT = "infrafoundry.providers.opnsense.validator.OPNsenseClient"
+
+    @staticmethod
+    def _resources() -> list[ResourceConfig]:
+        return [ResourceConfig(name="h", type="system.hostname", provider="opnsense", config={})]
+
+    def test_errors_warnings_and_success(self, env_config: Any, report: MagicMock) -> None:
+        from unittest.mock import patch
+
+        from infrafoundry.providers.opnsense.endpoint_support import EndpointSupport
+
+        validator = OPNsenseValidator(env_config, report)
+        validator.api_validator = MagicMock()
+        result = EndpointSupport(version="26.1.6", errors=["e1", "e2"], warnings=["w1"])
+        with patch(self._CHECK, return_value=result), patch(self._CLIENT):
+            validator.validate_endpoint_support(self._resources())
+        messages = [c.kwargs["message"] for c in validator.api_validator.add_error.call_args_list]
+        assert messages == ["e1", "e2", "w1"]
+        validator.api_validator.add_success.assert_not_called()
+
+    def test_clean_result_adds_success(self, env_config: Any, report: MagicMock) -> None:
+        from unittest.mock import patch
+
+        from infrafoundry.providers.opnsense.endpoint_support import EndpointSupport
+
+        validator = OPNsenseValidator(env_config, report)
+        validator.api_validator = MagicMock()
+        with (
+            patch(self._CHECK, return_value=EndpointSupport(version="26.1.6")),
+            patch(self._CLIENT),
+        ):
+            validator.validate_endpoint_support(self._resources())
+        validator.api_validator.add_error.assert_not_called()
+        success = validator.api_validator.add_success.call_args.kwargs
+        assert success["check_name"] == "opnsense_endpoint_support"
+        assert "26.1.6" in success["message"]
+
+    def test_missing_credentials_adds_nothing(self, report: MagicMock) -> None:
+        from unittest.mock import patch
+
+        validator = OPNsenseValidator(make_env_config(provider_settings={}), report)
+        validator.api_validator = MagicMock()
+        with patch(self._CHECK) as check:
+            validator.validate_endpoint_support(self._resources())
+        check.assert_not_called()
+        validator.api_validator.add_error.assert_not_called()
+
+    def test_no_resources_adds_nothing(self, env_config: Any, report: MagicMock) -> None:
+        validator = OPNsenseValidator(env_config, report)
+        validator.api_validator = MagicMock()
+        validator.validate_endpoint_support([])
+        validator.api_validator.add_error.assert_not_called()
+        validator.api_validator.add_success.assert_not_called()

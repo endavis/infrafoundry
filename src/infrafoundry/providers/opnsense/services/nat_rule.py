@@ -54,6 +54,7 @@ from typing import Any, Literal
 from infrafoundry.core.exceptions import APIError, InfraFoundryError
 from infrafoundry.core.provider import ResourceConfig
 
+from .. import endpoints
 from ._category_marker import INFRAFOUNDRY_CATEGORY_NAME as _SHARED_CATEGORY_NAME
 from ._category_marker import ensure_infrafoundry_category
 from ._nested_emit import emit_nested_list_yaml
@@ -78,16 +79,7 @@ ALLOWED_KINDS: tuple[NATRuleKind, ...] = ("outbound", "one_to_one", "port_forwar
 _IDENTITY_PATTERN = re.compile(r"^(?:(.+?)\s+)?\[infrafoundry:([a-z0-9-]+)\]\s*$")
 _IDENTITY_PROBE = re.compile(r"\[infrafoundry:[^\]]*\]")
 
-# Outbound endpoint suffix on ``firewall/source_nat`` controller.
-_OUTBOUND_BASE = "firewall/source_nat"
-# 1:1 endpoint suffix on ``firewall/one_to_one`` controller.
-_ONE_TO_ONE_BASE = "firewall/one_to_one"
-# Port-forward endpoint suffix on ``firewall/d_nat`` controller. Note the
-# snake-case routing: OPNsense's MVC controller is ``DNatController``
-# which OPNsense camelCase→snake_case routing renders as ``d_nat`` (not
-# ``dnat``). The 2026-05-03 probe missed this and incorrectly concluded the
-# controller was absent; the 2026-05-04 re-probe confirmed it ships stock.
-_PORT_FORWARD_BASE = "firewall/d_nat"
+# Controller paths live in ``..endpoints`` (``SOURCE_NAT``, ``ONE_TO_ONE``, ``D_NAT``).
 
 # Default sequence for new rules — matches the OPNsense schema default.
 DEFAULT_SEQUENCE = 100
@@ -908,12 +900,12 @@ class NATRuleService(BaseService):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _base_for(kind: NATRuleKind) -> str:
+    def _endpoints_for(kind: NATRuleKind) -> endpoints.RuleEndpoints:
         if kind == "outbound":
-            return _OUTBOUND_BASE
+            return endpoints.SOURCE_NAT
         if kind == "one_to_one":
-            return _ONE_TO_ONE_BASE
-        return _PORT_FORWARD_BASE
+            return endpoints.ONE_TO_ONE
+        return endpoints.D_NAT
 
     # ------------------------------------------------------------------
     # Category bootstrap (fleet-wide marker)
@@ -972,8 +964,8 @@ class NATRuleService(BaseService):
         Raises:
             OpnsenseDriftError: If any row has a malformed identity prefix.
         """
-        base = self._base_for(kind)
-        response = self.client.request("POST", f"{base}/searchRule")
+        eps = self._endpoints_for(kind)
+        response = self.client.request(eps.search.method, eps.search.path())
 
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):
@@ -1013,9 +1005,9 @@ class NATRuleService(BaseService):
                 if exc.status_code == 404:
                     logger.warning(
                         "OPNsense NAT controller for kind %r is not available "
-                        "(HTTP 404 on %s/searchRule); skipping during migrate.",
+                        "(HTTP 404 on %s); skipping during migrate.",
                         kind,
-                        self._base_for(kind),
+                        self._endpoints_for(kind).search.template,
                     )
                     continue
                 raise
@@ -1041,9 +1033,9 @@ class NATRuleService(BaseService):
         Returns:
             API response dict.
         """
-        base = self._base_for(rule.kind)
+        eps = self._endpoints_for(rule.kind)
         return self.client.request(
-            "POST", f"{base}/addRule", data=self._payload_with_category(rule)
+            eps.add.method, eps.add.path(), data=self._payload_with_category(rule)
         )
 
     def update(self, uuid: str, rule: NATRuleConfig) -> dict[str, Any]:
@@ -1059,9 +1051,11 @@ class NATRuleService(BaseService):
         Returns:
             API response dict.
         """
-        base = self._base_for(rule.kind)
+        eps = self._endpoints_for(rule.kind)
         return self.client.request(
-            "POST", f"{base}/setRule/{uuid}", data=self._payload_with_category(rule)
+            eps.update.method,
+            eps.update.path(uuid=uuid),
+            data=self._payload_with_category(rule),
         )
 
     def delete(self, uuid: str, kind: NATRuleKind) -> dict[str, Any]:
@@ -1074,8 +1068,8 @@ class NATRuleService(BaseService):
         Returns:
             API response dict.
         """
-        base = self._base_for(kind)
-        return self.client.request("POST", f"{base}/delRule/{uuid}")
+        eps = self._endpoints_for(kind)
+        return self.client.request(eps.delete.method, eps.delete.path(uuid=uuid))
 
     def apply_changes(self, kind: NATRuleKind) -> dict[str, Any]:
         """Apply pending NAT changes (commit staged config to running system).
@@ -1086,8 +1080,8 @@ class NATRuleService(BaseService):
         26.1.6_2 — ``applyChanges`` 404s on these specific controllers.
         Must be called after add/update/delete to activate.
         """
-        base = self._base_for(kind)
-        return self.client.request("POST", f"{base}/apply")
+        eps = self._endpoints_for(kind)
+        return self.client.request(eps.apply.method, eps.apply.path())
 
     # ------------------------------------------------------------------
     # Diff + apply orchestration

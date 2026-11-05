@@ -122,11 +122,9 @@ from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
 
+from .. import endpoints
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
-
-# Controller base for all alias CRUD + reconfigure endpoints.
-_ALIAS_BASE = "firewall/alias"
 
 # Alias types that OPNsense maintains internally and that the operator
 # cannot create / edit / delete via the public alias controller. Filtered
@@ -515,7 +513,7 @@ class AliasService(BaseService):
             rows. Defensive against non-dict responses and missing
             ``rows`` key — both yield ``[]``.
         """
-        response = self.client.request("POST", f"{_ALIAS_BASE}/searchItem")
+        response = self.client.request(endpoints.ALIAS.search.method, endpoints.ALIAS.search.path())
 
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):
@@ -532,7 +530,9 @@ class AliasService(BaseService):
         with peer services (`unbound_host_alias`, `static_route`); the
         diff engine reads everything from the ``searchItem`` row.
         """
-        return self.client.request("GET", f"{_ALIAS_BASE}/getItem/{uuid}")
+        return self.client.request(
+            endpoints.ALIAS.read.method, endpoints.ALIAS.read.path(uuid=uuid)
+        )
 
     def add(self, alias: AliasConfig) -> dict[str, Any]:
         """Create an alias.
@@ -544,8 +544,8 @@ class AliasService(BaseService):
             API response dict (typically ``{"result": "saved", "uuid": ...}``).
         """
         return self.client.request(
-            "POST",
-            f"{_ALIAS_BASE}/addItem",
+            endpoints.ALIAS.add.method,
+            endpoints.ALIAS.add.path(),
             data=alias.to_payload(),
         )
 
@@ -560,8 +560,8 @@ class AliasService(BaseService):
             API response dict.
         """
         return self.client.request(
-            "POST",
-            f"{_ALIAS_BASE}/setItem/{uuid}",
+            endpoints.ALIAS.update.method,
+            endpoints.ALIAS.update.path(uuid=uuid),
             data=alias.to_payload(),
         )
 
@@ -574,7 +574,9 @@ class AliasService(BaseService):
         Returns:
             API response dict (typically ``{"result": "deleted"}``).
         """
-        return self.client.request("POST", f"{_ALIAS_BASE}/delItem/{uuid}")
+        return self.client.request(
+            endpoints.ALIAS.delete.method, endpoints.ALIAS.delete.path(uuid=uuid)
+        )
 
     def reconfigure(self) -> dict[str, Any]:
         """Apply pending alias changes (commit staged config to running system).
@@ -582,7 +584,7 @@ class AliasService(BaseService):
         Must be called after add/update/delete operations to activate them.
         Response shape per the OpenAPI spec is ``{"status": "ok" | "failed"}``.
         """
-        return self.client.request("POST", f"{_ALIAS_BASE}/reconfigure")
+        return self.client.request(endpoints.ALIAS.apply.method, endpoints.ALIAS.apply.path())
 
     # ------------------------------------------------------------------
     # Diff + apply orchestration

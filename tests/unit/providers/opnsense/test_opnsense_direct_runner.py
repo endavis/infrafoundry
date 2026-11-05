@@ -1201,3 +1201,56 @@ class TestSiblingResourceThreading:
         call_kwargs = manager_instance.plan.call_args.kwargs
         # The runner must NOT pass sibling_resources to managers that don't opt in.
         assert "sibling_resources" not in call_kwargs
+
+
+class TestPlanEndpointSupport:
+    """``plan`` asks the provider whether the box's version serves the endpoints (#1239)."""
+
+    def _run(
+        self, provider: MagicMock, hook_result: Any
+    ) -> tuple[Any, MagicMock, MagicMock, list[ResourceConfig]]:
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        manager_mock = MagicMock()
+        manager_mock.plan.return_value = Diff()
+        manager_cls = MagicMock(return_value=manager_mock)
+        provider.get_direct_api_resource_types.return_value = {"interfaces.vlans": manager_cls}
+        provider.check_endpoint_support.return_value = hook_result
+        runner = OPNsenseDirectRunner()
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            result = runner.plan(provider)
+        return result, manager_mock, provider.check_endpoint_support, resources
+
+    def test_errors_fail_plan_before_any_manager(self, provider_with_env: MagicMock) -> None:
+        result, manager, _, _ = self._run(
+            provider_with_env, {"errors": ["boom: needs X"], "warnings": []}
+        )
+        assert result["success"] is False
+        assert "boom: needs X" in result["error"]
+        manager.plan.assert_not_called()
+
+    def test_warnings_are_printed_and_plan_proceeds(
+        self, provider_with_env: MagicMock, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        result, manager, _, _ = self._run(
+            provider_with_env, {"errors": [], "warnings": ["version unknown"]}
+        )
+        assert result["success"] is True
+        manager.plan.assert_called_once()
+        assert "version unknown" in capsys.readouterr().out
+
+    def test_hook_receives_only_types_with_resources(self, provider_with_env: MagicMock) -> None:
+        _, _, hook, _ = self._run(provider_with_env, {"errors": [], "warnings": []})
+        hook.assert_called_once_with("test-env", ["interfaces.vlans"])
+
+    def test_hook_not_called_without_resources(self, provider_with_env: MagicMock) -> None:
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": MagicMock()
+        }
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().plan(provider_with_env)
+        provider_with_env.check_endpoint_support.assert_not_called()
+
+    def test_non_dict_hook_result_is_ignored(self, provider_with_env: MagicMock) -> None:
+        result, manager, _, _ = self._run(provider_with_env, MagicMock())
+        assert result["success"] is True
+        manager.plan.assert_called_once()

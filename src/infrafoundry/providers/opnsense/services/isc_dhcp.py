@@ -6,6 +6,7 @@ from typing import Any
 
 from infrafoundry.core.exceptions import APIError
 
+from .. import endpoints
 from ..api_client import OPNsenseClient
 from .base import BaseService
 
@@ -35,7 +36,9 @@ class ISCDHCPService(BaseService):
         """
         try:
             # Use the core API to get configuration
-            response = self.client.request("GET", "core/menu/search")
+            response = self.client.request(
+                endpoints.CORE_MENU_SEARCH.method, endpoints.CORE_MENU_SEARCH.path()
+            )
             return response if response else {}
         except APIError:
             # Fallback: return empty dict if API call fails

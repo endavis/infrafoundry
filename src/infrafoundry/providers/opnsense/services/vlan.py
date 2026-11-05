@@ -24,6 +24,7 @@ from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
 
+from .. import endpoints
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
@@ -267,7 +268,7 @@ class VlanService(BaseService):
             ``LiveVlan`` instances normalized from the search rows.
         """
         # OPNsense's searchItem is a POST despite being a "search" verb.
-        response = self.client.request("POST", "interfaces/vlan_settings/searchItem")
+        response = self.client.request(endpoints.VLAN.search.method, endpoints.VLAN.search.path())
 
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):
@@ -287,8 +288,8 @@ class VlanService(BaseService):
             API response dict (typically ``{"result": "saved", "uuid": ...}``).
         """
         return self.client.request(
-            "POST",
-            "interfaces/vlan_settings/addItem",
+            endpoints.VLAN.add.method,
+            endpoints.VLAN.add.path(),
             data=vlan.to_payload(),
         )
 
@@ -303,8 +304,8 @@ class VlanService(BaseService):
             API response dict.
         """
         return self.client.request(
-            "POST",
-            f"interfaces/vlan_settings/setItem/{uuid}",
+            endpoints.VLAN.update.method,
+            endpoints.VLAN.update.path(uuid=uuid),
             data=vlan.to_payload(),
         )
 
@@ -317,14 +318,16 @@ class VlanService(BaseService):
         Returns:
             API response dict.
         """
-        return self.client.request("POST", f"interfaces/vlan_settings/delItem/{uuid}")
+        return self.client.request(
+            endpoints.VLAN.delete.method, endpoints.VLAN.delete.path(uuid=uuid)
+        )
 
     def reconfigure(self) -> dict[str, Any]:
         """Apply pending VLAN changes (commit staged config to running system).
 
         Must be called after add/update/delete operations to activate them.
         """
-        return self.client.request("POST", "interfaces/vlan_settings/reconfigure")
+        return self.client.request(endpoints.VLAN.apply.method, endpoints.VLAN.apply.path())
 
     # ------------------------------------------------------------------
     # Diff + apply orchestration

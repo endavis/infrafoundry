@@ -70,18 +70,13 @@ from typing import Any, Literal
 
 from infrafoundry.core.provider import ResourceConfig
 
+from .. import endpoints
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 # Allowed values for the ``type`` discriminator.
 ForwardType = Literal["forward", "dot"]
 ALLOWED_FORWARD_TYPES: tuple[ForwardType, ...] = ("forward", "dot")
-
-# Controller base for all forward CRUD endpoints.
-_FORWARD_BASE = "unbound/settings"
-# The Unbound service's reconfigure verb is shared across every
-# Unbound-managed component (host overrides / aliases / forwards).
-_RECONFIGURE_PATH = "unbound/service/reconfigure"
 
 # Default port when operator omits ``port`` from YAML.
 _DEFAULT_PORT = "53"
@@ -456,7 +451,9 @@ class UnboundForwardService(BaseService):
         Returns:
             ``LiveUnboundForward`` instances normalized from the search rows.
         """
-        response = self.client.request("POST", f"{_FORWARD_BASE}/searchForward")
+        response = self.client.request(
+            endpoints.UNBOUND_FORWARD.search.method, endpoints.UNBOUND_FORWARD.search.path()
+        )
 
         rows: list[dict[str, Any]] = []
         if isinstance(response, dict):
@@ -473,7 +470,9 @@ class UnboundForwardService(BaseService):
         that ``searchForward`` doesn't expose. Returns the raw envelope
         ``{"dot": {...}}``.
         """
-        return self.client.request("GET", f"{_FORWARD_BASE}/getForward/{uuid}")
+        return self.client.request(
+            endpoints.UNBOUND_FORWARD.read.method, endpoints.UNBOUND_FORWARD.read.path(uuid=uuid)
+        )
 
     def add(self, forward: UnboundForwardConfig) -> dict[str, Any]:
         """Create a forward.
@@ -485,8 +484,8 @@ class UnboundForwardService(BaseService):
             API response dict (typically ``{"result": "saved", "uuid": ...}``).
         """
         return self.client.request(
-            "POST",
-            f"{_FORWARD_BASE}/addForward",
+            endpoints.UNBOUND_FORWARD.add.method,
+            endpoints.UNBOUND_FORWARD.add.path(),
             data=forward.to_payload(),
         )
 
@@ -501,8 +500,8 @@ class UnboundForwardService(BaseService):
             API response dict.
         """
         return self.client.request(
-            "POST",
-            f"{_FORWARD_BASE}/setForward/{uuid}",
+            endpoints.UNBOUND_FORWARD.update.method,
+            endpoints.UNBOUND_FORWARD.update.path(uuid=uuid),
             data=forward.to_payload(),
         )
 
@@ -515,7 +514,10 @@ class UnboundForwardService(BaseService):
         Returns:
             API response dict (typically ``{"result": "deleted"}``).
         """
-        return self.client.request("POST", f"{_FORWARD_BASE}/delForward/{uuid}")
+        return self.client.request(
+            endpoints.UNBOUND_FORWARD.delete.method,
+            endpoints.UNBOUND_FORWARD.delete.path(uuid=uuid),
+        )
 
     def reconfigure(self) -> dict[str, Any]:
         """Apply pending Unbound changes (commit staged config to running system).
@@ -523,7 +525,9 @@ class UnboundForwardService(BaseService):
         Must be called after add/update/delete operations to activate them.
         Response shape per the OpenAPI spec is ``{"status": "ok" | "failed"}``.
         """
-        return self.client.request("POST", _RECONFIGURE_PATH)
+        return self.client.request(
+            endpoints.UNBOUND_RECONFIGURE.method, endpoints.UNBOUND_RECONFIGURE.path()
+        )
 
     # ------------------------------------------------------------------
     # Diff + apply orchestration

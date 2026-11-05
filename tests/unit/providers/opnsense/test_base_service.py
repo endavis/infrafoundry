@@ -139,3 +139,15 @@ class TestFromEnvironmentWithOverride:
         monkeypatch.setenv(API_URL_ENV_VAR, "https://mirror.example")
         with pytest.raises(ValueError, match="No opnsense provider settings"):
             VlanService.from_environment("prod", "opnsense", tmp_path / "envs")
+
+
+class TestClientFromEnvironment:
+    def test_builds_client_without_a_service(self, tmp_path: Path) -> None:
+        _write_settings(tmp_path, "prod", api_url="https://prod.example")
+        client = VlanService.client_from_environment("prod", "opnsense", tmp_path / "envs")
+        assert client.base_url == "https://prod.example"
+
+    def test_missing_provider_settings_raise(self, tmp_path: Path) -> None:
+        _write_settings(tmp_path, "prod")
+        with pytest.raises(ValueError, match="No other provider settings"):
+            VlanService.client_from_environment("prod", "other", tmp_path / "envs")

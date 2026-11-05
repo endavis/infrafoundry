@@ -55,7 +55,7 @@ The decision answers the nine open questions deferred from [ADR-0013](0013-opnse
 
 ### 2. Schema source
 
-**Pydantic models from OPNsense's OpenAPI spec, accessed via `opnsense_openapi.list_endpoints()` and the matched spec file.** Where the spec disagrees with a live box (see [`#32`](https://github.com/endavis/opnsense-openapi/issues/32) — controller-name bug for multi-word controllers), components fall back to hand-typed dicts at the impacted call sites. `auto_detect_version=True` correctly resolved `26.1.6_2` against the bundled `26.1.6` spec during the spike, so version pinning is not required.
+**Pydantic models from OPNsense's OpenAPI spec, accessed via `opnsense_openapi.list_endpoints()` and the matched spec file.** Where the spec disagrees with a live box (see [`#32`](https://github.com/endavis/opnsense-openapi/issues/32) — controller-name bug for multi-word controllers), components fall back to hand-typed dicts at the impacted call sites. `auto_detect_version=True` correctly resolved `26.1.6_2` against the bundled `26.1.6` spec during the spike, so version pinning is not required. Production sets `auto_detect_version=False` and reads the version explicitly for the endpoint check (§10, #1239).
 
 ### 3. Client surface
 
@@ -116,6 +116,10 @@ See [`docs/development/implementing-providers.md`](../development/implementing-p
 The `templates/opnsense/playbook.yml.j2` Ansible service-reload playbook retires once the last Terraform-based component is gone.
 
 > **Note (interface_assignments, #711, amended 2026-05-03):** OPNsense `26.1.6_2` exposes no REST CRUD for `<interfaces>`. The component shipped read-only in PR #712 (`list` / `migrate` / validation work; `apply` / `destroy` are loud no-ops). The write path is decided in this ADR's "Per-component decisions" section: server-side-validated REST via a forked, in-tree PHP controller (PR #716 spike). Production conversion (`OPNsenseDirectRunner.apply()` from no-op to live for this resource) was carried out in #720, which cleared gates (2) and (3) recorded above.
+
+### 10. Endpoint registry and version check
+
+**All endpoint paths live in one registry (`providers/opnsense/endpoints.py`) and are checked against the box's version.** The registry is verified offline against the specs bundled with `opnsense-openapi` for the supported series, and at `infra plan` (hence `apply`) and `infra doctor` against the version read from `core/firmware/info`; a resource type whose endpoints the version lacks is rejected. `interfaces/assign_settings/*` is exempt as an in-tree extension. `opnsense-openapi` strict mode (`validate_endpoints=True`) stays off: it needs a known box version and cannot exempt the extension. See [#1239](https://github.com/endavis/infrafoundry/issues/1239) and [Endpoint registry and version check](../development/opnsense-resource-coverage.md#endpoint-registry-and-version-check-1239).
 
 ## Per-component decisions
 

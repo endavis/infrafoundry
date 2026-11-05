@@ -328,6 +328,16 @@ class OPNsenseDirectRunner(BaseRunner):
 
         resources = self._load_provider_resources(provider)
 
+        # Reject resource types the box's OPNsense version cannot serve before
+        # any manager touches the box (#1239). ``apply`` runs plan first.
+        types_in_scope = [
+            t for t in dispatch_table if self._filter_by_type(resources, t, target_resources)
+        ]
+        if types_in_scope:
+            support_errors = self._check_endpoint_support(provider, env_name, types_in_scope)
+            if support_errors:
+                return PlanResult(success=False, error="\n".join(support_errors))
+
         any_changes = False
         summary_parts: list[str] = []
 
@@ -363,6 +373,38 @@ class OPNsenseDirectRunner(BaseRunner):
             has_changes=any_changes,
             changes_summary=" | ".join(summary_parts),
         )
+
+    def _check_endpoint_support(
+        self, provider: ProviderBase, env_name: str, resource_types: list[str]
+    ) -> list[str]:
+        """Ask the provider whether the box's version serves the types' endpoints (#1239).
+
+        Reads the optional duck-typed ``check_endpoint_support`` hook; a provider
+        without it, or a hook that does not return ``{"errors": [...], "warnings":
+        [...]}``, is treated as having nothing to report.
+
+        Args:
+            provider: Provider being planned.
+            env_name: Active environment name.
+            resource_types: Resource types that have resources in scope.
+
+        Returns:
+            The error messages; warnings are printed.
+        """
+        hook = getattr(provider, "check_endpoint_support", None)
+        if not callable(hook):
+            return []
+        result = hook(env_name, resource_types)
+        if not isinstance(result, dict):
+            return []
+        errors = result.get("errors")
+        warnings = result.get("warnings")
+        if isinstance(warnings, list):
+            for warning in warnings:
+                self.console.print(f"  [yellow]opnsense_direct: {warning}[/yellow]")
+        if isinstance(errors, list) and all(isinstance(e, str) for e in errors):
+            return list(errors)
+        return []
 
     @staticmethod
     def _format_plan_summary(type_name: str, diff: Any, *, add_only: bool) -> str:
