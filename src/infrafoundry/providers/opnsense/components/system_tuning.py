@@ -139,8 +139,8 @@ class SystemTuningManager(BaseComponentManager):
         provider_name: str = "opnsense",
     ) -> dict[str, str]:
         """Return the singleton's stable id."""
-        del env_name, resources, provider_name
-        return {"settings": "global"}
+        del env_name, provider_name
+        return {resource.name: "global" for resource in resources}
 
     def migrate(
         self,

@@ -44,7 +44,7 @@ def enforce_singleton(
 
     The nested-namespace loader already enforces this via the
     ``DOTTED_RESOURCE_SHAPES`` table (a dict-shape path emits exactly one
-    ``ResourceConfig`` with ``name="settings"``), but a malformed
+    ``ResourceConfig`` named by its dotted type, #1237), but a malformed
     resource-centric YAML could in principle slip past, so every
     singleton manager rechecks here at the manager boundary.
 

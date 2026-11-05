@@ -99,7 +99,7 @@ class SystemHostnameService(BaseService):
 
         Args:
             resource: ``system.hostname`` ``ResourceConfig`` with
-                ``name="settings"`` and the operator's YAML mapping in
+                ``name="system.hostname"`` and the operator's YAML mapping in
                 ``config``.
 
         Returns:

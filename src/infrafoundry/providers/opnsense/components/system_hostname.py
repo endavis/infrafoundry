@@ -13,8 +13,8 @@ Singleton semantics (per the #806 plan, validated against ADR-0016 §4):
   dict-shape paths.
 - Destroy is a no-op (return zero counts) — global system settings are
   never auto-uninstalled.
-- ``get_resource_ids()`` returns ``{"settings": "global"}`` — the
-  singleton resource always lives at the same logical key.
+- ``get_resource_ids()`` returns ``{<resource name>: "global"}`` — the
+  singleton is named by its dotted type (``system.hostname``, #1237).
 """
 
 from __future__ import annotations
@@ -123,7 +123,7 @@ class SystemHostnameManager(BaseComponentManager):
                 ResourceOutcome(
                     address="opnsense_system_hostname.settings",
                     action="update",
-                    resource_name="settings",
+                    resource_name=resources[0].name,
                 )
             ],
         }
@@ -161,8 +161,8 @@ class SystemHostnameManager(BaseComponentManager):
         OPNsense UUID to track. The stable id ``"global"`` lets state
         tracking record one entry per env.
         """
-        del env_name, resources, provider_name
-        return {"settings": "global"}
+        del env_name, provider_name
+        return {resource.name: "global" for resource in resources}
 
     def migrate(
         self,

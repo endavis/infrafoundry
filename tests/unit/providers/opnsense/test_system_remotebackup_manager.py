@@ -41,7 +41,7 @@ def _resource(
     gdrive_p12_key: str = "secret://env_secrets/opnsense/gdrive/p12_key",
 ) -> ResourceConfig:
     return ResourceConfig(
-        name="settings",
+        name="system.remotebackup",
         type="system.remotebackup",
         provider="opnsense",
         config={
@@ -98,7 +98,7 @@ def _live(*, password: str = "PLAIN_PW", p12_key: str = "PLAIN_P12") -> dict[str
 def _resolved_resource() -> ResourceConfig:
     """A ResourceConfig with secrets pre-resolved (mimicking _resolve_secrets)."""
     return ResourceConfig(
-        name="settings",
+        name="system.remotebackup",
         type="system.remotebackup",
         provider="opnsense",
         config={
@@ -166,6 +166,7 @@ class TestApply:
         assert "GDriveFolderID" in payload["general"]
         assert payload["general"]["GDriveFolderID"] == "FOLDER_ID"
         assert result["resources_updated"] == 1
+        assert result["resource_outcomes"][0].resource_name == "system.remotebackup"
 
 
 class TestDestroy:
@@ -179,7 +180,15 @@ class TestGetResourceIds:
     def test_get_resource_ids(self, tmp_path: Path) -> None:
         manager = SystemRemoteBackupManager(tmp_path)
         result = manager.get_resource_ids("test-env", [_resource()])
-        assert result == {"settings": "global"}
+        assert result == {"system.remotebackup": "global"}
+
+    def test_get_resource_ids_uses_resource_name(self, tmp_path: Path) -> None:
+        custom = _resource().model_copy(update={"name": "custom"})
+        result = SystemRemoteBackupManager(tmp_path).get_resource_ids("test-env", [custom])
+        assert result == {"custom": "global"}
+
+    def test_get_resource_ids_empty(self, tmp_path: Path) -> None:
+        assert SystemRemoteBackupManager(tmp_path).get_resource_ids("test-env", []) == {}
 
 
 # ---------------------------------------------------------------------------

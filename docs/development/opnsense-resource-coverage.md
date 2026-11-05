@@ -15,6 +15,8 @@ It exists to support the decision in [ADR-0013](../decisions/0013-opnsense-full-
 
 ## Coverage matrix
 
+Every dict-shaped (singleton) resource is named by its dotted type, so `-r system.tuning` selects it and several singletons can coexist in one environment (#1237). State rows recorded under the old name `settings` are renamed automatically on the next run.
+
 Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src/infrafoundry/providers/opnsense/__init__.py`.
 
 | Section in `config.xml` | InfraFoundry resource type | Status |

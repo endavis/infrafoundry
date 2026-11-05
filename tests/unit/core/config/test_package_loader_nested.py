@@ -60,10 +60,10 @@ class TestNestedFormatConstants:
 
 @pytest.mark.unit
 class TestParseNestedSingleton:
-    """Singleton (dict-leaf) shape — emits one ResourceConfig with name='settings'."""
+    """Singleton (dict-leaf) shape — emits one ResourceConfig with name=<dotted type>."""
 
-    def test_firewall_log_singleton_emits_one_settings(self, temp_dir: Path) -> None:
-        """``opnsense.firewall.log`` dict leaf becomes a ``settings`` resource."""
+    def test_firewall_log_singleton_emits_one_dotted_name(self, temp_dir: Path) -> None:
+        """``opnsense.firewall.log`` dict leaf becomes a resource named ``firewall.log``."""
         loader = PackageLoader(temp_dir)
         data = {
             "opnsense": {
@@ -77,7 +77,7 @@ class TestParseNestedSingleton:
         }
         resources = loader._parse_resources_from_data(data, "test.yaml", "opnsense")
         assert len(resources) == 1
-        assert resources[0].name == "settings"
+        assert resources[0].name == "firewall.log"
         assert resources[0].type == "firewall.log"
         assert resources[0].provider == "opnsense"
         assert resources[0].config == {
@@ -97,7 +97,7 @@ class TestParseNestedSingleton:
         }
         resources = loader._parse_resources_from_data(data, "ts.yaml", "opnsense")
         assert len(resources) == 1
-        assert resources[0].name == "settings"
+        assert resources[0].name == "tailscale.settings"
         assert resources[0].type == "tailscale.settings"
         assert resources[0].config == {"enabled": True, "exit_node": False}
 
@@ -107,7 +107,7 @@ class TestParseNestedSingleton:
         data = {"opnsense": {"radvd": {"interfaces": ["lan"], "ra_lifetime": 1800}}}
         resources = loader._parse_resources_from_data(data, "radvd.yaml", "opnsense")
         assert len(resources) == 1
-        assert resources[0].name == "settings"
+        assert resources[0].name == "radvd"
         assert resources[0].type == "radvd"
         assert resources[0].config == {"interfaces": ["lan"], "ra_lifetime": 1800}
 
@@ -144,7 +144,7 @@ class TestParseNestedSingleton:
         data = {"opnsense": {"radvd": radvd_config}}
         resources = loader._parse_resources_from_data(data, "radvd.yaml", "opnsense")
         assert len(resources) == 1
-        assert resources[0].name == "settings"
+        assert resources[0].name == "radvd"
         assert resources[0].type == "radvd"
         assert resources[0].provider == "opnsense"
         assert resources[0].config == radvd_config
@@ -162,11 +162,11 @@ class TestParseNestedSingleton:
         assert original == {"log_default_block": False}
 
     def test_system_hostname_singleton_round_trip(self, temp_dir: Path) -> None:
-        """``opnsense.system.hostname`` (#806) emits exactly one settings resource.
+        """``opnsense.system.hostname`` (#806) emits exactly one singleton resource.
 
         Round-trip check: the nested YAML dict at ``opnsense.system.hostname``
         becomes one ``ResourceConfig`` with ``type="system.hostname"``,
-        ``name="settings"``, and the dict carried verbatim as ``.config``.
+        ``name="system.hostname"``, and the dict carried verbatim as ``.config``.
         Confirms the seven ``system.*`` singletons added in #806 work
         through the nested-format loader.
         """
@@ -180,7 +180,7 @@ class TestParseNestedSingleton:
         data = {"opnsense": {"system": {"hostname": hostname_config}}}
         resources = loader._parse_resources_from_data(data, "system.yaml", "opnsense")
         assert len(resources) == 1
-        assert resources[0].name == "settings"
+        assert resources[0].name == "system.hostname"
         assert resources[0].type == "system.hostname"
         assert resources[0].provider == "opnsense"
         assert resources[0].config == hostname_config
@@ -289,9 +289,9 @@ class TestParseNestedMixed:
         resources = loader._parse_resources_from_data(data, "fw.yaml", "opnsense")
         types = {r.type for r in resources}
         assert types == {"firewall.log", "firewall.aliases", "firewall.rules"}
-        # Singleton has name="settings"; list entries keep their own names.
+        # Singleton has name=<dotted type>; list entries keep their own names.
         log_resource = next(r for r in resources if r.type == "firewall.log")
-        assert log_resource.name == "settings"
+        assert log_resource.name == "firewall.log"
         alias_resource = next(r for r in resources if r.type == "firewall.aliases")
         assert alias_resource.name == "trusted"
 
@@ -622,7 +622,7 @@ class TestNestedFormatProviderCentricLoader:
         resources = loader.load_resources("dev", "opnsense", "log")
         assert len(resources) == 1
         assert resources[0].type == "firewall.log"
-        assert resources[0].name == "settings"
+        assert resources[0].name == "firewall.log"
         assert resources[0].provider == "opnsense"
 
     def test_provider_centric_loader_parses_nested_list(self, temp_dir: Path) -> None:
@@ -706,7 +706,7 @@ class TestNestedFormatResourceCentricLoader:
         resources = loader.load_resources("dev")
         assert len(resources) == 1
         assert resources[0].type == "firewall.log"
-        assert resources[0].name == "settings"
+        assert resources[0].name == "firewall.log"
         assert resources[0].provider == "opnsense"
         assert resources[0].config == {
             "log_default_block": False,
@@ -783,3 +783,24 @@ class TestParseNestedDirect:
         with pytest.raises(InvalidConfigurationError) as excinfo:
             loader._parse_nested_provider_format(data, "opnsense", "x.yaml")
         assert "must be a string" in str(excinfo.value)
+
+
+@pytest.mark.unit
+class TestSingletonNamesAreDotted:
+    """Several singletons coexist because each is named by its dotted type (#1237)."""
+
+    def test_two_singletons_get_distinct_names(self, temp_dir: Path) -> None:
+        loader = PackageLoader(temp_dir)
+        data = {"opnsense": {"system": {"tuning": {"a": 1}, "firmware": {"b": 2}}}}
+        resources = loader._parse_resources_from_data(data, "system.yaml", "opnsense")
+        assert sorted(r.name for r in resources) == ["system.firmware", "system.tuning"]
+        assert all(r.name == r.type for r in resources)
+
+    def test_singleton_resource_types_constant(self) -> None:
+        from infrafoundry.core.config.package_loader import SINGLETON_RESOURCE_TYPES
+
+        assert {
+            k for k, v in DOTTED_RESOURCE_SHAPES.items() if v == "dict"
+        } == SINGLETON_RESOURCE_TYPES
+        assert {"system.tuning", "radvd"} <= SINGLETON_RESOURCE_TYPES
+        assert "firewall.aliases" not in SINGLETON_RESOURCE_TYPES

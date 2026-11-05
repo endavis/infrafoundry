@@ -71,7 +71,7 @@ class SystemWebguiManager(BaseComponentManager):
                 ResourceOutcome(
                     address="opnsense_system_webgui.settings",
                     action="update",
-                    resource_name="settings",
+                    resource_name=resources[0].name,
                 )
             ],
         }
@@ -100,8 +100,8 @@ class SystemWebguiManager(BaseComponentManager):
         provider_name: str = "opnsense",
     ) -> dict[str, str]:
         """Return the singleton's stable id."""
-        del env_name, resources, provider_name
-        return {"settings": "global"}
+        del env_name, provider_name
+        return {resource.name: "global" for resource in resources}
 
     def migrate(
         self,

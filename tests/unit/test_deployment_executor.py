@@ -879,6 +879,23 @@ def test_validate_resource_filter_error_includes_names() -> None:
     assert "vm2" in error_msg
 
 
+def test_validate_resource_filter_legacy_settings_name_lists_new_names() -> None:
+    """``-r settings`` no longer matches OPNsense singletons; the error lists dotted names."""
+    executor = _make_executor()
+    resources_by_provider: dict[str, list[ResourceConfig]] = {
+        "opnsense": [
+            _resource("system.tuning", "opnsense", "system.tuning"),
+            _resource("system.firmware", "opnsense", "system.firmware"),
+        ],
+    }
+
+    with pytest.raises(ResourceFilterError) as exc_info:
+        executor._validate_resource_filter(resources_by_provider, {"settings"})
+
+    assert "system.tuning" in str(exc_info.value)
+    assert "system.firmware" in str(exc_info.value)
+
+
 def test_validate_resource_filter_partial_match_warns() -> None:
     """Partial match warns but does not raise."""
     executor = _make_executor()

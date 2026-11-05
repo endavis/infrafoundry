@@ -79,6 +79,41 @@ def _create_loose_resources(
 
 
 @pytest.mark.unit
+class TestOpnsenseSingletonsCoexist:
+    """Several OPNsense singletons load together (#1237)."""
+
+    def test_two_singletons_in_one_file_load(self, temp_dir: Path) -> None:
+        _create_env(temp_dir, "dev")
+        _create_loose_resources(
+            temp_dir,
+            "dev",
+            "opnsense",
+            "system.yaml",
+            "opnsense:\n  system:\n    tuning:\n      a: 1\n    firmware:\n      b: 2\n",
+        )
+        manager = ConfigManager(base_dir=temp_dir)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            resources = manager.get_all_resources_all_providers("dev")
+        assert sorted(r.name for r in resources) == ["system.firmware", "system.tuning"]
+
+    def test_same_singleton_in_two_files_still_duplicate(self, temp_dir: Path) -> None:
+        _create_env(temp_dir, "dev")
+        for fname in ("a.yaml", "b.yaml"):
+            _create_loose_resources(
+                temp_dir,
+                "dev",
+                "opnsense",
+                fname,
+                "opnsense:\n  system:\n    tuning:\n      a: 1\n",
+            )
+        manager = ConfigManager(base_dir=temp_dir)
+        with pytest.raises(ValueError, match="Duplicate resource names") as exc:
+            manager.get_all_resources_all_providers("dev")
+        assert "opnsense:system.tuning" in str(exc.value)
+
+
+@pytest.mark.unit
 class TestDiscoverEnvRootPackages:
     """Tests for PackageLoader.discover_env_root_packages."""
 

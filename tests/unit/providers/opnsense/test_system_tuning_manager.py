@@ -33,7 +33,7 @@ LIVE_ITEMS: dict[str, dict[str, str]] = {
 
 def _resource(items: list[dict[str, Any]] | None = None) -> ResourceConfig:
     return ResourceConfig(
-        name="settings",
+        name="system.tuning",
         type="system.tuning",
         provider="opnsense",
         config={"items": items or []},
@@ -154,7 +154,15 @@ class TestMisc:
 
     def test_get_resource_ids(self, tmp_path: Path) -> None:
         result = SystemTuningManager(tmp_path).get_resource_ids("test-env", [_resource()])
-        assert result == {"settings": "global"}
+        assert result == {"system.tuning": "global"}
+
+    def test_get_resource_ids_uses_resource_name(self, tmp_path: Path) -> None:
+        custom = _resource().model_copy(update={"name": "custom"})
+        result = SystemTuningManager(tmp_path).get_resource_ids("test-env", [custom])
+        assert result == {"custom": "global"}
+
+    def test_get_resource_ids_empty(self, tmp_path: Path) -> None:
+        assert SystemTuningManager(tmp_path).get_resource_ids("test-env", []) == {}
 
     def test_migrate_delegates_to_export(self, tmp_path: Path) -> None:
         service = MagicMock()

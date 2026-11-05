@@ -6,7 +6,7 @@ Coverage:
     - apply skips set_general_settings when the singleton is in sync.
     - apply calls set_general_settings with the desired payload on drift.
     - destroy is a no-op (returns ``resources_destroyed=0``).
-    - get_resource_ids returns ``{"settings": "global"}``.
+    - get_resource_ids returns ``{"system.hostname": "global"}``.
     - plan raises ``InvalidConfigurationError`` if not exactly one resource.
 """
 
@@ -35,7 +35,7 @@ def _resource(
     language: str = "en_US",
 ) -> ResourceConfig:
     return ResourceConfig(
-        name="settings",
+        name="system.hostname",
         type="system.hostname",
         provider="opnsense",
         config={
@@ -140,7 +140,7 @@ class TestApply:
         assert result["resources_updated"] == 1
         outcome = result["resource_outcomes"][0]
         assert outcome.action == "update"
-        assert outcome.resource_name == "settings"
+        assert outcome.resource_name == "system.hostname"
 
 
 class TestDestroy:
@@ -155,4 +155,12 @@ class TestGetResourceIds:
     def test_get_resource_ids(self, tmp_path: Path) -> None:
         manager = SystemHostnameManager(tmp_path)
         result = manager.get_resource_ids("test-env", [_resource()])
-        assert result == {"settings": "global"}
+        assert result == {"system.hostname": "global"}
+
+    def test_get_resource_ids_uses_resource_name(self, tmp_path: Path) -> None:
+        custom = _resource().model_copy(update={"name": "custom"})
+        result = SystemHostnameManager(tmp_path).get_resource_ids("test-env", [custom])
+        assert result == {"custom": "global"}
+
+    def test_get_resource_ids_empty(self, tmp_path: Path) -> None:
+        assert SystemHostnameManager(tmp_path).get_resource_ids("test-env", []) == {}

@@ -24,7 +24,7 @@ def _resource(
     ssl_certref: str = "abc123",
 ) -> ResourceConfig:
     return ResourceConfig(
-        name="settings",
+        name="system.webgui",
         type="system.webgui",
         provider="opnsense",
         config={
@@ -106,6 +106,7 @@ class TestApply:
         assert "webgui" in payload
         assert payload["webgui"]["protocol"] == "https"
         assert result["resources_updated"] == 1
+        assert result["resource_outcomes"][0].resource_name == "system.webgui"
 
 
 class TestDestroy:
@@ -119,4 +120,12 @@ class TestGetResourceIds:
     def test_get_resource_ids(self, tmp_path: Path) -> None:
         manager = SystemWebguiManager(tmp_path)
         result = manager.get_resource_ids("test-env", [_resource()])
-        assert result == {"settings": "global"}
+        assert result == {"system.webgui": "global"}
+
+    def test_get_resource_ids_uses_resource_name(self, tmp_path: Path) -> None:
+        custom = _resource().model_copy(update={"name": "custom"})
+        result = SystemWebguiManager(tmp_path).get_resource_ids("test-env", [custom])
+        assert result == {"custom": "global"}
+
+    def test_get_resource_ids_empty(self, tmp_path: Path) -> None:
+        assert SystemWebguiManager(tmp_path).get_resource_ids("test-env", []) == {}

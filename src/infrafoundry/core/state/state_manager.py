@@ -26,6 +26,9 @@ from infrafoundry.core.state.prune import prune_environment as _prune_environmen
 from infrafoundry.core.state.rename import count_environment_rows as _count_environment_rows
 from infrafoundry.core.state.rename import rename_environment as _rename_environment
 from infrafoundry.core.state.resource_repository import ResourceRepository
+from infrafoundry.core.state.singleton_names import (
+    rename_legacy_singleton_rows as _rename_legacy_singleton_rows,
+)
 from infrafoundry.core.types import DeploymentMetadata, ResourceTrackingMetadata, RollbackData
 
 
@@ -63,6 +66,9 @@ class StateManager(BaseManager):
         """Initialize database schema."""
         self._log_debug("Initializing database schema")
         Base.metadata.create_all(self.engine)
+        renamed = _rename_legacy_singleton_rows(self.SessionLocal)
+        if renamed:
+            self._log_info(f"Renamed {renamed} legacy OPNsense singleton rows (#1237)")
         self._log_info("Database schema initialized")
 
     # Deployment operations - delegate to DeploymentRepository

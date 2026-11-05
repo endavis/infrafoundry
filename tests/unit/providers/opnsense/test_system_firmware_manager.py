@@ -34,7 +34,7 @@ def _resource(
     *, plugins: list[str] | None = None, extra: dict[str, str] | None = None
 ) -> ResourceConfig:
     return ResourceConfig(
-        name="settings",
+        name="system.firmware",
         type="system.firmware",
         provider="opnsense",
         config={
@@ -147,7 +147,15 @@ class TestGetResourceIds:
     def test_get_resource_ids(self, tmp_path: Path) -> None:
         manager = SystemFirmwareManager(tmp_path)
         result = manager.get_resource_ids("test-env", [_resource()])
-        assert result == {"settings": "global"}
+        assert result == {"system.firmware": "global"}
+
+    def test_get_resource_ids_uses_resource_name(self, tmp_path: Path) -> None:
+        custom = _resource().model_copy(update={"name": "custom"})
+        result = SystemFirmwareManager(tmp_path).get_resource_ids("test-env", [custom])
+        assert result == {"custom": "global"}
+
+    def test_get_resource_ids_empty(self, tmp_path: Path) -> None:
+        assert SystemFirmwareManager(tmp_path).get_resource_ids("test-env", []) == {}
 
 
 # ---------------------------------------------------------------------------
@@ -244,6 +252,7 @@ class TestSettings:
         settings_outcome = result["resource_outcomes"][-1]
         assert settings_outcome.address == "opnsense_system_firmware.settings"
         assert settings_outcome.action == "update"
+        assert settings_outcome.resource_name == "system.firmware"
 
     def test_apply_no_set_when_only_plugins_differ(self, tmp_path: Path) -> None:
         manager = SystemFirmwareManager(tmp_path)

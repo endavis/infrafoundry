@@ -22,7 +22,7 @@ def _resource(
     interfaces: list[str] | None = None,
 ) -> ResourceConfig:
     return ResourceConfig(
-        name="settings",
+        name="system.ssh",
         type="system.ssh",
         provider="opnsense",
         config={
@@ -106,6 +106,7 @@ class TestApply:
         assert result["resources_updated"] == 1
         outcome = result["resource_outcomes"][0]
         assert outcome.action == "update"
+        assert outcome.resource_name == "system.ssh"
 
 
 class TestDestroy:
@@ -119,4 +120,12 @@ class TestGetResourceIds:
     def test_get_resource_ids(self, tmp_path: Path) -> None:
         manager = SystemSshManager(tmp_path)
         result = manager.get_resource_ids("test-env", [_resource()])
-        assert result == {"settings": "global"}
+        assert result == {"system.ssh": "global"}
+
+    def test_get_resource_ids_uses_resource_name(self, tmp_path: Path) -> None:
+        custom = _resource().model_copy(update={"name": "custom"})
+        result = SystemSshManager(tmp_path).get_resource_ids("test-env", [custom])
+        assert result == {"custom": "global"}
+
+    def test_get_resource_ids_empty(self, tmp_path: Path) -> None:
+        assert SystemSshManager(tmp_path).get_resource_ids("test-env", []) == {}

@@ -189,6 +189,16 @@ class TestFilterByType:
         assert [r.type for r in result] == ["interfaces.vlans"]
         assert [r.name for r in result] == ["v1"]
 
+    def test_singletons_selected_by_dotted_name(self) -> None:
+        """Singletons carry their dotted type as name, so ``-r`` selects one (#1237)."""
+        resources = [
+            ResourceConfig(name=t, type=t, provider="opnsense", config={})
+            for t in ("system.tuning", "system.firmware")
+        ]
+        result = OPNsenseDirectRunner._filter_by_type(resources, "system.tuning", ["system.tuning"])
+        assert [r.name for r in result] == ["system.tuning"]
+        assert OPNsenseDirectRunner._filter_by_type(resources, "system.tuning", ["settings"]) == []
+
 
 class TestResolveDispatchTable:
     """``_resolve_dispatch_table`` survives providers that don't expose the hook."""

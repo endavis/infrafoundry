@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 # - ``"list"`` paths must appear as YAML sequences (each entry a dict with a
 #   ``name:`` field). Each entry emits one ``ResourceConfig``.
 # - ``"dict"`` paths must appear as YAML mappings. The whole mapping becomes
-#   a single singleton ``ResourceConfig`` with ``name="settings"``.
+#   a single singleton ``ResourceConfig`` named by its dotted path (#1237).
 #
 # Mismatched shape (e.g. operator typo ``firewall: {rules: {...}}`` instead
 # of ``firewall: {rules: [...]}``) raises a clear error rather than
@@ -95,7 +95,7 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     # #806 system core (singletons). Each is a self-contained
     # ``opnsense.system.<surface>`` namespace mapping a chunk of the
     # OPNsense ``<system>`` block in ``config.xml`` to a singleton
-    # ``ResourceConfig`` with ``name="settings"``. Per ADR-0016 these are
+    # ``ResourceConfig`` named by its dotted type (#1237). Per ADR-0016 these are
     # all ``"dict"`` because each surface is a global per-box setting.
     "system.hostname": "dict",
     "system.dns": "dict",
@@ -110,6 +110,15 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
 # namespace. Provided as a separate constant for callers that only need to
 # check membership (e.g. cross-reference resolvers in #793 Phase 3).
 DOTTED_RESOURCE_TYPES: frozenset[str] = frozenset(DOTTED_RESOURCE_SHAPES)
+
+# Dict-shaped (singleton) dotted types. Each is named by its dotted type (#1237).
+SINGLETON_RESOURCE_TYPES: frozenset[str] = frozenset(
+    k for k, v in DOTTED_RESOURCE_SHAPES.items() if v == "dict"
+)
+
+# Name every singleton carried before #1237; state rows stored under it are
+# migrated to the dotted type by ``core.state.singleton_names``.
+LEGACY_SINGLETON_RESOURCE_NAME: str = "settings"
 
 # YAML namespace key that triggers the nested-format parse branch (#793
 # Phase 2). The direct-OPNsense provider is the only consumer; nested format
@@ -526,7 +535,7 @@ class PackageLoader:
            dict value): Walk the nested structure under ``opnsense:`` to
            collect leaves; each leaf's dotted path (e.g. ``firewall.aliases``,
            ``kea.dhcp4.subnets``) becomes the ``ResourceConfig.type``. Lists
-           emit one resource per entry; dicts emit a single ``settings``
+           emit one resource per entry; dicts emit a single dotted-path-named
            singleton. Provider is forced to ``opnsense``. Per ADR-0016
            (#793 Phase 2).
 
@@ -623,8 +632,9 @@ class PackageLoader:
           YAML sequence; each entry must be a dict with a ``name:`` field.
           Each entry emits one ``ResourceConfig``.
         - **Dict-shape** path (e.g. ``firewall.log``) — leaf must be a YAML
-          mapping. Emits a single ``ResourceConfig`` with ``name="settings"``
-          and the mapping as ``config``.
+          mapping. Emits a single ``ResourceConfig`` named by its dotted
+          path (e.g. ``name="firewall.log"``, #1237) and the mapping as
+          ``config``.
 
         Unknown dotted paths and shape mismatches (operator typo
         ``firewall: {rules: {...}}`` instead of ``firewall: {rules: [...]}``)
@@ -671,10 +681,11 @@ class PackageLoader:
                             "('- name: ...' entries) for collections."
                         )
                     # Singleton leaf — emit one ResourceConfig with
-                    # name="settings" and the dict as config.
+                    # name=<dotted path> (unique per leaf, #1237) and the
+                    # dict as config.
                     results.append(
                         ResourceConfig(
-                            name="settings",
+                            name=dotted,
                             type=dotted,
                             provider=provider,
                             config=dict(value),
