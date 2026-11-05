@@ -1297,3 +1297,106 @@ def test_apply_aggregate_abort_raises() -> None:
     abort = EventResult(success=False, abort=True, reason="stop", handler_name="h")
     with pytest.raises(EventAbortedError):
         _apply_created(["a"], [_pkg_res("a", {"x": 1})], [abort])
+
+
+def _opnsense_executor(
+    apply_result: dict[str, Any], managed_rows: Any = None
+) -> tuple[DeploymentExecutor, MagicMock, MagicMock]:
+    """Build an executor with one runner returning ``apply_result``."""
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.apply = MagicMock(return_value=apply_result)
+    tf_runner.plan = MagicMock()
+    tf_runner.destroy = MagicMock()
+    tf_runner.get_resource_ids = MagicMock(return_value={})
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    runner_registry.create_runner.return_value = tf_runner
+
+    state_manager = MagicMock()
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    state_manager.get_managed_resources.return_value = (
+        managed_rows if managed_rows is not None else []
+    )
+    provider = MagicMock()
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=MagicMock(),
+        providers={"opnsense": provider},
+    )
+    return executor, tf_runner, state_manager
+
+
+def _apply_opnsense(executor: DeploymentExecutor, resources: list[Any]) -> dict[str, Any]:
+    return executor.apply_single_provider(
+        env_name="dev",
+        deployment_id=7,
+        provider_name="opnsense",
+        provider=MagicMock(),
+        resources=resources,
+        auto_approve=True,
+    )
+
+
+def test_apply_passes_managed_resources_to_runner() -> None:
+    """The runner receives the managed rows rebuilt as ResourceConfigs (#1256)."""
+    from types import SimpleNamespace
+
+    rows = [SimpleNamespace(resource_type="unbound.forwards", name="f1", config={"server": "x"})]
+    executor, runner, state = _opnsense_executor({"success": True}, rows)
+
+    _apply_opnsense(executor, [])
+
+    state.get_managed_resources.assert_called_once_with("dev", "opnsense")
+    managed = runner.apply.call_args.kwargs["managed_resources"]
+    assert [r.name for r in managed["unbound.forwards"]] == ["f1"]
+
+
+def test_apply_records_released_resources_as_deleted() -> None:
+    """Each released resource becomes a DELETED row carrying the managed config (#1256)."""
+    from types import SimpleNamespace
+
+    rows = [SimpleNamespace(resource_type="unbound.forwards", name="f1", config={"server": "x"})]
+    result = {
+        "success": True,
+        "released_resources": [{"resource_type": "unbound.forwards", "name": "f1"}],
+    }
+    executor, _, state = _opnsense_executor(result, rows)
+
+    _apply_opnsense(executor, [])
+
+    state.track_resource.assert_called_once_with(
+        deployment_id=7,
+        environment="dev",
+        provider="opnsense",
+        resource_type="unbound.forwards",
+        name="f1",
+        state=ResourceState.DELETED,
+        config={"server": "x"},
+    )
+
+
+def test_apply_records_nothing_when_runner_fails() -> None:
+    """A failed runner releases nothing (#1256)."""
+    result = {
+        "success": False,
+        "error": "boom",
+        "released_resources": [{"resource_type": "unbound.forwards", "name": "f1"}],
+    }
+    executor, _, state = _opnsense_executor(result)
+
+    with pytest.raises(Exception, match="boom"):
+        _apply_opnsense(executor, [])
+
+    assert state.track_resource.call_count == 0
+
+
+def test_apply_with_unreadable_managed_set_passes_empty_mapping() -> None:
+    """A MagicMock state manager (non-list rows) yields an empty managed mapping (#1256)."""
+    executor, runner, state = _opnsense_executor({"success": True})
+    state.get_managed_resources.return_value = MagicMock()
+
+    _apply_opnsense(executor, [])
+
+    assert runner.apply.call_args.kwargs["managed_resources"] == {}

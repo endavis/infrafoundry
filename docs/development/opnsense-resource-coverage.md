@@ -83,11 +83,27 @@ opnsense:
         - test.example.net
 ```
 
-## Removing the last entry of a list type (#1252)
+## How deletes work: the managed set (#1256)
 
-`infra plan` and `infra apply` skip any resource type with no entries in YAML. Removing the **last** entry of a list type (for example the only alias) therefore leaves the live objects on the box and shows no pending delete. Remove them in the OPNsense GUI, or keep one entry of that type declared so the type still reconciles.
+`opnsense_direct` deletes only objects InfraFoundry manages ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). A live object InfraFoundry never applied is kept, whether or not its type has YAML entries. `infra plan` shows those as `N unmanaged (kept)` on the type's summary line.
 
-This is deliberate: reconciling a type with no YAML entries would delete unmanaged objects of that type, because the state database cannot identify which live objects InfraFoundry manages. Singleton types are unaffected, since their destroy is a no-op. The full fix is tracked in [#1256](https://github.com/endavis/infrafoundry/issues/1256).
+**What counts as managed.** The state database keeps an append-only row per applied resource. For each type and name, the newest row that is `active` or `deleted` decides; the entry is managed when that row is `active`. A successful full `infra apply` records a `deleted` row for every managed name that is no longer in YAML, so it stops being managed. A managed entry InfraFoundry cannot resolve to a key (a row that no longer parses, or a host alias or kea reservation with no resolvable parent and no orphan match) is not released: it stays managed, the plan warns, and the next run retries it. A run that applies only part of the environment (`--add-only`, `-r`, `-p`) deletes nothing and records nothing.
+
+**Removing the last entry of a list type.** The type is still dispatched when it has managed objects, so removing the only alias, forward or reservation deletes that object on the next apply. A type with no YAML entries and nothing managed is skipped.
+
+**Two kinds of type.**
+
+- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets` and `kea.dhcp6.reservations`.
+- **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
+- **Singletons** (`system.*`, `unbound.advanced`, `radvd`) are unaffected.
+
+**Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
+
+**Parent and child types.** Unbound host overrides are applied before host aliases, and kea subnets before kea reservations. When a parent and its children leave YAML together, the parent is deleted first. The child is then matched to its parent through live orphans (an alias whose parent override is gone, a reservation whose subnet is gone) with the same MAC/DUID, or for an alias the same hostname and domain, as a managed entry. An alias is matched only when exactly one live orphan fits. A managed child with no parent and no single orphan match is skipped with a warning and retried on the next run. Whether OPNsense cascades the child delete, refuses the parent delete, or leaves an orphan is **unverified on a live box**: no box was contacted when this was written. If it cascades, the plan lists the child delete but the apply counts none for it. Check this on a live box after upgrading.
+
+**`lan` and `wan` are protected.** A managed `lan` or `wan` assignment is never deleted; it is reported as unmanaged and a warning is logged, because removing the interface the API is reached through would lock you out. Other assignments are deletable, including one that carries the management address. Keep the management interface in YAML with `lock: true`.
+
+**Known gap.** Removing the environment's last `provider: opnsense` resource still leaves its objects on the box, because the provider is not dispatched when it has no resources. Tracked in #1260.
 
 ## Box-to-box migration runbook (template)
 

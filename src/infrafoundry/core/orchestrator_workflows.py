@@ -24,6 +24,7 @@ from infrafoundry.core.events import EventAbortedError, EventManager, EventType
 from infrafoundry.core.exceptions import ProviderFilterError, TerraformError
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
 from infrafoundry.core.known_hosts import forget_on_jumphost, hosts_to_forget
+from infrafoundry.core.managed_set import build_managed_resources
 from infrafoundry.core.protocols import (
     ChecksFilteredDestroy,
     Destroyable,
@@ -607,6 +608,13 @@ class PlanOrchestrator(HookExecutionMixin):
                         self.console,
                     )
 
+                    # Rows InfraFoundry already applied: direct-API runners delete
+                    # only these (ADR-0018).
+                    managed = build_managed_resources(
+                        self.state_manager.get_managed_resources(env_name, provider_name),
+                        provider_name,
+                    )
+
                     for tool_name, runner in sorted_runners:
                         # Only IaC runners auto-run; config tools run as event handlers
                         if not runner.is_iac_runner:
@@ -649,6 +657,7 @@ class PlanOrchestrator(HookExecutionMixin):
                                     provider,
                                     target_resources=resource_filter if resource_filter else None,
                                     add_only=add_only,
+                                    managed_resources=managed,
                                 )
                                 provider_results[f"{tool_name}_plan"] = runner_result
 

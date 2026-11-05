@@ -28,9 +28,10 @@ plumbing fires on apply only (per ADR-0014 §"Finalization hooks").
 
 from __future__ import annotations
 
+import logging
 from typing import Any, ClassVar
 
-from infrafoundry.core.exceptions import ReferenceValidationError
+from infrafoundry.core.exceptions import InfraFoundryError, ReferenceValidationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
 
@@ -42,6 +43,8 @@ from ..services.unbound_host_alias import (
     unbound_host_alias_configs_from_resources,
 )
 from .base import BaseComponentManager
+
+logger = logging.getLogger(__name__)
 
 
 class UnboundHostAliasManager(BaseComponentManager):
@@ -59,6 +62,9 @@ class UnboundHostAliasManager(BaseComponentManager):
     #: per apply.
     FINALIZATION_HOOK: ClassVar[str] = "unbound_reconfigure"
 
+    #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
+    DELETE_SCOPE: ClassVar[str] = "managed_set"
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------
@@ -69,6 +75,7 @@ class UnboundHostAliasManager(BaseComponentManager):
         resources: list[ResourceConfig],
         *,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> Diff:
         """Compute the add/update/delete diff for the given resources.
@@ -77,6 +84,9 @@ class UnboundHostAliasManager(BaseComponentManager):
             env_name: Active environment name.
             resources: Host-alias ``ResourceConfig`` entries (filtered upstream).
             add_only: If True, suppress deletes for live aliases not in YAML.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live aliases matching them may be deleted; ``None`` deletes every
+                live alias missing from YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -89,7 +99,12 @@ class UnboundHostAliasManager(BaseComponentManager):
         service = UnboundHostAliasService.from_environment(env_name, provider_name, self.config_dir)
         desired = _resolve_host_uuids(unbound_host_alias_configs_from_resources(resources), service)
         live = service.search()
-        return service.compute_diff(desired, live, add_only=add_only)
+        return service.compute_diff(
+            desired,
+            live,
+            add_only=add_only,
+            managed_keys=_managed_alias_keys(managed_resources, service, live),
+        )
 
     def apply(
         self,
@@ -98,6 +113,7 @@ class UnboundHostAliasManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
         """Apply the diff: add/update/delete host aliases and reconfigure.
@@ -107,6 +123,9 @@ class UnboundHostAliasManager(BaseComponentManager):
             resources: Host-alias ``ResourceConfig`` entries.
             auto_approve: Currently a no-op; the diff engine is the gate.
             add_only: If True, suppress deletes.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live aliases matching them may be deleted; ``None`` deletes every
+                live alias missing from YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -121,7 +140,13 @@ class UnboundHostAliasManager(BaseComponentManager):
         service = UnboundHostAliasService.from_environment(env_name, provider_name, self.config_dir)
         desired = _resolve_host_uuids(unbound_host_alias_configs_from_resources(resources), service)
         live = service.search()
-        diff = service.compute_diff(desired, live, add_only=add_only)
+        unresolved_managed: set[str] = set()
+        diff = service.compute_diff(
+            desired,
+            live,
+            add_only=add_only,
+            managed_keys=_managed_alias_keys(managed_resources, service, live, unresolved_managed),
+        )
 
         outcomes: list[ResourceOutcome] = []
         for alias in diff.adds:
@@ -159,6 +184,7 @@ class UnboundHostAliasManager(BaseComponentManager):
             "resources_updated": counts["updated"],
             "resources_deleted": counts["deleted"],
             "resource_outcomes": outcomes,
+            "unresolved_managed": sorted(unresolved_managed),
         }
 
     def destroy(
@@ -290,6 +316,115 @@ class UnboundHostAliasManager(BaseComponentManager):
         return service.export_to_yaml()
 
 
+def _build_override_lookup(service: UnboundHostAliasService) -> dict[str, str]:
+    """Build the name-shape to UUID lookup over the live host overrides.
+
+    Keys are ``hostname.domain``, the bare ``hostname`` (first match wins) and the
+    override's UUID itself.
+
+    Args:
+        service: Service used to fetch the host-override rows.
+
+    Returns:
+        Mapping from each name shape to the override's UUID.
+    """
+    rows = service.search_host_overrides()
+    name_to_uuid: dict[str, str] = {}
+    for row in rows:
+        uuid = str(row.get("uuid", ""))
+        if not uuid:
+            continue
+        hostname = str(row.get("hostname", ""))
+        domain = str(row.get("domain", ""))
+        # ``hostname.domain`` form — the natural cross-ref shape.
+        if hostname and domain:
+            name_to_uuid[f"{hostname}.{domain}"] = uuid
+        if hostname:
+            # Bare hostname is convenient when there is exactly one match;
+            # if multiple overrides share a hostname across domains, the
+            # last one wins (best-effort — operator should use FQDN form).
+            name_to_uuid.setdefault(hostname, uuid)
+        # Defensive: operator might paste a UUID directly.
+        name_to_uuid[uuid] = uuid
+    return name_to_uuid
+
+
+def _managed_alias_keys(
+    managed: list[ResourceConfig] | None,
+    service: UnboundHostAliasService,
+    live: list[LiveUnboundHostAlias],
+    unresolved: set[str] | None = None,
+) -> set[tuple[str, str]] | None:
+    """Derive the live keys of the managed host-alias rows (ADR-0018).
+
+    A row's key is ``(parent_uuid, hostname)``. The parent override's UUID exists
+    only on the box, so the row's ``host_name`` is resolved against the same
+    live lookup the YAML aliases use, but without raising.
+
+    When the parent no longer resolves, for example because the override left
+    YAML in the same apply and was deleted first, the row falls back to the
+    orphan live aliases (parent UUID not any live override's) with the same
+    hostname. A row with neither a resolved parent nor an orphan match is
+    skipped with a warning, so it is never deleted.
+
+    Args:
+        managed: Managed host-alias rows, or ``None`` for the legacy full reconcile.
+        service: Service used to fetch the host-override rows.
+        live: Live aliases from the box.
+        unresolved: Optional collector for the names of rows that were skipped (could not
+            be parsed, or had neither a live parent nor an orphan match), so the runner
+            keeps them managed and retries them next run.
+
+    Returns:
+        The live keys that may be deleted, or ``None`` when ``managed`` is ``None``.
+    """
+    if managed is None:
+        return None
+    if not managed:
+        return set()
+    lookup = _build_override_lookup(service)
+    live_override_uuids = set(lookup.values())
+    keys: set[tuple[str, str]] = set()
+    for row in managed:
+        try:
+            configs = unbound_host_alias_configs_from_resources([row])
+        except (ValueError, TypeError, KeyError, InfraFoundryError):
+            logger.warning(
+                "unbound.host_aliases: managed row %r could not be parsed; it will not be deleted",
+                row.name,
+            )
+            if unresolved is not None:
+                unresolved.add(row.name)
+            continue
+        for cfg in configs:
+            parent_uuid = lookup.get(cfg.host_name)
+            if parent_uuid is not None:
+                keys.add((parent_uuid, cfg.hostname))
+                continue
+            # Match an orphan on hostname AND domain, and only when exactly one
+            # live orphan fits: an ambiguous match could delete an alias
+            # InfraFoundry never applied, so it fails closed instead.
+            orphans = [
+                alias.diff_key
+                for alias in live
+                if alias.host_uuid not in live_override_uuids
+                and alias.hostname == cfg.hostname
+                and str(alias.raw.get("domain", "")) == cfg.domain
+            ]
+            if len(orphans) != 1:
+                logger.warning(
+                    "unbound.host_aliases: managed alias %r has no live parent and %s orphan "
+                    "match; it will not be deleted",
+                    row.name,
+                    "no" if not orphans else "an ambiguous",
+                )
+                if unresolved is not None:
+                    unresolved.add(row.name)
+                continue
+            keys.update(orphans)
+    return keys
+
+
 def _resolve_host_uuids(
     configs: list[UnboundHostAliasConfig],
     service: UnboundHostAliasService,
@@ -319,24 +454,7 @@ def _resolve_host_uuids(
     if not configs:
         return []
 
-    rows = service.search_host_overrides()
-    name_to_uuid: dict[str, str] = {}
-    for row in rows:
-        uuid = str(row.get("uuid", ""))
-        if not uuid:
-            continue
-        hostname = str(row.get("hostname", ""))
-        domain = str(row.get("domain", ""))
-        # ``hostname.domain`` form — the natural cross-ref shape.
-        if hostname and domain:
-            name_to_uuid[f"{hostname}.{domain}"] = uuid
-        if hostname:
-            # Bare hostname is convenient when there is exactly one match;
-            # if multiple overrides share a hostname across domains, the
-            # last one wins (best-effort — operator should use FQDN form).
-            name_to_uuid.setdefault(hostname, uuid)
-        # Defensive: operator might paste a UUID directly.
-        name_to_uuid[uuid] = uuid
+    name_to_uuid = _build_override_lookup(service)
 
     resolved: list[UnboundHostAliasConfig] = []
     for cfg in configs:

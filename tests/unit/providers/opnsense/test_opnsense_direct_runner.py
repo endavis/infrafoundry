@@ -407,11 +407,13 @@ class TestFilteredRunsNeverDelete:
         manager_mock.plan.assert_called_once_with("test-env", resources, add_only=False)
 
 
-class TestTypeWithNoYamlEntriesIsSkipped:
-    """A type with no YAML entries is never dispatched (#1252, full fix in #1256).
+class TestTypeWithNoYamlEntriesIsSkippedWithoutManagedSet:
+    """A type with no YAML entries is not dispatched when no managed set is given (#1252).
 
-    Reconciling it would delete unmanaged live objects of that type, because the
-    runner cannot tell managed objects from unmanaged ones.
+    Without ``managed_resources`` the runner cannot tell managed objects from
+    unmanaged ones, so reconciling the type would delete unmanaged live objects.
+    With a managed set the type is dispatched only for its managed rows (#1256);
+    see ``TestTypeWithNoYamlEntriesDispatchedWhenManaged``.
     """
 
     def _setup(self, provider: MagicMock) -> tuple[MagicMock, MagicMock, MagicMock]:
@@ -1328,3 +1330,366 @@ class TestPlanEndpointSupport:
         result, manager, _, _ = self._run(provider_with_env, MagicMock())
         assert result["success"] is True
         manager.plan.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Managed-set deletes (#1256, ADR-0018)
+# ---------------------------------------------------------------------------
+
+
+def _scoped_manager(
+    scope: str | None, *, sibling_type: str | None = None, diff: Any = None
+) -> tuple[Any, MagicMock]:
+    """Build a manager class with the given ``DELETE_SCOPE`` and a mock instance."""
+    instance = MagicMock()
+    instance.plan.return_value = diff if diff is not None else Diff()
+    instance.apply.return_value = {
+        "success": True,
+        "resources_created": 0,
+        "resources_updated": 0,
+        "resources_deleted": 1,
+        "resource_outcomes": [],
+    }
+    attrs: dict[str, Any] = {}
+    if scope is not None:
+        attrs["DELETE_SCOPE"] = scope
+    if sibling_type is not None:
+        attrs["SIBLING_RESOURCE_TYPE"] = sibling_type
+    cls = MagicMock(return_value=instance, **{})
+    for key, value in attrs.items():
+        setattr(cls, key, value)
+    return cls, instance
+
+
+def _managed(*pairs: tuple[str, str]) -> dict[str, list[ResourceConfig]]:
+    """Build a managed-resources mapping from ``(type, name)`` pairs."""
+    out: dict[str, list[ResourceConfig]] = {}
+    for type_name, name in pairs:
+        out.setdefault(type_name, []).append(
+            ResourceConfig(name=name, type=type_name, provider="opnsense", config={"name": name})
+        )
+    return out
+
+
+class TestTypeWithNoYamlEntriesDispatchedWhenManaged:
+    """A type with no YAML entries is dispatched for its managed rows only (#1256)."""
+
+    def test_plan_dispatches_scoped_type_with_managed_rows(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        cls, instance = _scoped_manager("managed_set", diff=Diff(deletes=[MagicMock()]))
+        provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+        managed = _managed(("unbound.forwards", "f1"))
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            result = OPNsenseDirectRunner().plan(provider_with_env, managed_resources=managed)
+
+        instance.plan.assert_called_once()
+        assert instance.plan.call_args.args[1] == []
+        assert result["has_changes"] is True
+        assert "unbound.forwards: 0 to add, 0 to update, 1 to delete" in result["changes_summary"]
+
+    def test_empty_managed_list_is_not_dispatched(self, provider_with_env: MagicMock) -> None:
+        cls, instance = _scoped_manager("managed_set")
+        provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().plan(provider_with_env, managed_resources={})
+
+        instance.plan.assert_not_called()
+
+    def test_unscoped_manager_is_never_dispatched_without_yaml(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        cls, instance = _scoped_manager(None)
+        provider_with_env.get_direct_api_resource_types.return_value = {"system.tuning": cls}
+        managed = _managed(("system.tuning", "t1"))
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().plan(provider_with_env, managed_resources=managed)
+            OPNsenseDirectRunner().apply(provider_with_env, managed_resources=managed)
+
+        instance.plan.assert_not_called()
+        instance.apply.assert_not_called()
+
+    def test_plain_magicmock_class_is_not_scoped(self, provider_with_env: MagicMock) -> None:
+        instance = MagicMock()
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "unbound.forwards": MagicMock(return_value=instance)
+        }
+        managed = _managed(("unbound.forwards", "f1"))
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().plan(provider_with_env, managed_resources=managed)
+
+        instance.plan.assert_not_called()
+
+    def test_add_only_and_filtered_runs_never_dispatch_without_yaml(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        cls, instance = _scoped_manager("managed_set")
+        provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+        managed = _managed(("unbound.forwards", "f1"))
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().plan(provider_with_env, managed_resources=managed, add_only=True)
+            OPNsenseDirectRunner().apply(
+                provider_with_env, managed_resources=managed, target_resources=["x"]
+            )
+
+        instance.plan.assert_not_called()
+        instance.apply.assert_not_called()
+
+    def test_no_managed_set_keeps_legacy_skip(self, provider_with_env: MagicMock) -> None:
+        cls, instance = _scoped_manager("managed_set")
+        provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().plan(provider_with_env)
+
+        instance.plan.assert_not_called()
+
+    def test_endpoint_check_includes_types_dispatched_without_yaml(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        cls, _ = _scoped_manager("managed_set")
+        provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+        provider_with_env.check_endpoint_support.return_value = {"errors": [], "warnings": []}
+        managed = _managed(("unbound.forwards", "f1"))
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().plan(provider_with_env, managed_resources=managed)
+
+        provider_with_env.check_endpoint_support.assert_called_once_with(
+            "test-env", ["unbound.forwards"]
+        )
+
+    def test_apply_dispatches_scoped_type_with_managed_rows(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        cls, instance = _scoped_manager("marker")
+        provider_with_env.get_direct_api_resource_types.return_value = {"cron.jobs": cls}
+        managed = _managed(("cron.jobs", "j1"))
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            result = OPNsenseDirectRunner().apply(provider_with_env, managed_resources=managed)
+
+        instance.apply.assert_called_once()
+        assert result["resources_deleted"] == 1
+
+
+class TestManagedResourcesThreading:
+    """``managed_resources`` reaches only ``managed_set`` managers (#1256)."""
+
+    def test_only_managed_set_managers_receive_managed_resources(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        set_cls, set_inst = _scoped_manager("managed_set")
+        marker_cls, marker_inst = _scoped_manager("marker")
+        bare_cls, bare_inst = _scoped_manager(None)
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "unbound.forwards": set_cls,
+            "cron.jobs": marker_cls,
+            "system.tuning": bare_cls,
+        }
+        managed = _managed(("unbound.forwards", "f1"))
+        resources = [
+            ResourceConfig(name="j", type="cron.jobs", provider="opnsense", config={}),
+            ResourceConfig(name="t", type="system.tuning", provider="opnsense", config={}),
+        ]
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().plan(provider_with_env, managed_resources=managed)
+
+        assert [r.name for r in set_inst.plan.call_args.kwargs["managed_resources"]] == ["f1"]
+        assert "managed_resources" not in marker_inst.plan.call_args.kwargs
+        assert "managed_resources" not in bare_inst.plan.call_args.kwargs
+
+    def test_apply_threads_managed_resources(self, provider_with_env: MagicMock) -> None:
+        cls, inst = _scoped_manager("managed_set")
+        provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+        managed = _managed(("unbound.forwards", "f1"))
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().apply(provider_with_env, managed_resources=managed)
+
+        assert [r.name for r in inst.apply.call_args.kwargs["managed_resources"]] == ["f1"]
+
+    def test_no_managed_resources_kwarg_when_runner_got_none(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        cls, inst = _scoped_manager("managed_set")
+        provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+        resources = [
+            ResourceConfig(name="f", type="unbound.forwards", provider="opnsense", config={})
+        ]
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().plan(provider_with_env)
+
+        assert "managed_resources" not in inst.plan.call_args.kwargs
+
+
+class TestManagedSiblingThreading:
+    """``managed_sibling_resources`` reaches sibling-type managed_set managers (#1256)."""
+
+    def test_sibling_managed_rows_are_threaded(self, provider_with_env: MagicMock) -> None:
+        res_cls, res_inst = _scoped_manager("managed_set", sibling_type="kea.dhcp4.subnets")
+        plain_cls, plain_inst = _scoped_manager("managed_set")
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "kea.dhcp4.reservations": res_cls,
+            "unbound.forwards": plain_cls,
+        }
+        managed = _managed(
+            ("kea.dhcp4.reservations", "r1"),
+            ("kea.dhcp4.subnets", "s1"),
+            ("unbound.forwards", "f1"),
+        )
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().plan(provider_with_env, managed_resources=managed)
+
+        kwargs = res_inst.plan.call_args.kwargs
+        assert [r.name for r in kwargs["managed_sibling_resources"]] == ["s1"]
+        assert "managed_sibling_resources" not in plain_inst.plan.call_args.kwargs
+
+    def test_sibling_threaded_even_without_managed_subnets(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        res_cls, res_inst = _scoped_manager("managed_set", sibling_type="kea.dhcp4.subnets")
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "kea.dhcp4.reservations": res_cls
+        }
+        managed = _managed(("kea.dhcp4.reservations", "r1"))
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().apply(provider_with_env, managed_resources=managed)
+
+        assert res_inst.apply.call_args.kwargs["managed_sibling_resources"] == []
+
+
+class TestReleasedResources:
+    """Managed names that left YAML are reported as released after a full apply (#1256)."""
+
+    def _apply(
+        self,
+        provider: MagicMock,
+        managed: dict[str, list[ResourceConfig]],
+        resources: list[ResourceConfig],
+        scope: str | None = "managed_set",
+        **kwargs: Any,
+    ) -> Any:
+        cls, _ = _scoped_manager(scope)
+        provider.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            return OPNsenseDirectRunner().apply(provider, managed_resources=managed, **kwargs)
+
+    def _yaml(self, *names: str) -> list[ResourceConfig]:
+        return [
+            ResourceConfig(name=n, type="unbound.forwards", provider="opnsense", config={})
+            for n in names
+        ]
+
+    def test_released_is_managed_minus_yaml(self, provider_with_env: MagicMock) -> None:
+        managed = _managed(("unbound.forwards", "f1"), ("unbound.forwards", "f2"))
+        result = self._apply(provider_with_env, managed, self._yaml("f2"))
+        assert result["released_resources"] == [{"resource_type": "unbound.forwards", "name": "f1"}]
+
+    def test_released_when_last_entry_removed(self, provider_with_env: MagicMock) -> None:
+        managed = _managed(("unbound.forwards", "f1"))
+        result = self._apply(provider_with_env, managed, [])
+        assert result["released_resources"] == [{"resource_type": "unbound.forwards", "name": "f1"}]
+
+    def test_nothing_released_when_all_still_in_yaml(self, provider_with_env: MagicMock) -> None:
+        managed = _managed(("unbound.forwards", "f1"))
+        result = self._apply(provider_with_env, managed, self._yaml("f1"))
+        assert "released_resources" not in result
+
+    def test_no_release_in_add_only_or_filtered_mode(self, provider_with_env: MagicMock) -> None:
+        managed = _managed(("unbound.forwards", "f1"), ("unbound.forwards", "f2"))
+        add_only = self._apply(provider_with_env, managed, self._yaml("f2"), add_only=True)
+        filtered = self._apply(
+            provider_with_env, managed, self._yaml("f2"), target_resources=["f2"]
+        )
+        assert "released_resources" not in add_only
+        assert "released_resources" not in filtered
+
+    def test_no_release_for_unscoped_manager(self, provider_with_env: MagicMock) -> None:
+        managed = _managed(("unbound.forwards", "f1"))
+        result = self._apply(provider_with_env, managed, self._yaml("f2"), scope=None)
+        assert "released_resources" not in result
+
+    def test_no_release_on_failure(self, provider_with_env: MagicMock) -> None:
+        cls, inst = _scoped_manager("managed_set")
+        inst.apply.side_effect = RuntimeError("boom")
+        provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+        managed = _managed(("unbound.forwards", "f1"))
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            result = OPNsenseDirectRunner().apply(provider_with_env, managed_resources=managed)
+        assert result["success"] is False
+        assert "released_resources" not in result
+
+
+class TestUnmanagedSummary:
+    """The plan summary reports live objects kept because they are unmanaged (#1256)."""
+
+    def test_summary_appends_unmanaged_count(self) -> None:
+        diff = Diff(unmanaged=[MagicMock(), MagicMock()])
+        summary = OPNsenseDirectRunner._format_plan_summary(
+            "interfaces.vlans", diff, add_only=False
+        )
+        assert summary == (
+            "interfaces.vlans: 0 to add, 0 to update, 0 to delete, 0 locked, 2 unmanaged (kept)."
+        )
+
+    def test_summary_unchanged_without_unmanaged(self) -> None:
+        summary = OPNsenseDirectRunner._format_plan_summary(
+            "interfaces.vlans", Diff(), add_only=False
+        )
+        assert summary == "interfaces.vlans: 0 to add, 0 to update, 0 to delete, 0 locked."
+
+    def test_unmanaged_does_not_count_as_a_change(self) -> None:
+        assert Diff(unmanaged=[MagicMock()]).is_empty is True
+
+
+class TestUnresolvedManagedRowsAreNotReleased:
+    """Managed rows a manager could not resolve stay managed and are retried (#1256)."""
+
+    def _apply(
+        self, provider: MagicMock, managed: dict[str, list[ResourceConfig]], unresolved: Any
+    ) -> Any:
+        cls, inst = _scoped_manager("managed_set")
+        inst.apply.return_value = {
+            "success": True,
+            "resources_created": 0,
+            "resources_updated": 0,
+            "resources_deleted": 0,
+            "resource_outcomes": [],
+            "unresolved_managed": unresolved,
+        }
+        provider.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            return OPNsenseDirectRunner().apply(provider, managed_resources=managed)
+
+    def test_unresolved_name_is_excluded_and_resolved_absent_name_is_released(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        managed = _managed(("unbound.forwards", "stuck"), ("unbound.forwards", "gone"))
+        result = self._apply(provider_with_env, managed, ["stuck"])
+        assert result["released_resources"] == [
+            {"resource_type": "unbound.forwards", "name": "gone"}
+        ]
+
+    def test_nothing_released_when_every_name_is_unresolved(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        managed = _managed(("unbound.forwards", "stuck"))
+        result = self._apply(provider_with_env, managed, ["stuck"])
+        assert "released_resources" not in result
+
+    def test_missing_or_malformed_report_releases_as_before(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        managed = _managed(("unbound.forwards", "gone"))
+        result = self._apply(provider_with_env, managed, MagicMock())
+        assert [r["name"] for r in result["released_resources"]] == ["gone"]

@@ -451,3 +451,84 @@ class TestStateManager:
 
         # Verify dependency was added successfully
         # The test succeeds if no exception is raised
+
+
+class TestManagedResources:
+    """``get_managed_resources`` applies the latest-row rule (#1256, ADR-0018)."""
+
+    def _track(
+        self,
+        manager: StateManager,
+        deployment_id: int,
+        state: ResourceState,
+        *,
+        name: str = "f1",
+        resource_type: str = "unbound.forwards",
+        env: str = "dev",
+        provider: str = "opnsense",
+    ) -> None:
+        manager.track_resource(
+            deployment_id=deployment_id,
+            environment=env,
+            provider=provider,
+            resource_type=resource_type,
+            name=name,
+            state=state,
+            config={"name": name},
+        )
+
+    def _names(self, manager: StateManager, env: str = "dev") -> list[str]:
+        return sorted(r.name for r in manager.get_managed_resources(env, "opnsense"))
+
+    def test_active_then_planned_is_managed(self, state_manager: StateManager) -> None:
+        dep = state_manager.create_deployment("dev", "apply")
+        self._track(state_manager, dep, ResourceState.ACTIVE)
+        self._track(state_manager, dep, ResourceState.PLANNED)
+        assert self._names(state_manager) == ["f1"]
+
+    def test_active_then_deleted_is_not_managed(self, state_manager: StateManager) -> None:
+        dep = state_manager.create_deployment("dev", "apply")
+        self._track(state_manager, dep, ResourceState.ACTIVE)
+        self._track(state_manager, dep, ResourceState.DELETED)
+        assert self._names(state_manager) == []
+
+    def test_active_deleted_active_is_managed(self, state_manager: StateManager) -> None:
+        dep = state_manager.create_deployment("dev", "apply")
+        for state in (ResourceState.ACTIVE, ResourceState.DELETED, ResourceState.ACTIVE):
+            self._track(state_manager, dep, state)
+        assert self._names(state_manager) == ["f1"]
+
+    def test_planned_or_creating_only_is_not_managed(self, state_manager: StateManager) -> None:
+        dep = state_manager.create_deployment("dev", "apply")
+        self._track(state_manager, dep, ResourceState.PLANNED, name="p")
+        self._track(state_manager, dep, ResourceState.CREATING, name="c")
+        assert self._names(state_manager) == []
+
+    def test_other_environment_and_provider_are_excluded(self, state_manager: StateManager) -> None:
+        dep = state_manager.create_deployment("dev", "apply")
+        self._track(state_manager, dep, ResourceState.ACTIVE, name="mine")
+        self._track(state_manager, dep, ResourceState.ACTIVE, name="other-env", env="prod")
+        self._track(state_manager, dep, ResourceState.ACTIVE, name="other-prov", provider="proxmox")
+        assert self._names(state_manager) == ["mine"]
+
+    def test_same_name_in_two_types_is_tracked_separately(
+        self, state_manager: StateManager
+    ) -> None:
+        dep = state_manager.create_deployment("dev", "apply")
+        self._track(state_manager, dep, ResourceState.ACTIVE, resource_type="unbound.forwards")
+        self._track(state_manager, dep, ResourceState.ACTIVE, resource_type="firewall.aliases")
+        self._track(state_manager, dep, ResourceState.DELETED, resource_type="firewall.aliases")
+        rows = state_manager.get_managed_resources("dev", "opnsense")
+        assert [(r.resource_type, r.name) for r in rows] == [("unbound.forwards", "f1")]
+
+    def test_returns_the_newest_active_row(self, state_manager: StateManager) -> None:
+        dep = state_manager.create_deployment("dev", "apply")
+        state_manager.track_resource(
+            dep, "dev", "opnsense", "unbound.forwards", "f1", ResourceState.ACTIVE, {"v": 1}
+        )
+        state_manager.track_resource(
+            dep, "dev", "opnsense", "unbound.forwards", "f1", ResourceState.ACTIVE, {"v": 2}
+        )
+        rows = state_manager.get_managed_resources("dev", "opnsense")
+        assert len(rows) == 1
+        assert rows[0].config == {"v": 2}

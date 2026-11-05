@@ -53,6 +53,10 @@ class CronJobsManager(BaseComponentManager):
     #: changed state.
     FINALIZATION_HOOK: ClassVar[str] = "cron_reconfigure"
 
+    #: The diff engine deletes only objects carrying InfraFoundry's marker, so no
+    #: managed set is needed (ADR-0018).
+    DELETE_SCOPE: ClassVar[str] = "marker"
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------

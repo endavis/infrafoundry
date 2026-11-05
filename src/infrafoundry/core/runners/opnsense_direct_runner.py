@@ -19,6 +19,12 @@ components left; the priority is retained for the cross-runner ordering
 contract and for any future provider that introduces a terraform path
 behind direct-API state.
 
+Deletes are limited to the managed set (ADR-0018). The orchestrator and executor
+read the objects InfraFoundry applied before from the state database and pass them
+as ``managed_resources=``. A manager that declares ``DELETE_SCOPE`` deletes only
+those, and a type whose last YAML entry was removed is still dispatched so its
+managed objects go away. Live objects InfraFoundry never applied are left alone.
+
 Drift detection (``DriftDetectable``) is intentionally not implemented in this
 PR; ``infra plan`` provides equivalent UX via the diff engine, and a full
 ``DriftDetectable`` implementation is tracked as a follow-up issue.
@@ -32,6 +38,7 @@ from typing import Any, override
 
 from rich.console import Console
 
+from infrafoundry.core.managed_set import ManagedResources, ReleasedResource
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.result_types import ApplyResult, DestroyResult, PlanResult
 from infrafoundry.core.runners.base_runner import BaseRunner
@@ -215,6 +222,132 @@ class OPNsenseDirectRunner(BaseRunner):
         return [r for r in all_resources if r.type == sibling_type]
 
     @staticmethod
+    def _delete_scope(manager_cls: type[Any]) -> str | None:
+        """Return how a manager limits its deletes, or ``None`` if it does not opt in (#1256).
+
+        Managers declare a class-level ``DELETE_SCOPE: ClassVar[str]``:
+
+        - ``"managed_set"``: deletes only live objects InfraFoundry applied
+          before. The runner passes ``managed_resources=`` to the manager.
+        - ``"marker"``: the engine already deletes only objects carrying
+          InfraFoundry's marker, so no managed set is needed.
+
+        Args:
+            manager_cls: The manager class registered in the dispatch table.
+
+        Returns:
+            ``"managed_set"``, ``"marker"`` or ``None``.
+        """
+        scope = getattr(manager_cls, "DELETE_SCOPE", None)
+        if scope in ("managed_set", "marker"):
+            return str(scope)
+        return None
+
+    def _types_to_dispatch(
+        self,
+        dispatch_table: dict[str, type[Any]],
+        resources: list[ResourceConfig],
+        target_resources: list[str] | None,
+        *,
+        add_only: bool,
+        managed: ManagedResources | None,
+    ) -> list[tuple[str, type[Any], list[ResourceConfig]]]:
+        """Pick the types to dispatch, with the YAML resources each one gets.
+
+        A type with YAML entries is always dispatched. A type without any is
+        dispatched only to delete what InfraFoundry managed (#1256): the run
+        has a managed set, is not add-only, and the manager has a delete scope
+        and managed rows. Everything else is skipped, so unmanaged objects of
+        an unreferenced type are never touched.
+
+        Args:
+            dispatch_table: Provider dispatch table.
+            resources: All provider resources for the environment.
+            target_resources: Optional name filter.
+            add_only: Whether deletes are suppressed (filtered runs are add-only).
+            managed: Managed resources by type, or ``None`` when the caller
+                did not supply any (legacy behaviour).
+
+        Returns:
+            ``(type_name, manager_class, typed_resources)`` in table order.
+        """
+        selected: list[tuple[str, type[Any], list[ResourceConfig]]] = []
+        for type_name, manager_cls in dispatch_table.items():
+            typed = self._filter_by_type(resources, type_name, target_resources)
+            if typed:
+                selected.append((type_name, manager_cls, typed))
+                continue
+            if managed is None or add_only or self._delete_scope(manager_cls) is None:
+                continue
+            if managed.get(type_name):
+                selected.append((type_name, manager_cls, []))
+        return selected
+
+    def _managed_kwargs(
+        self,
+        type_name: str,
+        manager_cls: type[Any],
+        managed: ManagedResources | None,
+    ) -> dict[str, Any]:
+        """Build the managed-set kwargs for a manager that opted in (#1256).
+
+        Args:
+            type_name: Resource type being dispatched.
+            manager_cls: The manager class.
+            managed: Managed resources by type, or ``None``.
+
+        Returns:
+            ``managed_resources`` (and ``managed_sibling_resources`` for a
+            manager with a sibling type) for ``"managed_set"`` managers;
+            otherwise an empty dict.
+        """
+        if managed is None or self._delete_scope(manager_cls) != "managed_set":
+            return {}
+        kwargs: dict[str, Any] = {"managed_resources": list(managed.get(type_name, []))}
+        sibling_type = getattr(manager_cls, "SIBLING_RESOURCE_TYPE", None)
+        if isinstance(sibling_type, str) and sibling_type:
+            kwargs["managed_sibling_resources"] = list(managed.get(sibling_type, []))
+        return kwargs
+
+    @staticmethod
+    def _released_for(
+        type_name: str,
+        manager_cls: type[Any],
+        resources: list[ResourceConfig],
+        managed: ManagedResources | None,
+        unresolved: set[str] | None = None,
+    ) -> list[ReleasedResource]:
+        """List managed names of a type that left YAML (#1256).
+
+        Called after a full-mode apply of the type succeeded, so the engine
+        has deleted them (or found them already gone). Names in ``unresolved`` are
+        managed rows whose key the manager could not derive (fail closed); they stay
+        managed so the next run retries them and warns again.
+
+        Args:
+            type_name: Resource type just applied.
+            manager_cls: The manager class.
+            resources: All provider resources for the environment.
+            managed: Managed resources by type, or ``None``.
+            unresolved: Managed names the manager reported it could not resolve.
+
+        Returns:
+            One entry per managed name that is no longer in YAML and was resolved.
+        """
+        if managed is None or OPNsenseDirectRunner._delete_scope(manager_cls) is None:
+            return []
+        yaml_names = {r.name for r in resources if r.type == type_name}
+        blocked = unresolved or set()
+        seen: set[str] = set()
+        released: list[ReleasedResource] = []
+        for row in managed.get(type_name, []):
+            if row.name in yaml_names or row.name in seen or row.name in blocked:
+                continue
+            seen.add(row.name)
+            released.append({"resource_type": type_name, "name": row.name})
+        return released
+
+    @staticmethod
     def _filter_vlans(
         resources: list[ResourceConfig],
         target_resources: list[str] | None,
@@ -308,6 +441,10 @@ class OPNsenseDirectRunner(BaseRunner):
             **kwargs: Runner options:
                 - target_resources: Optional list of resource names to scope to.
                 - add_only: If True, suppress deletes (ADR-0014 §5).
+                - managed_resources: Managed rows by type from the state
+                  database (ADR-0018). Managers with a delete scope delete
+                  only these; a type with no YAML entries is dispatched when
+                  it has managed rows. ``None`` keeps the legacy behaviour.
 
         Returns:
             PlanResult with a human-readable changes summary.
@@ -327,12 +464,15 @@ class OPNsenseDirectRunner(BaseRunner):
         add_only = bool(kwargs.get("add_only", False)) or bool(target_resources)
 
         resources = self._load_provider_resources(provider)
+        managed: ManagedResources | None = kwargs.get("managed_resources")
+        selected = self._types_to_dispatch(
+            dispatch_table, resources, target_resources, add_only=add_only, managed=managed
+        )
 
         # Reject resource types the box's OPNsense version cannot serve before
-        # any manager touches the box (#1239). ``apply`` runs plan first.
-        types_in_scope = [
-            t for t in dispatch_table if self._filter_by_type(resources, t, target_resources)
-        ]
+        # any manager touches the box (#1239). ``apply`` runs plan first. Types
+        # dispatched only to delete managed objects are checked too (#1256).
+        types_in_scope = [type_name for type_name, _, _ in selected]
         if types_in_scope:
             support_errors = self._check_endpoint_support(provider, env_name, types_in_scope)
             if support_errors:
@@ -341,21 +481,10 @@ class OPNsenseDirectRunner(BaseRunner):
         any_changes = False
         summary_parts: list[str] = []
 
-        for type_name, manager_cls in dispatch_table.items():
-            typed_resources = self._filter_by_type(resources, type_name, target_resources)
-            if not typed_resources:
-                # Deliberate (#1252): a type with no YAML entries is skipped, so
-                # removing the LAST entry of a list type leaves its live objects
-                # on the box. A full reconcile here would delete unmanaged
-                # objects of that type: the state DB cannot identify managed
-                # objects (no DELETED marking, rows hold YAML names while managers
-                # match by natural key, and the runner has no StateManager).
-                # Full fix tracked in #1256.
-                continue
-
+        for type_name, manager_cls, typed_resources in selected:
             manager = manager_cls(provider.config_dir)
             sibling_resources = self._sibling_resources_for(manager_cls, resources)
-            extra_kwargs: dict[str, Any] = {}
+            extra_kwargs: dict[str, Any] = self._managed_kwargs(type_name, manager_cls, managed)
             if sibling_resources is not None:
                 extra_kwargs["sibling_resources"] = sibling_resources
             try:
@@ -436,6 +565,9 @@ class OPNsenseDirectRunner(BaseRunner):
             f"{type_name}: {len(diff.adds)} to add, {len(diff.updates)} to update, "
             f"{len(diff.deletes)} to delete, {len(diff.locked)} locked."
         )
+        unmanaged = getattr(diff, "unmanaged", None)
+        if isinstance(unmanaged, list) and unmanaged:
+            summary = summary[:-1] + f", {len(unmanaged)} unmanaged (kept)."
         if add_only:
             summary += " (add-only mode)"
         return summary
@@ -455,6 +587,8 @@ class OPNsenseDirectRunner(BaseRunner):
             **kwargs: Runner options:
                 - target_resources: Optional list of resource names.
                 - add_only: If True, suppress deletes.
+                - managed_resources: Managed rows by type, as for ``plan``
+                  (ADR-0018).
 
         Returns:
             ApplyResult with resource counts and a ``resource_outcomes`` list
@@ -475,11 +609,16 @@ class OPNsenseDirectRunner(BaseRunner):
         add_only = bool(kwargs.get("add_only", False)) or bool(target_resources)
 
         resources = self._load_provider_resources(provider)
+        managed: ManagedResources | None = kwargs.get("managed_resources")
+        selected = self._types_to_dispatch(
+            dispatch_table, resources, target_resources, add_only=add_only, managed=managed
+        )
 
         total_created = 0
         total_updated = 0
         total_deleted = 0
         all_outcomes: list[ResourceOutcome] = []
+        released_resources: list[ReleasedResource] = []
         any_dispatched = False
 
         # Track finalization-hook keys whose managers actually mutated state in
@@ -487,22 +626,12 @@ class OPNsenseDirectRunner(BaseRunner):
         # so multiple managers sharing a key share a single hook firing.
         triggered_hook_keys: set[str] = set()
 
-        for type_name, manager_cls in dispatch_table.items():
-            typed_resources = self._filter_by_type(resources, type_name, target_resources)
-            if not typed_resources:
-                # Deliberate (#1252): a type with no YAML entries is skipped, so
-                # removing the LAST entry of a list type leaves its live objects
-                # on the box. A full reconcile here would delete unmanaged
-                # objects of that type: the state DB cannot identify managed
-                # objects (no DELETED marking, rows hold YAML names while managers
-                # match by natural key, and the runner has no StateManager).
-                # Full fix tracked in #1256.
-                continue
+        for type_name, manager_cls, typed_resources in selected:
             any_dispatched = True
 
             manager = manager_cls(provider.config_dir)
             sibling_resources = self._sibling_resources_for(manager_cls, resources)
-            extra_kwargs: dict[str, Any] = {}
+            extra_kwargs: dict[str, Any] = self._managed_kwargs(type_name, manager_cls, managed)
             if sibling_resources is not None:
                 extra_kwargs["sibling_resources"] = sibling_resources
             try:
@@ -524,6 +653,16 @@ class OPNsenseDirectRunner(BaseRunner):
             total_updated += updated
             total_deleted += deleted
             all_outcomes.extend(result.get("resource_outcomes", []))
+            if not add_only:
+                reported = result.get("unresolved_managed")
+                unresolved = (
+                    {str(n) for n in reported}
+                    if isinstance(reported, (list, set, tuple))
+                    else set()
+                )
+                released_resources.extend(
+                    self._released_for(type_name, manager_cls, resources, managed, unresolved)
+                )
 
             had_changes = (created + updated + deleted) > 0
             if had_changes:
@@ -550,6 +689,8 @@ class OPNsenseDirectRunner(BaseRunner):
         }
         applied["resource_outcomes"] = all_outcomes
         applied["resource_outcomes_summary"] = [o.to_dict() for o in all_outcomes]
+        if released_resources:
+            applied["released_resources"] = released_resources
         return applied
 
     def _fire_finalization_hooks(

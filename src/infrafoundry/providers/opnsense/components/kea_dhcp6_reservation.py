@@ -51,6 +51,7 @@ Reconfigure semantics:
 
 from __future__ import annotations
 
+import logging
 from typing import Any, ClassVar
 
 from infrafoundry.core.exceptions import ReferenceValidationError
@@ -65,13 +66,16 @@ from ..services.kea_dhcp import (
 )
 from .base import BaseComponentManager
 
+logger = logging.getLogger(__name__)
+
 
 class _Diff:
     """Add/update/delete plan for DHCPv6 reservations.
 
     Same shape as :class:`.kea_dhcp6_subnet._Diff` so the runner's
     ``_format_plan_summary`` can read the plan summary uniformly across
-    every direct-API component.
+    every direct-API component. ``unmanaged`` holds live reservations kept
+    because InfraFoundry never applied them (ADR-0018).
     """
 
     def __init__(
@@ -80,10 +84,15 @@ class _Diff:
         adds: list[dict[str, Any]] | None = None,
         updates: list[tuple[str, dict[str, Any]]] | None = None,
         deletes: list[tuple[str, str]] | None = None,
+        unmanaged: list[tuple[str, str]] | None = None,
+        unresolved_managed: set[str] | None = None,
     ) -> None:
         self.adds: list[dict[str, Any]] = adds or []
         self.updates: list[tuple[str, dict[str, Any]]] = updates or []
         self.deletes: list[tuple[str, str]] = deletes or []
+        self.unmanaged: list[tuple[str, str]] = unmanaged or []
+        # Managed names whose key could not be resolved; the runner keeps them managed.
+        self.unresolved_managed: set[str] = unresolved_managed or set()
         self.locked: list[Any] = []
 
     @property
@@ -108,6 +117,9 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
     #: ``subnet_ref`` to a CIDR before the live UUID lookup.
     SIBLING_RESOURCE_TYPE: ClassVar[str | None] = "kea.dhcp6.subnets"
 
+    #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
+    DELETE_SCOPE: ClassVar[str] = "managed_set"
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------
@@ -118,6 +130,8 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
         resources: list[ResourceConfig],
         *,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
+        managed_sibling_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
         sibling_resources: list[ResourceConfig] | None = None,
     ) -> _Diff:
@@ -127,6 +141,11 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
             env_name: Active environment name.
             resources: DHCPv6 reservation ``ResourceConfig`` entries.
             add_only: If True, suppress deletes for live reservations not in YAML.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live reservations matching them may be deleted; ``None`` deletes
+                every live reservation missing from YAML.
+            managed_sibling_resources: Managed subnet rows, used to resolve the
+                managed reservations' ``subnet_ref`` after the subnet left YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
             sibling_resources: ``kea.dhcp6.subnets`` resources, threaded
                 in by ``OPNsenseDirectRunner``. Used to resolve
@@ -144,7 +163,14 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
         """
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
         name_to_cidr = _build_subnet_name_to_cidr(sibling_resources)
-        return self._compute_diff(service, resources, add_only=add_only, name_to_cidr=name_to_cidr)
+        return self._compute_diff(
+            service,
+            resources,
+            add_only=add_only,
+            name_to_cidr=name_to_cidr,
+            managed_resources=managed_resources,
+            managed_sibling_resources=managed_sibling_resources,
+        )
 
     def apply(
         self,
@@ -153,6 +179,8 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
+        managed_sibling_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
         sibling_resources: list[ResourceConfig] | None = None,
     ) -> dict[str, Any]:
@@ -166,6 +194,11 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
             resources: DHCPv6 reservation ``ResourceConfig`` entries.
             auto_approve: Currently a no-op; the diff engine is the gate.
             add_only: If True, suppress deletes.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live reservations matching them may be deleted; ``None`` deletes
+                every live reservation missing from YAML.
+            managed_sibling_resources: Managed subnet rows, used to resolve the
+                managed reservations' ``subnet_ref`` after the subnet left YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
             sibling_resources: ``kea.dhcp6.subnets`` resources, threaded
                 in by ``OPNsenseDirectRunner``. Used to resolve
@@ -183,7 +216,14 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
         del auto_approve
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
         name_to_cidr = _build_subnet_name_to_cidr(sibling_resources)
-        diff = self._compute_diff(service, resources, add_only=add_only, name_to_cidr=name_to_cidr)
+        diff = self._compute_diff(
+            service,
+            resources,
+            add_only=add_only,
+            name_to_cidr=name_to_cidr,
+            managed_resources=managed_resources,
+            managed_sibling_resources=managed_sibling_resources,
+        )
 
         outcomes: list[ResourceOutcome] = []
         created = 0
@@ -237,6 +277,7 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
             "resources_updated": updated,
             "resources_deleted": deleted,
             "resource_outcomes": outcomes,
+            "unresolved_managed": sorted(diff.unresolved_managed),
         }
 
     def destroy(
@@ -365,6 +406,8 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
         *,
         add_only: bool,
         name_to_cidr: dict[str, str],
+        managed_resources: list[ResourceConfig] | None = None,
+        managed_sibling_resources: list[ResourceConfig] | None = None,
     ) -> _Diff:
         """Compute the add/update/delete diff against live state.
 
@@ -412,18 +455,126 @@ class KeaDHCPv6ReservationManager(BaseComponentManager):
                 adds.append({**reservation_data, "__name__": resource.name})
 
         deletes: list[tuple[str, str]] = []
+        unmanaged: list[tuple[str, str]] = []
+        managed_keys: set[tuple[str, str]] | None = None
+        orphan_rows: dict[str, list[str]] = {}
+        unresolved: set[str] = set()
+        if managed_resources is not None and not add_only:
+            managed_keys, orphan_rows, unresolved = _managed_reservation_keys(
+                managed_resources,
+                {**_build_subnet_name_to_cidr(managed_sibling_resources), **name_to_cidr},
+                cidr_to_uuid,
+            )
         if not add_only:
+            live_subnet_uuids = set(cidr_to_uuid.values())
+            orphan_ids = set(orphan_rows)
+            live_orphan_ids = {
+                ident for (ident, sub) in live_by_key if sub not in live_subnet_uuids
+            }
+            for ident, names in orphan_rows.items():
+                if ident not in live_orphan_ids:
+                    logger.warning(
+                        "kea reservation: managed row(s) %s have no resolvable subnet and no "
+                        "orphan match; they will not be deleted",
+                        ", ".join(sorted(names)),
+                    )
+                    unresolved.update(names)
             for (duid, subnet_uuid), live in live_by_key.items():
                 if (duid, subnet_uuid) in seen_keys:
                     continue
                 live_uuid = str(live.get("uuid", ""))
                 if not live_uuid:
                     continue
+                if managed_keys is not None and not _is_managed_reservation(
+                    (duid, subnet_uuid), managed_keys, orphan_ids, live_subnet_uuids
+                ):
+                    unmanaged.append((live_uuid, duid or live_uuid))
+                    continue
                 # Synthetic descriptor for the delete outcome's resource_name.
                 descriptor = duid or live_uuid
                 deletes.append((live_uuid, descriptor))
 
-        return _Diff(adds=adds, updates=updates, deletes=deletes)
+        return _Diff(
+            adds=adds,
+            updates=updates,
+            deletes=deletes,
+            unmanaged=unmanaged,
+            unresolved_managed=unresolved,
+        )
+
+
+def _managed_reservation_keys(
+    managed: list[ResourceConfig],
+    name_to_cidr: dict[str, str],
+    cidr_to_uuid: dict[str, str],
+) -> tuple[set[tuple[str, str]], dict[str, list[str]], set[str]]:
+    """Derive the live keys of the managed reservation rows (ADR-0018).
+
+    Never raises: a managed row is only a candidate for deletion, so a row that
+    cannot be resolved must not stop the run. YAML rows keep their strict
+    resolution elsewhere.
+
+    A row resolves to ``(duid, subnet_uuid)`` through its subnet CIDR (the
+    ``subnet_ref`` or ``subnet`` field, looked up in ``name_to_cidr``) and then
+    the live subnet UUID. When the subnet cannot be resolved, for example because
+    the subnet left YAML in the same apply and was deleted first, the row's
+    ``duid`` goes into the second set. :func:`_is_managed_reservation` then
+    accepts a live reservation with that identifier only if its subnet no longer
+    exists on the box (an orphan). A row with no identifier is skipped.
+
+    Args:
+        managed: Managed reservation rows from the state database.
+        name_to_cidr: Subnet name to CIDR, YAML subnets over managed ones.
+        cidr_to_uuid: Live subnet CIDR to UUID.
+
+    Returns:
+        ``(keys, orphan_rows, unresolved)``: resolved ``(duid, subnet_uuid)`` keys,
+        the row names by identifier for rows whose subnet did not resolve, and the
+        names of rows with no identifier.
+    """
+    keys: set[tuple[str, str]] = set()
+    orphan_rows: dict[str, list[str]] = {}
+    unresolved: set[str] = set()
+    for row in managed:
+        identifier = str(row.config.get("duid") or "")
+        if not identifier:
+            logger.warning(
+                "kea reservation: managed row %r has no duid; it will not be deleted", row.name
+            )
+            unresolved.add(row.name)
+            continue
+        try:
+            subnet_uuid = cidr_to_uuid.get(_resolve_subnet_cidr(row, name_to_cidr), "")
+        except ReferenceValidationError:
+            subnet_uuid = ""
+        if subnet_uuid:
+            keys.add((identifier, subnet_uuid))
+        else:
+            orphan_rows.setdefault(identifier, []).append(row.name)
+    return keys, orphan_rows, unresolved
+
+
+def _is_managed_reservation(
+    key: tuple[str, str],
+    managed_keys: set[tuple[str, str]],
+    orphan_ids: set[str],
+    live_subnet_uuids: set[str],
+) -> bool:
+    """Return True if a live reservation may be deleted as managed (ADR-0018).
+
+    Args:
+        key: The live reservation's ``(duid, subnet_uuid)``.
+        managed_keys: Keys resolved from managed rows.
+        orphan_ids: Identifiers of managed rows whose subnet did not resolve.
+        live_subnet_uuids: UUIDs of the subnets on the box.
+
+    Returns:
+        True for a resolved managed key, or for an orphan (its subnet is gone)
+        whose identifier belongs to a managed row with an unresolved subnet.
+    """
+    if key in managed_keys:
+        return True
+    return key[0] in orphan_ids and key[1] not in live_subnet_uuids
 
 
 def _build_subnet_cidr_lookup(service: KeaDHCPService) -> dict[str, str]:

@@ -43,6 +43,7 @@ from ..services.kea_dhcp import (
     _extract_subnet4_fields,
     _log_field_diff,
 )
+from ._managed import subnet_cidr_keys
 from .base import BaseComponentManager
 
 
@@ -52,7 +53,8 @@ class _Diff:
     Lightweight container shaped after the other direct-API services'
     ``Diff`` dataclasses so the runner's ``_format_plan_summary`` can
     read ``adds``/``updates``/``deletes``/``locked`` and ``is_empty``
-    uniformly. ``locked`` is always empty here — DHCPv4 subnets do not
+    uniformly. ``unmanaged`` holds live subnets kept because InfraFoundry never
+    applied them (ADR-0018). ``locked`` is always empty here — DHCPv4 subnets do not
     yet support the per-resource ``lock: true`` annotation; promoting
     it is a separate change.
     """
@@ -63,10 +65,12 @@ class _Diff:
         adds: list[dict[str, Any]] | None = None,
         updates: list[tuple[str, dict[str, Any]]] | None = None,
         deletes: list[tuple[str, str]] | None = None,
+        unmanaged: list[tuple[str, str]] | None = None,
     ) -> None:
         self.adds: list[dict[str, Any]] = adds or []
         self.updates: list[tuple[str, dict[str, Any]]] = updates or []
         self.deletes: list[tuple[str, str]] = deletes or []
+        self.unmanaged: list[tuple[str, str]] = unmanaged or []
         self.locked: list[Any] = []
 
     @property
@@ -91,6 +95,9 @@ class KeaDHCPv4SubnetManager(BaseComponentManager):
     #: fires per apply regardless of which Kea components changed.
     FINALIZATION_HOOK: ClassVar[str] = "kea_reconfigure"
 
+    #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
+    DELETE_SCOPE: ClassVar[str] = "managed_set"
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------
@@ -101,6 +108,7 @@ class KeaDHCPv4SubnetManager(BaseComponentManager):
         resources: list[ResourceConfig],
         *,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> _Diff:
         """Compute the add/update/delete diff for the given subnets.
@@ -109,13 +117,21 @@ class KeaDHCPv4SubnetManager(BaseComponentManager):
             env_name: Active environment name.
             resources: DHCPv4 subnet ``ResourceConfig`` entries (filtered upstream).
             add_only: If True, suppress deletes for live subnets not in YAML.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live subnets matching them may be deleted; ``None`` deletes every
+                live subnet missing from YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
             ``_Diff`` describing what apply would do.
         """
         service = KeaDHCPService.from_environment(env_name, provider_name, self.config_dir)
-        return self._compute_diff(service, resources, add_only=add_only)
+        return self._compute_diff(
+            service,
+            resources,
+            add_only=add_only,
+            managed_keys=subnet_cidr_keys(managed_resources),
+        )
 
     def apply(
         self,
@@ -124,6 +140,7 @@ class KeaDHCPv4SubnetManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
         """Apply the diff: add / update / delete DHCPv4 subnets.
@@ -139,6 +156,9 @@ class KeaDHCPv4SubnetManager(BaseComponentManager):
             resources: DHCPv4 subnet ``ResourceConfig`` entries.
             auto_approve: Currently a no-op; the diff engine is the gate.
             add_only: If True, suppress deletes.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live subnets matching them may be deleted; ``None`` deletes every
+                live subnet missing from YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -158,7 +178,13 @@ class KeaDHCPv4SubnetManager(BaseComponentManager):
         if required_interfaces:
             service.ensure_dhcpv4_enabled(required_interfaces)
 
-        diff = self._compute_diff(service, resources, add_only=add_only)
+        unresolved_managed: set[str] = set()
+        diff = self._compute_diff(
+            service,
+            resources,
+            add_only=add_only,
+            managed_keys=subnet_cidr_keys(managed_resources, unresolved_managed),
+        )
 
         outcomes: list[ResourceOutcome] = []
         created = 0
@@ -209,6 +235,7 @@ class KeaDHCPv4SubnetManager(BaseComponentManager):
             "resources_updated": updated,
             "resources_deleted": deleted,
             "resource_outcomes": outcomes,
+            "unresolved_managed": sorted(unresolved_managed),
         }
 
     def destroy(
@@ -302,6 +329,7 @@ class KeaDHCPv4SubnetManager(BaseComponentManager):
         resources: list[ResourceConfig],
         *,
         add_only: bool,
+        managed_keys: set[str] | None = None,
     ) -> _Diff:
         """Compute the add/update/delete diff against live state.
 
@@ -309,7 +337,8 @@ class KeaDHCPv4SubnetManager(BaseComponentManager):
         operator-facing ``name`` injected as ``__name__`` so ``apply``
         can attribute outcomes); updates carry ``(uuid, subnet_data)``;
         deletes carry ``(uuid, subnet_address)`` for synthetic-name
-        construction.
+        construction. With ``managed_keys`` set, live subnets outside it are
+        reported in ``unmanaged`` instead of ``deletes``.
         """
         existing = service.search_dhcpv4_subnets()
         existing_by_subnet = {str(s.get("subnet", "")): str(s.get("uuid", "")) for s in existing}
@@ -340,12 +369,17 @@ class KeaDHCPv4SubnetManager(BaseComponentManager):
                 adds.append({**subnet_data, "__name__": resource.name})
 
         deletes: list[tuple[str, str]] = []
+        unmanaged: list[tuple[str, str]] = []
         if not add_only:
             for subnet_address, uuid in existing_by_subnet.items():
-                if subnet_address and subnet_address not in seen_subnets:
-                    deletes.append((uuid, subnet_address))
+                if not subnet_address or subnet_address in seen_subnets:
+                    continue
+                if managed_keys is not None and subnet_address not in managed_keys:
+                    unmanaged.append((uuid, subnet_address))
+                    continue
+                deletes.append((uuid, subnet_address))
 
-        return _Diff(adds=adds, updates=updates, deletes=deletes)
+        return _Diff(adds=adds, updates=updates, deletes=deletes, unmanaged=unmanaged)
 
 
 # (YAML key, option_data wire key) for the comma-joined list options.

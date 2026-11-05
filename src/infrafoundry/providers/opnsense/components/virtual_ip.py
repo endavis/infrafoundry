@@ -29,7 +29,7 @@ Failure modes:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.provider import ResourceConfig
@@ -43,6 +43,7 @@ from ..services.virtual_ip import (
     VirtualIPService,
     virtual_ip_configs_from_resources,
 )
+from ._managed import managed_keys as derive_managed_keys
 from .base import BaseComponentManager
 
 
@@ -56,6 +57,9 @@ class VirtualIPManager(BaseComponentManager):
     into ``PlanResult.error``/``ApplyResult.error``.
     """
 
+    #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
+    DELETE_SCOPE: ClassVar[str] = "managed_set"
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------
@@ -66,6 +70,7 @@ class VirtualIPManager(BaseComponentManager):
         resources: list[ResourceConfig],
         *,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> Diff:
         """Compute the add/update/delete diff for the given resources.
@@ -74,6 +79,9 @@ class VirtualIPManager(BaseComponentManager):
             env_name: Active environment name.
             resources: Virtual-IP ``ResourceConfig`` entries (filtered upstream).
             add_only: If True, suppress deletes for live VIPs not in YAML.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live objects matching them may be deleted; ``None`` deletes every
+                live object missing from YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -86,7 +94,16 @@ class VirtualIPManager(BaseComponentManager):
         service = VirtualIPService.from_environment(env_name, provider_name, self.config_dir)
         desired = self._resolve_and_parse(env_name, resources)
         live = service.search()
-        return service.compute_diff(desired, live, add_only=add_only)
+        return service.compute_diff(
+            desired,
+            live,
+            add_only=add_only,
+            managed_keys=derive_managed_keys(
+                managed_resources,
+                virtual_ip_configs_from_resources,
+                type_name="interfaces.virtual_ips",
+            ),
+        )
 
     def apply(
         self,
@@ -95,6 +112,7 @@ class VirtualIPManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
         """Apply the diff: add/update/delete virtual IPs and reconfigure.
@@ -104,6 +122,9 @@ class VirtualIPManager(BaseComponentManager):
             resources: Virtual-IP ``ResourceConfig`` entries.
             auto_approve: Currently a no-op; the diff engine is the gate.
             add_only: If True, suppress deletes.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live objects matching them may be deleted; ``None`` deletes every
+                live object missing from YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -118,7 +139,18 @@ class VirtualIPManager(BaseComponentManager):
         service = VirtualIPService.from_environment(env_name, provider_name, self.config_dir)
         desired = self._resolve_and_parse(env_name, resources)
         live = service.search()
-        diff = service.compute_diff(desired, live, add_only=add_only)
+        unresolved_managed: set[str] = set()
+        diff = service.compute_diff(
+            desired,
+            live,
+            add_only=add_only,
+            managed_keys=derive_managed_keys(
+                managed_resources,
+                virtual_ip_configs_from_resources,
+                type_name="interfaces.virtual_ips",
+                unresolved=unresolved_managed,
+            ),
+        )
 
         outcomes: list[ResourceOutcome] = []
         for vip in diff.adds:
@@ -156,6 +188,7 @@ class VirtualIPManager(BaseComponentManager):
             "resources_updated": counts["updated"],
             "resources_deleted": counts["deleted"],
             "resource_outcomes": outcomes,
+            "unresolved_managed": sorted(unresolved_managed),
         }
 
     def destroy(

@@ -35,6 +35,7 @@ from ..services.unbound_host_override import (
     UnboundHostOverrideService,
     unbound_host_override_configs_from_resources,
 )
+from ._managed import managed_keys as derive_managed_keys
 from .base import BaseComponentManager
 
 
@@ -53,6 +54,9 @@ class UnboundHostOverrideManager(BaseComponentManager):
     #: per apply.
     FINALIZATION_HOOK: ClassVar[str] = "unbound_reconfigure"
 
+    #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
+    DELETE_SCOPE: ClassVar[str] = "managed_set"
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------
@@ -63,6 +67,7 @@ class UnboundHostOverrideManager(BaseComponentManager):
         resources: list[ResourceConfig],
         *,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> Diff:
         """Compute the add/update/delete diff for the given resources.
@@ -71,6 +76,9 @@ class UnboundHostOverrideManager(BaseComponentManager):
             env_name: Active environment name.
             resources: Host-override ``ResourceConfig`` entries (filtered upstream).
             add_only: If True, suppress deletes for live overrides not in YAML.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live objects matching them may be deleted; ``None`` deletes every
+                live object missing from YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -81,7 +89,16 @@ class UnboundHostOverrideManager(BaseComponentManager):
         )
         desired = unbound_host_override_configs_from_resources(resources)
         live = service.search()
-        return service.compute_diff(desired, live, add_only=add_only)
+        return service.compute_diff(
+            desired,
+            live,
+            add_only=add_only,
+            managed_keys=derive_managed_keys(
+                managed_resources,
+                unbound_host_override_configs_from_resources,
+                type_name="unbound.host_overrides",
+            ),
+        )
 
     def apply(
         self,
@@ -90,6 +107,7 @@ class UnboundHostOverrideManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
         """Apply the diff: add/update/delete host overrides.
@@ -105,6 +123,9 @@ class UnboundHostOverrideManager(BaseComponentManager):
             resources: Host-override ``ResourceConfig`` entries.
             auto_approve: Currently a no-op; the diff engine is the gate.
             add_only: If True, suppress deletes.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live objects matching them may be deleted; ``None`` deletes every
+                live object missing from YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -117,7 +138,18 @@ class UnboundHostOverrideManager(BaseComponentManager):
         )
         desired = unbound_host_override_configs_from_resources(resources)
         live = service.search()
-        diff = service.compute_diff(desired, live, add_only=add_only)
+        unresolved_managed: set[str] = set()
+        diff = service.compute_diff(
+            desired,
+            live,
+            add_only=add_only,
+            managed_keys=derive_managed_keys(
+                managed_resources,
+                unbound_host_override_configs_from_resources,
+                type_name="unbound.host_overrides",
+                unresolved=unresolved_managed,
+            ),
+        )
 
         outcomes: list[ResourceOutcome] = []
         for override in diff.adds:
@@ -155,6 +187,7 @@ class UnboundHostOverrideManager(BaseComponentManager):
             "resources_updated": counts["updated"],
             "resources_deleted": counts["deleted"],
             "resource_outcomes": outcomes,
+            "unresolved_managed": sorted(unresolved_managed),
         }
 
     def destroy(

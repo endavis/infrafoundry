@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+from typing import Any, ClassVar
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
@@ -41,6 +41,7 @@ from ..services.interface_assignment import (
     find_lockout_conflicts,
     interface_assignment_configs_from_resources,
 )
+from ._managed import managed_keys as derive_managed_keys
 from .base import BaseComponentManager
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,9 @@ class InterfaceAssignmentManager(BaseComponentManager):
     table can call any registered manager uniformly.
     """
 
+    #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
+    DELETE_SCOPE: ClassVar[str] = "managed_set"
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------
@@ -74,6 +78,7 @@ class InterfaceAssignmentManager(BaseComponentManager):
         resources: list[ResourceConfig],
         *,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> Diff:
         """Compute the add/update/delete diff for the given resources.
@@ -84,6 +89,10 @@ class InterfaceAssignmentManager(BaseComponentManager):
                 entries (filtered upstream).
             add_only: If ``True``, suppress deletes for live entries
                 not in YAML.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live assignments matching them may be deleted, and ``lan`` and
+                ``wan`` never are; ``None`` deletes every live assignment missing
+                from YAML.
             provider_name: Provider identifier (defaults to
                 ``opnsense``).
 
@@ -95,7 +104,16 @@ class InterfaceAssignmentManager(BaseComponentManager):
         )
         desired = interface_assignment_configs_from_resources(resources)
         live = service.list()
-        return service.compute_diff(desired, live, add_only=add_only)
+        return service.compute_diff(
+            desired,
+            live,
+            add_only=add_only,
+            managed_keys=derive_managed_keys(
+                managed_resources,
+                interface_assignment_configs_from_resources,
+                type_name="interfaces.assignments",
+            ),
+        )
 
     def apply(
         self,
@@ -104,6 +122,7 @@ class InterfaceAssignmentManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
         """Apply the diff: add/update/delete assignments via the gist controller.
@@ -127,6 +146,10 @@ class InterfaceAssignmentManager(BaseComponentManager):
             auto_approve: Currently a no-op; the diff engine itself
                 is the gate.
             add_only: If ``True``, suppress deletes.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live assignments matching them may be deleted, and ``lan`` and
+                ``wan`` never are; ``None`` deletes every live assignment missing
+                from YAML.
             provider_name: Provider identifier (defaults to
                 ``opnsense``).
 
@@ -156,7 +179,18 @@ class InterfaceAssignmentManager(BaseComponentManager):
         )
         desired = interface_assignment_configs_from_resources(resources)
         live = service.list()
-        diff = service.compute_diff(desired, live, add_only=add_only)
+        unresolved_managed: set[str] = set()
+        diff = service.compute_diff(
+            desired,
+            live,
+            add_only=add_only,
+            managed_keys=derive_managed_keys(
+                managed_resources,
+                interface_assignment_configs_from_resources,
+                type_name="interfaces.assignments",
+                unresolved=unresolved_managed,
+            ),
+        )
 
         # Pre-flight 3: lockout check before mutating.
         conflicts = find_lockout_conflicts(diff, live)
@@ -173,6 +207,7 @@ class InterfaceAssignmentManager(BaseComponentManager):
             "resources_updated": apply_result.updated,
             "resources_deleted": apply_result.deleted,
             "resource_outcomes": outcomes,
+            "unresolved_managed": sorted(unresolved_managed),
         }
         if apply_result.failure_message is not None:
             # Surface partial-success counts in the operator-facing

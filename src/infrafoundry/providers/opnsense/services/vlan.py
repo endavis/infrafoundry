@@ -106,6 +106,7 @@ class Diff:
     adds: list[VlanConfig] = field(default_factory=list)
     updates: list[tuple[LiveVlan, VlanConfig]] = field(default_factory=list)
     deletes: list[LiveVlan] = field(default_factory=list)
+    unmanaged: list[LiveVlan] = field(default_factory=list)
     # Locked YAML entries paired with their live counterpart (or ``None`` if
     # declared-but-missing). Always reported in the plan output, never acted
     # on by ``apply``.
@@ -123,7 +124,11 @@ class Diff:
 
 
 def compute_diff(
-    desired: list[VlanConfig], current: list[LiveVlan], *, add_only: bool = False
+    desired: list[VlanConfig],
+    current: list[LiveVlan],
+    *,
+    add_only: bool = False,
+    managed_keys: set[tuple[str, int]] | None = None,
 ) -> Diff:
     """Compare desired YAML state to live state, keyed by ``(device, tag)``.
 
@@ -133,6 +138,9 @@ def compute_diff(
         add_only: If ``True``, never emit deletes for live resources that
             don't appear in ``desired``. Adds and updates still happen
             normally. Useful for partial migrations.
+        managed_keys: When given, only live objects whose key is in this set may be
+            deleted; other live objects missing from ``desired`` go to ``Diff.unmanaged``
+            (ADR-0018). ``None`` keeps the legacy full reconcile.
 
     Returns:
         A ``Diff`` with adds/updates/deletes plus a ``locked`` list of
@@ -146,6 +154,7 @@ def compute_diff(
     adds: list[VlanConfig] = []
     updates: list[tuple[LiveVlan, VlanConfig]] = []
     deletes: list[LiveVlan] = []
+    unmanaged: list[LiveVlan] = []
     locked: list[tuple[VlanConfig, LiveVlan | None]] = []
 
     for key, want in desired_by_key.items():
@@ -163,10 +172,14 @@ def compute_diff(
             if key in locked_keys:
                 # Already recorded above as locked; never emit a delete.
                 continue
-            if key not in desired_by_key:
-                deletes.append(have)
+            if key in desired_by_key:
+                continue
+            if managed_keys is not None and key not in managed_keys:
+                unmanaged.append(have)
+                continue
+            deletes.append(have)
 
-    return Diff(adds=adds, updates=updates, deletes=deletes, locked=locked)
+    return Diff(adds=adds, updates=updates, deletes=deletes, locked=locked, unmanaged=unmanaged)
 
 
 # ---------------------------------------------------------------------------
@@ -339,13 +352,14 @@ class VlanService(BaseService):
         live: list[LiveVlan],
         *,
         add_only: bool = False,
+        managed_keys: set[tuple[str, int]] | None = None,
     ) -> Diff:
         """Compute the add/update/delete diff between desired and live state.
 
         Thin wrapper over the module-level ``compute_diff`` for callers that
         prefer the service-method form.
         """
-        return compute_diff(desired, live, add_only=add_only)
+        return compute_diff(desired, live, add_only=add_only, managed_keys=managed_keys)
 
     def apply_diff(self, diff: Diff) -> dict[str, int]:
         """Dispatch the operations described by ``diff``, then reconfigure.

@@ -165,6 +165,7 @@ nav:
     - ADR-0015 OPNsense Firewall Rules: decisions/0015-opnsense-firewall-rules-direct-api-via-mvc-controller.md
     - ADR-0016 OPNsense Nested YAML Schema: decisions/0016-direct-opnsense-nested-yaml-schema.md
     - ADR-0017 Blueprint Requirements: decisions/0017-blueprint-declared-requirements-with-a-preflight-check.md
+    - ADR-0018 OPNsense Managed-Set Deletes: decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md
     - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
     - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
     - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md

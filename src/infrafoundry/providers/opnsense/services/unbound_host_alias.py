@@ -211,6 +211,7 @@ class Diff:
     adds: list[UnboundHostAliasConfig] = field(default_factory=list)
     updates: list[tuple[LiveUnboundHostAlias, UnboundHostAliasConfig]] = field(default_factory=list)
     deletes: list[LiveUnboundHostAlias] = field(default_factory=list)
+    unmanaged: list[LiveUnboundHostAlias] = field(default_factory=list)
     locked: list[tuple[UnboundHostAliasConfig, LiveUnboundHostAlias | None]] = field(
         default_factory=list
     )
@@ -231,6 +232,7 @@ def compute_diff(
     current: list[LiveUnboundHostAlias],
     *,
     add_only: bool = False,
+    managed_keys: set[tuple[str, str]] | None = None,
 ) -> Diff:
     """Compare desired YAML state to live state, keyed by ``(host_uuid, hostname)``.
 
@@ -240,6 +242,9 @@ def compute_diff(
         current: Aliases currently on the box.
         add_only: If True, never emit deletes for live aliases that don't
             appear in ``desired``. Adds and updates still happen.
+        managed_keys: When given, only live aliases whose key is in this set may be
+            deleted; other live aliases missing from ``desired`` go to
+            ``Diff.unmanaged`` (ADR-0018). ``None`` keeps the legacy full reconcile.
 
     Returns:
         ``Diff`` with adds / updates / deletes plus locked entries.
@@ -251,6 +256,7 @@ def compute_diff(
     adds: list[UnboundHostAliasConfig] = []
     updates: list[tuple[LiveUnboundHostAlias, UnboundHostAliasConfig]] = []
     deletes: list[LiveUnboundHostAlias] = []
+    unmanaged: list[LiveUnboundHostAlias] = []
     locked: list[tuple[UnboundHostAliasConfig, LiveUnboundHostAlias | None]] = []
 
     for key, want in desired_by_key.items():
@@ -267,10 +273,14 @@ def compute_diff(
         for key, have in current_by_key.items():
             if key in locked_keys:
                 continue
-            if key not in desired_by_key:
-                deletes.append(have)
+            if key in desired_by_key:
+                continue
+            if managed_keys is not None and key not in managed_keys:
+                unmanaged.append(have)
+                continue
+            deletes.append(have)
 
-    return Diff(adds=adds, updates=updates, deletes=deletes, locked=locked)
+    return Diff(adds=adds, updates=updates, deletes=deletes, locked=locked, unmanaged=unmanaged)
 
 
 def _needs_update(have: LiveUnboundHostAlias, want: UnboundHostAliasConfig) -> bool:
@@ -538,13 +548,14 @@ class UnboundHostAliasService(BaseService):
         live: list[LiveUnboundHostAlias],
         *,
         add_only: bool = False,
+        managed_keys: set[tuple[str, str]] | None = None,
     ) -> Diff:
         """Compute the add/update/delete diff between desired and live state.
 
         Thin wrapper over the module-level ``compute_diff`` for callers
         that prefer the service-method form.
         """
-        return compute_diff(desired, live, add_only=add_only)
+        return compute_diff(desired, live, add_only=add_only, managed_keys=managed_keys)
 
     def apply_diff(self, diff: Diff) -> dict[str, int]:
         """Dispatch the operations described by ``diff``.

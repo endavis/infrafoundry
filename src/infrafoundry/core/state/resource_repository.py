@@ -147,6 +147,40 @@ class ResourceRepository:
             session.expunge_all()
             return resources
 
+    def get_managed(self, environment: str, provider: str) -> list[Resource]:
+        """Return the rows InfraFoundry currently manages for a provider.
+
+        The ``resources`` table is append-only: plans add ``PLANNED`` rows and
+        destroys add a new row marked ``DELETED`` without touching older
+        ``ACTIVE`` rows. For each ``(resource_type, name)`` the newest row (by
+        ``id``) whose state is ``ACTIVE`` or ``DELETED`` decides: the entry is
+        managed when that row is ``ACTIVE``.
+
+        Args:
+            environment: Environment name
+            provider: Provider name
+
+        Returns:
+            The newest ``ACTIVE`` row of each managed ``(resource_type, name)``
+        """
+        with self.SessionLocal() as session:
+            rows = (
+                session.query(Resource)
+                .filter(
+                    Resource.environment == environment,
+                    Resource.provider == provider,
+                    Resource.state.in_([ResourceState.ACTIVE, ResourceState.DELETED]),
+                )
+                .order_by(Resource.id.asc())
+                .all()
+            )
+            latest: dict[tuple[str, str], Resource] = {}
+            for row in rows:
+                latest[(row.resource_type, row.name)] = row
+            managed = [row for row in latest.values() if row.state == ResourceState.ACTIVE]
+            session.expunge_all()
+            return managed
+
     def list_environments(self) -> list[str]:
         """List distinct environment names from tracked resources.
 

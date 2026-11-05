@@ -254,6 +254,7 @@ class Diff:
     adds: list[AliasConfig] = field(default_factory=list)
     updates: list[tuple[LiveAlias, AliasConfig]] = field(default_factory=list)
     deletes: list[LiveAlias] = field(default_factory=list)
+    unmanaged: list[LiveAlias] = field(default_factory=list)
     locked: list[tuple[AliasConfig, LiveAlias | None]] = field(default_factory=list)
 
     @property
@@ -272,6 +273,7 @@ def compute_diff(
     current: list[LiveAlias],
     *,
     add_only: bool = False,
+    managed_keys: set[str] | None = None,
 ) -> Diff:
     """Compare desired YAML state to live state, keyed by alias ``name``.
 
@@ -285,6 +287,9 @@ def compute_diff(
         current: Aliases currently on the box.
         add_only: If True, never emit deletes for live aliases that don't
             appear in ``desired``. Adds and updates still happen.
+        managed_keys: When given, only live objects whose key is in this set may be
+            deleted; other live objects missing from ``desired`` go to ``Diff.unmanaged``
+            (ADR-0018). ``None`` keeps the legacy full reconcile.
 
     Returns:
         ``Diff`` with adds / updates / deletes plus locked entries.
@@ -298,6 +303,7 @@ def compute_diff(
     adds: list[AliasConfig] = []
     updates: list[tuple[LiveAlias, AliasConfig]] = []
     deletes: list[LiveAlias] = []
+    unmanaged: list[LiveAlias] = []
     locked: list[tuple[AliasConfig, LiveAlias | None]] = []
 
     for key, want in desired_by_key.items():
@@ -314,10 +320,14 @@ def compute_diff(
         for key, have in current_by_key.items():
             if key in locked_keys:
                 continue
-            if key not in desired_by_key:
-                deletes.append(have)
+            if key in desired_by_key:
+                continue
+            if managed_keys is not None and key not in managed_keys:
+                unmanaged.append(have)
+                continue
+            deletes.append(have)
 
-    return Diff(adds=adds, updates=updates, deletes=deletes, locked=locked)
+    return Diff(adds=adds, updates=updates, deletes=deletes, locked=locked, unmanaged=unmanaged)
 
 
 def _needs_update(have: LiveAlias, want: AliasConfig) -> bool:
@@ -596,13 +606,14 @@ class AliasService(BaseService):
         live: list[LiveAlias],
         *,
         add_only: bool = False,
+        managed_keys: set[str] | None = None,
     ) -> Diff:
         """Compute the add/update/delete diff between desired and live state.
 
         Thin wrapper over the module-level ``compute_diff`` for callers
         that prefer the service-method form.
         """
-        return compute_diff(desired, live, add_only=add_only)
+        return compute_diff(desired, live, add_only=add_only, managed_keys=managed_keys)
 
     def apply_diff(self, diff: Diff) -> dict[str, int]:
         """Dispatch the operations described by ``diff``, then reconfigure.

@@ -11,7 +11,7 @@ takes no part in matching — that is entirely the diff engine's job in
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
@@ -34,6 +34,10 @@ class NATRuleManager(BaseComponentManager):
     is responsible for translating exceptions into ``PlanResult.error``/
     ``ApplyResult.error``.
     """
+
+    #: The diff engine deletes only objects carrying InfraFoundry's marker, so no
+    #: managed set is needed (ADR-0018).
+    DELETE_SCOPE: ClassVar[str] = "marker"
 
     # ------------------------------------------------------------------
     # Plan / apply / destroy

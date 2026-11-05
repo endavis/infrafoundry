@@ -348,7 +348,7 @@ foundry infra plan --env dev --verbose
 
 **Options:** `-e/--env TEXT` (required), `--dry-run`, `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `-P/--provider TEXT` (repeatable), `--enforce-policies`, `--add-only`, `-v/--verbose`
 
-**`--add-only`:** Suppresses deletes for live resources not present in YAML, for direct-API runners that compute live-vs-desired diffs (currently `OPNsenseDirectRunner`). Useful for partial cutover migrations where IaC adopts a subset of existing resources before taking full ownership. Other runners ignore the flag.
+**`--add-only`:** Suppresses deletes of managed objects for direct-API runners that compute live-vs-desired diffs (currently `OPNsenseDirectRunner`). The runner never deletes objects InfraFoundry did not apply, with or without this flag; see [How deletes work: the managed set](../development/opnsense-resource-coverage.md#how-deletes-work-the-managed-set-1256). Other runners ignore the flag.
 
 **`-P/--provider`:** Limit the operation to one or more providers. Cross-provider dependencies pointing at filtered-out providers are silently skipped for this run. Unknown provider names raise an error.
 
@@ -372,7 +372,7 @@ foundry infra apply --env dev --add-only
 
 **Options:** `-e/--env TEXT` (required), `--auto-approve`, `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `-P/--provider TEXT` (repeatable), `--parallel`, `--max-workers INTEGER` (default: 4), `--lock-timeout INTEGER` (default: 0), `--lock-ttl INTEGER` (default: 600), `--add-only`
 
-**`--add-only`:** Same semantics as `infra plan --add-only` — suppresses deletes for live resources missing from YAML during apply. Direct-API runners only.
+**`--add-only`:** Same semantics as `infra plan --add-only` — suppresses deletes of managed objects missing from YAML during apply. Objects InfraFoundry did not apply are never deleted. Direct-API runners only.
 
 **`-P/--provider`:** Same semantics as `infra plan --provider` — limit the operation to one or more providers. Mutually exclusive with `--package` and `--resource`.
 

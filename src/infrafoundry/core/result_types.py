@@ -8,6 +8,8 @@ dict-based code.
 
 from typing import Any, NotRequired, TypedDict
 
+from infrafoundry.core.managed_set import ReleasedResource
+
 
 class BaseResult(TypedDict):
     """Base result for all runner operations.
@@ -72,6 +74,13 @@ class ApplyResult(BaseResult):
 
     resources_deleted: NotRequired[int]
     """Number of resources deleted."""
+
+    released_resources: NotRequired[list[ReleasedResource]]
+    """Managed resources that left the desired state and were removed from the box.
+
+    The executor records each as a ``DELETED`` row so later runs stop treating it
+    as managed (ADR-0018).
+    """
 
 
 class DestroyResult(BaseResult):

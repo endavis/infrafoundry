@@ -164,6 +164,68 @@ def test_plan_orchestrator_runs_runners_in_priority_order(console: Console) -> N
     assert tf_runner.plan.call_args_list[0][0][0] == provider
 
 
+def _plan_with_runner(console: Console, *, dry_run: bool) -> tuple[MagicMock, MagicMock]:
+    """Run a one-provider plan and return ``(runner, state_manager)``."""
+    from types import SimpleNamespace
+
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 2
+    state_manager.get_managed_resources.return_value = [
+        SimpleNamespace(resource_type="unbound.forwards", name="f1", config={"server": "x"})
+    ]
+    runner = MagicMock()
+    runner.priority = 0
+    runner.plan = MagicMock(return_value={"success": True})
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    runner_registry.create_runner.return_value = runner
+    provider = MagicMock()
+    provider.generate_terraform = MagicMock()
+    providers: dict[str, ProviderBase] = {"proxmox": provider}
+
+    def load_resources(env: str) -> Any:
+        res = [_resource("vm1")]
+        return res, {"proxmox": res}
+
+    orchestrator = PlanOrchestrator(
+        console,
+        state_manager,
+        MagicMock(),
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda resources_by_provider, filt, reverse, env_name: [
+            ProviderResourceBatch("proxmox", resources_by_provider["proxmox"], 1)
+        ],
+        validate_resources=MagicMock(),
+        has_policies=lambda: False,
+        check_policies=MagicMock(),
+        secret_manager_factory=MagicMock(),
+        get_current_user=lambda: "tester",
+        fail_on_missing_secrets=False,
+        get_runner_priorities=lambda _: {},
+    )
+    orchestrator.plan(env_name="dev", dry_run=dry_run, resource_filter=None, enforce_policies=False)
+    return runner, state_manager
+
+
+def test_plan_orchestrator_passes_managed_resources_to_runner(console: Console) -> None:
+    """``runner.plan`` receives the managed rows from the state database (#1256)."""
+    runner, state_manager = _plan_with_runner(console, dry_run=False)
+
+    state_manager.get_managed_resources.assert_called_once_with("dev", "proxmox")
+    managed = runner.plan.call_args.kwargs["managed_resources"]
+    assert [r.name for r in managed["unbound.forwards"]] == ["f1"]
+
+
+def test_plan_orchestrator_dry_run_does_not_query_managed_set(console: Console) -> None:
+    """A dry run never reaches the runner, so it makes no managed-set query (#1256)."""
+    runner, state_manager = _plan_with_runner(console, dry_run=True)
+
+    runner.plan.assert_not_called()
+    state_manager.get_managed_resources.assert_not_called()
+
+
 def test_apply_orchestrator_uses_parallel_when_multiple_providers(console: Console) -> None:
     """Apply chooses parallel path when requested and multiple providers exist."""
     state_manager = MagicMock()

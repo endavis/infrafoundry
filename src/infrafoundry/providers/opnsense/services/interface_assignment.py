@@ -31,6 +31,7 @@ but never adds, updates, or deletes it.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -40,6 +41,13 @@ from infrafoundry.core.provider import ResourceConfig
 from .. import endpoints
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
+
+logger = logging.getLogger(__name__)
+
+#: Identifiers a restricted delete never removes, because the API is usually
+#: reached through one of them (ADR-0018). ``find_lockout_conflicts`` checks adds
+#: and updates only.
+PROTECTED_IDENTIFIERS: frozenset[str] = frozenset({"lan", "wan"})
 
 # ---------------------------------------------------------------------------
 # Module-level constants
@@ -187,6 +195,8 @@ class Diff:
         adds: New assignments to create.
         updates: ``(live, want)`` pairs that need a ``setItem`` call.
         deletes: Live assignments to remove.
+        unmanaged: Live assignments kept because InfraFoundry never applied them
+            (or because they are protected), see ADR-0018.
         locked: Locked YAML entries paired with their live
             counterpart (or ``None`` if declared-but-missing).
             Always reported in the plan output, never acted on by
@@ -198,6 +208,7 @@ class Diff:
         default_factory=list
     )
     deletes: list[LiveInterfaceAssignment] = field(default_factory=list)
+    unmanaged: list[LiveInterfaceAssignment] = field(default_factory=list)
     locked: list[tuple[InterfaceAssignmentConfig, LiveInterfaceAssignment | None]] = field(
         default_factory=list
     )
@@ -685,6 +696,8 @@ def compute_diff(
     current: list[LiveInterfaceAssignment],
     *,
     add_only: bool = False,
+    managed_keys: set[str] | None = None,
+    protected_keys: frozenset[str] = PROTECTED_IDENTIFIERS,
 ) -> Diff:
     """Compare desired YAML state to live state, keyed by logical name.
 
@@ -694,6 +707,12 @@ def compute_diff(
         add_only: If ``True``, never emit deletes for live resources
             that don't appear in ``desired``. Adds and updates still
             happen normally. Useful for partial migrations.
+        managed_keys: When given, only live assignments whose identifier is in this
+            set may be deleted; others missing from ``desired`` go to
+            ``Diff.unmanaged`` (ADR-0018). ``None`` keeps the legacy full reconcile.
+        protected_keys: Identifiers never deleted in restricted mode (``managed_keys``
+            given): they go to ``Diff.unmanaged`` with a warning, because removing
+            the assignment the API is reached through would lock the operator out.
 
     Returns:
         ``Diff`` describing what apply would do. Locked YAML entries
@@ -707,6 +726,7 @@ def compute_diff(
     adds: list[InterfaceAssignmentConfig] = []
     updates: list[tuple[LiveInterfaceAssignment, InterfaceAssignmentConfig]] = []
     deletes: list[LiveInterfaceAssignment] = []
+    unmanaged: list[LiveInterfaceAssignment] = []
     locked: list[tuple[InterfaceAssignmentConfig, LiveInterfaceAssignment | None]] = []
 
     for key, want in desired_by_key.items():
@@ -723,10 +743,23 @@ def compute_diff(
         for key, have in current_by_key.items():
             if key in locked_keys:
                 continue
-            if key not in desired_by_key:
-                deletes.append(have)
+            if key in desired_by_key:
+                continue
+            if managed_keys is not None:
+                if key not in managed_keys:
+                    unmanaged.append(have)
+                    continue
+                if key in protected_keys:
+                    logger.warning(
+                        "interface_assignments: not deleting '%s'; it is protected because the "
+                        "API may be reached through it. Keep it in YAML with lock: true.",
+                        key,
+                    )
+                    unmanaged.append(have)
+                    continue
+            deletes.append(have)
 
-    return Diff(adds=adds, updates=updates, deletes=deletes, locked=locked)
+    return Diff(adds=adds, updates=updates, deletes=deletes, locked=locked, unmanaged=unmanaged)
 
 
 # ---------------------------------------------------------------------------
@@ -881,13 +914,21 @@ class InterfaceAssignmentService(BaseService):
         live: list[LiveInterfaceAssignment],
         *,
         add_only: bool = False,
+        managed_keys: set[str] | None = None,
+        protected_keys: frozenset[str] = PROTECTED_IDENTIFIERS,
     ) -> Diff:
         """Compute the add/update/delete diff between desired and live state.
 
         Thin wrapper over the module-level ``compute_diff`` for
         callers that prefer the service-method form.
         """
-        return compute_diff(desired, live, add_only=add_only)
+        return compute_diff(
+            desired,
+            live,
+            add_only=add_only,
+            managed_keys=managed_keys,
+            protected_keys=protected_keys,
+        )
 
     def apply_diff(self, diff: Diff) -> ApplyDiffResult:
         """Dispatch the operations described by ``diff`` to the controller.

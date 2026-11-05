@@ -456,6 +456,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_infra_testing.py",
     "tests/unit/test_inventory_generator.py",
     "tests/unit/test_isc_to_kea_migration.py",
+    "tests/unit/test_managed_set.py",
     "tests/unit/test_manifest_utils.py",
     "tests/unit/test_minio_blueprint.py",
     "tests/unit/test_notifications.py",

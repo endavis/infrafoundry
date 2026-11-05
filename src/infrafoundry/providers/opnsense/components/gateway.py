@@ -11,7 +11,7 @@ no part in matching — that is entirely the diff engine's job in
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
@@ -22,6 +22,7 @@ from ..services.gateway import (
     LiveGateway,
     gateway_configs_from_resources,
 )
+from ._managed import managed_keys as derive_managed_keys
 from .base import BaseComponentManager
 
 
@@ -34,6 +35,9 @@ class GatewayManager(BaseComponentManager):
     ``ApplyResult.error``.
     """
 
+    #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
+    DELETE_SCOPE: ClassVar[str] = "managed_set"
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------
@@ -44,6 +48,7 @@ class GatewayManager(BaseComponentManager):
         resources: list[ResourceConfig],
         *,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> Diff:
         """Compute the add/update/delete diff for the given resources.
@@ -53,6 +58,9 @@ class GatewayManager(BaseComponentManager):
             resources: Gateway ``ResourceConfig`` entries (filtered upstream).
             add_only: If True, suppress deletes for managed live gateways
                 not in YAML. Dynamic gateways are always ignored.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live objects matching them may be deleted; ``None`` deletes every
+                live object missing from YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -61,7 +69,14 @@ class GatewayManager(BaseComponentManager):
         service = GatewayService.from_environment(env_name, provider_name, self.config_dir)
         desired = gateway_configs_from_resources(resources)
         live = service.search()
-        return service.compute_diff(desired, live, add_only=add_only)
+        return service.compute_diff(
+            desired,
+            live,
+            add_only=add_only,
+            managed_keys=derive_managed_keys(
+                managed_resources, gateway_configs_from_resources, type_name="routing.gateways"
+            ),
+        )
 
     def apply(
         self,
@@ -70,6 +85,7 @@ class GatewayManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
         """Apply the diff: add/update/delete gateways and reconfigure.
@@ -80,6 +96,9 @@ class GatewayManager(BaseComponentManager):
             auto_approve: Currently a no-op; the diff engine itself is
                 the gate.
             add_only: If True, suppress deletes.
+            managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
+                only live objects matching them may be deleted; ``None`` deletes every
+                live object missing from YAML.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -90,7 +109,18 @@ class GatewayManager(BaseComponentManager):
         service = GatewayService.from_environment(env_name, provider_name, self.config_dir)
         desired = gateway_configs_from_resources(resources)
         live = service.search()
-        diff = service.compute_diff(desired, live, add_only=add_only)
+        unresolved_managed: set[str] = set()
+        diff = service.compute_diff(
+            desired,
+            live,
+            add_only=add_only,
+            managed_keys=derive_managed_keys(
+                managed_resources,
+                gateway_configs_from_resources,
+                type_name="routing.gateways",
+                unresolved=unresolved_managed,
+            ),
+        )
 
         outcomes: list[ResourceOutcome] = []
         for gateway in diff.adds:
@@ -130,6 +160,7 @@ class GatewayManager(BaseComponentManager):
             "resources_updated": counts["updated"],
             "resources_deleted": counts["deleted"],
             "resource_outcomes": outcomes,
+            "unresolved_managed": sorted(unresolved_managed),
         }
 
     def destroy(

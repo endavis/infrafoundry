@@ -361,6 +361,18 @@ class StateManager(BaseManager):
         """
         return self.resources.get_all(environment, provider, resource_type, state)
 
+    def get_managed_resources(self, environment: str, provider: str) -> list[Resource]:
+        """Return the rows InfraFoundry currently manages for a provider.
+
+        Args:
+            environment: Environment name
+            provider: Provider name
+
+        Returns:
+            The newest ``ACTIVE`` row of each managed ``(resource_type, name)``
+        """
+        return self.resources.get_managed(environment, provider)
+
     def get_resource_by_name(self, environment: str, provider: str, name: str) -> Resource | None:
         """Get a resource by its unique identifiers.
 

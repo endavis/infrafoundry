@@ -11,6 +11,7 @@ from infrafoundry.core.config.models import IaCTool
 from infrafoundry.core.events import EventAbortedError, EventManager, EventType
 from infrafoundry.core.exceptions import InfraFoundryError, ResourceFilterError
 from infrafoundry.core.execution_planner import ExecutionPlanner
+from infrafoundry.core.managed_set import ReleasedResource, build_managed_resources
 from infrafoundry.core.protocols import Applyable, StateAware
 from infrafoundry.core.provider import ProviderBase, ResourceConfig, group_by_package_variables
 from infrafoundry.core.runner_results import raise_on_runner_failure
@@ -447,6 +448,11 @@ class DeploymentExecutor:
         runner_results: dict[str, Any] = {}
         terraform_ids: dict[str, str] = {}
         all_outcomes: list[ResourceOutcome] = []
+        # Rows InfraFoundry already applied: direct-API runners delete only these
+        # (ADR-0018). Read before this run's rows reach ACTIVE.
+        managed = build_managed_resources(
+            self.state_manager.get_managed_resources(env_name, provider_name), provider_name
+        )
 
         for tool_name, runner in self._get_sorted_runners():
             # Only IaC runners auto-run; config tools run as event handlers
@@ -488,6 +494,7 @@ class DeploymentExecutor:
                     parallelism=provider.terraform_parallelism,
                     add_only=add_only,
                     resource_names=[r.name for r in resources],
+                    managed_resources=managed,
                 )
                 runner_results[tool_name] = run_result
 
@@ -504,6 +511,13 @@ class DeploymentExecutor:
                     run_result,
                     provider_name=provider_name,
                     phase="apply",
+                )
+                self._record_released_resources(
+                    run_result.get("released_resources"),
+                    managed,
+                    deployment_id=deployment_id,
+                    env_name=env_name,
+                    provider_name=provider_name,
                 )
 
                 completed_event: RunnerEventData = {
@@ -598,6 +612,42 @@ class DeploymentExecutor:
                 ]
 
         return runner_results
+
+    def _record_released_resources(
+        self,
+        released: Any,
+        managed: Any,
+        *,
+        deployment_id: int,
+        env_name: str,
+        provider_name: str,
+    ) -> None:
+        """Mark resources a runner released as ``DELETED`` (ADR-0018).
+
+        Inserts one ``DELETED`` row per released resource, the way destroy does,
+        so the next run's managed set no longer contains it.
+
+        Args:
+            released: The runner's ``released_resources`` list, if any.
+            managed: Managed resources by type, used to copy the row config.
+            deployment_id: Deployment the new rows belong to.
+            env_name: Environment name.
+            provider_name: Provider name.
+        """
+        if not isinstance(released, list):
+            return
+        for item in cast(list[ReleasedResource], released):
+            rows = managed.get(item["resource_type"], [])
+            config = next((r.config for r in rows if r.name == item["name"]), None)
+            self.state_manager.track_resource(
+                deployment_id=deployment_id,
+                environment=env_name,
+                provider=provider_name,
+                resource_type=item["resource_type"],
+                name=item["name"],
+                state=ResourceState.DELETED,
+                config=config,
+            )
 
     def _fire_resource_lifecycle_events(
         self,
