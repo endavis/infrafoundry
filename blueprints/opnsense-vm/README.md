@@ -38,9 +38,10 @@ reach the API. The OPNsense provider can then manage it with no manual steps.
 3. **Manage it.** Point the environment's `opnsense` provider settings at
    `https://<wan_ip>` with the same key and secret.
 
-The bootstrap does not set a default gateway, DNS or LAN DHCP. Manage those
-with the provider (`gateways`, `system.dns`, `kea.dhcp4.subnets`) after the
-box is up.
+The bootstrap does not set a default gateway, DNS or LAN DHCP. Manage the
+gateway and LAN DHCP with the provider (`routing.gateways`,
+`kea.dhcp4.subnets`) after the box is up. The provider does not manage DNS on
+OPNsense 26.1; set it by hand on System > Settings > General.
 
 ## Usage
 
