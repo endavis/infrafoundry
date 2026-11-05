@@ -97,3 +97,48 @@ def test_publish_dns_emits_one_override_per_reservation(tmp_path: Path) -> None:
 def test_publish_dns_without_domain_fails(tmp_path: Path) -> None:
     with pytest.raises(InvalidConfigurationError, match="dns_domain must be set when publish_dns"):
         _load(tmp_path, "publish_dns: true\n")
+
+
+@pytest.mark.unit
+def test_publish_domain_overrides_dns_domain(tmp_path: Path) -> None:
+    resources = _load(
+        tmp_path,
+        'publish_dns: true\ndns_domain: "ontap.test"\ndns_publish_domain: "lab.test"\n',
+    )
+
+    overrides = [r for r in resources if r.type == OVERRIDE]
+    assert len(overrides) == 5
+    assert all(r.config["domain"] == "lab.test" for r in overrides)
+
+
+@pytest.mark.unit
+def test_publish_domain_alone_is_enough(tmp_path: Path) -> None:
+    resources = _load(tmp_path, 'publish_dns: true\ndns_publish_domain: "lab.test"\n')
+
+    overrides = [r for r in resources if r.type == OVERRIDE]
+    assert len(overrides) == 5
+    assert all(r.config["domain"] == "lab.test" for r in overrides)
+
+
+@pytest.mark.unit
+def test_empty_publish_domain_falls_back_to_dns_domain(tmp_path: Path) -> None:
+    resources = _load(
+        tmp_path, 'publish_dns: true\ndns_domain: "ontap.test"\ndns_publish_domain: ""\n'
+    )
+
+    overrides = [r for r in resources if r.type == OVERRIDE]
+    assert len(overrides) == 5
+    assert all(r.config["domain"] == "ontap.test" for r in overrides)
+
+
+@pytest.mark.unit
+def test_publish_dns_without_any_domain_names_dns_publish_domain(tmp_path: Path) -> None:
+    with pytest.raises(InvalidConfigurationError, match="dns_publish_domain"):
+        _load(tmp_path, "publish_dns: true\n")
+
+
+@pytest.mark.unit
+def test_publish_domain_ignored_when_publish_dns_is_false(tmp_path: Path) -> None:
+    resources = _load(tmp_path, 'publish_dns: false\ndns_publish_domain: "lab.test"\n')
+
+    assert [r for r in resources if r.type == OVERRIDE] == []

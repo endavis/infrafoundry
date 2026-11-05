@@ -17,10 +17,12 @@ prerequisites, and the description of the post-deploy event handler.
 Set `publish_dns: true` and `dns_domain` in `infrafoundry.yml` to create an
 OPNsense Unbound host override for each reserved IP: the cluster management LIF,
 both node management addresses and both data LIFs, named `<hostname>-dns`
-(for example `ontapcl-dev-dns`). `dns_domain` is required with `publish_dns` and
-doubles as ONTAP's DNS search domain. Clients must reach this OPNsense box's
-Unbound directly, or through an `unbound.forwards` entry for `dns_domain`
-(#1168). Turning `publish_dns` off may leave the last override on the box
+(for example `ontapcl-dev-dns`). The overrides use `dns_publish_domain`, or
+`dns_domain` when that is empty; one of the two is required with `publish_dns`.
+`dns_domain` also stays ONTAP's DNS search domain, so set `dns_publish_domain`
+when the OPNsense zone differs from it (#1267). Clients must reach this
+OPNsense box's Unbound directly, or through an `unbound.forwards` entry for the
+published domain (#1168). Turning `publish_dns` off may leave the last override on the box
 (#1252).
 
 ## Cluster interconnect MTU

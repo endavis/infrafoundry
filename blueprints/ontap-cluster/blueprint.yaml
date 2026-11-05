@@ -166,7 +166,10 @@ inputs:
     type: boolean
     default: false
   - name: dns_domain
-    description: "Domain for the host overrides; required when publish_dns is true"
+    description: "ONTAP DNS search domain; also the host override domain when dns_publish_domain is empty"
+    default: ""
+  - name: dns_publish_domain
+    description: "Domain for the published host overrides; falls back to dns_domain when empty. One of the two is required when publish_dns is true"
     default: ""
 
   # Extra Proxmox tags appended to the blueprint's default tags
