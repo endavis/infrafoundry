@@ -230,7 +230,14 @@ def _build_desired_reservation_fields(
 # from comparison only when the live response is missing/empty for that
 # field, so a future OPNsense version that does expose the value would
 # re-engage normal change-detection automatically.
-_ASYMMETRIC_SUBNET_FIELDS: Final[tuple[str, ...]] = ("valid_lifetime",)
+#
+# ``interface`` is also listed, applied defensively (#1253): the DHCPv4 subnet
+# returns no ``interface`` from ``getSubnet`` on OPNsense 26.1, but the DHCPv6
+# behaviour is unconfirmed (the bundled specs carry no Kea field schemas and
+# the test box has no subnet6 objects). The rule only skips the comparison when
+# the box returns nothing for it; ``interface`` is still sent on write, and a
+# live value that is present is still compared.
+_ASYMMETRIC_SUBNET_FIELDS: Final[tuple[str, ...]] = ("valid_lifetime", "interface")
 
 
 def _drop_non_round_trip_subnet_fields(
@@ -446,7 +453,14 @@ def _build_desired_reservation4_fields(reservation_data: dict[str, Any]) -> dict
 # The same ``valid_lifetime`` asymmetry applies — an empty live value is
 # dropped from the comparison so apply doesn't trigger spurious updates
 # every plan/apply cycle.
-_ASYMMETRIC_SUBNET4_FIELDS: Final[tuple[str, ...]] = ("valid_lifetime",)
+#
+# ``interface`` is in the same class on OPNsense 26.1: ``getSubnet`` returns
+# ``subnet4`` with no ``interface`` key (Kea's listen interfaces are the global
+# setting, managed via ``ensure_dhcpv4_enabled``). With the key absent the live
+# value normalizes to ``""`` and would differ from the desired value forever, so
+# it is not compared when the box does not return it (#1253). It is still sent
+# on write. A live value that is present is still compared.
+_ASYMMETRIC_SUBNET4_FIELDS: Final[tuple[str, ...]] = ("valid_lifetime", "interface")
 
 
 def _drop_non_round_trip_subnet4_fields(
@@ -459,7 +473,9 @@ def _drop_non_round_trip_subnet4_fields(
     :func:`_drop_non_round_trip_subnet_fields` for the DHCPv6 case; the
     desired-side payload sent to ``update_dhcp4_subnet`` still includes
     these fields, so apply continues to set them. This helper only
-    governs whether a diff is *triggered* by them.
+    governs whether a diff is *triggered* by them. ``interface`` is
+    included because OPNsense 26.1 returns no per-subnet interface on GET
+    (#1253); a non-empty live value is still compared.
     """
     for field in _ASYMMETRIC_SUBNET4_FIELDS:
         if not current_fields.get(field):

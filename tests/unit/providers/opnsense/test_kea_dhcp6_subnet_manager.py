@@ -182,6 +182,37 @@ class TestPlan:
         assert diff.is_empty
 
 
+class TestInterfaceNotReturnedByLiveApi:
+    """The live DHCPv6 subnet may return no ``interface`` (#1253, unconfirmed on 26.1)."""
+
+    @staticmethod
+    def _plan(live: dict[str, Any]) -> Any:
+        manager = KeaDHCPv6SubnetManager(Path("."))
+        service = _make_service_mock(
+            existing=[{"subnet": "fd00:1::/64", "uuid": "u1"}],
+            get_responses={"u1": {"subnet6": live}},
+        )
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            return manager.plan("test-env", [_subnet("vlan10-v6", interface="lan")])
+
+    def test_absent_live_interface_is_not_drift(self) -> None:
+        diff = self._plan({"subnet": "fd00:1::/64", "description": "vlan10-v6 desc"})
+        assert diff.updates == []
+
+    def test_present_but_different_live_interface_still_updates(self) -> None:
+        diff = self._plan(
+            {"subnet": "fd00:1::/64", "interface": "opt1", "description": "vlan10-v6 desc"}
+        )
+        assert len(diff.updates) == 1
+        assert diff.updates[0][1]["interface"] == "lan"
+
+    def test_other_field_differing_still_updates_without_live_interface(self) -> None:
+        diff = self._plan({"subnet": "fd00:1::/64", "description": "old"})
+        assert len(diff.updates) == 1
+        assert diff.updates[0][1]["interface"] == "lan"
+
+
 # ---------------------------------------------------------------------------
 # apply
 # ---------------------------------------------------------------------------

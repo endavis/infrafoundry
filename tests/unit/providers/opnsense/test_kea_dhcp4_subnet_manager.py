@@ -255,6 +255,37 @@ class TestPlan:
 # ---------------------------------------------------------------------------
 
 
+class TestInterfaceNotReturnedByLiveApi:
+    """OPNsense 26.1 returns no ``interface`` in getSubnet (#1253)."""
+
+    @staticmethod
+    def _plan(live: dict[str, Any], **overrides: Any) -> Any:
+        manager = KeaDHCPv4SubnetManager(Path("."))
+        service = _make_service_mock(
+            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            get_responses={"u1": {"subnet4": live}},
+        )
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            return manager.plan("test-env", [_subnet("vlan10", interface="lan", **overrides)])
+
+    def test_absent_live_interface_is_not_drift(self) -> None:
+        diff = self._plan({"subnet": "10.0.10.0/24", "description": "vlan10 desc"})
+        assert diff.updates == []
+
+    def test_present_but_different_live_interface_still_updates(self) -> None:
+        diff = self._plan(
+            {"subnet": "10.0.10.0/24", "interface": "opt1", "description": "vlan10 desc"}
+        )
+        assert len(diff.updates) == 1
+        assert diff.updates[0][1]["interface"] == "lan"
+
+    def test_other_field_differing_still_updates_without_live_interface(self) -> None:
+        diff = self._plan({"subnet": "10.0.10.0/24", "description": "old"})
+        assert len(diff.updates) == 1
+        assert diff.updates[0][1]["interface"] == "lan"
+
+
 class TestApply:
     def test_apply_creates_subnet_and_emits_outcome(self, tmp_path: Path) -> None:
         manager = KeaDHCPv4SubnetManager(tmp_path)
@@ -614,3 +645,29 @@ class TestExportReadsDottedOptionKeys:
         assert subnet["config"]["dns_servers"] == ["172.20.20.1", "172.20.10.1"]
         assert subnet["config"]["domain_name"] == "example.net"
         assert subnet["config"]["ntp_servers"] == ["172.20.20.1"]
+
+
+class TestDropNonRoundTripSubnet4Fields:
+    """Direct tests of the DHCPv4 drop helper for ``interface``."""
+
+    def test_drops_interface_from_both_sides_when_live_empty(self) -> None:
+        from infrafoundry.providers.opnsense.services.kea_dhcp import (
+            _drop_non_round_trip_subnet4_fields,
+        )
+
+        current = {"interface": "", "description": "a"}
+        desired = {"interface": "lan", "description": "a"}
+        _drop_non_round_trip_subnet4_fields(current, desired)
+        assert "interface" not in current
+        assert "interface" not in desired
+
+    def test_keeps_interface_when_live_present(self) -> None:
+        from infrafoundry.providers.opnsense.services.kea_dhcp import (
+            _drop_non_round_trip_subnet4_fields,
+        )
+
+        current = {"interface": "opt1"}
+        desired = {"interface": "lan"}
+        _drop_non_round_trip_subnet4_fields(current, desired)
+        assert current == {"interface": "opt1"}
+        assert desired == {"interface": "lan"}

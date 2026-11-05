@@ -40,6 +40,12 @@ InfraFoundry aligns OPNsense Kea DHCPv4 reservations with Proxmox VMs so VMs use
            - range: "172.20.10.100-172.20.10.200"
          dns_servers: ["172.20.10.1"]
    ```
+
+   `interface` is sent when the subnet is written, but OPNsense 26.1 does not
+   return it when the subnet is read back, so it is not compared for drift.
+   The interfaces Kea listens on are Kea's global setting, not per subnet.
+   DHCPv6 subnets get the same comparison rule; whether 26.1 returns the
+   interface for a DHCPv6 subnet is unconfirmed.
 2. Add a DHCP reservation for the VM. The reservation must point at a
    `kea_subnet` resource declared in the same environment. Two equivalent
    schemas are accepted:
