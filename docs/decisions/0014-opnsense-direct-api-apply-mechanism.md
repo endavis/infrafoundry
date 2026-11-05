@@ -35,6 +35,7 @@ tags:
 **Amended:** 2026-10-27 (#1144, #1149) — `radvd` and `cron.jobs` are accepted by `OPNsenseProvider.get_resource_types()`, which is now derived from the direct-API manager table. Before this they had managers but were rejected before planning. The seven `system.*` singletons from #806 stay rejected: on OPNsense 26.1 their services' read endpoints return 404 or an error (`system/general`, `system/settings`, `firmware/info`, `gdrivebackup/settings`, `diagnostics/system/sysctl`). #1149 resolves this (see the next line).
 **Amended:** 2026-11-04 (#1149) — `system.firmware` and `system.tuning` move to the 26.1 `core/firmware/*` and `core/tunables/*` controllers and are accepted (reads verified live on 26.1.6_2; writes follow the MVC convention and are not yet verified live). `system.hostname`, `system.dns`, `system.ssh`, `system.webgui` and `system.remotebackup` have no API on 26.1 and are retired: they move to `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (type to reason), surfaced through the additive `ProviderBase.get_unsupported_resource_types()` hook so `infra plan`/`apply` and `infra doctor` report the reason. Their managers stay registered but are unreachable; deleting them is a follow-up.
 **Amended:** 2026-11-04 (#1237) — singleton identity is now the dotted type (`system.tuning`, `radvd`, …) instead of the shared name `settings`, so several singletons coexist in one environment. `resources` rows recorded as `(opnsense, <singleton type>, settings)` are renamed to the dotted type by an idempotent migration in `StateManager.initialize()`; history tables are untouched. `-r settings` is replaced by `-r <dotted type>`.
+**Amended:** 2026-11-05 (#1244) — the unreachable implementation of the five retired types (`system.hostname`, `system.dns`, `system.ssh`, `system.webgui`, `system.remotebackup`) is removed: their components, services and validators (including `components/system_hostname.py` and `validators/_secrets.py`), the matching `SystemClient` methods and tests. `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES`, the `DOTTED_RESOURCE_SHAPES` entries and the retired endpoint registry entries stay, so the types are still rejected with their #1149 reason.
 **Status:** Accepted
 
 ## Status
@@ -282,7 +283,7 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 ### `system.hostname` (#806, 2026-05-10)
 
-**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149).
+**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149); implementation removed (#1244).
 
 **Mechanism:** Stock direct-REST against `system/general/*` (default §1 path). New singleton component manager `SystemHostnameManager` (in `components/system_hostname.py`) drives `OPNsenseDirectRunner` for hostname/domain/timezone/language drift. First of the 7 `opnsense.system.*` singletons added in #806, all sharing the new `_singleton.py` helper (`SingletonDiff`, `diff_singleton`, `enforce_singleton`).
 
@@ -295,7 +296,7 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 ### `system.dns` (#806, 2026-05-10)
 
-**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149).
+**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149); implementation removed (#1244).
 
 **Mechanism:** Stock direct-REST sharing the `system/general/*` controller with `system.hostname` — the same XML block in OPNsense's config carries both surfaces, but the InfraFoundry component split keeps them as independent singletons so an operator can edit DNS resolvers without touching hostname.
 
@@ -308,7 +309,7 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 ### `system.ssh` (#806, 2026-05-10)
 
-**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149).
+**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149); implementation removed (#1244).
 
 **Mechanism:** Stock direct-REST against `system/settings/*` (the SSH and WebGUI surfaces share that controller; this manager only writes the `ssh` subkey).
 
@@ -321,7 +322,7 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 ### `system.webgui` (#806, 2026-05-10)
 
-**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149).
+**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149); implementation removed (#1244).
 
 **Mechanism:** Stock direct-REST against `system/settings/*` (subkey `webgui` — shared controller with `system.ssh`).
 
@@ -350,7 +351,7 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 ### `system.remotebackup` (#806, 2026-05-10)
 
-**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149).
+**Not in effect:** no API on OPNsense 26.1; the type is rejected via `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES` (#1149); implementation removed (#1244).
 
 **Mechanism:** Stock direct-REST against the modern `gdrivebackup/settings/*` MVC controller. **Second direct-API surface** (after `virtual_ips` from #723) to carry secret-bearing fields — the trigger for the secret-required validator pattern in `validators/_secrets.py`.
 
@@ -504,6 +505,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#709](https://github.com/endavis/infrafoundry/issues/709): feat: add `OPNsenseDirectRunner` and migrate VLAN component to direct-API (first implementation).
 - Issue [#711](https://github.com/endavis/infrafoundry/issues/711): feat: add OPNsense `interface_assignments` component (read-only / migrate; dispatch-table refactor).
 - Issue [#707](https://github.com/endavis/infrafoundry/issues/707): chore: write ADR-0014 codifying OPNsense direct-API apply mechanism (this ADR).
+- Issue [#1244](https://github.com/endavis/infrafoundry/issues/1244): refactor: remove the unreachable implementation of the five retired OPNsense system types.
 - Issue [#705](https://github.com/endavis/infrafoundry/issues/705): feat: spike direct-API VLAN component to inform ADR-0014 (closed; PR [#706](https://github.com/endavis/infrafoundry/pull/706) merged).
 - Issue [#701](https://github.com/endavis/infrafoundry/issues/701): the ADR-0013 work that deferred this decision (PR [#704](https://github.com/endavis/infrafoundry/pull/704)).
 - Upstream [`endavis/opnsense-openapi#32`](https://github.com/endavis/opnsense-openapi/issues/32): bug — spec generator emits wrong controller names for multi-word controllers (blocker for typed surface).

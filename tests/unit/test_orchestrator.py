@@ -338,6 +338,37 @@ class TestOrchestratorValidateResources:
         with pytest.raises(ValueError, match=r"not supported through the OPNsense API on 26\.1"):
             orchestrator.validate_resources([bad])
 
+    @pytest.mark.parametrize(
+        "resource_type",
+        ["system.hostname", "system.dns", "system.ssh", "system.webgui", "system.remotebackup"],
+    )
+    def test_validate_resources_rejects_each_retired_opnsense_type(
+        self, tmp_path: Path, resource_type: str
+    ) -> None:
+        """Each retired system type fails plan-time validation with the #1149 message."""
+        from infrafoundry.core.provider import unsupported_resource_message
+        from infrafoundry.providers.opnsense import OPNsenseProvider
+
+        provider = OPNsenseProvider(tmp_path, tmp_path)
+        config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
+        orchestrator = Orchestrator(config_manager)
+        orchestrator.register_provider(provider)
+
+        bad = Mock()
+        bad.provider = "opnsense"
+        bad.type = resource_type
+        bad.name = "retired"
+        expected = unsupported_resource_message(
+            "opnsense",
+            "retired",
+            resource_type,
+            provider.get_unsupported_resource_types()[resource_type],
+        )
+        with pytest.raises(ValueError) as excinfo:
+            orchestrator.validate_resources([bad])
+        assert str(excinfo.value) == expected
+
     def test_validate_resources_empty_list(self, tmp_path: Path) -> None:
         """Test validation succeeds with empty resource list."""
         config_manager = Mock(spec=ConfigManager)

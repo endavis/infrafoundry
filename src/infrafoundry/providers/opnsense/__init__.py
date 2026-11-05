@@ -87,8 +87,8 @@ class OPNsenseProvider(
     #: future manager that has not been verified against a live box.
     UNVERIFIED_RESOURCE_TYPES: ClassVar[frozenset[str]] = frozenset()
 
-    #: Types with a (now unreachable) manager whose endpoints 404 on OPNsense
-    #: 26.1 and have no API replacement. Mapped to the reason shown by
+    #: Types whose endpoints 404 on OPNsense 26.1 and have no API replacement;
+    #: their implementation was removed in #1244. Mapped to the reason shown by
     #: ``infra plan``/``apply`` and ``infra doctor`` (#1149). The page names
     #: are the legacy GUI pages; the remotebackup page name is an inference.
     UNSUPPORTED_RESOURCE_TYPES: ClassVar[dict[str, str]] = {
@@ -261,13 +261,8 @@ class OPNsenseProvider(
         from .components.nat_rule import NATRuleManager
         from .components.radvd import RadvdManager
         from .components.static_route import StaticRouteManager
-        from .components.system_dns import SystemDnsManager
         from .components.system_firmware import SystemFirmwareManager
-        from .components.system_hostname import SystemHostnameManager
-        from .components.system_remotebackup import SystemRemoteBackupManager
-        from .components.system_ssh import SystemSshManager
         from .components.system_tuning import SystemTuningManager
-        from .components.system_webgui import SystemWebguiManager
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
         from .components.unbound_host_override import UnboundHostOverrideManager
@@ -290,12 +285,7 @@ class OPNsenseProvider(
         # so a brand-new override exists on the box before any aliases
         # reference it (#776).
         return {
-            "system.hostname": SystemHostnameManager,
-            "system.dns": SystemDnsManager,
-            "system.ssh": SystemSshManager,
-            "system.webgui": SystemWebguiManager,
             "system.firmware": SystemFirmwareManager,
-            "system.remotebackup": SystemRemoteBackupManager,
             "system.tuning": SystemTuningManager,
             "interfaces.vlans": VlanManager,
             "interfaces.assignments": InterfaceAssignmentManager,

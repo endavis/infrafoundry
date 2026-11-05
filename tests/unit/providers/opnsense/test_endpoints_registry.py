@@ -45,7 +45,10 @@ def test_sample_path_has_no_placeholders() -> None:
 
 def test_resource_types_match_the_provider(tmp_path: Path) -> None:
     provider = OPNsenseProvider(config_dir=tmp_path, output_dir=tmp_path)
-    assert set(endpoints.RESOURCE_TYPE_ENDPOINTS) == set(provider.get_direct_api_resource_types())
+    direct = set(provider.get_direct_api_resource_types())
+    unsupported = set(provider.get_unsupported_resource_types())
+    assert set(endpoints.RESOURCE_TYPE_ENDPOINTS) == direct | unsupported
+    assert not direct & unsupported
 
 
 def test_extension_entries_are_exactly_assign_settings() -> None:

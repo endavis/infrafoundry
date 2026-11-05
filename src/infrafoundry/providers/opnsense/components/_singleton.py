@@ -1,11 +1,9 @@
 """Shared helper for OPNsense singleton component managers (#806).
 
-Singleton components (``system.hostname``, ``system.dns``, ``system.ssh``,
-``system.webgui``, ``system.firmware``, ``system.remotebackup``,
-``system.tuning``, and future per-box settings under the ``opnsense.system.*``
-namespace) all share the same diff shape: compare a flat-string field map
-extracted from the live OPNsense response against a flat-string field map
-built from the desired YAML. If they match, no apply is needed; if they
+Singleton components (``system.firmware``, ``system.tuning``, and future per-box
+settings under the ``opnsense.system.*`` namespace) all share the same diff shape: compare a
+flat-string field map extracted from the live OPNsense response against a
+flat-string field map built from the desired YAML. If they match, no apply is needed; if they
 differ, apply with the desired payload.
 
 This module owns:
@@ -51,7 +49,7 @@ def enforce_singleton(
     Args:
         resources: Resource list passed to ``plan`` / ``apply``.
         type_name: The dotted type name for the singleton (e.g.,
-            ``"system.hostname"``); used in the error message.
+            ``"system.tuning"``); used in the error message.
 
     Raises:
         InvalidConfigurationError: If ``len(resources) != 1``.

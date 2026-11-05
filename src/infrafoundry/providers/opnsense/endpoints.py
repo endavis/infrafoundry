@@ -341,7 +341,8 @@ TUNABLES_SET = Endpoint("POST", "core/tunables/setItem/{uuid}")
 TUNABLES_DEL = Endpoint("POST", "core/tunables/delItem/{uuid}")
 TUNABLES_RECONFIGURE = Endpoint("POST", "core/tunables/reconfigure")
 
-# --- retired by #1149: kept so the conformance test proves they are absent ------------
+# --- retired by #1149, implementation removed in #1244: kept so the conformance test
+# proves they are absent and the registry still names the retired types ------------
 SYSTEM_GENERAL_GET = Endpoint("GET", "system/general/get")
 SYSTEM_GENERAL_SET = Endpoint("POST", "system/general/set")
 SYSTEM_SETTINGS_GET = Endpoint("GET", "system/settings/get")
@@ -357,8 +358,10 @@ _KEA_V4 = (KEA_DHCPV4_GET, KEA_DHCPV4_SET, KEA_RECONFIGURE)
 _KEA_V6 = (KEA_DHCPV6_GET, KEA_DHCPV6_SET, KEA_RECONFIGURE)
 
 #: Endpoints each resource type's plan/apply path calls, keyed like
-#: ``OPNsenseProvider.get_direct_api_resource_types()``. Registered but uncalled
-#: methods (firmware remove/lock, tunables del, filter savepoint) are not listed.
+#: ``OPNsenseProvider.get_direct_api_resource_types()`` plus
+#: ``OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES`` (the retired types, #1244).
+#: Registered but uncalled methods (firmware remove/lock, tunables del, filter
+#: savepoint) are not listed.
 RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     "system.hostname": (SYSTEM_GENERAL_GET, SYSTEM_GENERAL_SET),
     "system.dns": (SYSTEM_GENERAL_GET, SYSTEM_GENERAL_SET),

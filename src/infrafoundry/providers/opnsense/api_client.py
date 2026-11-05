@@ -691,17 +691,15 @@ class KeaClient:
 class SystemClient:
     """OPNsense ``<system>`` block API operations (#806).
 
-    Wraps :class:`OPNsenseClient` with one ``get_*_settings`` /
-    ``set_*_settings`` pair per ``opnsense.system.*`` singleton surface
-    plus the firmware plugin install/lock/remove verbs. Each pair lines
-    up with a singleton component manager declared in
+    Wraps :class:`OPNsenseClient` with the firmware (plugin install/lock/remove)
+    and tunables verbs behind the ``system.firmware`` and ``system.tuning``
+    singleton managers declared in
     ``OPNsenseProvider.get_direct_api_resource_types()``.
 
-    ``system.firmware`` and ``system.tuning`` use the 26.1 ``core/firmware``
-    and ``core/tunables`` controllers (#1149): the reads were verified live
-    on 26.1.6_2, the writes follow the MVC convention and are unverified.
-    The general/settings/gdrivebackup methods are retained but 404 on 26.1;
-    their types are unsupported.
+    Both use the 26.1 ``core/firmware`` and ``core/tunables`` controllers
+    (#1149): the reads were verified live on 26.1.6_2, the writes follow the
+    MVC convention and are unverified. The general/settings/gdrivebackup
+    methods were removed with their unsupported types (#1244).
 
     Args:
         client: ``OPNsenseClient`` instance for making authenticated requests.
@@ -710,75 +708,6 @@ class SystemClient:
     def __init__(self, client: OPNsenseClient) -> None:
         """Initialize SystemClient with an OPNsense client wrapper."""
         self.client = client
-
-    # ------------------------------------------------------------------
-    # system.hostname (and shared with system.dns; see services for split)
-    # ------------------------------------------------------------------
-
-    def get_general_settings(self) -> dict[str, Any]:
-        """Fetch the OPNsense system general settings (hostname/domain/dns).
-
-        404 on 26.1; type is unsupported (#1149).
-
-        Returns:
-            Raw API response. The wire envelope is typically nested under
-            ``{"general": {...}}`` or ``{"system": {"general": {...}}}`` —
-            services normalize either shape via ``extract_*_fields``.
-        """
-        return self.client.request(
-            endpoints.SYSTEM_GENERAL_GET.method, endpoints.SYSTEM_GENERAL_GET.path()
-        )
-
-    def set_general_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Update OPNsense system general settings.
-
-        404 on 26.1; type is unsupported (#1149).
-
-        Args:
-            settings: Settings payload, typically wrapped in a ``general``
-                or ``system.general`` envelope (matches the GET shape).
-
-        Returns:
-            Response with ``result`` field (e.g., ``"saved"``).
-        """
-        return self.client.request(
-            endpoints.SYSTEM_GENERAL_SET.method, endpoints.SYSTEM_GENERAL_SET.path(), data=settings
-        )
-
-    # ------------------------------------------------------------------
-    # system.ssh / system.webgui (shared system/settings controller)
-    # ------------------------------------------------------------------
-
-    def get_system_settings(self) -> dict[str, Any]:
-        """Fetch the OPNsense system settings (ssh + webgui subkeys).
-
-        404 on 26.1; type is unsupported (#1149).
-
-        Returns:
-            Raw API response. Subkeys ``ssh`` and ``webgui`` are read by
-            the per-surface services.
-        """
-        return self.client.request(
-            endpoints.SYSTEM_SETTINGS_GET.method, endpoints.SYSTEM_SETTINGS_GET.path()
-        )
-
-    def set_system_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Update OPNsense system settings.
-
-        404 on 26.1; type is unsupported (#1149).
-
-        Args:
-            settings: Payload for the ssh/webgui sub-blocks. The caller is
-                responsible for wrapping under the correct envelope.
-
-        Returns:
-            Response with ``result`` field.
-        """
-        return self.client.request(
-            endpoints.SYSTEM_SETTINGS_SET.method,
-            endpoints.SYSTEM_SETTINGS_SET.path(),
-            data=settings,
-        )
 
     # ------------------------------------------------------------------
     # system.firmware
@@ -882,39 +811,6 @@ class SystemClient:
         """
         return self.client.request(
             endpoints.FIRMWARE_LOCK.method, endpoints.FIRMWARE_LOCK.path(name=quote(name, safe=""))
-        )
-
-    # ------------------------------------------------------------------
-    # system.remotebackup (gdrivebackup MVC)
-    # ------------------------------------------------------------------
-
-    def get_remotebackup_settings(self) -> dict[str, Any]:
-        """Fetch OPNsense remote-backup (Google Drive) settings.
-
-        404 on 26.1; type is unsupported (#1149).
-
-        Returns:
-            Raw API response. The wire envelope is typically
-            ``{"gdrivebackup": {"general": {...}}}`` (modern MVC) or
-            ``{"general": {...}}`` — services normalize either shape.
-        """
-        return self.client.request(
-            endpoints.GDRIVEBACKUP_GET.method, endpoints.GDRIVEBACKUP_GET.path()
-        )
-
-    def set_remotebackup_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Update OPNsense remote-backup (Google Drive) settings.
-
-        404 on 26.1; type is unsupported (#1149).
-
-        Args:
-            settings: Payload (envelope matches the GET shape).
-
-        Returns:
-            Response with ``result`` field.
-        """
-        return self.client.request(
-            endpoints.GDRIVEBACKUP_SET.method, endpoints.GDRIVEBACKUP_SET.path(), data=settings
         )
 
     # ------------------------------------------------------------------

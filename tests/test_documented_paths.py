@@ -104,6 +104,8 @@ ALLOWED: dict[str, str] = {
     # Template-owned test (ADR-9017, TEMPLATE_OWNED_TEST_FILES): it lives in
     # pyproject-template and is never copied into a project made from it (#1208).
     "tests/template/test_utils.py": "template-owned test named in ADR-9017, absent here",
+    "components/system_hostname.py": "named in ADR-0014 as removed (#1244)",
+    "validators/_secrets.py": "named in ADR-0014 as removed (#1244)",
 }
 
 # Package-agnostic exemptions, as compiled regex -> reason. These are worked

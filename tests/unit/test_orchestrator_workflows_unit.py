@@ -2365,6 +2365,29 @@ def test_doctor_reports_unsupported_type_with_reason(console: Console) -> None:
     assert "not supported on this box" in failed[0].message
 
 
+@pytest.mark.parametrize(
+    "rtype",
+    ["system.hostname", "system.dns", "system.ssh", "system.webgui", "system.remotebackup"],
+)
+def test_doctor_rejects_each_retired_opnsense_type(console: Console, rtype: str) -> None:
+    """Each retired system type fails doctor with the exact #1149 message, no network."""
+    from infrafoundry.core.provider import unsupported_resource_message
+    from infrafoundry.providers.opnsense import OPNsenseProvider
+
+    real = OPNsenseProvider(Path("."), Path("."))
+    provider = MagicMock(wraps=real)
+    provider.validate_connectivity = MagicMock()
+    provider.validate_references = MagicMock()
+
+    results = _doctor_results(provider, console, rtype)
+
+    failed = [r for r in results["opnsense"]["report"].results if not r.passed]
+    assert [r.check_name for r in failed] == ["unsupported_resource_type_thing"]
+    assert failed[0].message == unsupported_resource_message(
+        "opnsense", "thing", rtype, real.get_unsupported_resource_types()[rtype]
+    )
+
+
 def test_doctor_adds_no_unsupported_check_without_hook(console: Console) -> None:
     """A provider without the hook gets no such check."""
     provider = MagicMock(spec=["validate_connectivity", "validate_references"])

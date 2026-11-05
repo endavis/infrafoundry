@@ -1,5 +1,6 @@
 """Unit tests for OPNsense provider reset and migrate functionality."""
 
+import importlib.util
 import warnings
 from collections.abc import Iterator
 from pathlib import Path
@@ -12,6 +13,14 @@ from infrafoundry.core.protocols import ValidatesReferencesInContext
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense import OPNsenseProvider
 from infrafoundry.providers.proxmox import ProxmoxProvider
+
+_RETIRED_SYSTEM_TYPES = [
+    "system.hostname",
+    "system.dns",
+    "system.ssh",
+    "system.webgui",
+    "system.remotebackup",
+]
 
 
 class TestOPNsenseProviderReset:
@@ -173,10 +182,9 @@ class TestOPNsenseResourceTypes:
         unverified = OPNsenseProvider.UNVERIFIED_RESOURCE_TYPES
         unsupported = set(provider.get_unsupported_resource_types())
 
-        assert supported | unverified | unsupported == managed
+        assert supported | unverified == managed
+        assert not managed & unsupported
         assert not supported & unverified
-        assert not supported & unsupported
-        assert not set(unverified) & unsupported
 
     @pytest.mark.parametrize("resource_type", ["radvd", "cron.jobs"])
     def test_previously_rejected_types_are_supported(
@@ -208,6 +216,46 @@ class TestOPNsenseResourceTypes:
         reason = provider.get_unsupported_resource_types()[resource_type]
         assert reason
         assert "26.1" in reason
+
+    @pytest.mark.parametrize("resource_type", _RETIRED_SYSTEM_TYPES)
+    def test_retired_system_types_have_no_implementation(
+        self, provider: OPNsenseProvider, resource_type: str
+    ) -> None:
+        from infrafoundry.core.config.package_loader import DOTTED_RESOURCE_SHAPES
+        from infrafoundry.providers.opnsense import endpoints
+
+        module = resource_type.replace(".", "_")
+        for layer in ("components", "services"):
+            assert (
+                importlib.util.find_spec(f"infrafoundry.providers.opnsense.{layer}.{module}")
+                is None
+            )
+        validator = f"infrafoundry.providers.opnsense.validators.{module}_validator"
+        assert importlib.util.find_spec(validator) is None
+        assert resource_type not in provider.get_direct_api_resource_types()
+        assert resource_type in endpoints.RESOURCE_TYPE_ENDPOINTS
+        assert resource_type in DOTTED_RESOURCE_SHAPES
+
+    @pytest.mark.parametrize(
+        "method",
+        [
+            "get_general_settings",
+            "set_general_settings",
+            "get_system_settings",
+            "set_system_settings",
+            "get_remotebackup_settings",
+            "set_remotebackup_settings",
+        ],
+    )
+    def test_retired_client_methods_are_gone(self, method: str) -> None:
+        from infrafoundry.providers.opnsense.api_client import SystemClient
+
+        assert not hasattr(SystemClient, method)
+
+    def test_secret_reference_helper_is_gone(self) -> None:
+        assert (
+            importlib.util.find_spec("infrafoundry.providers.opnsense.validators._secrets") is None
+        )
 
     def test_unsupported_hook_returns_a_copy(self, provider: OPNsenseProvider) -> None:
         table = provider.get_unsupported_resource_types()
