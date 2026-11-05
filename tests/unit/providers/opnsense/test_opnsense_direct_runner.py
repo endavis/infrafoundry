@@ -407,6 +407,53 @@ class TestFilteredRunsNeverDelete:
         manager_mock.plan.assert_called_once_with("test-env", resources, add_only=False)
 
 
+class TestTypeWithNoYamlEntriesIsSkipped:
+    """A type with no YAML entries is never dispatched (#1252, full fix in #1256).
+
+    Reconciling it would delete unmanaged live objects of that type, because the
+    runner cannot tell managed objects from unmanaged ones.
+    """
+
+    def _setup(self, provider: MagicMock) -> tuple[MagicMock, MagicMock, MagicMock]:
+        vlan_manager = MagicMock()
+        vlan_manager.plan.return_value = Diff()
+        vlan_manager.apply.return_value = {
+            "success": True,
+            "resources_created": 0,
+            "resources_updated": 0,
+            "resources_deleted": 0,
+            "resource_outcomes": [],
+        }
+        ifa_manager = MagicMock()
+        # Live objects exist on the box; a reconcile would delete them.
+        ifa_manager.plan.return_value = Diff(deletes=[MagicMock()])
+        provider.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": MagicMock(return_value=vlan_manager),
+            "interfaces.assignments": MagicMock(return_value=ifa_manager),
+        }
+        return vlan_manager, ifa_manager, provider
+
+    def test_plan_skips_type_without_yaml_entries(self, provider_with_env: MagicMock) -> None:
+        vlan_manager, ifa_manager, _ = self._setup(provider_with_env)
+        resources = [_vlan_resource("v1", "igb0", 10)]
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().plan(provider_with_env)
+
+        vlan_manager.plan.assert_called_once()
+        ifa_manager.plan.assert_not_called()
+
+    def test_apply_skips_type_without_yaml_entries(self, provider_with_env: MagicMock) -> None:
+        vlan_manager, ifa_manager, _ = self._setup(provider_with_env)
+        resources = [_vlan_resource("v1", "igb0", 10)]
+
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().apply(provider_with_env, auto_approve=True)
+
+        vlan_manager.apply.assert_called_once()
+        ifa_manager.apply.assert_not_called()
+
+
 class TestApplyDelegation:
     """``runner.apply`` iterates the dispatch table and threads ``add_only``."""
 

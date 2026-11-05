@@ -83,6 +83,12 @@ opnsense:
         - test.example.net
 ```
 
+## Removing the last entry of a list type (#1252)
+
+`infra plan` and `infra apply` skip any resource type with no entries in YAML. Removing the **last** entry of a list type (for example the only alias) therefore leaves the live objects on the box and shows no pending delete. Remove them in the OPNsense GUI, or keep one entry of that type declared so the type still reconciles.
+
+This is deliberate: reconciling a type with no YAML entries would delete unmanaged objects of that type, because the state database cannot identify which live objects InfraFoundry manages. Singleton types are unaffected, since their destroy is a no-op. The full fix is tracked in [#1256](https://github.com/endavis/infrafoundry/issues/1256).
+
 ## Box-to-box migration runbook (template)
 
 This template assumes you are cutting over a current box (`OLD`) to a new box (`NEW`) and want the result to be a drop-in replacement, with subsequent migrations between same-spec boxes being trivial.

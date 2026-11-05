@@ -344,6 +344,13 @@ class OPNsenseDirectRunner(BaseRunner):
         for type_name, manager_cls in dispatch_table.items():
             typed_resources = self._filter_by_type(resources, type_name, target_resources)
             if not typed_resources:
+                # Deliberate (#1252): a type with no YAML entries is skipped, so
+                # removing the LAST entry of a list type leaves its live objects
+                # on the box. A full reconcile here would delete unmanaged
+                # objects of that type: the state DB cannot identify managed
+                # objects (no DELETED marking, rows hold YAML names while managers
+                # match by natural key, and the runner has no StateManager).
+                # Full fix tracked in #1256.
                 continue
 
             manager = manager_cls(provider.config_dir)
@@ -483,6 +490,13 @@ class OPNsenseDirectRunner(BaseRunner):
         for type_name, manager_cls in dispatch_table.items():
             typed_resources = self._filter_by_type(resources, type_name, target_resources)
             if not typed_resources:
+                # Deliberate (#1252): a type with no YAML entries is skipped, so
+                # removing the LAST entry of a list type leaves its live objects
+                # on the box. A full reconcile here would delete unmanaged
+                # objects of that type: the state DB cannot identify managed
+                # objects (no DELETED marking, rows hold YAML names while managers
+                # match by natural key, and the runner has no StateManager).
+                # Full fix tracked in #1256.
                 continue
             any_dispatched = True
 
