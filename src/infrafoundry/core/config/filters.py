@@ -1,8 +1,8 @@
 """Custom Jinja2 filters for InfraFoundry configuration rendering.
 
-Provides unit-conversion and formatting filters for blueprint templates,
-plus a factory function that creates a Jinja2 environment with all filters
-pre-registered.
+Provides unit-conversion and formatting filters for blueprint templates, a
+``required`` guard for inputs a template cannot do without, plus a factory
+function that creates a Jinja2 environment with all filters pre-registered.
 """
 
 from __future__ import annotations
@@ -11,6 +11,8 @@ import hashlib
 from typing import Any
 
 import jinja2
+
+from infrafoundry.core.exceptions import InvalidConfigurationError
 
 
 def generate_mac(value: str) -> str:
@@ -104,6 +106,29 @@ def cidr_prefix(value: str) -> str:
     return value.split("/")[1]
 
 
+def required(value: Any, message: str) -> Any:
+    """Return ``value`` when it is truthy, otherwise fail the render.
+
+    Lets a blueprint insist on an input only where it is used, for example
+    ``{{ dns_domain | required('dns_domain must be set') }}`` inside a
+    gated resource file.
+
+    Args:
+        value: The value to check.
+        message: Error message used when the value is falsy (empty string,
+            ``None``, ``0``, empty collection, undefined).
+
+    Returns:
+        ``value`` unchanged when truthy.
+
+    Raises:
+        InvalidConfigurationError: If ``value`` is falsy.
+    """
+    if not value:
+        raise InvalidConfigurationError(message)
+    return value
+
+
 # Registry of all custom filters. New filters should be added here.
 _FILTERS: dict[str, Any] = {
     "generate_mac": generate_mac,
@@ -113,6 +138,7 @@ _FILTERS: dict[str, Any] = {
     "bool_to_tf": bool_to_tf,
     "cidr_ip": cidr_ip,
     "cidr_prefix": cidr_prefix,
+    "required": required,
 }
 
 

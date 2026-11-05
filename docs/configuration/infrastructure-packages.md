@@ -207,6 +207,7 @@ blueprint validation.
 | `bool_to_tf` | any | `"true"` / `"false"` | Convert a value to a Terraform boolean string. |
 | `cidr_ip` | CIDR string | string | Extract IP from CIDR notation (e.g., `"172.21.0.1/24"` -> `"172.21.0.1"`). |
 | `cidr_prefix` | CIDR string | string | Extract prefix length from CIDR notation (e.g., `"172.21.0.1/24"` -> `"24"`). |
+| `required` | any, message | the input value | Return the value if truthy, otherwise fail the render with `message` (an `InvalidConfigurationError`). Use it inside a gated resource file so an input is demanded only where it is used, e.g. `{{ dns_domain \| required('dns_domain must be set') }}`. |
 
 **Usage in templates:**
 

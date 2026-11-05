@@ -1,0 +1,17 @@
+# AIQUM DNS host overrides (#1251). Emitted only when publish_dns is true;
+# otherwise the file yields no resources. Each override mirrors a DHCP
+# reservation in dhcp.yaml (same hostname and IP) and adds the domain, so
+# clients resolve the name without an unbound.forwards entry per host.
+{% if publish_dns | string | lower == "true" %}
+resources:
+  - provider: opnsense
+    type: unbound.host_overrides
+    name: "{{ vm_name }}-dns"
+    config:
+      hostname: "{{ vm_name }}"
+      domain: "{{ dns_domain | required('aiqum: dns_domain must be set when publish_dns is true') }}"
+      server: "{{ ip_address }}"
+      description: "NetApp Active IQ Unified Manager"
+{% else %}
+resources: []
+{% endif %}

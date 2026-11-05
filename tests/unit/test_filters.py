@@ -12,10 +12,12 @@ from infrafoundry.core.config.filters import (
     cidr_prefix,
     create_jinja2_env,
     generate_mac,
+    required,
     to_gb,
     to_gib,
     to_mib,
 )
+from infrafoundry.core.exceptions import InvalidConfigurationError
 
 
 class TestGenerateMac:
@@ -140,6 +142,25 @@ class TestCidrPrefix:
 
     def test_host_route(self) -> None:
         assert cidr_prefix("192.168.1.1/32") == "32"
+
+
+class TestRequired:
+    """Tests for the required filter."""
+
+    def test_truthy_value_passes_through(self) -> None:
+        assert required("example.test", "needed") == "example.test"
+
+    @pytest.mark.parametrize("value", ["", None, 0, [], False])
+    def test_falsy_value_raises(self, value: object) -> None:
+        with pytest.raises(InvalidConfigurationError, match="needed here"):
+            required(value, "needed here")
+
+    def test_registered_and_raises_in_template(self) -> None:
+        env = create_jinja2_env()
+        template = env.from_string("{{ domain | required('domain must be set') }}")
+        assert template.render(domain="lab.test") == "lab.test"
+        with pytest.raises(InvalidConfigurationError, match="domain must be set"):
+            template.render(domain="")
 
 
 class TestCreateJinja2Env:

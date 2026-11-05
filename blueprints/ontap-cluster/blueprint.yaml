@@ -158,6 +158,17 @@ inputs:
   - name: dhcp_subnet
     default: opt1-servers
 
+  # --- DNS ---
+  # Publish a DNS name (OPNsense Unbound host override) for each reserved IP so
+  # clients resolve the hostnames. Off by default (#1251).
+  - name: publish_dns
+    description: "Create Unbound host overrides for the reserved hostnames"
+    type: boolean
+    default: false
+  - name: dns_domain
+    description: "Domain for the host overrides; required when publish_dns is true"
+    default: ""
+
   # Extra Proxmox tags appended to the blueprint's default tags
   - name: extra_tags
     default: []
@@ -224,6 +235,7 @@ inputs:
 resources:
   - vm.yaml
   - dhcp.yaml
+  - dns.yaml
 
 events:
   on_create:

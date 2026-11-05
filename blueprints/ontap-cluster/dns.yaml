@@ -1,0 +1,53 @@
+# ONTAP cluster DNS host overrides (#1251). Emitted only when publish_dns is true;
+# otherwise the file yields no resources. Each override mirrors a DHCP
+# reservation in dhcp.yaml (same hostname and IP) and adds the domain, so
+# clients resolve the name without an unbound.forwards entry per host.
+{% if publish_dns | string | lower == "true" %}
+resources:
+  - provider: opnsense
+    type: unbound.host_overrides
+    name: "{{ cluster_name }}-dns"
+    config:
+      hostname: "{{ cluster_name }}"
+      domain: "{{ dns_domain | required('ontap-cluster: dns_domain must be set when publish_dns is true') }}"
+      server: "{{ cluster_mgmt_ip }}"
+      description: "ONTAP Cluster Management LIF"
+
+  - provider: opnsense
+    type: unbound.host_overrides
+    name: "{{ node01_name }}-dns"
+    config:
+      hostname: "{{ node01_name }}"
+      domain: "{{ dns_domain | required('ontap-cluster: dns_domain must be set when publish_dns is true') }}"
+      server: "{{ node01_mgmt_ip }}"
+      description: "ONTAP Simulator Node 1 (e0c mgmt)"
+
+  - provider: opnsense
+    type: unbound.host_overrides
+    name: "{{ node02_name }}-dns"
+    config:
+      hostname: "{{ node02_name }}"
+      domain: "{{ dns_domain | required('ontap-cluster: dns_domain must be set when publish_dns is true') }}"
+      server: "{{ node02_mgmt_ip }}"
+      description: "ONTAP Simulator Node 2 (e0c mgmt)"
+
+  - provider: opnsense
+    type: unbound.host_overrides
+    name: "{{ cluster_name }}-data1-dns"
+    config:
+      hostname: "{{ cluster_name }}-data1"
+      domain: "{{ dns_domain | required('ontap-cluster: dns_domain must be set when publish_dns is true') }}"
+      server: "{{ data_lif1_ip }}"
+      description: "ONTAP Cluster Data LIF 1"
+
+  - provider: opnsense
+    type: unbound.host_overrides
+    name: "{{ cluster_name }}-data2-dns"
+    config:
+      hostname: "{{ cluster_name }}-data2"
+      domain: "{{ dns_domain | required('ontap-cluster: dns_domain must be set when publish_dns is true') }}"
+      server: "{{ data_lif2_ip }}"
+      description: "ONTAP Cluster Data LIF 2"
+{% else %}
+resources: []
+{% endif %}

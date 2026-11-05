@@ -76,7 +76,23 @@ infra apply --env <env> --package aiqum
 | `aiqum_admin_user` | `umadmin` | AIQUM admin username |
 | `smtp_port` | `587` | SMTP port |
 | `ontap_admin_user` | `admin` | ONTAP admin username |
+| `publish_dns` | `false` | Create an OPNsense Unbound host override for the VM (see Publishing DNS) |
+| `dns_domain` | `""` | Domain for the override; required when `publish_dns` is true |
 | `extra_tags` | `[]` | Additional Proxmox tags to append |
+
+## Publishing DNS
+
+With `publish_dns: true` (and `dns_domain` set) the blueprint also emits an
+`unbound.host_overrides` resource named `<vm_name>-dns` on OPNsense, mapping
+`<vm_name>.<dns_domain>` to `ip_address`. The default is off and emits nothing;
+`publish_dns: true` without `dns_domain` fails the load with an error naming
+the input.
+
+- Clients must reach this OPNsense box's Unbound directly, or through an
+  `unbound.forwards` entry for `dns_domain` on the resolver they do use (see
+  #1168).
+- Turning `publish_dns` off later may leave the last override on the box
+  (#1252); remove it by hand if it matters.
 
 ## Prerequisites
 

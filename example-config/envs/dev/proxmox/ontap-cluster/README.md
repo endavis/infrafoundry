@@ -12,6 +12,17 @@ foundry -c example-config infra apply --env dev --package ontap-cluster
 See `blueprints/ontap-cluster/blueprint.yaml` for the full variable reference,
 prerequisites, and the description of the post-deploy event handler.
 
+## Publishing DNS names
+
+Set `publish_dns: true` and `dns_domain` in `infrafoundry.yml` to create an
+OPNsense Unbound host override for each reserved IP: the cluster management LIF,
+both node management addresses and both data LIFs, named `<hostname>-dns`
+(for example `ontapcl-dev-dns`). `dns_domain` is required with `publish_dns` and
+doubles as ONTAP's DNS search domain. Clients must reach this OPNsense box's
+Unbound directly, or through an `unbound.forwards` entry for `dns_domain`
+(#1168). Turning `publish_dns` off may leave the last override on the box
+(#1252).
+
 ## Cluster interconnect MTU
 
 `cluster_mtu` (default `1500`) sets the MTU of the ONTAP `Cluster` broadcast
