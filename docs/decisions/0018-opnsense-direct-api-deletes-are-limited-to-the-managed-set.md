@@ -14,6 +14,8 @@ tags:
 
 Accepted
 
+**Amended:** 2026-11-05 (#1264) - kea deletes run in a reverse-order phase, and a subnet delete is refused while reservations InfraFoundry does not manage still use it
+
 ## Decision
 
 `opnsense_direct` deletes only the objects InfraFoundry manages. The managed set comes from the state database, and a live object that InfraFoundry never applied is kept whether or not its type has YAML entries. This applies to all sixteen list types. It partly supersedes the "fully-managed by default" rule in [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md) section 5 for unmanaged objects.
@@ -40,9 +42,11 @@ A type with no YAML entries is dispatched only when the run has a managed set, i
 | `interfaces.assignments` | Logical identifier | Config only, with the `lan` and `wan` guard below |
 | `firewall.rules`, `firewall.nat`, `cron.jobs` | Marker name | Existing marker scoping |
 
-**Parent and child types.** The dispatch table applies `unbound.host_overrides` before `unbound.host_aliases`, and kea subnets before kea reservations. When a parent and its children leave YAML together, the parent is deleted first and the child's parent no longer resolves. For a managed row whose parent does not resolve, the engine matches live orphans: aliases whose parent UUID is not any live override's, with the same hostname and domain, matched only when exactly one live orphan fits (an ambiguous match could delete an alias InfraFoundry never applied); reservations whose subnet UUID is not a live subnet's, with the same MAC or DUID. A managed row with neither a resolved parent nor an orphan match is skipped with a warning (fail closed), kept as managed and retried. YAML rows keep their strict resolution and still raise.
+**Parent and child types.** The dispatch table applies `unbound.host_overrides` before `unbound.host_aliases`, and kea subnets before kea reservations. For kea, deletes run the other way (#1264). The four kea managers declare `SPLIT_DELETE_PHASE`, and the runner first calls each of them with `deletes_only=True` in reverse table order (reservations, then subnets). The forward pass then calls them with `add_only=True`. A managed reservation is therefore deleted while its subnet is still live, so its key resolves through the managed subnet row and the live CIDR, and the release is recorded from the first phase. `destroy` uses the same order. The orphan matching stays as a safety net: for a managed row whose parent does not resolve, the engine matches live orphans (aliases whose parent UUID is not any live override's, with the same hostname and domain, matched only when exactly one live orphan fits; reservations whose subnet UUID is not a live subnet's, with the same MAC or DUID). A managed row with neither a resolved parent nor an orphan match is skipped with a warning (fail closed), kept as managed and retried. YAML rows keep their strict resolution and still raise.
 
-**Unverified on a live box.** Whether OPNsense cascades the child when its parent is deleted, refuses the parent delete, or leaves an orphan has not been checked, because no box was contacted. If it cascades, the plan shows the child delete (the parent is still live when the plan runs) but the apply counts none for it. The full reconcile this replaces had the same ordering, so this change does not make it worse. A live check after merge is requested in the PR.
+**Verified on a live box (#1264).** OPNsense kea `delSubnet` neither cascades to the subnet's reservations nor refuses: they stay, pointing at the deleted UUID. Unbound `delHostOverride` does cascade to its aliases, so unbound needs no delete phase.
+
+**Refusing a subnet delete.** A subnet is not deleted while a reservation InfraFoundry does not manage still uses it, such as a hand-made one. The plan keeps the subnet, shows `N blocked (kept)` and a warning naming the CIDR and each reservation's MAC or DUID and IP. The apply checks the box after the reservation deletes, skips the subnet with the same warning, and keeps its row managed so the next run retries and warns again. It does not fail the apply, because that would block unrelated changes over an object outside InfraFoundry's control. `destroy` skips such a subnet with a warning. The operator removes or moves the reservation on the box and re-runs apply.
 
 **`lan` and `wan` guard.** `find_lockout_conflicts` checks adds and updates only, so with no YAML entries for `interfaces.assignments` a restricted delete could remove the assignment the API is reached through. In restricted mode a managed `lan` or `wan` is never deleted: it goes to `unmanaged` with a warning. Assignments that are neither but carry the management address are still deletable. Keep the management interface in YAML with `lock: true`.
 
@@ -53,7 +57,7 @@ A type with no YAML entries is dispatched only when the run has a managed set, i
 - **The state database is the only record of what InfraFoundry applied.** The runner has no `StateManager` of its own, so the orchestrator and executor read the rows and hand them over.
 - **The issue's "non-`DELETED` rows" rule is wrong for this table.** Plans add `PLANNED` rows and destroys leave older `ACTIVE` rows in place, so only the newest `ACTIVE` or `DELETED` row tells the current state.
 - **Breaking change.** Objects added by hand next to managed ones used to be deleted by the full reconcile and are now kept. This reverses ADR-0014 section 5 for unmanaged objects. It is released with a `BREAKING CHANGE:` footer.
-- **No opt-out flag and no phases.** All sixteen list types change together, so there is one rule for operators.
+- **No opt-out flag and no rollout phases.** All sixteen list types change together, so there is one rule for operators.
 
 ### Known limit
 
@@ -69,4 +73,5 @@ Operator-facing behavior is described in [OPNsense resource coverage: how delete
 
 - [#1256](https://github.com/endavis/infrafoundry/issues/1256): feat: let `opnsense_direct` delete only the objects InfraFoundry manages.
 - [#1260](https://github.com/endavis/infrafoundry/issues/1260): dispatches `opnsense_direct` when an environment's last opnsense resource is removed.
+- [#1264](https://github.com/endavis/infrafoundry/issues/1264): kea deletes reservations before subnets and refuses a subnet delete that would orphan unmanaged reservations.
 - [#1252](https://github.com/endavis/infrafoundry/issues/1252): documented and pinned the last-list-entry limitation this change removes.

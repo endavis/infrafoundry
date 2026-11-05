@@ -1728,3 +1728,245 @@ class TestNeedsManagedDispatch:
         provider_with_env.get_direct_api_resource_types.return_value = {"unbound.forwards": cls}
 
         assert OPNsenseDirectRunner().needs_managed_dispatch(provider_with_env, {}) is False
+
+
+# ---------------------------------------------------------------------------
+# Delete phase for kea parents and children (#1264)
+# ---------------------------------------------------------------------------
+
+_APPLY_OK = {
+    "success": True,
+    "resources_created": 0,
+    "resources_updated": 0,
+    "resources_deleted": 0,
+    "resource_outcomes": [],
+}
+
+
+def _phase_manager(
+    log: list[str],
+    label: str,
+    *,
+    split: bool,
+    dependent_type: str | None = None,
+    result: dict[str, Any] | None = None,
+) -> tuple[Any, MagicMock]:
+    """Build a manager class whose apply/destroy calls are appended to ``log``."""
+    instance = MagicMock()
+
+    def _apply(env: str, resources: list[Any], **kwargs: Any) -> dict[str, Any]:
+        if kwargs.get("deletes_only"):
+            tag = "deletes_only"
+        elif kwargs.get("add_only"):
+            tag = "add_only"
+        else:
+            tag = "single"
+        log.append(f"{label}.apply({tag})")
+        return dict(result or _APPLY_OK)
+
+    def _destroy(env: str, resources: list[Any], **kwargs: Any) -> dict[str, Any]:
+        log.append(f"{label}.destroy")
+        return {"success": True, "resources_destroyed": 1}
+
+    instance.apply.side_effect = _apply
+    instance.destroy.side_effect = _destroy
+    cls = MagicMock(return_value=instance)
+    cls.DELETE_SCOPE = "managed_set"
+    if split:
+        cls.SPLIT_DELETE_PHASE = True
+    if dependent_type is not None:
+        cls.DEPENDENT_RESOURCE_TYPE = dependent_type
+    return cls, instance
+
+
+def _yaml(type_name: str, name: str) -> ResourceConfig:
+    return ResourceConfig(name=name, type=type_name, provider="opnsense", config={"name": name})
+
+
+class TestDeletePhase:
+    """Split types delete in reverse table order before the forward pass (#1264)."""
+
+    def _setup(
+        self, provider: MagicMock, log: list[str], **overrides: Any
+    ) -> tuple[dict[str, MagicMock], list[ResourceConfig]]:
+        sub_cls, sub = _phase_manager(
+            log, "sub", split=True, dependent_type="kea.dhcp4.reservations", **overrides
+        )
+        res_cls, res = _phase_manager(log, "res", split=True)
+        plain_cls, plain = _phase_manager(log, "plain", split=False)
+        provider.get_direct_api_resource_types.return_value = {
+            "kea.dhcp4.subnets": sub_cls,
+            "kea.dhcp4.reservations": res_cls,
+            "other.thing": plain_cls,
+        }
+        resources = [
+            _yaml("kea.dhcp4.subnets", "s"),
+            _yaml("kea.dhcp4.reservations", "r"),
+            _yaml("other.thing", "o"),
+        ]
+        return {"sub": sub, "res": res, "plain": plain}, resources
+
+    def test_full_apply_order(self, provider_with_env: MagicMock) -> None:
+        log: list[str] = []
+        _, resources = self._setup(provider_with_env, log)
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            result = OPNsenseDirectRunner().apply(provider_with_env, managed_resources={})
+        assert result["success"] is True
+        assert log == [
+            "res.apply(deletes_only)",
+            "sub.apply(deletes_only)",
+            "sub.apply(add_only)",
+            "res.apply(add_only)",
+            "plain.apply(single)",
+        ]
+
+    def test_non_split_manager_gets_no_deletes_only(self, provider_with_env: MagicMock) -> None:
+        log: list[str] = []
+        mocks, resources = self._setup(provider_with_env, log)
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().apply(provider_with_env, managed_resources={})
+        assert mocks["plain"].apply.call_count == 1
+        assert "deletes_only" not in mocks["plain"].apply.call_args.kwargs
+
+    @pytest.mark.parametrize("kwargs", [{"add_only": True}, {"target_resources": ["s", "r"]}])
+    def test_add_only_and_filtered_runs_make_one_call(
+        self, provider_with_env: MagicMock, kwargs: dict[str, Any]
+    ) -> None:
+        log: list[str] = []
+        _, resources = self._setup(provider_with_env, log)
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().apply(provider_with_env, **kwargs)
+        assert not any("deletes_only" in entry for entry in log)
+        assert log.count("sub.apply(add_only)") == 1
+        assert log.count("res.apply(add_only)") == 1
+
+    def test_split_type_without_yaml_gets_only_the_delete_phase(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        log: list[str] = []
+        _, resources = self._setup(provider_with_env, log)
+        yaml_without_res = [r for r in resources if r.type != "kea.dhcp4.reservations"]
+        managed = _managed(("kea.dhcp4.reservations", "gone"))
+        with patch.object(
+            OPNsenseDirectRunner, "_load_provider_resources", return_value=yaml_without_res
+        ):
+            result = OPNsenseDirectRunner().apply(provider_with_env, managed_resources=managed)
+        assert log == [
+            "res.apply(deletes_only)",
+            "sub.apply(deletes_only)",
+            "sub.apply(add_only)",
+            "plain.apply(single)",
+        ]
+        assert result["released_resources"] == [
+            {"resource_type": "kea.dhcp4.reservations", "name": "gone"}
+        ]
+
+    def test_release_comes_from_phase_one_and_honours_unresolved(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        log: list[str] = []
+        _, resources = self._setup(
+            provider_with_env, log, result={**_APPLY_OK, "unresolved_managed": ["kept-sub"]}
+        )
+        managed = _managed(("kea.dhcp4.subnets", "kept-sub"), ("kea.dhcp4.subnets", "old-sub"))
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            result = OPNsenseDirectRunner().apply(provider_with_env, managed_resources=managed)
+        assert result["released_resources"] == [
+            {"resource_type": "kea.dhcp4.subnets", "name": "old-sub"}
+        ]
+
+    def test_counts_are_summed_and_hook_fires_once(self, provider_with_env: MagicMock) -> None:
+        log: list[str] = []
+        sub_cls, _ = _phase_manager(
+            log, "sub", split=True, result={**_APPLY_OK, "resources_deleted": 1}
+        )
+        sub_cls.FINALIZATION_HOOK = "kea_reconfigure"
+        res_cls, _ = _phase_manager(
+            log, "res", split=True, result={**_APPLY_OK, "resources_created": 2}
+        )
+        res_cls.FINALIZATION_HOOK = "kea_reconfigure"
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "kea.dhcp4.subnets": sub_cls,
+            "kea.dhcp4.reservations": res_cls,
+        }
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"kea_reconfigure": hook}
+        resources = [_yaml("kea.dhcp4.subnets", "s"), _yaml("kea.dhcp4.reservations", "r")]
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            result = OPNsenseDirectRunner().apply(provider_with_env, managed_resources={})
+        # sub: 1 delete in each of its two calls; res: 2 creates in each of its two calls.
+        assert result["resources_deleted"] == 2
+        assert result["resources_created"] == 4
+        hook.assert_called_once_with("test-env")
+
+    def test_phase_one_failure_skips_phase_two(self, provider_with_env: MagicMock) -> None:
+        log: list[str] = []
+        mocks, resources = self._setup(provider_with_env, log)
+        mocks["res"].apply.side_effect = RuntimeError("boom")
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            result = OPNsenseDirectRunner().apply(provider_with_env, managed_resources={})
+        assert result["success"] is False
+        assert "boom" in result["error"]
+        assert log == []
+
+    def test_plain_magicmock_class_is_not_split(self) -> None:
+        assert OPNsenseDirectRunner._splits_deletes(MagicMock()) is False
+
+    def test_apply_prints_manager_warnings(self, provider_with_env: MagicMock) -> None:
+        log: list[str] = []
+        _, resources = self._setup(
+            provider_with_env, log, result={**_APPLY_OK, "warnings": ["not deleting x"]}
+        )
+        runner = OPNsenseDirectRunner()
+        runner.console = MagicMock()
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env, managed_resources={})
+        printed = [str(c.args[0]) for c in runner.console.print.call_args_list]
+        assert any("[yellow]" in line and "not deleting x" in line for line in printed)
+
+    def test_plan_prints_diff_warnings_and_counts_blocked(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        diff = Diff()
+        diff.blocked = [("u", "172.21.0.0/24", ["aa:bb 172.21.0.5"])]  # type: ignore[attr-defined]
+        diff.warnings = ["not deleting y"]  # type: ignore[attr-defined]
+        cls, _ = _scoped_manager("managed_set", diff=diff)
+        provider_with_env.get_direct_api_resource_types.return_value = {"kea.dhcp4.subnets": cls}
+        runner = OPNsenseDirectRunner()
+        runner.console = MagicMock()
+        with patch.object(
+            OPNsenseDirectRunner,
+            "_load_provider_resources",
+            return_value=[_yaml("kea.dhcp4.subnets", "s")],
+        ):
+            result = runner.plan(provider_with_env, managed_resources={})
+        assert "1 blocked (kept)." in result["changes_summary"]
+        printed = [str(c.args[0]) for c in runner.console.print.call_args_list]
+        assert any("[yellow]" in line and "not deleting y" in line for line in printed)
+
+    def test_dependent_kwargs_only_for_managers_with_the_marker(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        log: list[str] = []
+        mocks, resources = self._setup(provider_with_env, log)
+        managed = _managed(("kea.dhcp4.reservations", "old"))
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().apply(provider_with_env, managed_resources=managed)
+            sub_kwargs = mocks["sub"].apply.call_args.kwargs
+            assert [r.name for r in sub_kwargs["dependent_resources"]] == ["r"]
+            assert [r.name for r in sub_kwargs["managed_dependent_resources"]] == ["old"]
+            assert "dependent_resources" not in mocks["res"].apply.call_args.kwargs
+            assert "dependent_resources" not in mocks["plain"].apply.call_args.kwargs
+            # Without a managed set only the YAML slice is passed.
+            mocks["sub"].apply.reset_mock()
+            OPNsenseDirectRunner().apply(provider_with_env)
+            assert "managed_dependent_resources" not in mocks["sub"].apply.call_args.kwargs
+            assert "dependent_resources" in mocks["sub"].apply.call_args.kwargs
+
+    def test_destroy_order(self, provider_with_env: MagicMock) -> None:
+        log: list[str] = []
+        _, resources = self._setup(provider_with_env, log)
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            result = OPNsenseDirectRunner().destroy(provider_with_env)
+        assert result["success"] is True
+        assert log == ["res.destroy", "sub.destroy", "plain.destroy"]

@@ -279,7 +279,10 @@ class OPNsenseProvider(
         # applied before reservations because reservations resolve their
         # subnet UUID via ``search_dhcpv4_subnets`` / ``search_dhcpv6_subnets``
         # at apply time — a brand-new subnet must exist on the box before its
-        # reservations can reference it. Aliases are applied before
+        # reservations can reference it. Deletes run the other way: the kea
+        # managers declare ``SPLIT_DELETE_PHASE``, so the runner deletes their
+        # types in reverse table order first (reservations, then subnets) and
+        # only adds and updates in this order (#1264). Aliases are applied before
         # ``nat_rules`` and ``firewall_rules`` so the alias names those
         # rules reference exist on the box first (#775).
         # ``unbound_host_override`` is applied before ``unbound_host_alias``

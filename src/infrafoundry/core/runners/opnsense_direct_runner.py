@@ -27,6 +27,11 @@ managed objects go away. Live objects InfraFoundry never applied are left alone.
 The orchestrator also dispatches the provider when the environment has no opnsense
 YAML at all, if ``needs_managed_dispatch`` says managed objects remain (#1260).
 
+A manager that declares ``SPLIT_DELETE_PHASE`` (the kea managers) has its deletes run
+in a separate phase before any adds, in reverse table order, so a child type such as
+reservations is deleted while its parent subnet is still live (#1264). The forward
+pass then adds and updates only. ``destroy`` uses the same order.
+
 Drift detection (``DriftDetectable``) is intentionally not implemented in this
 PR; ``infra plan`` provides equivalent UX via the diff engine, and a full
 ``DriftDetectable`` implementation is tracked as a follow-up issue.
@@ -35,6 +40,7 @@ PR; ``infra plan`` provides equivalent UX via the diff engine, and a full
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, override
 
@@ -47,6 +53,18 @@ from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.types import ResourceOutcome
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class _ApplyTotals:
+    """Counts and outcomes accumulated across the manager calls of one apply."""
+
+    created: int = 0
+    updated: int = 0
+    deleted: int = 0
+    outcomes: list[ResourceOutcome] = field(default_factory=list)
+    released: list[ReleasedResource] = field(default_factory=list)
+    hook_keys: set[str] = field(default_factory=set)
 
 
 class OPNsenseDirectRunner(BaseRunner):
@@ -222,6 +240,49 @@ class OPNsenseDirectRunner(BaseRunner):
         if not isinstance(sibling_type, str) or not sibling_type:
             return None
         return [r for r in all_resources if r.type == sibling_type]
+
+    @staticmethod
+    def _splits_deletes(manager_cls: type[Any]) -> bool:
+        """Return True if a manager's deletes run in their own reverse-order phase (#1264).
+
+        Uses ``is True`` because a plain ``MagicMock`` class returns a truthy mock for
+        any attribute.
+
+        Args:
+            manager_cls: The manager class registered in the dispatch table.
+        """
+        return bool(getattr(manager_cls, "SPLIT_DELETE_PHASE", None) is True)
+
+    def _dependent_kwargs(
+        self,
+        manager_cls: type[Any],
+        resources: list[ResourceConfig],
+        managed: ManagedResources | None,
+    ) -> dict[str, Any]:
+        """Build the dependent-resource kwargs for a manager that declares one (#1264).
+
+        A kea subnet manager predicts, at plan time, which subnet deletes would orphan a
+        reservation. It declares ``DEPENDENT_RESOURCE_TYPE`` and receives that type's
+        YAML slice as ``dependent_resources``, plus the managed rows as
+        ``managed_dependent_resources`` when it has a managed-set delete scope.
+
+        Args:
+            manager_cls: The manager class.
+            resources: All provider resources for the environment.
+            managed: Managed resources by type, or ``None``.
+
+        Returns:
+            The kwargs, empty for a manager without the marker.
+        """
+        dependent_type = getattr(manager_cls, "DEPENDENT_RESOURCE_TYPE", None)
+        if not isinstance(dependent_type, str) or not dependent_type:
+            return {}
+        kwargs: dict[str, Any] = {
+            "dependent_resources": [r for r in resources if r.type == dependent_type]
+        }
+        if managed is not None and self._delete_scope(manager_cls) == "managed_set":
+            kwargs["managed_dependent_resources"] = list(managed.get(dependent_type, []))
+        return kwargs
 
     @staticmethod
     def _delete_scope(manager_cls: type[Any]) -> str | None:
@@ -508,6 +569,7 @@ class OPNsenseDirectRunner(BaseRunner):
             extra_kwargs: dict[str, Any] = self._managed_kwargs(type_name, manager_cls, managed)
             if sibling_resources is not None:
                 extra_kwargs["sibling_resources"] = sibling_resources
+            extra_kwargs.update(self._dependent_kwargs(manager_cls, resources, managed))
             try:
                 diff = manager.plan(env_name, typed_resources, add_only=add_only, **extra_kwargs)
             except Exception as exc:
@@ -517,6 +579,7 @@ class OPNsenseDirectRunner(BaseRunner):
             type_summary = self._format_plan_summary(type_name, diff, add_only=add_only)
             summary_parts.append(type_summary)
             self.console.print(f"  [dim]opnsense_direct: {type_summary}[/dim]")
+            self._print_warnings(getattr(diff, "warnings", None))
 
             if not diff.is_empty:
                 any_changes = True
@@ -589,6 +652,9 @@ class OPNsenseDirectRunner(BaseRunner):
         unmanaged = getattr(diff, "unmanaged", None)
         if isinstance(unmanaged, list) and unmanaged:
             summary = summary[:-1] + f", {len(unmanaged)} unmanaged (kept)."
+        blocked = getattr(diff, "blocked", None)
+        if isinstance(blocked, list) and blocked:
+            summary = summary[:-1] + f", {len(blocked)} blocked (kept)."
         if add_only:
             summary += " (add-only mode)"
         return summary
@@ -635,63 +701,55 @@ class OPNsenseDirectRunner(BaseRunner):
             dispatch_table, resources, target_resources, add_only=add_only, managed=managed
         )
 
-        total_created = 0
-        total_updated = 0
-        total_deleted = 0
-        all_outcomes: list[ResourceOutcome] = []
-        released_resources: list[ReleasedResource] = []
-        any_dispatched = False
+        totals = _ApplyTotals()
+        any_dispatched = bool(selected)
 
-        # Track finalization-hook keys whose managers actually mutated state in
-        # this apply (#758). A hook fires once at end-of-apply per unique key,
-        # so multiple managers sharing a key share a single hook firing.
-        triggered_hook_keys: set[str] = set()
+        # Deletes of types that split them run first, in reverse table order, so a
+        # child (reservations) is deleted while its parent (subnets) is still live;
+        # the forward pass below then only adds and updates them (#1264). Add-only and
+        # filtered runs have no deletes and make one add-only call as before.
+        two_phase = not add_only
+        if two_phase:
+            for type_name, manager_cls, typed_resources in reversed(selected):
+                if not self._splits_deletes(manager_cls):
+                    continue
+                error = self._apply_one(
+                    provider,
+                    env_name,
+                    auto_approve,
+                    type_name,
+                    manager_cls,
+                    typed_resources,
+                    resources,
+                    managed,
+                    totals,
+                    add_only=False,
+                    deletes_only=True,
+                    release=True,
+                )
+                if error is not None:
+                    return ApplyResult(success=False, error=error)
 
         for type_name, manager_cls, typed_resources in selected:
-            any_dispatched = True
-
-            manager = manager_cls(provider.config_dir)
-            sibling_resources = self._sibling_resources_for(manager_cls, resources)
-            extra_kwargs: dict[str, Any] = self._managed_kwargs(type_name, manager_cls, managed)
-            if sibling_resources is not None:
-                extra_kwargs["sibling_resources"] = sibling_resources
-            try:
-                result = manager.apply(
-                    env_name,
-                    typed_resources,
-                    auto_approve=auto_approve,
-                    add_only=add_only,
-                    **extra_kwargs,
-                )
-            except Exception as exc:
-                logger.exception("opnsense_direct %s apply failed", type_name)
-                return ApplyResult(success=False, error=str(exc))
-
-            created = int(result.get("resources_created", 0))
-            updated = int(result.get("resources_updated", 0))
-            deleted = int(result.get("resources_deleted", 0))
-            total_created += created
-            total_updated += updated
-            total_deleted += deleted
-            all_outcomes.extend(result.get("resource_outcomes", []))
-            if not add_only:
-                reported = result.get("unresolved_managed")
-                unresolved = (
-                    {str(n) for n in reported}
-                    if isinstance(reported, (list, set, tuple))
-                    else set()
-                )
-                released_resources.extend(
-                    self._released_for(type_name, manager_cls, resources, managed, unresolved)
-                )
-
-            had_changes = (created + updated + deleted) > 0
-            if had_changes:
-                hook_key = getattr(manager_cls, "FINALIZATION_HOOK", None)
-                if isinstance(hook_key, str) and hook_key:
-                    triggered_hook_keys.add(hook_key)
-
-            self._log_apply_progress(type_name, result, created, updated, deleted)
+            splits = two_phase and self._splits_deletes(manager_cls)
+            if splits and not typed_resources:
+                continue  # only had managed rows to delete, done in the first phase
+            error = self._apply_one(
+                provider,
+                env_name,
+                auto_approve,
+                type_name,
+                manager_cls,
+                typed_resources,
+                resources,
+                managed,
+                totals,
+                add_only=add_only or splits,
+                deletes_only=False,
+                release=not add_only and not splits,
+            )
+            if error is not None:
+                return ApplyResult(success=False, error=error)
 
         if not any_dispatched:
             self.console.print("  [dim]opnsense_direct: no direct-API resources to apply[/dim]")
@@ -699,20 +757,108 @@ class OPNsenseDirectRunner(BaseRunner):
 
         # Fire finalization hooks once each (#758). Errors propagate — a failing
         # post-apply hook (e.g., Kea reconfigure) must fail the apply.
-        if triggered_hook_keys:
-            self._fire_finalization_hooks(provider, env_name, triggered_hook_keys)
+        if totals.hook_keys:
+            self._fire_finalization_hooks(provider, env_name, totals.hook_keys)
 
         applied: ApplyResult = {
             "success": True,
-            "resources_created": total_created,
-            "resources_updated": total_updated,
-            "resources_deleted": total_deleted,
+            "resources_created": totals.created,
+            "resources_updated": totals.updated,
+            "resources_deleted": totals.deleted,
         }
-        applied["resource_outcomes"] = all_outcomes
-        applied["resource_outcomes_summary"] = [o.to_dict() for o in all_outcomes]
-        if released_resources:
-            applied["released_resources"] = released_resources
+        applied["resource_outcomes"] = totals.outcomes
+        applied["resource_outcomes_summary"] = [o.to_dict() for o in totals.outcomes]
+        if totals.released:
+            applied["released_resources"] = totals.released
         return applied
+
+    def _apply_one(
+        self,
+        provider: ProviderBase,
+        env_name: str,
+        auto_approve: bool,
+        type_name: str,
+        manager_cls: type[Any],
+        typed_resources: list[ResourceConfig],
+        resources: list[ResourceConfig],
+        managed: ManagedResources | None,
+        totals: _ApplyTotals,
+        *,
+        add_only: bool,
+        deletes_only: bool,
+        release: bool,
+    ) -> str | None:
+        """Run one manager's apply and fold its result into ``totals``.
+
+        Args:
+            provider: OPNsense provider instance.
+            env_name: Active environment name.
+            auto_approve: Passed through to the manager.
+            type_name: Resource type being applied.
+            manager_cls: The manager class.
+            typed_resources: YAML resources of the type.
+            resources: All provider resources for the environment.
+            managed: Managed resources by type, or ``None``.
+            totals: Accumulator updated in place.
+            add_only: Passed to the manager (suppresses deletes).
+            deletes_only: When True, passes ``deletes_only=True`` (the delete phase).
+            release: Whether managed names that left YAML are released after this call.
+
+        Returns:
+            ``None`` on success, otherwise the error message of the failed call.
+        """
+        manager = manager_cls(provider.config_dir)
+        sibling_resources = self._sibling_resources_for(manager_cls, resources)
+        extra_kwargs: dict[str, Any] = self._managed_kwargs(type_name, manager_cls, managed)
+        if sibling_resources is not None:
+            extra_kwargs["sibling_resources"] = sibling_resources
+        extra_kwargs.update(self._dependent_kwargs(manager_cls, resources, managed))
+        if deletes_only:
+            extra_kwargs["deletes_only"] = True
+        try:
+            result = manager.apply(
+                env_name,
+                typed_resources,
+                auto_approve=auto_approve,
+                add_only=add_only,
+                **extra_kwargs,
+            )
+        except Exception as exc:
+            logger.exception("opnsense_direct %s apply failed", type_name)
+            return str(exc)
+
+        created = int(result.get("resources_created", 0))
+        updated = int(result.get("resources_updated", 0))
+        deleted = int(result.get("resources_deleted", 0))
+        totals.created += created
+        totals.updated += updated
+        totals.deleted += deleted
+        totals.outcomes.extend(result.get("resource_outcomes", []))
+        if release:
+            reported = result.get("unresolved_managed")
+            unresolved = (
+                {str(n) for n in reported} if isinstance(reported, (list, set, tuple)) else set()
+            )
+            totals.released.extend(
+                self._released_for(type_name, manager_cls, resources, managed, unresolved)
+            )
+
+        if (created + updated + deleted) > 0:
+            hook_key = getattr(manager_cls, "FINALIZATION_HOOK", None)
+            if isinstance(hook_key, str) and hook_key:
+                totals.hook_keys.add(hook_key)
+
+        self._log_apply_progress(type_name, result, created, updated, deleted)
+        self._print_warnings(result.get("warnings"))
+        return None
+
+    def _print_warnings(self, warnings: Any) -> None:
+        """Print a manager's warnings in yellow; ignore anything but a list of strings."""
+        if not isinstance(warnings, list):
+            return
+        for warning in warnings:
+            if isinstance(warning, str):
+                self.console.print(f"  [yellow]opnsense_direct: {warning}[/yellow]")
 
     def _fire_finalization_hooks(
         self,
@@ -839,7 +985,12 @@ class OPNsenseDirectRunner(BaseRunner):
         total_destroyed = 0
         any_dispatched = False
 
-        for type_name, manager_cls in dispatch_table.items():
+        # Types that split deletes go first in reverse table order, so a subnet's
+        # reservations are gone before the subnet is (#1264); the rest keep table order.
+        ordered = [(t, c) for t, c in reversed(dispatch_table.items()) if self._splits_deletes(c)]
+        ordered += [(t, c) for t, c in dispatch_table.items() if not self._splits_deletes(c)]
+
+        for type_name, manager_cls in ordered:
             typed_resources = self._filter_by_type(resources, type_name, target_resources)
             if not typed_resources:
                 continue
@@ -868,6 +1019,7 @@ class OPNsenseDirectRunner(BaseRunner):
                 self.console.print(
                     f"  [dim]opnsense_direct: {type_name}: destroyed {destroyed} resources[/dim]"
                 )
+            self._print_warnings(result.get("warnings"))
 
         if not any_dispatched:
             self.console.print("  [dim]opnsense_direct: no direct-API resources to destroy[/dim]")

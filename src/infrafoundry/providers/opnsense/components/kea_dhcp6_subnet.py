@@ -39,6 +39,7 @@ Reconfigure semantics:
 
 from __future__ import annotations
 
+import logging
 from typing import Any, ClassVar
 
 from infrafoundry.core.provider import ResourceConfig
@@ -51,8 +52,12 @@ from ..services.kea_dhcp import (
     _extract_subnet_fields,
     _log_field_diff,
 )
+from ._kea_blockers import live_reservations_by_subnet, split_blocked_deletes
 from ._managed import subnet_cidr_keys
 from .base import BaseComponentManager
+from .kea_dhcp6_reservation import _build_subnet_name_to_cidr, reservations_kept_on_subnets
+
+logger = logging.getLogger(__name__)
 
 
 class _Diff:
@@ -74,11 +79,17 @@ class _Diff:
         updates: list[tuple[str, dict[str, Any]]] | None = None,
         deletes: list[tuple[str, str]] | None = None,
         unmanaged: list[tuple[str, str]] | None = None,
+        blocked: list[tuple[str, str, list[str]]] | None = None,
+        warnings: list[str] | None = None,
     ) -> None:
         self.adds: list[dict[str, Any]] = adds or []
         self.updates: list[tuple[str, dict[str, Any]]] = updates or []
         self.deletes: list[tuple[str, str]] = deletes or []
         self.unmanaged: list[tuple[str, str]] = unmanaged or []
+        # Deletes refused because reservations InfraFoundry does not manage still use the
+        # subnet: (uuid, cidr, descriptors). ``is_empty`` ignores them (#1264).
+        self.blocked: list[tuple[str, str, list[str]]] = blocked or []
+        self.warnings: list[str] = warnings or []
         self.locked: list[Any] = []
 
     @property
@@ -106,6 +117,15 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
     #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
     DELETE_SCOPE: ClassVar[str] = "managed_set"
 
+    #: The runner deletes in a separate phase after the reservation manager, so a
+    #: subnet is deleted only once its reservations are gone (#1264).
+    SPLIT_DELETE_PHASE: ClassVar[bool] = True
+
+    #: Resource type whose YAML and managed rows the runner threads in as
+    #: ``dependent_resources`` / ``managed_dependent_resources``, to predict which
+    #: subnet deletes would orphan a reservation (#1264).
+    DEPENDENT_RESOURCE_TYPE: ClassVar[str | None] = "kea.dhcp6.reservations"
+
     # ------------------------------------------------------------------
     # Plan / apply / destroy
     # ------------------------------------------------------------------
@@ -117,6 +137,8 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         *,
         add_only: bool = False,
         managed_resources: list[ResourceConfig] | None = None,
+        dependent_resources: list[ResourceConfig] | None = None,
+        managed_dependent_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> _Diff:
         """Compute the add/update/delete diff for the given subnets.
@@ -128,6 +150,9 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
             managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
                 only live subnets matching them may be deleted; ``None`` deletes every
                 live subnet missing from YAML.
+            dependent_resources: ``kea.dhcp6.reservations`` in YAML, used to predict which
+                subnet deletes a reservation would block (#1264).
+            managed_dependent_resources: Managed reservation rows, as for ``managed_resources``.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -139,6 +164,9 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
             resources,
             add_only=add_only,
             managed_keys=subnet_cidr_keys(managed_resources),
+            managed_subnets=managed_resources,
+            dependent_resources=dependent_resources,
+            managed_dependent_resources=managed_dependent_resources,
         )
 
     def apply(
@@ -148,7 +176,10 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        deletes_only: bool = False,
         managed_resources: list[ResourceConfig] | None = None,
+        dependent_resources: list[ResourceConfig] | None = None,
+        managed_dependent_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
         """Apply the diff: add / update / delete DHCPv6 subnets.
@@ -164,9 +195,15 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
             resources: DHCPv6 subnet ``ResourceConfig`` entries.
             auto_approve: Currently a no-op; the diff engine is the gate.
             add_only: If True, suppress deletes.
+            deletes_only: If True, only delete: the runner's delete phase, run after the
+                reservation manager deleted its reservations (#1264). Any reservation
+                still on a subnet then blocks its delete.
             managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
                 only live subnets matching them may be deleted; ``None`` deletes every
                 live subnet missing from YAML.
+            dependent_resources: ``kea.dhcp6.reservations`` in YAML, used to predict which
+                subnet deletes a reservation would block (#1264).
+            managed_dependent_resources: Managed reservation rows, as for ``managed_resources``.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -182,7 +219,7 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         required_interfaces = sorted(
             {str(r.config.get("interface")) for r in resources if r.config.get("interface")}
         )
-        if required_interfaces:
+        if required_interfaces and not deletes_only:
             service.ensure_dhcpv6_enabled(required_interfaces)
 
         unresolved_managed: set[str] = set()
@@ -191,7 +228,20 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
             resources,
             add_only=add_only,
             managed_keys=subnet_cidr_keys(managed_resources, unresolved_managed),
+            managed_subnets=managed_resources,
+            dependent_resources=dependent_resources,
+            managed_dependent_resources=managed_dependent_resources,
+            deletes_only=deletes_only,
         )
+        for _, blocked_cidr, _ in diff.blocked:
+            # Keep the row managed so the next run retries the delete and warns again.
+            unresolved_managed.update(
+                row.name
+                for row in managed_resources or []
+                if str(row.config.get("subnet", "")) == blocked_cidr
+            )
+        for warning in diff.warnings:
+            logger.warning("kea subnet: %s", warning)
 
         outcomes: list[ResourceOutcome] = []
         created = 0
@@ -245,6 +295,7 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
             "resources_deleted": deleted,
             "resource_outcomes": outcomes,
             "unresolved_managed": sorted(unresolved_managed),
+            "warnings": list(diff.warnings),
         }
 
     def destroy(
@@ -277,10 +328,23 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         existing_by_subnet = {str(s.get("subnet", "")): str(s.get("uuid", "")) for s in existing}
 
         deleted = 0
+        candidates = [
+            (existing_by_subnet[addr], addr)
+            for addr in (str(r.config.get("subnet", "")) for r in resources)
+            if existing_by_subnet.get(addr)
+        ]
+        # The reservation destroy ran first; refuse any subnet that still has reservations.
+        still_used = live_reservations_by_subnet(
+            service.search_dhcpv6_reservations(), {u for u, _ in candidates}, "duid"
+        )
+        _, blocked, warnings = split_blocked_deletes(candidates, still_used, "kea.dhcp6.subnets")
+        blocked_uuids = {uuid for uuid, _, _ in blocked}
+        for warning in warnings:
+            logger.warning("kea subnet: %s", warning)
         for resource in resources:
             subnet_address = str(resource.config.get("subnet", ""))
             uuid = existing_by_subnet.get(subnet_address)
-            if not uuid:
+            if not uuid or uuid in blocked_uuids:
                 continue
             service.delete_dhcpv6_subnet(uuid)
             deleted += 1
@@ -289,6 +353,8 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
             "success": True,
             "resources_destroyed": deleted,
             "locked_skipped": 0,
+            "blocked_skipped": len(blocked),
+            "warnings": warnings,
         }
 
     # ------------------------------------------------------------------
@@ -339,6 +405,10 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         *,
         add_only: bool,
         managed_keys: set[str] | None = None,
+        managed_subnets: list[ResourceConfig] | None = None,
+        dependent_resources: list[ResourceConfig] | None = None,
+        managed_dependent_resources: list[ResourceConfig] | None = None,
+        deletes_only: bool = False,
     ) -> _Diff:
         """Compute the add/update/delete diff against live state.
 
@@ -348,6 +418,12 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
         deletes carry ``(uuid, subnet_address)`` for synthetic-name
         construction. With ``managed_keys`` set, live subnets outside it are
         reported in ``unmanaged`` instead of ``deletes``.
+
+        A delete is refused (moved to ``blocked``, with a warning) while a reservation
+        InfraFoundry will not delete still uses the subnet (#1264). With ``deletes_only``
+        the reservation phase has run, so any live reservation on the subnet blocks it;
+        otherwise the reservations apply will delete are predicted from
+        ``dependent_resources`` and ``managed_dependent_resources``.
         """
         existing = service.search_dhcpv6_subnets()
         existing_by_subnet = {str(s.get("subnet", "")): str(s.get("uuid", "")) for s in existing}
@@ -360,6 +436,8 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
             subnet_data = _build_subnet_payload(resource)
             subnet_address = str(subnet_data["subnet"])
             seen_subnets.add(subnet_address)
+            if deletes_only:
+                continue
 
             existing_uuid = existing_by_subnet.get(subnet_address)
             if existing_uuid:
@@ -388,7 +466,35 @@ class KeaDHCPv6SubnetManager(BaseComponentManager):
                     continue
                 deletes.append((uuid, subnet_address))
 
-        return _Diff(adds=adds, updates=updates, deletes=deletes, unmanaged=unmanaged)
+        blocked: list[tuple[str, str, list[str]]] = []
+        warnings: list[str] = []
+        if deletes:
+            live_reservations = service.search_dhcpv6_reservations()
+            candidate_uuids = {uuid for uuid, _ in deletes}
+            if deletes_only:
+                kept = live_reservations_by_subnet(live_reservations, candidate_uuids, "duid")
+            else:
+                kept = reservations_kept_on_subnets(
+                    live_reservations,
+                    candidate_uuids,
+                    yaml_reservations=dependent_resources or [],
+                    managed_reservations=managed_dependent_resources,
+                    name_to_cidr={
+                        **_build_subnet_name_to_cidr(managed_subnets),
+                        **_build_subnet_name_to_cidr(resources),
+                    },
+                    cidr_to_uuid={c: u for c, u in existing_by_subnet.items() if c and u},
+                )
+            deletes, blocked, warnings = split_blocked_deletes(deletes, kept, "kea.dhcp6.subnets")
+
+        return _Diff(
+            adds=adds,
+            updates=updates,
+            deletes=deletes,
+            unmanaged=unmanaged,
+            blocked=blocked,
+            warnings=warnings,
+        )
 
 
 def _build_subnet_payload(resource: ResourceConfig) -> dict[str, Any]:

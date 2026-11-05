@@ -296,3 +296,16 @@ class TestOPNsenseResourceTypes:
         assert set(deps) == supported
         for required in deps.values():
             assert set(required) <= supported
+
+    def test_delete_phase_types_follow_dependency_order(self, provider: OPNsenseProvider) -> None:
+        """A type that splits deletes comes after the split types it depends on (#1264)."""
+        table = provider.get_direct_api_resource_types()
+        order = list(table)
+        splitting = {
+            t for t, cls in table.items() if getattr(cls, "SPLIT_DELETE_PHASE", None) is True
+        }
+        assert splitting  # the kea managers opt in
+        deps = provider.get_dependencies()
+        for type_name in splitting:
+            for dependency in set(deps[type_name]) & splitting:
+                assert order.index(dependency) < order.index(type_name)

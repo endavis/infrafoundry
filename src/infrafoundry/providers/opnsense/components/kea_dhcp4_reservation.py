@@ -65,6 +65,7 @@ from ..services.kea_dhcp import (
     _extract_reservation4_fields,
     _log_field_diff,
 )
+from ._kea_blockers import describe_reservation
 from .base import BaseComponentManager
 
 logger = logging.getLogger(__name__)
@@ -120,6 +121,10 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
 
     #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
     DELETE_SCOPE: ClassVar[str] = "managed_set"
+
+    #: The runner deletes in a separate phase ahead of the subnet manager, so a
+    #: subnet is deleted only after its reservations (#1264).
+    SPLIT_DELETE_PHASE: ClassVar[bool] = True
 
     # ------------------------------------------------------------------
     # Plan / apply / destroy
@@ -182,6 +187,7 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        deletes_only: bool = False,
         managed_resources: list[ResourceConfig] | None = None,
         managed_sibling_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
@@ -197,6 +203,9 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
             resources: DHCPv4 reservation ``ResourceConfig`` entries.
             auto_approve: Currently a no-op; the diff engine is the gate.
             add_only: If True, suppress deletes.
+            deletes_only: If True, only delete: the runner's delete phase, run before
+                the subnet manager deletes subnets (#1264). A reservation on a
+                subnet that is not live yet is skipped rather than raising.
             managed_resources: Rows InfraFoundry applied before (ADR-0018). When given,
                 only live reservations matching them may be deleted; ``None`` deletes
                 every live reservation missing from YAML.
@@ -224,6 +233,8 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
             resources,
             add_only=add_only,
             name_to_cidr=name_to_cidr,
+            allow_pending_subnets=deletes_only,
+            deletes_only=deletes_only,
             managed_resources=managed_resources,
             managed_sibling_resources=managed_sibling_resources,
         )
@@ -410,6 +421,7 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
         add_only: bool,
         name_to_cidr: dict[str, str],
         allow_pending_subnets: bool = False,
+        deletes_only: bool = False,
         managed_resources: list[ResourceConfig] | None = None,
         managed_sibling_resources: list[ResourceConfig] | None = None,
     ) -> _Diff:
@@ -443,6 +455,8 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
 
         for resource in resources:
             subnet_cidr = _resolve_subnet_cidr(resource, name_to_cidr)
+            if deletes_only and subnet_cidr in pending_cidrs:
+                continue  # subnet not live yet: nothing of ours can sit on it
             if subnet_cidr in pending_cidrs:
                 # The UUID does not exist yet; carry the CIDR for display.
                 pending = _build_reservation_payload(resource, subnet_cidr)
@@ -453,6 +467,8 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
             hw_address = str(reservation_data["hw_address"])
             key = (hw_address, subnet_uuid)
             seen_keys.add(key)
+            if deletes_only:
+                continue
 
             existing = live_by_key.get(key)
             if existing is not None:
@@ -519,6 +535,60 @@ class KeaDHCPv4ReservationManager(BaseComponentManager):
             unmanaged=unmanaged,
             unresolved_managed=unresolved,
         )
+
+
+def reservations_kept_on_subnets(
+    live_reservations: list[dict[str, Any]],
+    subnet_uuids: set[str],
+    *,
+    yaml_reservations: list[ResourceConfig],
+    managed_reservations: list[ResourceConfig] | None,
+    name_to_cidr: dict[str, str],
+    cidr_to_uuid: dict[str, str],
+) -> dict[str, list[str]]:
+    """Find the live reservations on ``subnet_uuids`` that apply will not delete (#1264).
+
+    The subnet manager uses this to predict which subnet deletes would orphan a
+    reservation. A reservation is deleted when its key is not among the YAML
+    reservations and, with a managed set, is among the managed rows' keys.
+
+    Args:
+        live_reservations: Rows from ``search_dhcpv4_reservations``.
+        subnet_uuids: UUIDs of the subnets about to be deleted.
+        yaml_reservations: Reservations in YAML. A row that does not resolve is
+            skipped here; the reservation plan raises for it.
+        managed_reservations: Managed reservation rows, or ``None`` for the legacy
+            full reconcile (every reservation missing from YAML is deleted).
+        name_to_cidr: Subnet name to CIDR, covering YAML and managed subnets.
+        cidr_to_uuid: Live subnet CIDR to UUID.
+
+    Returns:
+        Subnet UUID to ``"<hw_address> <ip>"`` descriptors of the reservations kept.
+    """
+    yaml_keys: set[tuple[str, str]] = set()
+    for resource in yaml_reservations:
+        try:
+            cidr = _resolve_subnet_cidr(resource, name_to_cidr)
+        except ReferenceValidationError:
+            continue
+        uuid = cidr_to_uuid.get(cidr)
+        if uuid:
+            yaml_keys.add((str(resource.config.get("hw_address")), uuid))
+    managed_keys: set[tuple[str, str]] | None = None
+    if managed_reservations is not None:
+        managed_keys, _, _ = _managed_reservation_keys(
+            managed_reservations, name_to_cidr, cidr_to_uuid
+        )
+    kept: dict[str, list[str]] = {}
+    for row in live_reservations:
+        subnet = str(row.get("subnet", ""))
+        if subnet not in subnet_uuids:
+            continue
+        key = (str(row.get("hw_address", "")), subnet)
+        if key not in yaml_keys and (managed_keys is None or key in managed_keys):
+            continue
+        kept.setdefault(subnet, []).append(describe_reservation(row, "hw_address"))
+    return kept
 
 
 def _managed_reservation_keys(
