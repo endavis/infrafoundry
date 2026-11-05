@@ -112,8 +112,11 @@ def state() -> None:
     "--output-dir",
     "-o",
     type=click.Path(file_okay=False, dir_okay=True, writable=True),
-    default=".",
-    help="Directory to save the backup files. Defaults to current directory.",
+    default=None,
+    help=(
+        "Directory to save the backup files. Defaults to a 'backups' directory "
+        "next to the state database."
+    ),
 )
 @click.option(
     "--include-generated",
@@ -125,7 +128,7 @@ def state() -> None:
 def state_backup(
     _ctx: click.Context,
     orchestrator: Orchestrator,
-    output_dir: str,
+    output_dir: str | None,
     include_generated: bool,
 ) -> None:
     """Create a timestamped backup of the InfraFoundry state database.
@@ -133,9 +136,6 @@ def state_backup(
     Optionally includes the 'generated/' directory.
     """
     try:
-        output_path = Path(output_dir).resolve()
-        output_path.mkdir(parents=True, exist_ok=True)
-
         state_db_path = sqlite_db_path(orchestrator)
         if state_db_path is None:
             # Not SQLite, so likely a remote DB: backup is not a file copy.
@@ -147,6 +147,11 @@ def state_backup(
         if not state_db_path or not state_db_path.exists():
             console.error("InfraFoundry state database file not found.")
             return
+
+        output_path = (
+            Path(output_dir) if output_dir else state_db_path.parent / "backups"
+        ).resolve()
+        output_path.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         db_backup_path = copy_state_db(state_db_path, output_path, timestamp)

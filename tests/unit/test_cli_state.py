@@ -144,3 +144,76 @@ def test_state_backup_non_sqlite(
             in result.output
         )
         assert "State backup failed" not in result.output  # Should not fail
+
+
+def test_state_backup_default_dir_is_backups_next_to_db(
+    cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path
+) -> None:
+    """Without -o the backup lands in <db parent>/backups, not the cwd."""
+    db_parent = tmp_path / ".infrafoundry"
+    with cli_runner.isolated_filesystem() as td:
+        with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+            result = cli_runner.invoke(main, ["state", "backup"])
+
+        assert result.exit_code == 0
+        backups = list((db_parent / "backups").glob("infrafoundry_state_*"))
+        assert len(backups) == 1
+        assert list(Path(td).iterdir()) == []
+
+
+def test_state_backup_output_dir_overrides_default(
+    cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path
+) -> None:
+    """-o wins over the default and the default directory is not created."""
+    target = tmp_path / "custom"
+    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+        result = cli_runner.invoke(main, ["state", "backup", "-o", str(target)])
+
+    assert result.exit_code == 0
+    assert len(list(target.glob("infrafoundry_state_*"))) == 1
+    assert not (tmp_path / ".infrafoundry" / "backups").exists()
+
+
+def test_state_backup_dot_restores_cwd_behavior(
+    cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path
+) -> None:
+    """-o . writes the backup into the current directory."""
+    with cli_runner.isolated_filesystem() as td:
+        with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+            result = cli_runner.invoke(main, ["state", "backup", "-o", "."])
+
+        assert result.exit_code == 0
+        assert len(list(Path(td).glob("infrafoundry_state_*"))) == 1
+        assert not (tmp_path / ".infrafoundry" / "backups").exists()
+
+
+def test_state_backup_generated_archive_goes_to_default_dir(
+    cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path
+) -> None:
+    """-g without -o puts the archive next to the DB backup in the backups dir."""
+    backups = (tmp_path / ".infrafoundry" / "backups").resolve()
+    with cli_runner.isolated_filesystem() as td:
+        (Path(td) / "generated").mkdir()
+        (Path(td) / "generated" / "file.txt").touch()
+        with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+            result = cli_runner.invoke(main, ["state", "backup", "-g"])
+
+        assert result.exit_code == 0
+        assert len(list(backups.glob("infrafoundry_state_*"))) == 1
+        assert len(list(backups.glob("infrafoundry_generated_*.tar.gz"))) == 1
+        assert sorted(p.name for p in Path(td).iterdir()) == ["generated"]
+
+
+def test_state_backup_non_sqlite_default_creates_no_directory(
+    cli_runner: CliRunner, mock_orchestrator: Mock, tmp_path: Path
+) -> None:
+    """Non-SQLite with the default warns and creates no backups directory."""
+    mock_orchestrator.state_manager.engine.url.drivername = "postgresql"
+    with cli_runner.isolated_filesystem() as td:
+        with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+            result = cli_runner.invoke(main, ["state", "backup"])
+
+        assert result.exit_code == 0
+        assert "Skipping file backup." in result.output
+        assert list(Path(td).iterdir()) == []
+    assert not (tmp_path / ".infrafoundry" / "backups").exists()

@@ -610,12 +610,15 @@ foundry state resources --provider proxmox --type vm
 Create a timestamped backup of the state database. Optionally includes the `generated/` directory. An existing backup is never overwritten: if the name is taken, `-1`, `-2`, ... is appended.
 
 ```bash
-foundry state backup
+foundry state backup                                  # to <state db dir>/backups
 foundry state backup --output-dir ./backups
 foundry state backup --output-dir ./backups --include-generated
+foundry state backup -o .                             # current directory
 ```
 
 **Options:** `-o/--output-dir DIRECTORY`, `-g/--include-generated`
+
+Without `--output-dir` the backup (and the `--include-generated` archive) goes to a `backups` directory next to the state database, created if missing. Pass `-o .` to write to the current directory, as earlier versions did by default.
 
 ### `state prune`
 
