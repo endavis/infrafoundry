@@ -1356,9 +1356,11 @@ def _check_branch_up_to_date(current_branch: str, console: Console, base: str = 
 
 
 def _ensure_branch_pushed(current_branch: str, console: Console, no_push: bool) -> None:
-    """Ensure the current branch has an upstream on ``origin``.
+    """Ensure the current branch's upstream is ``origin/<branch>``.
 
-    If the branch already has an upstream, returns silently. Otherwise,
+    If it is, returns silently. A missing upstream, or one that is another
+    branch (a worktree branch cut from ``origin/main``), counts as not pushed.
+    Otherwise,
     runs ``git push -u origin <branch>`` to create it. On push failure,
     calls ``sys.exit(1)``.
 
@@ -1371,19 +1373,21 @@ def _ensure_branch_pushed(current_branch: str, console: Console, no_push: bool) 
         no_push: If True, never push; abort if upstream is missing.
     """
     try:
-        subprocess.run(
+        result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
             check=True,
             capture_output=True,
             text=True,
         )
-        return
+        if result.stdout.strip() == f"origin/{current_branch}":
+            return
     except subprocess.CalledProcessError:
         pass
 
     if no_push:
         console.print(
-            f"[red]Branch '{current_branch}' has no upstream and --no-push was passed.[/red]"
+            f"[red]Branch '{current_branch}' has no upstream of origin/{current_branch} "
+            "and --no-push was passed.[/red]"
         )
         console.print(f"[yellow]Push manually: git push -u origin {current_branch}[/yellow]")
         sys.exit(1)

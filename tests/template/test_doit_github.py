@@ -496,6 +496,35 @@ class TestEnsureBranchPushed:
 
         assert mock_subprocess.call_count == 1
 
+    def test_upstream_on_another_branch_pushes(self, mock_subprocess: MagicMock) -> None:
+        """A branch cut from origin/main tracks origin/main; it is not pushed (#1197)."""
+        console = self._make_console()
+        mock_subprocess.register(
+            {
+                ("git", "rev-parse"): {"stdout": "origin/main\n"},
+                ("git", "push", "-u"): {},
+            }
+        )
+        _ensure_branch_pushed("feat/x", console, no_push=False)
+
+        assert mock_subprocess.call_count == 2
+        push_cmd = mock_subprocess.call_args_list[1].args[0]
+        assert push_cmd == ["git", "push", "-u", "origin", "feat/x"]
+
+    def test_no_push_flag_with_upstream_on_another_branch_aborts(
+        self, mock_subprocess: MagicMock
+    ) -> None:
+        """no_push=True with upstream origin/main → SystemExit(1), no push (#1197)."""
+        console = self._make_console()
+        mock_subprocess.register({("git", "rev-parse"): {"stdout": "origin/main\n"}})
+
+        with pytest.raises(SystemExit) as excinfo:
+            _ensure_branch_pushed("feat/x", console, no_push=True)
+
+        assert excinfo.value.code == 1
+        assert mock_subprocess.call_count == 1
+        assert "origin/feat/x" in console.file.getvalue()  # type: ignore[attr-defined]
+
 
 class TestLabelsSync:
     """Tests for the ``labels_sync`` doit task and its helpers."""

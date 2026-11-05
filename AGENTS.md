@@ -499,7 +499,7 @@ Where `<agent-type>` is one of: `claude`, `copilot`, `codex`, `antigravity`, or 
 
 ## Development Workflow
 
-**Rule:** All *code* changes must originate from a GitHub Issue. Documentation updates are exempt from this rule.
+**Rule:** All changes must originate from a GitHub Issue, documentation changes included. The only exceptions are release PRs (`release/v*` branches opened by `doit release`) and Dependabot PRs.
 
 ### Issue-Driven Development Flow
 
@@ -661,7 +661,7 @@ The PR title becomes the merge commit message, so make it clear and descriptive.
 
 **Minimum requirements (enforced by CI):**
 - At least 50 characters
-- Include reference to related issue (except docs-only PRs)
+- Include reference to related issue (except release and Dependabot PRs)
 - Describe what changed and why
 - Include testing information
 
@@ -672,7 +672,7 @@ The PR title becomes the merge commit message, so make it clear and descriptive.
 <type>: <subject> (merges PR #XX, addresses #YY)
 ```
 
-**When PR is part of multi-PR issue or docs-only:**
+**When PR is part of a multi-PR issue:**
 ```
 <type>: <subject> (merges PR #XX)
 ```
@@ -681,7 +681,7 @@ The PR title becomes the merge commit message, so make it clear and descriptive.
 ```
 feat: add PyInfra runner support (merges PR #18, addresses #42)
 fix: handle None values in OPNsense provider (merges PR #23, addresses #19)
-docs: update provider implementation guide (merges PR #29)
+docs: update provider implementation guide (merges PR #29, addresses #25)
 ```
 
 **Examples - Incorrect:**

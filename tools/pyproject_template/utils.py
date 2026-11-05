@@ -613,10 +613,15 @@ def download_and_extract_archive(url: str, target_dir: Path) -> Path:
         if zipfile.is_zipfile(archive_path):
             with zipfile.ZipFile(archive_path, "r") as zf:
                 # Filter out dangerous paths
-                for member in zf.namelist():
-                    if member.startswith("/") or ".." in member:
+                for info in zf.infolist():
+                    if info.filename.startswith("/") or ".." in info.filename:
                         continue
-                    zf.extract(member, extract_dir)
+                    extracted_path = Path(zf.extract(info, extract_dir))
+                    # zf.extract drops Unix modes; restore them so executable
+                    # scripts stay executable (#1199).
+                    mode = (info.external_attr >> 16) & 0o777
+                    if mode and not info.is_dir():
+                        extracted_path.chmod(mode)
         elif tarfile.is_tarfile(archive_path):
             with tarfile.open(archive_path, "r:*") as tf:
                 # Filter out dangerous members

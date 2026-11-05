@@ -10,6 +10,9 @@ The hook is best-effort: any failure (timeout, ruff missing, malformed payload)
 is swallowed and the hook exits 0 so it never blocks a tool call. The next
 ``doit check`` will surface any genuine issue.
 
+Warning: F401 removes an import nothing uses yet, so add an import in the same
+edit as its first use, or after that code exists.
+
 For full documentation, see: docs/development/ai/ruff-fix-hook.md
 """
 

@@ -369,6 +369,40 @@ BREAKING CHANGE: All public methods are now async.
 Update calling code to use `await`.
 ```
 
+### Signed Commits
+
+Commits merged into `main` must have a verified signature: the `main` ruleset requires it (see
+[Ruleset: `main`](../docs/development/github-repository-settings.md#ruleset-main)). This applies to every
+commit on a pull request's branch, not only the final squash commit. GitHub checks the head
+branch's commits before it allows a squash merge, so a single unsigned commit blocks the PR, even
+for its author (see GitHub's
+[Require signed commits](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets#require-signed-commits)).
+
+**Set up signing before your first commit.** GitHub accepts GPG, SSH and S/MIME signatures; follow
+[About commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)
+to create a key, add it to your GitHub account and tell Git about it. Then sign every commit by
+default:
+
+```bash
+git config commit.gpgsign true
+```
+
+**Sign commits already on your PR branch** by rewriting them, then force-push your own branch:
+
+```bash
+# One commit
+git commit --amend -S --no-edit
+
+# Several commits: re-sign everything since main
+git rebase --exec 'git commit --amend --no-edit -S' origin/main
+
+git push --force-with-lease
+```
+
+Only force-push a branch you own, such as your fork's PR branch — never `main`. If you cannot sign
+your commits, say so in the PR; a maintainer with permission to bypass the ruleset can merge it
+instead.
+
 ### Exceptions
 
 **Dependabot commits** are exempt from the full merge commit format. Dependabot automatically generates commits with:
@@ -392,6 +426,8 @@ This is acceptable because:
    ```
 
 2. **Use conventional commit messages** - Your commit messages (`feat:`, `fix:`, etc.) automatically become changelog entries during release. See [Commit Guidelines](#commit-guidelines).
+
+   **Sign every commit** - An unsigned commit on the branch blocks the merge. See [Signed Commits](#signed-commits).
 
 3. **Update documentation** (if needed)
 
@@ -808,7 +844,7 @@ Use the feature request template (`.github/ISSUE_TEMPLATE/feature_request.yml`):
 
 ## Development Workflow
 
-**MANDATORY RULE:** All changes must originate from a GitHub Issue.
+**MANDATORY RULE:** All changes must originate from a GitHub Issue, documentation changes included. The only exceptions are release PRs (`release/v*` branches opened by `doit release`) and Dependabot PRs.
 
 ### Issue-Driven Development
 

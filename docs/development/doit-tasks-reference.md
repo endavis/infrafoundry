@@ -281,7 +281,7 @@ doit env_check
 
 **What it does:**
 - Runs `uv sync --all-extras --dev --check`
-- If it exits non-zero, prints `uv.lock changed — run: doit install_dev` and returns — it never
+- If it exits non-zero, prints `environment does not match uv.lock — run: doit install_dev` and returns — it never
   fails the task and never runs `uv sync` itself
 
 **Why it exists (#1033):** it replaces the `uv-sync-on-pull`/`uv-sync-on-checkout` pre-commit hooks,
