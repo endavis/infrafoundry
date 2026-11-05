@@ -10,7 +10,9 @@ with 404s.
 Apply semantics (per the #806 user decision, 2026-05-10):
 
 - **Install-missing only.** Any plugin in YAML but not on the box gets
-  installed via ``firmware/install/<plugin_name>``.
+  installed via ``firmware/install/<plugin_name>``. The install is a
+  background job, so apply waits on ``firmware/upgradestatus`` and fails
+  unless the plugin is installed afterwards (#1238).
 - **Extras → warning, never removed.** Plugins on the box but not in
   YAML are logged at WARNING level only — never auto-uninstalled. This
   is a deliberate safety departure from the usual "live state == YAML
@@ -18,7 +20,7 @@ Apply semantics (per the #806 user decision, 2026-05-10):
 - **Destroy is a no-op.** Don't auto-uninstall.
 
 Settings drift (only keys present in YAML: ``mirror``, ``flavour``, ...) is
-written through ``core/firmware/set`` (#1149; the write is unverified live).
+written through ``core/firmware/set`` (#1149; verified live on 26.1.6_2).
 Plugins are read from ``core/firmware/info`` and settings from
 ``core/firmware/get``.
 """
@@ -51,16 +53,17 @@ class SystemFirmwareManager(BaseComponentManager):
     ) -> SingletonDiff:
         """Compute the install-missing list + settings diff.
 
-        The returned ``SingletonDiff`` carries up to one entry in
-        ``updates``: a dict with two keys:
+        The returned ``SingletonDiff`` counts the same changes ``apply``
+        reports (#1238):
 
-        - ``settings`` — the desired settings field map (or empty dict
-          when settings are in sync).
-        - ``install_missing`` — sorted list of plugin names to install.
+        - ``adds`` — one ``{"plugin": name}`` entry per missing plugin,
+          sorted by name.
+        - ``updates`` — at most one entry, ``{"settings": {...}}``, when
+          settings drift.
 
-        ``adds``/``deletes``/``locked`` are always empty for firmware.
-        ``is_empty`` is True iff both ``settings`` is in sync AND
-        ``install_missing`` is empty AND there are no extras to warn.
+        ``deletes``/``locked`` are always empty for firmware. ``is_empty``
+        is True iff there is no missing plugin AND no settings drift
+        (extras are only warned about).
 
         Args:
             env_name: Active environment name.
@@ -95,14 +98,9 @@ class SystemFirmwareManager(BaseComponentManager):
         desired_settings = service.build_desired_firmware_settings_fields(resources[0])
         settings_diff = service.settings_drift(live_settings, desired_settings)
 
-        if settings_diff is None and not install_missing:
-            return SingletonDiff(None)
-
         return SingletonDiff(
-            {
-                "settings": settings_diff or {},
-                "install_missing": install_missing,
-            }
+            {"settings": settings_diff} if settings_diff is not None else None,
+            adds=[{"plugin": name} for name in install_missing],
         )
 
     def apply(
@@ -116,6 +114,10 @@ class SystemFirmwareManager(BaseComponentManager):
     ) -> dict[str, Any]:
         """Apply: install missing plugins (one call per name), then write settings drift.
 
+        Each install is queued and then awaited; a plugin that is still not
+        installed afterwards raises ``APIError`` (#1238), and neither the
+        outcome nor the settings write follows it.
+
         Args:
             env_name: Active environment name.
             resources: Should contain exactly one ``system.firmware``
@@ -128,6 +130,10 @@ class SystemFirmwareManager(BaseComponentManager):
             Dict with counts and ``resource_outcomes``. Each installed
             plugin produces one ``ResourceOutcome`` with
             ``action="add"`` and ``resource_name=<plugin_name>``.
+
+        Raises:
+            APIError: If an install is rejected, times out, or finishes
+                without the plugin being installed.
         """
         del auto_approve, add_only
         enforce_singleton(resources, "system.firmware")

@@ -10,8 +10,8 @@ Endpoint surface:
 - ``GET core/tunables/get`` — ``{"sysctl": {"item": {<uuid>: {tunable,
   value, descr, default_value, ...}}}}``. Verified live on 26.1.6_2.
 - ``POST core/tunables/addItem`` / ``setItem/<uuid>`` / ``delItem/<uuid>``
-  and ``POST core/tunables/reconfigure`` — UNVERIFIED against a live box;
-  they follow the MVC convention. ``delItem`` is never called.
+  and ``POST core/tunables/reconfigure`` — verified live on 26.1.6_2
+  (``delItem`` by hand). ``delItem`` is never called by apply.
 
 Wire payload for a write: ``{"sysctl": {"tunable", "value", "descr"}}``.
 """

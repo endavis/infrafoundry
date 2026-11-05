@@ -769,8 +769,9 @@ class SystemClient:
     def set_firmware_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Update firmware settings.
 
-        Unverified against a live box: the ``{"firmware": {...}}`` partial
-        payload follows the MVC ``setBase`` convention (#1149).
+        Verified live on OPNsense 26.1.6_2 (``reboot`` 0 -> 1 -> 0); the
+        ``{"firmware": {...}}`` partial payload follows the MVC ``setBase``
+        convention (#1149).
 
         Args:
             payload: ``{"firmware": {<field>: <value>}}``.
@@ -783,8 +784,11 @@ class SystemClient:
     def install_plugin(self, name: str) -> dict[str, Any]:
         """Install a single OPNsense plugin (e.g., ``os-acme-client``).
 
-        Unverified against a live box. The install is asynchronous on
-        OPNsense and returns a job acknowledgement (#1149).
+        The request reaches OPNsense on 26.1.6_2, but it only queues a
+        background job: the response acknowledges the request, not the
+        install. A box that is out of date refuses the install in the job
+        log. Poll :meth:`get_upgrade_status` and re-read
+        :meth:`get_firmware_info` to learn the outcome (#1238).
 
         Args:
             name: Plugin name; percent-encoded into the URL path.
@@ -793,6 +797,19 @@ class SystemClient:
             API response (typically a job-acknowledgement payload).
         """
         return self.client.request("POST", f"core/firmware/install/{quote(name, safe='')}")
+
+    def get_upgrade_status(self) -> dict[str, Any]:
+        """Fetch the status of the running or last firmware background job.
+
+        ``GET core/firmware/upgradestatus`` is in the 26.1.6 spec. The
+        response carries ``status`` (``"running"`` while the job runs) and
+        ``log`` (the job log); its shape beyond those two keys is not
+        verified live (#1238).
+
+        Returns:
+            Raw API response.
+        """
+        return self.client.request("GET", "core/firmware/upgradestatus")
 
     def remove_plugin(self, name: str) -> dict[str, Any]:
         """Remove an OPNsense plugin (unverified; apply never calls this).
@@ -860,7 +877,7 @@ class SystemClient:
         return self.client.request("GET", "core/tunables/get")
 
     def add_tunable(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Add a tunable. Unverified write (MVC convention, #1149).
+        """Add a tunable. Verified live on 26.1.6_2 (58 -> 59 entries, #1238).
 
         Args:
             payload: ``{"sysctl": {"tunable": ..., "value": ..., "descr": ...}}``.
@@ -871,7 +888,7 @@ class SystemClient:
         return self.client.request("POST", "core/tunables/addItem", data=payload)
 
     def set_tunable(self, uuid: str, payload: dict[str, Any]) -> dict[str, Any]:
-        """Update a tunable by uuid. Unverified write (MVC convention, #1149).
+        """Update a tunable by uuid. Verified live on 26.1.6_2 (changed, then reverted).
 
         Args:
             uuid: Tunable uuid; percent-encoded into the URL path.
@@ -885,7 +902,7 @@ class SystemClient:
         )
 
     def del_tunable(self, uuid: str) -> dict[str, Any]:
-        """Delete a tunable by uuid. Unverified; apply never calls this.
+        """Delete a tunable by uuid. Verified by hand on 26.1.6_2; apply never calls this.
 
         Args:
             uuid: Tunable uuid; percent-encoded into the URL path.
@@ -896,7 +913,7 @@ class SystemClient:
         return self.client.request("POST", f"core/tunables/delItem/{quote(uuid, safe='')}")
 
     def reconfigure_tunables(self) -> dict[str, Any]:
-        """Apply pending tunable changes. Unverified write (#1149).
+        """Apply pending tunable changes. Verified live on 26.1.6_2 (re-plan stable).
 
         Returns:
             Response with ``status`` field.

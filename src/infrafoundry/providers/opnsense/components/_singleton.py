@@ -103,25 +103,33 @@ class SingletonDiff:
     surface that ``OPNsenseDirectRunner._format_plan_summary`` reads off
     list-shape components' ``_Diff`` classes. For singletons:
 
-    - ``adds`` and ``deletes`` are always empty lists.
+    - ``deletes`` is always an empty list.
+    - ``adds`` is empty unless the caller passes entries; only
+      ``system.firmware`` does (one per plugin to install, #1238).
     - ``updates`` carries zero (no change) or one entry — the desired
       field map.
     - ``locked`` is always empty — singletons have no per-row lock.
-    - ``is_empty`` is True iff there's no update entry.
+    - ``is_empty`` is True iff there are no update and no add entries.
 
     Args:
         update: The desired field map when the singleton is drifted, else
             ``None`` for an in-sync singleton.
+        adds: Entries to add, for singletons that also create things
+            (``system.firmware`` plugins). Defaults to none.
     """
 
-    def __init__(self, update: dict[str, Any] | None) -> None:
+    def __init__(
+        self,
+        update: dict[str, Any] | None,
+        adds: list[dict[str, Any]] | None = None,
+    ) -> None:
         """Initialize the singleton diff."""
-        self.adds: list[dict[str, Any]] = []
+        self.adds: list[dict[str, Any]] = list(adds) if adds else []
         self.updates: list[dict[str, Any]] = [update] if update is not None else []
         self.deletes: list[Any] = []
         self.locked: list[Any] = []
 
     @property
     def is_empty(self) -> bool:
-        """Return True when there are no updates to apply."""
-        return not self.updates
+        """Return True when there are no updates or adds to apply."""
+        return not self.updates and not self.adds

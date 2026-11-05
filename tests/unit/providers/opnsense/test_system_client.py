@@ -29,6 +29,7 @@ def parts() -> tuple[SystemClient, MagicMock]:
             "core/firmware/set",
             {"firmware": {"a": "b"}},
         ),
+        ("get_upgrade_status", (), "GET", "core/firmware/upgradestatus", None),
         ("install_plugin", ("os-a",), "POST", "core/firmware/install/os-a", None),
         ("remove_plugin", ("os-a",), "POST", "core/firmware/remove/os-a", None),
         ("lock_plugin", ("os-a",), "POST", "core/firmware/lock/os-a", None),

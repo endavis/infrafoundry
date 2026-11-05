@@ -4,7 +4,7 @@ Manager for the ``system.tuning`` dotted resource type. Uses the 26.1
 ``core/tunables/*`` controller: each tunable named in YAML is added or
 updated, matched by tunable name. Tunables not named in YAML (the box
 defaults) are never touched, and destroy is a no-op. The reads were
-verified live on 26.1.6_2; the writes are unverified (MVC convention).
+verified live on 26.1.6_2, and so were the writes (#1238).
 """
 
 from __future__ import annotations
