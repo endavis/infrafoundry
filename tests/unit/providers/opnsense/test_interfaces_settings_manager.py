@@ -146,3 +146,24 @@ def test_migrate_exports_non_defaults(tmp_path: Path) -> None:
         cls.from_environment.return_value = service
         text = InterfacesSettingsManager(tmp_path).migrate("env")
     assert yaml.safe_load(text)["opnsense"]["interfaces"]["settings"] == {}
+
+
+def test_plan_in_sync_with_list_form_option_field(tmp_path: Path) -> None:
+    live_list = {
+        "settings": {
+            **LIVE["settings"],
+            "disablevlanhwfilter": [
+                {"value": "Enable VLAN Hardware Filtering", "selected": 0},
+                {"value": "Disable VLAN Hardware Filtering", "selected": 1},
+                {"value": "Leave default", "selected": 0},
+            ],
+        }
+    }
+    service = _service()
+    service.client.request.return_value = live_list  # type: ignore[attr-defined]
+    with patch(SERVICE_PATH) as cls:
+        cls.from_environment.return_value = service
+        diff = InterfacesSettingsManager(tmp_path).plan(
+            "env", [_resource({"vlan_hardware_filtering": "disable"})]
+        )
+    assert diff.is_empty

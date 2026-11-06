@@ -240,3 +240,42 @@ def test_export_skips_non_integer_timeout_and_keeps_text_fields(
         doc = _export(_live(dhcp6_ratimeout="abc", dhcp6_duid="00:01"))
     assert doc["opnsense"]["interfaces"]["settings"] == {"dhcp6_duid": "00:01"}
     assert "dhcp6_ra_timeout" in caplog.text
+
+
+def _vlan_list(selected: int | None) -> list[dict[str, Any]]:
+    """The list-form OptionField shape OPNsense 26.1 returns for ``disablevlanhwfilter``."""
+    return [
+        {"value": label, "selected": 1 if index == selected else 0}
+        for index, label in enumerate(
+            ("Enable VLAN Hardware Filtering", "Disable VLAN Hardware Filtering", "Leave default")
+        )
+    ]
+
+
+def test_flatten_option_list_returns_selected_positional_index() -> None:
+    assert _flatten(_vlan_list(1)) == "1"
+    assert _flatten(_vlan_list(0)) == "0"
+    assert _flatten(_vlan_list(None)) == ""
+    assert _flatten([{"value": "a", "selected": 1}, "junk", {"value": "b", "selected": 1}]) == "0,2"
+
+
+def test_extract_live_and_drift_with_list_form() -> None:
+    svc = _svc()
+    live = svc.extract_live(_live(disablevlanhwfilter=_vlan_list(1)), list(FIELD_MAP))
+    assert live["vlan_hardware_filtering"] == "1"
+    assert svc.drift(live, {"vlan_hardware_filtering": "1"}) is None
+    assert svc.drift(live, {"vlan_hardware_filtering": "0"}) == {"vlan_hardware_filtering": "0"}
+
+
+def test_build_set_payload_echoes_undeclared_list_field_as_index() -> None:
+    payload = _svc().build_set_payload(
+        _live(disablevlanhwfilter=_vlan_list(1)), {"dhcp6_debug": "1"}
+    )
+    flat = payload["settings"]
+    assert flat["disablevlanhwfilter"] == "1"
+    assert "[" not in str(flat)
+
+
+def test_export_list_form_emits_disable() -> None:
+    doc = _export(_live(disablevlanhwfilter=_vlan_list(1)))
+    assert doc["opnsense"]["interfaces"]["settings"] == {"vlan_hardware_filtering": "disable"}

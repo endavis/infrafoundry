@@ -90,8 +90,16 @@ def _flatten(value: Any) -> str:
     """Flatten a live field into its wire string.
 
     An option dict (``{"1": {"value": "Disable", "selected": 1}, ...}``) flattens to
-    the comma-joined selected keys; ``None`` and ``[]`` flatten to ``""``.
+    the comma-joined selected keys. An option list
+    (``[{"value": "Disable", "selected": 1}, ...]``) flattens to the comma-joined
+    positional indexes of the selected entries. ``None`` and ``[]`` flatten to ``""``.
     """
+    if isinstance(value, list):
+        return ",".join(
+            str(index)
+            for index, entry in enumerate(value)
+            if isinstance(entry, dict) and entry.get("selected")
+        )
     if isinstance(value, dict):
         return ",".join(
             str(key)
