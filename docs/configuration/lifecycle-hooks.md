@@ -96,7 +96,7 @@ instance:
 | `description` | string | null | Human-readable description shown during execution |
 | `env` | dict | {} | Environment variables to pass to the script |
 | `continue_on_error` | bool | false | Whether to continue if script fails |
-| `timeout` | int | 300 | Script timeout in seconds (1-3600) |
+| `timeout` | int | 300 | Script timeout in seconds (1-14400, i.e. 4 hours; enforced by the script handler's config validation) |
 
 ### Supported Lifecycle Stages
 
@@ -277,7 +277,7 @@ chmod +x envs/prod/scripts/*.sh
 
 - **Symptom:** Secret not resolved. **Fix:** Check secret file exists at `envs/{env}/secrets/{file}.yaml` and key path is correct. Missing secrets become empty strings with a warning.
 
-- **Symptom:** Script times out. **Fix:** Increase `timeout` value or optimize script. Default is 300 seconds, maximum is 3600.
+- **Symptom:** Script times out. **Fix:** Increase `timeout` value or optimize script. Default is 300 seconds, maximum is 14400 (4 hours).
 
 - **Symptom:** Hook fails but operation continues. **Fix:** Remove `continue_on_error: true` if you want failures to stop the operation.
 
