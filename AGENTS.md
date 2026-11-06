@@ -315,6 +315,23 @@ InfraFoundry is synced from pyproject-template. Know which layer a file belongs 
 - **Path Traversal**: Validate all user-provided paths
 - **YAML Unsafe Loading**: Always use `yaml.safe_load()`, never `yaml.load()`
 
+### No Real Infrastructure Details in Public Text
+This repository is public. Never write details of a real deployment into anything it publishes:
+files (code, tests, fixtures, docs, ADRs, examples), commit messages, issue and PR titles and
+bodies, comments and review comments. That covers hostnames, domain names, IP addresses and
+prefixes (RFC 1918 and ULA included), MAC addresses, VPN endpoints, user names, email addresses,
+home-directory paths, and the names of user-created objects such as firewall rules, categories,
+aliases and VLAN descriptions.
+
+- Use generic stand-ins: role names (`fw-prod`, `fw-test`), `example.com` / `example.net`,
+  RFC 5737 / RFC 3849 documentation addresses, locally administered MACs (`02:00:00:…`).
+- Probe output from a real system stays in the conversation and in local scratch files. Describe
+  it generically ("a production firewall with VLAN hardware filtering disabled") before it goes
+  into an issue, PR, commit or file.
+- Check the text for these details before posting or committing. Copying an issue's existing
+  wording is not an exception.
+- Pass this rule to every subagent or delegated agent in its brief.
+
 ### State Management Pitfalls
 - **Race Conditions**: Configure Terraform backend locking (e.g., S3+DynamoDB) for concurrent operations
 - **Stale State**: Always refresh state before operations
@@ -485,6 +502,7 @@ Where `<agent-type>` is one of: `claude`, `copilot`, `codex`, `antigravity`, or 
 - **Scope:** Never mix refactoring, features, and docs in one PR. Create separate branches.
 - **Verify:** Check file paths (`ls`) and branch (`git status`) before assuming they exist.
 - **Security:** NEVER bypass security checks (e.g., `--no-verify`, ignoring secrets).
+- **Public text:** No real infrastructure details (hostnames, domains, IPs, MACs, user names, object names) in files, commits, issues, PRs or comments. Use generic stand-ins. See [No Real Infrastructure Details in Public Text](#no-real-infrastructure-details-in-public-text).
 - **Tooling:** Prefer `doit` tasks over manual commands.
 - **Integrity:** Respect architectural patterns (modularity) over "quick fixes".
 - **Local State:** Protect user config (e.g., `.envrc.local`, settings). Do not revert/delete without backup.
