@@ -12,6 +12,9 @@
 #   INFRAFOUNDRY_VAR_<key>     - package variables, including the secrets
 #                                opnsense_root_password, opnsense_api_key and
 #                                opnsense_api_secret
+#   On a jumphost run both directories are the framework's remote copies:
+#   BLUEPRINT_DIR is the rsynced blueprint tree, PACKAGE_DIR an empty per-run
+#   scratch directory (consumer files are not copied).
 
 set -euo pipefail
 

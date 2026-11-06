@@ -392,6 +392,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_backend_config.py",
     "tests/unit/test_blueprint_extra_freeform_tags.py",
     "tests/unit/test_blueprint_extra_tags.py",
+    "tests/unit/test_blueprint_jumphost_env.py",
     "tests/unit/test_blueprint_resolver.py",
     "tests/unit/test_blueprint_validator.py",
     "tests/unit/test_cli.py",

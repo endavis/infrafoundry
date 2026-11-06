@@ -23,7 +23,7 @@ The default — the host running `foundry infra apply`. Tools available here are
 
 ### 2. Jumphost (framework reexec)
 
-When the consuming package sets `jumphost` in its variables (`user@host`), the framework's `ScriptHandler._execute_on_jumphost` rsync's the blueprint's script directory to a temp dir on the jumphost and runs the script there via ssh. The wrapper (`src/infrafoundry/core/events/handlers/script.py`) forwards `INFRAFOUNDRY_PACKAGE_VARS` and re-exports each scalar as `INFRAFOUNDRY_VAR_<key>` on the remote side, matching local execution semantics.
+When the consuming package sets `jumphost` in its variables (`user@host`), the framework's `ScriptHandler._execute_on_jumphost` rsync's the whole blueprint directory (or, for a non-blueprint script, its parent directory) to a temp dir on the jumphost and runs the script there via ssh. `INFRAFOUNDRY_BLUEPRINT_DIR` points at the remote copy and `INFRAFOUNDRY_PACKAGE_DIR` at an empty scratch directory; `INFRAFOUNDRY_CONFIG_DIR` and `INFRAFOUNDRY_INVENTORY` are not available. See the [environment table](event-system.md#environment-on-the-jumphost). The wrapper (`src/infrafoundry/core/events/handlers/script.py`) forwards `INFRAFOUNDRY_PACKAGE_VARS` and re-exports each scalar as `INFRAFOUNDRY_VAR_<key>` on the remote side, matching local execution semantics.
 
 The jumphost may be a minimal Debian/Ubuntu/Rocky host. **Treat it as a stock base install** — do not assume anything beyond the portable baseline below.
 
@@ -184,6 +184,7 @@ Before submitting a PR that adds or changes a blueprint script:
 - [ ] If the script uses a tool outside the baseline, add a `command -v` or `python3 -c 'import X'` check at the top with `exit 127` and a clear error message.
 - [ ] If context 3 (target-VM upload): document the target OS, invocation pattern, env vars, and tool assumptions in the script header; confirm the blueprint README also states the OS expectation.
 - [ ] Use `python3 -c 'import json ...'` (stdlib) instead of `jq` for JSON parsing.
+- [ ] Read only framework variables available on the jumphost, or guard on `INFRAFOUNDRY_ON_JUMPHOST`. `tests/unit/test_blueprint_jumphost_env.py` enforces this.
 
 ## Related documentation
 

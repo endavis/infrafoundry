@@ -7,12 +7,14 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess  # nosec B404  # required for running user scripts
 import tempfile
 import threading
 import time
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, override
 
@@ -29,10 +31,43 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# Scalar, path-free context variables copied from the local environment to the
+# jumphost run, with the same values as a local run.
+_JUMPHOST_CONTEXT_ENV: tuple[str, ...] = (
+    "INFRAFOUNDRY_ENV",
+    "INFRAFOUNDRY_EVENT",
+    "INFRAFOUNDRY_PROVIDER",
+    "INFRAFOUNDRY_RESOURCE",
+    "INFRAFOUNDRY_RUNNER",
+    "INFRAFOUNDRY_PHASE",
+    "INFRAFOUNDRY_DEPLOYMENT_ID",
+    "INFRAFOUNDRY_TARGET_RESOURCES",
+)
+
+# Every ``INFRAFOUNDRY_*`` name a script can see on a jumphost run.
+# ``INFRAFOUNDRY_VAR_<key>`` is separate (one per scalar package variable).
+# ``INFRAFOUNDRY_CONFIG_DIR`` and ``INFRAFOUNDRY_INVENTORY`` are deliberately
+# left out: they point into the operator's config repo, which is not copied.
+JUMPHOST_FORWARDED_ENV: frozenset[str] = frozenset(
+    {
+        "INFRAFOUNDRY_ON_JUMPHOST",
+        "INFRAFOUNDRY_PACKAGE_VARS",
+        "INFRAFOUNDRY_WARNINGS_FILE",
+        "INFRAFOUNDRY_BLUEPRINT_DIR",
+        "INFRAFOUNDRY_PACKAGE_DIR",
+        *_JUMPHOST_CONTEXT_ENV,
+    }
+)
+
+_ENV_KEY_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+
+
 def _build_remote_bash(
     remote_dir: str,
     script_name: str,
     warnings_file: str | None = None,
+    *,
+    env: Mapping[str, str] | None = None,
 ) -> str:
     """Build the remote bash invocation used by jumphost reexec.
 
@@ -54,18 +89,29 @@ def _build_remote_bash(
       the remote script can append JSONL records that the orchestrator
       later scp's back and folds into the local summary.
 
+    - Exports each entry of ``env`` (shell-quoted) before running the script.
+
     Args:
-        remote_dir: Absolute path of the rsynced script directory on the
-            jumphost.
-        script_name: Basename of the script to execute.
+        remote_dir: Absolute path of the rsynced script root on the jumphost.
+        script_name: Path of the script relative to ``remote_dir``.
         warnings_file: Optional absolute path on the jumphost where remote
             code should append non-fatal warning JSONL records. When
             ``None``, no warnings plumbing is emitted (keeps existing
             callers that don't collect warnings simple).
+        env: Extra variables to export on the remote side. Keys must match
+            ``[A-Z_][A-Z0-9_]*``.
 
     Returns:
         A single bash command string to pass to ``ssh``.
+
+    Raises:
+        ValueError: If an ``env`` key is not a valid variable name.
     """
+    env_setup = ""
+    for key, value in (env or {}).items():
+        if not _ENV_KEY_RE.match(key):
+            raise ValueError(f"invalid environment variable name: {key!r}")
+        env_setup += f"export {key}={shlex.quote(value)}; "
     if warnings_file:
         # Seed the file first so scp-back always finds something to copy,
         # and export INFRAFOUNDRY_WARNINGS_FILE for the inner script (and
@@ -81,6 +127,7 @@ def _build_remote_bash(
         'echo "infrafoundry: python3 is required on the jumphost '
         'to expand INFRAFOUNDRY_VAR_* env vars" >&2; exit 127; }; '
         f"{warnings_setup}"
+        f"{env_setup}"
         'INFRAFOUNDRY_ON_JUMPHOST=1 INFRAFOUNDRY_PACKAGE_VARS="$(cat)"; '
         "export INFRAFOUNDRY_ON_JUMPHOST INFRAFOUNDRY_PACKAGE_VARS; "
         'while IFS= read -r -d "" entry; do '
@@ -96,7 +143,7 @@ def _build_remote_bash(
         "if not isinstance(v,(dict,list))]"
         "'"
         "); "
-        f"bash {remote_dir}/{script_name}"
+        f"bash {shlex.quote(f'{remote_dir}/{script_name}')}"
     )
 
 
@@ -133,6 +180,11 @@ class ScriptHandler(BaseHandler):
         INFRAFOUNDRY_BLUEPRINT_DIR: Path to blueprint directory (if dispatched from blueprint)
         INFRAFOUNDRY_PACKAGE_VARS: JSON string of all package variables (if available)
         INFRAFOUNDRY_VAR_<key>: Individual package variable values (if available)
+        On jumphost runs only ``JUMPHOST_FORWARDED_ENV`` is available:
+        ``BLUEPRINT_DIR`` is the rsynced remote copy, ``PACKAGE_DIR`` is an
+        empty per-run scratch directory, ``CONFIG_DIR``, ``INVENTORY`` and the
+        handler's ``env:`` block are not forwarded.
+
         INFRAFOUNDRY_WARNINGS_FILE: Path to the per-apply JSONL warnings file
             (forwarded from the current process; on jumphost reexec the remote
             wrapper points this at a file under the remote tmp dir and the
@@ -390,8 +442,11 @@ class ScriptHandler(BaseHandler):
     ) -> EventResult:
         """Execute the script on a remote jumphost via SSH.
 
-        Rsyncs the script's parent directory to a temp directory on the
-        jumphost, then re-executes the script remotely. The package variables
+        Rsyncs the script's parent directory (or, for a blueprint script, the
+        whole blueprint directory) to a temp directory on the jumphost, then
+        re-executes the script remotely with ``INFRAFOUNDRY_BLUEPRINT_DIR``
+        pointing at the remote copy and ``INFRAFOUNDRY_PACKAGE_DIR`` at an
+        empty per-run scratch directory. The package variables
         (minus ``jumphost``) are forwarded as JSON on stdin so secrets never
         appear on the command line or in remote ``ps`` output. The remote
         process sees ``INFRAFOUNDRY_ON_JUMPHOST=1`` so any blueprint-side shell
@@ -410,6 +465,35 @@ class ScriptHandler(BaseHandler):
         script_dir = script_path.parent
         remote_dir = f"/tmp/infrafoundry-{uuid.uuid4().hex}"  # nosec B108
 
+        # Layout under remote_dir: blueprint/ (whole blueprint tree), src/
+        # (script dir when the script is outside the blueprint), package/
+        # (empty scratch dir), warnings.jsonl.
+        blueprint_str = self.config.get("_blueprint_dir")
+        blueprint_local = Path(blueprint_str) if blueprint_str else None
+        script_rel: Path | None = None
+        if blueprint_local is not None:
+            try:
+                script_rel = script_path.relative_to(blueprint_local)
+            except ValueError:
+                script_rel = None
+        remote_blueprint = f"{remote_dir}/blueprint"
+        # (local dir, remote path) pairs to rsync, in order.
+        rsync_jobs: list[tuple[Path, str]] = []
+        if blueprint_local is not None and script_rel is not None:
+            rsync_jobs.append((blueprint_local, remote_blueprint))
+            script_root, script_name = remote_blueprint, script_rel.as_posix()
+        else:
+            rsync_jobs.append((script_dir, f"{remote_dir}/src"))
+            script_root, script_name = f"{remote_dir}/src", script_path.name
+            if blueprint_local is not None:
+                rsync_jobs.append((blueprint_local, remote_blueprint))
+
+        remote_env: dict[str, str] = {k: env[k] for k in _JUMPHOST_CONTEXT_ENV if k in env}
+        if blueprint_local is not None:
+            remote_env["INFRAFOUNDRY_BLUEPRINT_DIR"] = remote_blueprint
+        if self.config.get("_package_dir"):
+            remote_env["INFRAFOUNDRY_PACKAGE_DIR"] = f"{remote_dir}/package"
+
         # Strip 'jumphost' from forwarded package variables so any remote
         # script that branches on ${jumphost:-} does not attempt another hop.
         remote_vars = dict(context.package_variables or {})
@@ -417,14 +501,11 @@ class ScriptHandler(BaseHandler):
         remote_vars_json = json.dumps(remote_vars)
 
         ssh_opts = ["-o", "StrictHostKeyChecking=no"]
-        mkdir_cmd = ["ssh", *ssh_opts, jumphost, f"mkdir -p {remote_dir}"]
-        rsync_cmd = [
-            "rsync",
-            "-a",
-            "-e",
-            "ssh -o StrictHostKeyChecking=no",
-            f"{script_dir}/",
-            f"{jumphost}:{remote_dir}/",
+        mkdir_cmd = [
+            "ssh",
+            *ssh_opts,
+            jumphost,
+            f"mkdir -p {remote_dir}/src {remote_dir}/package",
         ]
         # Warnings collection: if the orchestrator has set up a local
         # warnings file, point the remote wrapper at a file under
@@ -443,7 +524,7 @@ class ScriptHandler(BaseHandler):
         # so values containing newlines, tabs, or equals signs are safe.
         # Requires python3 on the jumphost (checked by the wrapper itself).
         remote_bash = _build_remote_bash(
-            remote_dir, script_path.name, warnings_file=remote_warnings_path
+            script_root, script_name, warnings_file=remote_warnings_path, env=remote_env
         )
         ssh_run_cmd = ["ssh", *ssh_opts, jumphost, remote_bash]
         cleanup_cmd = ["ssh", *ssh_opts, jumphost, f"rm -rf {remote_dir}"]
@@ -477,34 +558,13 @@ class ScriptHandler(BaseHandler):
                 handler_name=self.name,
             )
 
-        # Step 2: rsync script directory to jumphost
-        try:
-            rsync_result = subprocess.run(  # nosec B603
-                rsync_cmd,
-                capture_output=True,
-                text=True,
-                timeout=300,
+        # Step 2: rsync the script directory (and blueprint tree) to jumphost
+        for local_dir, remote_path in rsync_jobs:
+            rsync_failure = self._rsync_to_remote(
+                local_dir, jumphost, remote_path, cleanup_cmd, start_time
             )
-        except (OSError, subprocess.TimeoutExpired) as e:
-            self._cleanup_remote(cleanup_cmd)
-            return EventResult(
-                success=False,
-                abort=not self.config.get("continue_on_error", False),
-                reason=f"rsync setup failed: {e}",
-                duration_seconds=time.monotonic() - start_time,
-                handler_name=self.name,
-            )
-        if rsync_result.returncode != 0:
-            self._cleanup_remote(cleanup_cmd)
-            return EventResult(
-                success=False,
-                abort=not self.config.get("continue_on_error", False),
-                reason=f"rsync setup failed: {rsync_result.stderr.strip()}",
-                stdout=rsync_result.stdout,
-                stderr=rsync_result.stderr,
-                duration_seconds=time.monotonic() - start_time,
-                handler_name=self.name,
-            )
+            if rsync_failure is not None:
+                return rsync_failure
 
         # Step 3: run the script remotely with streaming output.
         stdout_lines: list[str] = []
@@ -609,6 +669,65 @@ class ScriptHandler(BaseHandler):
                         ssh_opts=ssh_opts,
                     )
             self._cleanup_remote(cleanup_cmd)
+
+    def _rsync_to_remote(
+        self,
+        local_dir: Path,
+        jumphost: str,
+        remote_path: str,
+        cleanup_cmd: list[str],
+        start_time: float,
+    ) -> EventResult | None:
+        """Rsync ``local_dir/`` to ``remote_path/`` on the jumphost.
+
+        On failure the remote temp dir is cleaned up.
+
+        Args:
+            local_dir: Local directory whose contents are copied
+            jumphost: SSH destination
+            remote_path: Absolute remote destination directory
+            cleanup_cmd: ssh+rm-rf command to run on failure
+            start_time: ``time.monotonic()`` of the run, for the duration
+
+        Returns:
+            A failure ``EventResult``, or ``None`` on success.
+        """
+        rsync_cmd = [
+            "rsync",
+            "-a",
+            "-e",
+            "ssh -o StrictHostKeyChecking=no",
+            f"{local_dir}/",
+            f"{jumphost}:{remote_path}/",
+        ]
+        try:
+            rsync_result = subprocess.run(  # nosec B603
+                rsync_cmd,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            self._cleanup_remote(cleanup_cmd)
+            return EventResult(
+                success=False,
+                abort=not self.config.get("continue_on_error", False),
+                reason=f"rsync setup failed: {e}",
+                duration_seconds=time.monotonic() - start_time,
+                handler_name=self.name,
+            )
+        if rsync_result.returncode != 0:
+            self._cleanup_remote(cleanup_cmd)
+            return EventResult(
+                success=False,
+                abort=not self.config.get("continue_on_error", False),
+                reason=f"rsync setup failed: {rsync_result.stderr.strip()}",
+                stdout=rsync_result.stdout,
+                stderr=rsync_result.stderr,
+                duration_seconds=time.monotonic() - start_time,
+                handler_name=self.name,
+            )
+        return None
 
     def _cleanup_remote(self, cleanup_cmd: list[str]) -> None:
         """Run the remote tmp dir cleanup, swallowing all errors.

@@ -24,8 +24,9 @@ When the package sets `jumphost`, the install script runs there, so the kubeconf
 first written on the jumphost. The blueprint declares it under the handler's `outputs:`, and
 InfraFoundry copies it to the same `~` path on your workstation (`~/.kube/<cluster>.yaml`
 by default) once the script succeeds, so no manual `scp` is needed. The OCI variant
-works the same way: Ansible's `fetch` writes `kubeconfig_local_path` on the jumphost, and the
-framework copies it back.
+cannot use `jumphost` yet: its Ansible roles come from the config repo
+(`${INFRAFOUNDRY_CONFIG_DIR}/roles`), which is not copied to the jumphost, so the script fails
+fast with a clear message.
 
 ### OCI
 

@@ -15,7 +15,10 @@
 #   INFRAFOUNDRY_VAR_<key>     - Individual package variables
 #   INFRAFOUNDRY_EVENT         - event type (e.g., "resource_created")
 #   INFRAFOUNDRY_ENV           - environment name (e.g., "prod")
-#   INFRAFOUNDRY_CONFIG_DIR    - path to envs/<env>/
+#   INFRAFOUNDRY_CONFIG_DIR    - path to envs/<env>/ (local runs only)
+#   On a jumphost run both directories are the framework's remote copies:
+#   BLUEPRINT_DIR is the rsynced blueprint tree, PACKAGE_DIR an empty per-run
+#   scratch directory (consumer files are not copied).
 
 set -euo pipefail
 

@@ -47,7 +47,11 @@ for w in json.load(sys.stdin).get("workers",[]): print(w["name"])' <<< "${INFRAF
 
 # --- Paths ---
 BLUEPRINT_DIR="${INFRAFOUNDRY_BLUEPRINT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
-CONFIG_DIR="${INFRAFOUNDRY_CONFIG_DIR}"
+if [ -n "${INFRAFOUNDRY_ON_JUMPHOST:-}" ] && [ -z "${INFRAFOUNDRY_CONFIG_DIR:-}" ]; then
+    echo "ERROR: the k3s roles live in the config repo (\${INFRAFOUNDRY_CONFIG_DIR}/roles), which is not copied to the jumphost; unset jumphost for the oci variant" >&2
+    exit 1
+fi
+CONFIG_DIR="${INFRAFOUNDRY_CONFIG_DIR:?required: run via foundry, not directly}"
 ROLES_DIR="${CONFIG_DIR}/roles"
 PLAYBOOK="${BLUEPRINT_DIR}/playbook.yml"
 INVENTORY_FILE="$(mktemp -t k3s-inventory-XXXXXX.yml)"

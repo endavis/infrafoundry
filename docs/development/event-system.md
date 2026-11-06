@@ -90,8 +90,9 @@ events:
 | `INFRAFOUNDRY_RESOURCE` | `context.resource` is set |
 | `INFRAFOUNDRY_RUNNER` | `context.runner` is set |
 | `INFRAFOUNDRY_PHASE` | `data.phase` is set (`plan`, `apply`, or `destroy`) |
-| `INFRAFOUNDRY_CONFIG_DIR` | Always |
-| `INFRAFOUNDRY_PACKAGE_DIR` | Handler is dispatched from a package context (always set when the handler comes from a package or its consumed blueprint). Absolute path to the consuming env package directory (e.g., `envs/prod/proxmox/ontap-cluster/`). Use this — not `$(dirname "$0")` — to locate runtime artifacts. |
+| `INFRAFOUNDRY_BLUEPRINT_DIR` | Handler is dispatched from a blueprint. Absolute path to the blueprint directory (on a jumphost run, the remote copy; see [Jumphost Reexec](#jumphost-reexec)). |
+| `INFRAFOUNDRY_CONFIG_DIR` | Always on local runs; not available on a jumphost (see [Jumphost Reexec](#jumphost-reexec)) |
+| `INFRAFOUNDRY_PACKAGE_DIR` | Handler is dispatched from a package context (always set when the handler comes from a package or its consumed blueprint). Absolute path to the consuming env package directory (e.g., `envs/prod/proxmox/ontap-cluster/`). Use this — not `$(dirname "$0")` — to locate runtime artifacts. On a jumphost run it is an empty scratch directory (see [Jumphost Reexec](#jumphost-reexec)). |
 | `INFRAFOUNDRY_DEPLOYMENT_ID` | `context.deployment_id` is set |
 | `INFRAFOUNDRY_TARGET_RESOURCES` | `-r` filter is active (comma-separated list) |
 | `INFRAFOUNDRY_INVENTORY` | Package has an `inventory:` block and a `.generated-inventory.yml` exists in the package directory |
@@ -130,14 +131,29 @@ jumphost instead of the operator's workstation. This is how blueprints reach
 API endpoints sitting on VLANs that are not directly routable from the
 operator's host.
 
-The mechanics are: `ScriptHandler` rsyncs the script's **parent directory** to
-a fresh `/tmp/infrafoundry-<uuid>/` on the jumphost (so sibling helpers ship
-along), then invokes the script over SSH. The remote process sees
+The mechanics are: `ScriptHandler` rsyncs the script's directory to a fresh
+`/tmp/infrafoundry-<uuid>/` on the jumphost, then invokes the script over SSH.
+For a blueprint script the **whole blueprint directory** is rsynced to
+`blueprint/` (so playbooks, `roles/` and sibling helpers ship along); any other
+script's parent directory goes to `src/`. `package/` is an empty, writable
+per-run scratch directory. The remote process sees
 `INFRAFOUNDRY_ON_JUMPHOST=1` (a recursion guard) and receives a stripped
 `INFRAFOUNDRY_PACKAGE_VARS` JSON on stdin with the `jumphost` key removed, so
 any downstream logic that branches on `jumphost` does not attempt a second
 hop and so secrets never appear in the jumphost's `ps` output. The remote tmp
 directory is always cleaned up, including on failure or timeout.
+
+#### Environment on the jumphost
+
+| Status | Variables |
+| :--- | :--- |
+| Forwarded, same values as a local run | `INFRAFOUNDRY_VAR_<key>` (scalars), `INFRAFOUNDRY_PACKAGE_VARS`, `INFRAFOUNDRY_WARNINGS_FILE`, `INFRAFOUNDRY_ENV`, `INFRAFOUNDRY_EVENT`, `INFRAFOUNDRY_PROVIDER`, `INFRAFOUNDRY_RESOURCE`, `INFRAFOUNDRY_RUNNER`, `INFRAFOUNDRY_PHASE`, `INFRAFOUNDRY_DEPLOYMENT_ID`, `INFRAFOUNDRY_TARGET_RESOURCES` |
+| Set by the wrapper | `INFRAFOUNDRY_ON_JUMPHOST=1` |
+| Remapped | `INFRAFOUNDRY_BLUEPRINT_DIR` (the remote copy of the blueprint), `INFRAFOUNDRY_PACKAGE_DIR` (an empty per-run scratch directory; consumer files are not copied) |
+| Not available | `INFRAFOUNDRY_CONFIG_DIR`, `INFRAFOUNDRY_INVENTORY`, the handler's `env:` block |
+
+`tests/unit/test_blueprint_jumphost_env.py` fails when a blueprint script reads
+an `INFRAFOUNDRY_*` variable outside the forwarded set.
 
 **Prerequisites on the jumphost:** `bash`, `rsync`, `ssh`, `python3`, plus any
 tools the blueprint script itself needs. SSH must be reachable from the
@@ -331,8 +347,9 @@ Scripts and playbooks receive resource context via environment variables:
 | `INFRAFOUNDRY_PROVIDER` | Provider name |
 | `INFRAFOUNDRY_PACKAGE` | Package name |
 | `INFRAFOUNDRY_ENV` | Environment name |
-| `INFRAFOUNDRY_CONFIG_DIR` | Path to environment config directory |
-| `INFRAFOUNDRY_PACKAGE_DIR` | Absolute path to the consuming env package directory (e.g., `envs/prod/proxmox/ontap-cluster/`). Set when the handler is dispatched from a package context (always set when the handler comes from a package or its consumed blueprint). Use this — not `$(dirname "$0")` — to locate runtime artifacts. |
+| `INFRAFOUNDRY_BLUEPRINT_DIR` | Absolute path to the blueprint directory (set for blueprint handlers) |
+| `INFRAFOUNDRY_CONFIG_DIR` | Path to environment config directory (not available on jumphost runs) |
+| `INFRAFOUNDRY_PACKAGE_DIR` | Absolute path to the consuming env package directory (e.g., `envs/prod/proxmox/ontap-cluster/`). Set when the handler is dispatched from a package context (always set when the handler comes from a package or its consumed blueprint). Use this — not `$(dirname "$0")` — to locate runtime artifacts. On a jumphost run it is an empty scratch directory. |
 | `INFRAFOUNDRY_VAR_<key>` | Individual package variable (uppercase key) |
 | `INFRAFOUNDRY_PACKAGE_VARS` | JSON dict of all merged package variables |
 | `INFRAFOUNDRY_INVENTORY` | Absolute path to the package's `.generated-inventory.yml` (set only when the package defines an `inventory:` block) |

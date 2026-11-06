@@ -13,7 +13,11 @@ import pytest
 from infrafoundry.core.events import Event, EventHandlerError, EventManager, EventType
 from infrafoundry.core.events.bus import UnifiedEventBus
 from infrafoundry.core.events.context import EventContext, EventResult
-from infrafoundry.core.events.handlers.script import ScriptHandler, _build_remote_bash
+from infrafoundry.core.events.handlers.script import (
+    JUMPHOST_FORWARDED_ENV,
+    ScriptHandler,
+    _build_remote_bash,
+)
 
 
 @pytest.mark.unit
@@ -1756,3 +1760,167 @@ class TestScriptHandlerOutputs:
         content = warnings_file.read_text()
         assert "scp of output" in content
         assert "scp binary missing" in content
+
+
+class TestScriptHandlerJumphostLayout:
+    """Remote layout and environment of jumphost reexec (#1164)."""
+
+    def _setup(
+        self, tmp_path: Path, *, in_blueprint: bool = True, blueprint: bool = True
+    ) -> tuple[ScriptHandler, Path]:
+        """Build a handler whose script sits inside (or outside) a blueprint dir."""
+        bp = tmp_path / "bp"
+        (bp / "scripts").mkdir(parents=True)
+        pkg = tmp_path / "pkg"
+        pkg.mkdir()
+        env_dir = tmp_path / "envs" / "dev"
+        env_dir.mkdir(parents=True)
+        script = (bp / "scripts" / "x.sh") if in_blueprint else (env_dir / "x.sh")
+        script.write_text("#!/bin/bash\necho hi\n")
+        script.chmod(script.stat().st_mode | stat.S_IEXEC)
+        config: dict[str, Any] = {"script": str(script), "_package_dir": str(pkg)}
+        if blueprint:
+            config["_blueprint_dir"] = str(bp)
+        return ScriptHandler(config, config_base_dir=tmp_path), bp
+
+    def _run(
+        self,
+        handler: ScriptHandler,
+        run_results: list[MagicMock] | None = None,
+        **ctx_kwargs: Any,
+    ) -> tuple[EventResult, MagicMock, list[list[str]]]:
+        """Execute with mocked subprocess; return result, Popen mock and run() commands."""
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+            package_variables={"jumphost": "u@jh"},
+            **ctx_kwargs,
+        )
+        ok = MagicMock(returncode=0, stdout="", stderr="")
+        calls: list[list[str]] = []
+
+        def fake_run(cmd: list[str], **_: Any) -> MagicMock:
+            calls.append(cmd)
+            if run_results and len(calls) <= len(run_results):
+                return run_results[len(calls) - 1]
+            return ok
+
+        with (
+            patch("infrafoundry.core.events.handlers.script.subprocess.run", side_effect=fake_run),
+            patch("infrafoundry.core.events.handlers.script.subprocess.Popen") as popen,
+        ):
+            popen.return_value = _make_fake_process(returncode=0)
+            result = handler.execute(context)
+        return result, popen, calls
+
+    def test_blueprint_script_rsyncs_whole_blueprint(self, tmp_path: Path) -> None:
+        """A script inside the blueprint ships the whole blueprint in one rsync."""
+        handler, bp = self._setup(tmp_path)
+        result, popen, calls = self._run(handler)
+
+        assert result.success
+        rsyncs = [c for c in calls if c[0] == "rsync"]
+        assert len(rsyncs) == 1
+        assert rsyncs[0][-2] == f"{bp}/"
+        assert rsyncs[0][-1].split(":", 1)[1].endswith("/blueprint/")
+        remote = popen.call_args[0][0][-1]
+        root = rsyncs[0][-1].split(":", 1)[1].removesuffix("/blueprint/")
+        assert f"bash {root}/blueprint/scripts/x.sh" in remote
+        assert f"export INFRAFOUNDRY_BLUEPRINT_DIR={root}/blueprint;" in remote
+        assert f"export INFRAFOUNDRY_PACKAGE_DIR={root}/package;" in remote
+        mkdir = calls[0][-1]
+        assert f"{root}/package" in mkdir
+
+    def test_package_override_script_ships_both_dirs(self, tmp_path: Path) -> None:
+        """A script outside the blueprint runs from src/; the blueprint is also copied."""
+        handler, bp = self._setup(tmp_path, in_blueprint=False)
+        result, popen, calls = self._run(handler)
+
+        assert result.success
+        rsyncs = [c for c in calls if c[0] == "rsync"]
+        assert len(rsyncs) == 2
+        assert rsyncs[0][-1].split(":", 1)[1].endswith("/src/")
+        assert rsyncs[1][-2] == f"{bp}/"
+        assert rsyncs[1][-1].split(":", 1)[1].endswith("/blueprint/")
+        assert "/src/x.sh" in popen.call_args[0][0][-1]
+
+    def test_no_blueprint_single_rsync_and_no_dir_exports(self, tmp_path: Path) -> None:
+        """Without blueprint or package dir only the script dir ships, no dir exports."""
+        handler, _ = self._setup(tmp_path, in_blueprint=False, blueprint=False)
+        handler.config.pop("_package_dir")
+        result, popen, calls = self._run(handler)
+
+        assert result.success
+        assert len([c for c in calls if c[0] == "rsync"]) == 1
+        remote = popen.call_args[0][0][-1]
+        assert "INFRAFOUNDRY_BLUEPRINT_DIR" not in remote
+        assert "INFRAFOUNDRY_PACKAGE_DIR" not in remote
+
+    def test_second_rsync_failure_cleans_up(self, tmp_path: Path) -> None:
+        """A failing blueprint rsync aborts, reports rsync, and removes the remote dir."""
+        handler, _ = self._setup(tmp_path, in_blueprint=False)
+        ok = MagicMock(returncode=0, stdout="", stderr="")
+        bad = MagicMock(returncode=23, stdout="", stderr="boom")
+        # calls: mkdir, rsync src, rsync blueprint (fails), cleanup
+        result, popen, calls = self._run(handler, run_results=[ok, ok, bad])
+
+        assert not result.success
+        assert result.reason is not None
+        assert "rsync" in result.reason
+        assert popen.call_count == 0
+        assert calls[-1][-1].startswith("rm -rf /tmp/infrafoundry-")
+
+    def test_forwarded_constant_matches_exports(self, tmp_path: Path, monkeypatch: Any) -> None:
+        """Every name in JUMPHOST_FORWARDED_ENV is exported in the remote command."""
+        monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(tmp_path / "w.jsonl"))
+        handler, _ = self._setup(tmp_path)
+        _, popen, _ = self._run(
+            handler,
+            provider="p",
+            resource="r",
+            runner="terraform",
+            data={"phase": "apply"},
+            deployment_id=7,
+            target_resources=["a", "b"],
+        )
+        remote = popen.call_args[0][0][-1]
+        missing = [n for n in sorted(JUMPHOST_FORWARDED_ENV) if n not in remote]
+        assert missing == []
+
+    def test_remote_wrapper_exports_env_via_real_shell(self, tmp_path: Path) -> None:
+        """Quoted env values reach the script intact under set -u."""
+        if shutil.which("python3") is None or shutil.which("bash") is None:
+            pytest.skip("requires python3 and bash")
+        script = tmp_path / "scripts" / "dump.sh"
+        script.parent.mkdir()
+        script.write_text(
+            "#!/bin/bash\nset -u\n"
+            'echo "env=${INFRAFOUNDRY_ENV}"\n'
+            'echo "bp=${INFRAFOUNDRY_BLUEPRINT_DIR}"\n'
+            'echo "pkg=${INFRAFOUNDRY_PACKAGE_DIR}"\n'
+        )
+        remote_bash = _build_remote_bash(
+            str(tmp_path),
+            "scripts/dump.sh",
+            env={
+                "INFRAFOUNDRY_ENV": 'my env\'s "x" $HOME',
+                "INFRAFOUNDRY_BLUEPRINT_DIR": "/r/bp",
+                "INFRAFOUNDRY_PACKAGE_DIR": "/r/pkg",
+            },
+        )
+        proc = subprocess.run(  # nosec B603
+            ["bash", "-c", remote_bash],
+            input="{}",
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert proc.returncode == 0, proc.stderr
+        assert 'env=my env\'s "x" $HOME' in proc.stdout
+        assert "bp=/r/bp" in proc.stdout
+        assert "pkg=/r/pkg" in proc.stdout
+
+    def test_invalid_env_key_rejected(self) -> None:
+        """A malformed variable name raises ValueError."""
+        with pytest.raises(ValueError, match="invalid environment variable name"):
+            _build_remote_bash("/r", "x.sh", env={"bad key": "v"})

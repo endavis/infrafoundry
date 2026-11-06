@@ -11,7 +11,6 @@
 # SSH key for the VM may only exist there.
 #
 # Package variables are injected by InfraFoundry as:
-#   INFRAFOUNDRY_PACKAGE_DIR   - required: path to the consuming env package dir
 #   INFRAFOUNDRY_PACKAGE_VARS  - JSON string of all package variables
 #
 # Prerequisites:
@@ -23,9 +22,6 @@ log() { echo "[$(date +%H:%M:%S)] $*"; }
 
 # SCRIPT_DIR points at this blueprint's scripts/ dir (sibling remote script).
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# PACKAGE_DIR must come from the framework, not from $(dirname "$0").
-PACKAGE_DIR="${INFRAFOUNDRY_PACKAGE_DIR:?required: run via foundry, not directly}"
-export PACKAGE_DIR
 
 if [ -z "${INFRAFOUNDRY_PACKAGE_VARS:-}" ]; then
     echo "ERROR: INFRAFOUNDRY_PACKAGE_VARS is not set — run via 'foundry infra apply', not directly" >&2
