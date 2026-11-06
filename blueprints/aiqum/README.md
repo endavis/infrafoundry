@@ -94,6 +94,32 @@ the input.
 - Turning `publish_dns` off later may leave the last override on the box
   (#1252); remove it by hand if it matters.
 
+## ONTAP must resolve the AIQUM hostname
+
+When AIQUM adds a cluster it tells ONTAP to open a cluster-agent connection back to
+`wss://<hostname>:56443`, where `<hostname>` is the bare VM hostname (`vm_name`). ONTAP
+resolves that name with its own DNS servers. If it cannot, the add fails with an HTTP 500
+whose message talks about clock skew or the EMS destination limit. That message is
+misleading: the cause is name resolution (#1168).
+
+Before adding the cluster, Step 5 of `aiqum-initial-setup.py` reads ONTAP's DNS servers and
+search domains (`GET /api/name-services/dns`) and asks each server for `<vm_name>` and
+`<vm_name>.<domain>` for every ONTAP search domain. The outcomes:
+
+| Outcome | Meaning | What Step 5 does |
+|---------|---------|------------------|
+| OK | A server returned `ip_address` for one of the names | Adds the cluster |
+| ERROR | The servers answered but never with `ip_address` | Prints the fix and skips the cluster add; setup continues with Step 6 and still exits 0 |
+| WARNING (inconclusive) | No `vm_name` input, ONTAP REST unreadable, no DNS servers configured, or no DNS server answered | Prints the reason and adds the cluster anyway |
+
+To fix an ERROR, publish a DNS record for the hostname on a DNS server ONTAP uses: set
+`publish_dns: true` and `dns_domain` on the aiqum package (see
+[Publishing DNS](#publishing-dns)), and make sure ONTAP's DNS search domain covers
+`dns_domain` so the bare hostname resolves. The `ontap-cluster` package's
+`dns_domain` (ONTAP's search domain) and `dns_publish_domain` (the domain it publishes its
+own names under, defaulting to `dns_domain`) are the ONTAP-side inputs to keep consistent
+with it. Then re-run the package or add the cluster to AIQUM by hand.
+
 ## Prerequisites
 
 - The `rocky9-template` blueprint applied (provides VM ID `901` to clone from)
@@ -103,6 +129,8 @@ the input.
   - `install7zip.sh`
 - SSH jumphost reachable from the InfraFoundry host
 - ONTAP cluster running and reachable (for the cluster-add step)
+- ONTAP's DNS servers resolve the AIQUM hostname to `ip_address` (see
+  [ONTAP must resolve the AIQUM hostname](#ontap-must-resolve-the-aiqum-hostname))
 
 ## Automation Flow
 
@@ -133,8 +161,9 @@ infra apply --package aiqum
                  +-- Step 2: Enable AutoSupport
                  +-- Step 3: Change admin password
                  +-- Step 4: Enable API Gateway
-                 +-- Step 5: Add ONTAP cluster (waits up to 180 s; a failure or
-                 |           timeout is reported and setup continues)
+                 +-- Step 5: Check ONTAP resolves the AIQUM hostname, then add the
+                 |           ONTAP cluster (skipped if the check fails; waits up to
+                 |           180 s; a failure or timeout is reported and setup continues)
                  +-- Step 6: Mark setup complete
                  +-- Step 7: Create default alert policy (if aiqum_alert_email set)
                  +-- Step 8: Send test alert email (if alert created)

@@ -15,6 +15,8 @@ import importlib.util
 import io
 import json
 import smtplib
+import socket
+import struct
 import sys
 from pathlib import Path
 from typing import Any
@@ -538,6 +540,272 @@ class TestMainClusterStep:
         assert "Cluster: no response" in out
         assert "(non-fatal)" in out
         assert "Setup complete: OK" in out
+
+
+# ---------------------------------------------------------------------------
+# Tests: ONTAP DNS pre-check (#1168)
+# ---------------------------------------------------------------------------
+AIQUM_IP = "192.168.1.50"
+
+
+def _dns_response(
+    query: bytes, addresses: list[str], rcode: int = 0, extra_cname: bool = False
+) -> bytes:
+    """Build a DNS response to ``query`` using compression pointers for the answers."""
+    qid = query[:2]
+    question = query[12:]
+    answers = b""
+    if extra_cname:
+        # CNAME answer (type 5) with a 2-byte pointer rdata, to be skipped
+        answers += b"\xc0\x0c" + struct.pack(">HHIH", 5, 1, 60, 2) + b"\xc0\x0c"
+    for address in addresses:
+        answers += b"\xc0\x0c" + struct.pack(">HHIH", 1, 1, 60, 4) + socket.inet_aton(address)
+    count = len(addresses) + (1 if extra_cname else 0)
+    header = qid + struct.pack(">HHHHH", 0x8180 | rcode, 1, count, 0, 0)
+    return header + question + answers
+
+
+def _ontap_dns_body(servers: list[str], domains: list[str]) -> bytes:
+    return json.dumps({"records": [{"servers": servers, "domains": domains}]}).encode()
+
+
+def _dns_config() -> dict[str, Any]:
+    config = _make_config("")
+    config["vm_name"] = "aiqum"
+    return config
+
+
+class TestDnsPacket:
+    """Tests for the stdlib DNS query builder and response parser."""
+
+    def test_build_query_layout(self) -> None:
+        packet = aiqum_setup.build_dns_query("aiqum.lab.example.", 0x1234)
+        assert packet[:2] == b"\x12\x34"
+        assert struct.unpack(">HHHHH", packet[2:12]) == (0x0100, 1, 0, 0, 0)
+        assert packet[12:] == b"\x05aiqum\x03lab\x07example\x00" + struct.pack(">HH", 1, 1)
+
+    def test_parse_answer_with_compression_pointer_and_cname(self) -> None:
+        query = aiqum_setup.build_dns_query("aiqum", 7)
+        response = _dns_response(query, [AIQUM_IP, "172.21.0.9"], extra_cname=True)
+        assert aiqum_setup.parse_dns_a_records(response, 7) == [AIQUM_IP, "172.21.0.9"]
+
+    def test_parse_nxdomain_returns_empty(self) -> None:
+        query = aiqum_setup.build_dns_query("aiqum", 7)
+        assert aiqum_setup.parse_dns_a_records(_dns_response(query, [], rcode=3), 7) == []
+
+    def test_parse_id_mismatch_raises(self) -> None:
+        query = aiqum_setup.build_dns_query("aiqum", 7)
+        with pytest.raises(ValueError, match="mismatch"):
+            aiqum_setup.parse_dns_a_records(_dns_response(query, [AIQUM_IP]), 8)
+
+    def test_parse_truncated_raises(self) -> None:
+        query = aiqum_setup.build_dns_query("aiqum", 7)
+        response = _dns_response(query, [AIQUM_IP])
+        with pytest.raises(ValueError, match="truncated"):
+            aiqum_setup.parse_dns_a_records(response[:-2], 7)
+
+    def test_query_dns_a_over_udp(self) -> None:
+        """query_dns_a sends the query to port 53 and parses the reply."""
+        sock = MagicMock()
+        sock.__enter__.return_value = sock
+        sent: list[bytes] = []
+
+        def sendto(packet: bytes, addr: tuple[str, int]) -> None:
+            sent.append(packet)
+            assert addr == ("192.168.1.1", 53)
+
+        def recvfrom(size: int) -> tuple[bytes, tuple[str, int]]:
+            return _dns_response(sent[0], [AIQUM_IP]), ("192.168.1.1", 53)
+
+        sock.sendto.side_effect = sendto
+        sock.recvfrom.side_effect = recvfrom
+        with patch("aiqum_initial_setup.socket.socket", return_value=sock):
+            assert aiqum_setup.query_dns_a("192.168.1.1", "aiqum") == [AIQUM_IP]
+        sock.settimeout.assert_called_once_with(aiqum_setup.DNS_QUERY_TIMEOUT)
+
+    def test_query_dns_a_timeout_is_oserror(self) -> None:
+        sock = MagicMock()
+        sock.__enter__.return_value = sock
+        sock.recvfrom.side_effect = TimeoutError("timed out")
+        with (
+            patch("aiqum_initial_setup.socket.socket", return_value=sock),
+            pytest.raises(OSError),
+        ):
+            aiqum_setup.query_dns_a("192.168.1.1", "aiqum")
+
+
+class TestCheckOntapResolvesAiqum:
+    """Outcomes of check_ontap_resolves_aiqum."""
+
+    def _rest(self, servers: list[str], domains: list[str]) -> Any:
+        return patch(
+            "aiqum_initial_setup.urlopen",
+            return_value=_mock_urlopen_response(200, _ontap_dns_body(servers, domains)),
+        )
+
+    def test_match_returns_true(self) -> None:
+        def fake(server: str, name: str, timeout: float = 3) -> list[str]:
+            return [AIQUM_IP] if name == "aiqum.lab.example" else []
+
+        with (
+            self._rest(["192.168.1.1"], ["lab.example"]) as urlopen_mock,
+            patch("aiqum_initial_setup.query_dns_a", side_effect=fake),
+        ):
+            verdict, detail = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
+        assert verdict is True
+        assert "aiqum.lab.example" in detail
+        req = urlopen_mock.call_args.args[0]
+        assert req.full_url == (
+            "https://192.0.2.220/api/name-services/dns?fields=servers,domains"
+        )
+        assert urlopen_mock.call_args.kwargs["timeout"] == aiqum_setup.ONTAP_REST_TIMEOUT
+
+    def test_wrong_ip_returns_false(self) -> None:
+        with (
+            self._rest(["192.168.1.1"], []),
+            patch("aiqum_initial_setup.query_dns_a", return_value=["10.9.9.9"]),
+        ):
+            verdict, message = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
+        assert verdict is False
+        assert "'aiqum'" in message
+        assert "192.168.1.1" in message
+        assert "ontappass" not in message
+
+    def test_no_answer_returns_false(self) -> None:
+        with (
+            self._rest(["192.168.1.1", "192.168.1.2"], ["lab.example"]),
+            patch("aiqum_initial_setup.query_dns_a", return_value=[]),
+        ):
+            verdict, message = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
+        assert verdict is False
+        assert "192.168.1.2" in message
+
+    def test_second_server_can_match(self) -> None:
+        def fake(server: str, name: str, timeout: float = 3) -> list[str]:
+            if server == "192.168.1.1":
+                raise TimeoutError("timed out")
+            return [AIQUM_IP]
+
+        with (
+            self._rest(["192.168.1.1", "192.168.1.2"], []),
+            patch("aiqum_initial_setup.query_dns_a", side_effect=fake),
+        ):
+            verdict, _ = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
+        assert verdict is True
+
+    @pytest.mark.parametrize(
+        "exc", [URLError("refused"), TimeoutError("timed out"), _http_error(401)]
+    )
+    def test_rest_failure_is_inconclusive(self, exc: Exception) -> None:
+        with patch("aiqum_initial_setup.urlopen", side_effect=exc):
+            verdict, reason = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
+        assert verdict is None
+        assert reason
+
+    def test_bad_json_is_inconclusive(self) -> None:
+        with patch(
+            "aiqum_initial_setup.urlopen",
+            return_value=_mock_urlopen_response(200, b"not json"),
+        ):
+            verdict, _ = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
+        assert verdict is None
+
+    def test_no_dns_servers_is_inconclusive(self) -> None:
+        with self._rest([], ["lab.example"]):
+            verdict, reason = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
+        assert verdict is None
+        assert "no DNS servers" in reason
+
+    def test_all_servers_unreachable_is_inconclusive(self) -> None:
+        with (
+            self._rest(["192.168.1.1"], ["lab.example"]),
+            patch("aiqum_initial_setup.query_dns_a", side_effect=TimeoutError("timed out")),
+        ):
+            verdict, reason = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
+        assert verdict is None
+        assert "192.168.1.1" in reason
+
+    def test_missing_vm_name_is_skipped(self) -> None:
+        with patch("aiqum_initial_setup.urlopen") as urlopen_mock:
+            assert aiqum_setup.check_ontap_resolves_aiqum(_make_config("")) == (None, "")
+        urlopen_mock.assert_not_called()
+
+
+class TestMainDnsPreCheck:
+    """main() Step 5 behaviour driven by the DNS pre-check (#1168)."""
+
+    @staticmethod
+    def _cluster_posts(client: MagicMock) -> list[Any]:
+        return [
+            c for c in client.post.call_args_list if c.args[0] == "/api/admin/datasources/clusters"
+        ]
+
+    @patch("aiqum_initial_setup.check_ontap_resolves_aiqum", return_value=(False, "no DNS"))
+    @patch("aiqum_initial_setup.load_config")
+    @patch("aiqum_initial_setup.AIQUMClient")
+    def test_unresolvable_skips_cluster_add_and_continues(
+        self,
+        mock_client_cls: MagicMock,
+        mock_load_config: MagicMock,
+        _check: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mock_load_config.return_value = _dns_config()
+        client = _make_mock_client()
+        mock_client_cls.return_value = client
+
+        result = aiqum_setup.main()
+
+        out = capsys.readouterr().out
+        assert result == 0
+        assert self._cluster_posts(client) == []
+        assert "ERROR: no DNS" in out
+        assert "misleading" in out
+        assert "publish_dns" in out
+        assert "Setup complete: OK" in out
+
+    @patch(
+        "aiqum_initial_setup.check_ontap_resolves_aiqum",
+        return_value=(None, "none of ONTAP's DNS servers (x) answered"),
+    )
+    @patch("aiqum_initial_setup.load_config")
+    @patch("aiqum_initial_setup.AIQUMClient")
+    def test_inconclusive_warns_and_still_adds(
+        self,
+        mock_client_cls: MagicMock,
+        mock_load_config: MagicMock,
+        _check: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mock_load_config.return_value = _dns_config()
+        client = _make_mock_client()
+        mock_client_cls.return_value = client
+
+        result = aiqum_setup.main()
+
+        out = capsys.readouterr().out
+        assert result == 0
+        assert len(self._cluster_posts(client)) == 1
+        assert "WARNING: DNS pre-check inconclusive" in out
+
+    @patch("aiqum_initial_setup.check_ontap_resolves_aiqum", return_value=(True, "ok detail"))
+    @patch("aiqum_initial_setup.load_config")
+    @patch("aiqum_initial_setup.AIQUMClient")
+    def test_resolvable_adds_cluster(
+        self,
+        mock_client_cls: MagicMock,
+        mock_load_config: MagicMock,
+        _check: MagicMock,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        mock_load_config.return_value = _dns_config()
+        client = _make_mock_client()
+        mock_client_cls.return_value = client
+
+        assert aiqum_setup.main() == 0
+
+        assert len(self._cluster_posts(client)) == 1
+        assert "DNS pre-check: OK (ok detail)" in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------------------

@@ -13,7 +13,8 @@ Steps:
   2. Accept AutoSupport
   3. Change admin password
   4. Enable API Gateway
-  5. Add ONTAP cluster
+  5. Add ONTAP cluster (after a pre-check that ONTAP's DNS resolves the AIQUM
+     hostname; see #1168)
   6. Mark setup complete
   7. Create default alert policy (if aiqum_alert_email set)
   8. Send test alert email (if alert created)
@@ -24,8 +25,11 @@ from __future__ import annotations
 import base64
 import json
 import os
+import random
 import smtplib
+import socket
 import ssl
+import struct
 import sys
 import urllib.parse
 from email.mime.text import MIMEText
@@ -38,6 +42,9 @@ DEFAULT_PASSWORD = "admin"  # nosec B105 - initial FEW password published in Net
 # Adding a cluster returns only after AIQUM has set up its agent link to the
 # cluster: 12 s when it works, 86 s when the cluster cannot reach AIQUM (#1167).
 CLUSTER_ADD_TIMEOUT = 180
+# Timeouts for the ONTAP DNS pre-check (#1168), in seconds.
+ONTAP_REST_TIMEOUT = 10
+DNS_QUERY_TIMEOUT = 3
 
 DEFAULT_ALERT_SEVERITIES = ["critical", "error", "warning"]
 
@@ -380,6 +387,233 @@ def send_test_email(config: dict[str, Any], recipient: str) -> bool:
         return False
 
 
+def build_dns_query(name: str, query_id: int) -> bytes:
+    """Build a DNS A-record query packet.
+
+    Args:
+        name: Hostname to look up.
+        query_id: 16-bit transaction ID.
+
+    Returns:
+        The wire-format query (recursion desired, one question, type A, class IN).
+    """
+    header = struct.pack(">HHHHHH", query_id, 0x0100, 1, 0, 0, 0)
+    qname = b"".join(
+        bytes([len(label)]) + label.encode("ascii") for label in name.strip(".").split(".") if label
+    )
+    return header + qname + b"\x00" + struct.pack(">HH", 1, 1)
+
+
+def _skip_dns_name(data: bytes, pos: int) -> int:
+    """Return the offset just past the (possibly compressed) name at ``pos``."""
+    while True:
+        length = data[pos]
+        if length == 0:
+            return pos + 1
+        if length & 0xC0 == 0xC0:
+            return pos + 2
+        pos += 1 + length
+
+
+def parse_dns_a_records(data: bytes, query_id: int) -> list[str]:
+    """Extract the IPv4 addresses from a DNS response.
+
+    Args:
+        data: Raw response packet.
+        query_id: Transaction ID the query was sent with.
+
+    Returns:
+        Dotted-quad addresses of the A records in the answer section; empty if
+        the response carries none (including error responses).
+
+    Raises:
+        ValueError: If the packet is truncated or its ID does not match.
+    """
+    try:
+        rid, flags, qdcount, ancount = struct.unpack(">HHHH", data[:8])
+        if rid != query_id:
+            raise ValueError("DNS response ID mismatch")
+        if flags & 0x000F:  # non-zero RCODE (NXDOMAIN, SERVFAIL, REFUSED, ...)
+            return []
+        pos = 12
+        for _ in range(qdcount):
+            pos = _skip_dns_name(data, pos) + 4
+        addresses: list[str] = []
+        for _ in range(ancount):
+            pos = _skip_dns_name(data, pos)
+            rtype, rclass, _ttl, rdlength = struct.unpack(">HHIH", data[pos : pos + 10])
+            pos += 10
+            if pos + rdlength > len(data):
+                raise ValueError("truncated DNS response: rdata past end of packet")
+            if rtype == 1 and rclass == 1 and rdlength == 4:
+                addresses.append(socket.inet_ntoa(data[pos : pos + 4]))
+            pos += rdlength
+        return addresses
+    except (struct.error, IndexError) as exc:
+        raise ValueError(f"truncated DNS response: {exc}") from exc
+
+
+def query_dns_a(server: str, name: str, timeout: float = DNS_QUERY_TIMEOUT) -> list[str]:
+    """Ask one DNS server for the A records of ``name`` over UDP.
+
+    Args:
+        server: DNS server address.
+        name: Hostname to look up.
+        timeout: Seconds to wait for the answer.
+
+    Returns:
+        The A-record addresses (possibly empty).
+
+    Raises:
+        OSError: If the server cannot be reached or does not answer in time
+            (``TimeoutError`` is an ``OSError``), or the answer is malformed.
+    """
+    query_id = random.randint(0, 0xFFFF)  # nosec B311 - transaction ID, not a secret
+    family = socket.AF_INET6 if ":" in server else socket.AF_INET
+    with socket.socket(family, socket.SOCK_DGRAM) as sock:
+        sock.settimeout(timeout)
+        sock.sendto(build_dns_query(name, query_id), (server, 53))
+        data, _ = sock.recvfrom(4096)
+    try:
+        return parse_dns_a_records(data, query_id)
+    except ValueError as exc:
+        raise OSError(str(exc)) from exc
+
+
+def fetch_ontap_dns(config: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """Read the DNS servers and search domains configured on the ONTAP cluster.
+
+    Args:
+        config: Package variables with ``ontap_cluster_ip``, ``ontap_admin_user``
+            and ``ontap_admin_password``.
+
+    Returns:
+        ``(servers, domains)`` collected from every DNS record.
+
+    Raises:
+        OSError: If ONTAP cannot be reached or answers with an HTTP error.
+        ValueError: If the response is not the expected JSON.
+    """
+    token = base64.b64encode(
+        f"{config['ontap_admin_user']}:{config['ontap_admin_password']}".encode()
+    ).decode("ascii")
+    req = Request(
+        f"https://{config['ontap_cluster_ip']}/api/name-services/dns?fields=servers,domains",
+        method="GET",
+    )
+    req.add_header("Authorization", f"Basic {token}")
+    req.add_header("Accept", "application/json")
+    try:
+        with urlopen(  # nosec B310 - ONTAP URL constructed from package variables
+            req, context=make_ssl_context(), timeout=ONTAP_REST_TIMEOUT
+        ) as resp:
+            payload = json.loads(resp.read())
+    except HTTPError as exc:
+        raise OSError(f"ONTAP REST returned HTTP {exc.code}") from exc
+    records = payload.get("records") if isinstance(payload, dict) else None
+    if not isinstance(records, list):
+        raise ValueError("unexpected ONTAP DNS response")
+    servers: list[str] = []
+    domains: list[str] = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        for key, bucket in (("servers", servers), ("domains", domains)):
+            for value in record.get(key) or []:
+                if isinstance(value, str) and value not in bucket:
+                    bucket.append(value)
+    return servers, domains
+
+
+def check_ontap_resolves_aiqum(config: dict[str, Any]) -> tuple[bool | None, str]:
+    """Check that ONTAP's DNS servers resolve the AIQUM hostname to its IP.
+
+    AIQUM tells ONTAP to connect back to ``wss://<vm_name>:56443``; if ONTAP
+    cannot resolve that name, adding the cluster fails with a misleading
+    HTTP 500 (#1168).
+
+    Args:
+        config: Package variables dict.
+
+    Returns:
+        ``(True, detail)`` if a DNS server returned ``ip_address`` for the
+        hostname, ``(False, message)`` if the servers answered but never with
+        that address, ``(None, reason)`` if the check was inconclusive (no
+        ``vm_name``, ONTAP REST or every DNS server unreachable).
+    """
+    vm_name = config.get("vm_name")
+    if not vm_name:
+        return None, ""
+    expected = config["ip_address"]
+
+    try:
+        servers, domains = fetch_ontap_dns(config)
+    except (OSError, ValueError) as exc:
+        return None, f"could not read ONTAP's DNS configuration ({exc})"
+    if not servers:
+        return None, "ONTAP has no DNS servers configured"
+
+    candidates = [vm_name]
+    for domain in domains:
+        name = f"{vm_name}.{domain.strip('.')}"
+        if name not in candidates:
+            candidates.append(name)
+
+    reached = False
+    for server in servers:
+        for name in candidates:
+            try:
+                addresses = query_dns_a(server, name)
+            except OSError:
+                continue
+            reached = True
+            if expected in addresses:
+                return True, f"{name} -> {expected} via {server}"
+
+    if not reached:
+        return None, f"none of ONTAP's DNS servers ({', '.join(servers)}) answered"
+    return False, (
+        f"ONTAP's DNS servers ({', '.join(servers)}) do not resolve the AIQUM hostname "
+        f"'{vm_name}' to {expected} (tried: {', '.join(candidates)})."
+    )
+
+
+def add_cluster(client: AIQUMClient, config: dict[str, Any]) -> None:
+    """Add the ONTAP cluster to AIQUM (Step 5); every failure is non-fatal."""
+    try:
+        code, body = client.post(
+            "/api/admin/datasources/clusters",
+            body={
+                "address": config["ontap_cluster_ip"],
+                "username": config["ontap_admin_user"],
+                "password": config["ontap_admin_password"],
+                "port": 443,
+                "protocol": "https",
+            },
+            timeout=CLUSTER_ADD_TIMEOUT,
+        )
+    except OSError as exc:
+        # TimeoutError and URLError are both OSError. AIQUM may still finish
+        # the add on its side, so report it and carry on like any other failure.
+        print(f"  Cluster: no response ({exc}) (non-fatal)")
+        return
+    if code in (200, 201):
+        print("  Cluster: OK")
+    elif code == 409:
+        print("  Cluster: Already exists (OK)")
+    else:
+        print(f"  Cluster: {code} (non-fatal)")
+        # Best-effort detail extraction; mirrors the old behavior of the .text fallback
+        message = ""
+        if isinstance(body, dict):
+            error = body.get("error")
+            if isinstance(error, dict):
+                message = str(error.get("message", ""))
+            if not message:
+                message = str(body.get("_raw", ""))[:200]
+        print(f"    {message}")
+
+
 def main() -> int:
     """Run the First Experience Wizard against a freshly deployed AIQUM VM.
 
@@ -473,38 +707,23 @@ def main() -> int:
 
     # Step 5: Add ONTAP cluster
     print(f"\nStep 5: Adding ONTAP cluster ({config['ontap_cluster_ip']})...")
-    try:
-        code, body = client.post(
-            "/api/admin/datasources/clusters",
-            body={
-                "address": config["ontap_cluster_ip"],
-                "username": config["ontap_admin_user"],
-                "password": config["ontap_admin_password"],
-                "port": 443,
-                "protocol": "https",
-            },
-            timeout=CLUSTER_ADD_TIMEOUT,
+    verdict, detail = check_ontap_resolves_aiqum(config)
+    if verdict is False:
+        print(f"  ERROR: {detail}")
+        print(
+            "    AIQUM gives ONTAP a wss://<hostname>:56443 address to connect back to. Without\n"
+            "    DNS for it, AIQUM's cluster-add error (HTTP 500, mentioning clock skew or the\n"
+            "    EMS destination limit) is misleading. Publish a DNS record for the hostname on\n"
+            "    ONTAP's DNS server (e.g. publish_dns/dns_domain on the aiqum package) and make\n"
+            "    sure ONTAP's DNS search domain covers it."
         )
-    except OSError as exc:
-        # TimeoutError and URLError are both OSError. AIQUM may still finish
-        # the add on its side, so report it and carry on like any other failure.
-        print(f"  Cluster: no response ({exc}) (non-fatal)")
+        print("  Cluster: skipped, hostname not resolvable from ONTAP (non-fatal)")
     else:
-        if code in (200, 201):
-            print("  Cluster: OK")
-        elif code == 409:
-            print("  Cluster: Already exists (OK)")
-        else:
-            print(f"  Cluster: {code} (non-fatal)")
-            # Best-effort detail extraction; mirrors the old behavior of the .text fallback
-            message = ""
-            if isinstance(body, dict):
-                error = body.get("error")
-                if isinstance(error, dict):
-                    message = str(error.get("message", ""))
-                if not message:
-                    message = str(body.get("_raw", ""))[:200]
-            print(f"    {message}")
+        if verdict is True:
+            print(f"  DNS pre-check: OK ({detail})")
+        elif detail:
+            print(f"  WARNING: DNS pre-check inconclusive: {detail}; adding the cluster anyway")
+        add_cluster(client, config)
 
     # Step 6: Mark setup complete
     print("\nStep 6: Marking initial setup complete...")
