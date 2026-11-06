@@ -81,6 +81,16 @@
           done
           exec /tmp/ontap-console-restore-{{ ontap_vmid }}.exp
 
+    - name: Kill stale socat on the serial socket
+      ansible.builtin.command:
+        argv:
+          - pkill
+          - -f
+          - "^socat .*UNIX-CONNECT:/var/run/qemu-server/{{ ontap_vmid }}\\.serial0$"
+      register: stale_socat
+      failed_when: stale_socat.rc not in [0, 1]
+      changed_when: stale_socat.rc == 0
+
     - name: Launch wrapper script in background (catches VLOADER on next boot)
       ansible.builtin.shell: |
         nohup /tmp/ontap-console-restore-{{ ontap_vmid }}-wrapper.sh > /tmp/ontap-console-restore-wrapper-{{ ontap_vmid }}.out 2>&1 &
