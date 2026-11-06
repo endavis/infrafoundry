@@ -8,7 +8,7 @@ Coverage:
     - ``compute_diff`` add / update / delete / no-op / lock / add_only.
     - Unmanaged (unmarked) live rows ignored by the diff.
     - ``lock`` honored — skipped in diff, counted in ``Diff.locked``.
-    - ``add_only`` suppresses updates and deletes.
+    - ``add_only`` suppresses deletes only; adds and updates still apply.
     - ``to_payload`` forces ``origin="cron"`` on the wire regardless of YAML value.
     - ``export_to_yaml`` emits the ``opnsense.cron.jobs`` nested path and
       round-trips through the loader.
