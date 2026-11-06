@@ -19,6 +19,9 @@ resource but the apply path makes per-interface write calls.
 - **Per-record writes.** Each add/update/delete maps to one
   ``addEntry``/``setEntry``/``delEntry`` POST. Order: adds, updates,
   deletes (matching other direct-API managers).
+- **Split delete phase (#1272).** ``add_only`` suppresses deletes only
+  (updates still apply). The runner deletes radvd records in a separate
+  phase (``deletes_only``) before interface assignments are deleted.
 - **Reconfigure deferred** to the runner's finalization-hook plumbing —
   the manager declares ``FINALIZATION_HOOK = "radvd_reconfigure"``.
 - **Destroy nukes every live record** (full-destroy semantics).
@@ -86,6 +89,10 @@ class RadvdManager(BaseComponentManager):
     #: record changed state.
     FINALIZATION_HOOK: ClassVar[str] = "radvd_reconfigure"
 
+    #: The runner deletes in a separate phase before this type's adds and updates,
+    #: so a radvd record is deleted before the interface assignment it uses (#1272).
+    SPLIT_DELETE_PHASE: ClassVar[bool] = True
+
     def plan(
         self,
         env_name: str,
@@ -99,8 +106,7 @@ class RadvdManager(BaseComponentManager):
         Args:
             env_name: Active environment name.
             resources: Should contain exactly one ``radvd`` ``ResourceConfig``.
-            add_only: If True, suppress updates and deletes — only adds
-                are dispatched.
+            add_only: If True, suppress deletes; adds and updates still apply.
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -112,7 +118,6 @@ class RadvdManager(BaseComponentManager):
         desired = service.build_desired_interface_records(resources[0])
         adds_set, updates_set, deletes_set = service.compute_diff(live, desired)
         if add_only:
-            updates_set = set()
             deletes_set = set()
         return _RadvdDiff(
             adds=[(name, desired[name]) for name in sorted(adds_set)],
@@ -127,6 +132,7 @@ class RadvdManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        deletes_only: bool = False,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
         """Apply the diff: add/update/delete radvd records per-interface.
@@ -139,7 +145,9 @@ class RadvdManager(BaseComponentManager):
             env_name: Active environment name.
             resources: Should contain exactly one ``radvd`` ``ResourceConfig``.
             auto_approve: No-op (the diff engine is the gate).
-            add_only: If True, suppress updates and deletes.
+            add_only: If True, suppress deletes.
+            deletes_only: If True, only delete: the runner's delete phase, run
+                before the adds and updates (#1272).
             provider_name: Provider identifier (defaults to ``opnsense``).
 
         Returns:
@@ -150,6 +158,9 @@ class RadvdManager(BaseComponentManager):
         enforce_singleton(resources, "radvd")
         service = RadvdService.from_environment(env_name, provider_name, self.config_dir)
         diff = self.plan(env_name, resources, add_only=add_only, provider_name=provider_name)
+        if deletes_only:
+            diff.adds = []
+            diff.updates = []
         live_uuids = service.list_uuids_by_interface()
 
         outcomes: list[ResourceOutcome] = []

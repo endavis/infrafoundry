@@ -1839,6 +1839,33 @@ class TestDeletePhase:
             "asg.apply(add_only)",
         ]
 
+    def test_radvd_deletes_before_assignment_delete(self, provider_with_env: MagicMock) -> None:
+        """A radvd record goes before the assignment it uses, which goes before its VLAN (#1272)."""
+        log: list[str] = []
+        vlan_cls, _ = _phase_manager(log, "vlan", split=False)
+        asg_cls, _ = _phase_manager(log, "asg", split=True)
+        radvd_cls, _ = _phase_manager(log, "radvd", split=True)
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "interfaces.vlans": vlan_cls,
+            "interfaces.assignments": asg_cls,
+            "radvd": radvd_cls,
+        }
+        resources = [
+            _yaml("interfaces.vlans", "v"),
+            _yaml("interfaces.assignments", "a"),
+            _yaml("radvd", "settings"),
+        ]
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            result = OPNsenseDirectRunner().apply(provider_with_env, managed_resources={})
+        assert result["success"] is True
+        assert log == [
+            "radvd.apply(deletes_only)",
+            "asg.apply(deletes_only)",
+            "vlan.apply(single)",
+            "asg.apply(add_only)",
+            "radvd.apply(add_only)",
+        ]
+
     def test_non_split_manager_gets_no_deletes_only(self, provider_with_env: MagicMock) -> None:
         log: list[str] = []
         mocks, resources = self._setup(provider_with_env, log)

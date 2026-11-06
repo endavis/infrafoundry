@@ -8,8 +8,11 @@ Manager (``RadvdManager``):
     - test_plan_update
     - test_plan_delete
     - test_plan_full_reconcile
-    - test_plan_add_only_skips_updates_and_deletes
+    - test_plan_add_only_skips_deletes_only
     - test_apply_calls_per_record
+    - test_apply_deletes_only_skips_adds_and_updates
+    - test_apply_add_only_applies_adds_and_updates
+    - test_split_delete_phase_declared
     - test_destroy_deletes_all_live
     - test_get_resource_ids_returns_per_interface_uuids
     - test_finalization_hook_declared
@@ -216,8 +219,8 @@ class TestPlan:
         assert [name for name, _, _ in diff.updates] == ["opt1"]
         assert [name for name, _ in diff.deletes] == ["opt3"]
 
-    def test_plan_add_only_skips_updates_and_deletes(self, tmp_path: Path) -> None:
-        """add-only mode zeroes updates + deletes."""
+    def test_plan_add_only_skips_deletes_only(self, tmp_path: Path) -> None:
+        """add-only mode zeroes deletes; adds and updates stay (#1272)."""
         manager = RadvdManager(tmp_path)
         live = _live_with(
             ("opt1", _opt1_record()),
@@ -231,9 +234,9 @@ class TestPlan:
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service
             diff = manager.plan("test-env", [_resource(desired_yaml)], add_only=True)
-        # Adds preserved; updates and deletes suppressed.
+        # Adds and updates preserved; deletes suppressed.
         assert [name for name, _ in diff.adds] == ["opt2"]
-        assert diff.updates == []
+        assert [name for name, _, _ in diff.updates] == ["opt1"]
         assert diff.deletes == []
 
 
@@ -281,6 +284,48 @@ class TestApply:
             ("delete", "opt3"),
         ]
 
+    def test_apply_deletes_only_skips_adds_and_updates(self, tmp_path: Path) -> None:
+        """deletes_only runs just the deletes: the runner's delete phase (#1272)."""
+        manager = RadvdManager(tmp_path)
+        live = _live_with(("opt1", _opt1_record()), ("opt3", _opt2_record()))
+        service = _make_service_mock(live=live)
+        desired_yaml = {
+            "opt1": _opt1_record() | {"priority": "high"},
+            "opt2": _opt2_record(),
+        }
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            result = manager.apply("test-env", [_resource(desired_yaml)], deletes_only=True)
+
+        assert result["resources_created"] == 0
+        assert result["resources_updated"] == 0
+        assert result["resources_deleted"] == 1
+        service.add_record.assert_not_called()
+        service.set_record.assert_not_called()
+        assert service.del_record.call_count == 1
+        actions = [(o.action, o.resource_name) for o in result["resource_outcomes"]]
+        assert actions == [("delete", "opt3")]
+
+    def test_apply_add_only_applies_adds_and_updates(self, tmp_path: Path) -> None:
+        """add_only keeps adds and updates, suppresses deletes (#1272)."""
+        manager = RadvdManager(tmp_path)
+        live = _live_with(("opt1", _opt1_record()), ("opt3", _opt2_record()))
+        service = _make_service_mock(live=live)
+        desired_yaml = {
+            "opt1": _opt1_record() | {"priority": "high"},
+            "opt2": _opt2_record(),
+        }
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            result = manager.apply("test-env", [_resource(desired_yaml)], add_only=True)
+
+        assert result["resources_created"] == 1
+        assert result["resources_updated"] == 1
+        assert result["resources_deleted"] == 0
+        assert service.add_record.call_count == 1
+        assert service.set_record.call_count == 1
+        service.del_record.assert_not_called()
+
 
 class TestDestroy:
     def test_destroy_deletes_all_live(self, tmp_path: Path) -> None:
@@ -315,6 +360,10 @@ class TestFinalizationHook:
     def test_finalization_hook_declared(self) -> None:
         """RadvdManager.FINALIZATION_HOOK == 'radvd_reconfigure'."""
         assert RadvdManager.FINALIZATION_HOOK == "radvd_reconfigure"
+
+    def test_split_delete_phase_declared(self) -> None:
+        """RadvdManager deletes in the runner's split delete phase (#1272)."""
+        assert RadvdManager.SPLIT_DELETE_PHASE is True
 
 
 # ---------------------------------------------------------------------------

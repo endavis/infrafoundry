@@ -24,7 +24,6 @@ _RETIRED_SYSTEM_TYPES = [
 
 #: Dependent types that do not split deletes yet, each with the reason (#1269).
 _DELETE_PHASE_EXEMPT: dict[str, str] = {
-    "radvd": "add_only drops updates as well as deletes",
     "unbound.host_aliases": "OPNsense cascades a host override delete to its aliases",
 }
 
@@ -337,10 +336,6 @@ class TestOPNsenseResourceTypes:
         for parent in splitting:
             for child, required in deps.items():
                 if child in table and parent in required:
-                    if child in _DELETE_PHASE_EXEMPT:
-                        # radvd still deletes after its assignment's delete; #1272
-                        # removes the exemption and re-applies this rule.
-                        continue
                     assert child in splitting, f"{child} depends on split type {parent}"
 
     def test_assignments_split_and_vlans_delete_after_them(
@@ -352,6 +347,14 @@ class TestOPNsenseResourceTypes:
         order = list(table)
         # Deletes run in reverse table order, so the later type deletes first.
         assert order.index("interfaces.vlans") < order.index("interfaces.assignments")
+
+    def test_radvd_splits_and_deletes_before_assignments(self, provider: OPNsenseProvider) -> None:
+        """A radvd record is deleted before the assignment it uses (#1272)."""
+        table = provider.get_direct_api_resource_types()
+        assert getattr(table["radvd"], "SPLIT_DELETE_PHASE", None) is True
+        order = list(table)
+        # Deletes run in reverse table order, so the later type deletes first.
+        assert order.index("interfaces.assignments") < order.index("radvd")
 
     def test_gateway_dependents_split_deletes(self, provider: OPNsenseProvider) -> None:
         table = provider.get_direct_api_resource_types()
