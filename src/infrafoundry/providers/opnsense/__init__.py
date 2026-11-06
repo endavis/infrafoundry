@@ -147,6 +147,7 @@ class OPNsenseProvider(
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
         from .components.interface_assignment import InterfaceAssignmentManager
+        from .components.interfaces_settings import InterfacesSettingsManager
         from .components.isc_to_kea_migration import ISCToKeaMigrationManager
         from .components.kea_dhcp import KeaDHCPManager
         from .components.nat_rule import NATRuleManager
@@ -160,6 +161,7 @@ class OPNsenseProvider(
         components: list[tuple[str, type]] = [
             ("interfaces.vlans", VlanManager),
             ("interfaces.assignments", InterfaceAssignmentManager),
+            ("interfaces.settings", InterfacesSettingsManager),
             ("firewall.aliases", AliasManager),
             ("firewall.nat", NATRuleManager),
             ("firewall.rules", FirewallRuleManager),
@@ -254,6 +256,7 @@ class OPNsenseProvider(
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
         from .components.interface_assignment import InterfaceAssignmentManager
+        from .components.interfaces_settings import InterfacesSettingsManager
         from .components.kea_dhcp4_reservation import KeaDHCPv4ReservationManager
         from .components.kea_dhcp4_subnet import KeaDHCPv4SubnetManager
         from .components.kea_dhcp6_reservation import KeaDHCPv6ReservationManager
@@ -298,6 +301,7 @@ class OPNsenseProvider(
         return {
             "system.firmware": SystemFirmwareManager,
             "system.tuning": SystemTuningManager,
+            "interfaces.settings": InterfacesSettingsManager,
             "interfaces.vlans": VlanManager,
             "interfaces.assignments": InterfaceAssignmentManager,
             "firewall.aliases": AliasManager,
@@ -340,6 +344,8 @@ class OPNsenseProvider(
           :class:`UnboundForwardManager` and :class:`UnboundAdvancedManager`
           (#1254) so a single ``unbound/service/reconfigure`` call fires per
           apply when any of the four unbound components changed state.
+        - ``interfaces_settings_reconfigure`` (#1092) — fired by
+          :class:`InterfacesSettingsManager` when the interface settings changed.
 
         The mechanism is generic — future components with shared post-apply
         work register their own key here.
@@ -354,6 +360,7 @@ class OPNsenseProvider(
             "radvd_reconfigure": self._reconfigure_radvd,
             "cron_reconfigure": self._reconfigure_cron,
             "tunables_reconfigure": self._reconfigure_tunables,
+            "interfaces_settings_reconfigure": self._reconfigure_interfaces_settings,
         }
 
     def check_endpoint_support(
@@ -475,6 +482,23 @@ class OPNsenseProvider(
         service = SystemTuningService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
+    def _reconfigure_interfaces_settings(self, env_name: str) -> None:
+        """Reconfigure interface settings after a settings change (#1092).
+
+        Used by :meth:`get_finalization_hooks` so one
+        ``interfaces/settings/reconfigure`` call fires per apply, only when the
+        settings changed. Reconfigure re-applies hardware flags to every
+        interface, which on some NICs can briefly reset the link. Unverified
+        against a live box. Hook errors propagate, failing the apply.
+
+        Args:
+            env_name: Active environment name.
+        """
+        from .services.interfaces_settings import InterfacesSettingsService
+
+        service = InterfacesSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
     # All OPNsense components are now managed by ``OPNsenseDirectRunner``
     # (ADR-0014). Per-component history:
     # - ``firewall_rules`` (#724, ADR-0015), ``aliases`` (#775, firewall_alias),
@@ -566,6 +590,7 @@ class OPNsenseProvider(
             "cron.jobs": [],
             "system.firmware": [],
             "system.tuning": [],
+            "interfaces.settings": [],
         }
 
     @override

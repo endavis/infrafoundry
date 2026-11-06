@@ -215,6 +215,24 @@ class TestOPNsenseResourceTypes:
             == types["unbound.forwards"].FINALIZATION_HOOK
         )
 
+    def test_interfaces_settings_is_supported_with_its_own_hook(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        types = provider.get_direct_api_resource_types()
+        assert "interfaces.settings" in provider.get_resource_types()
+        assert provider.get_dependencies()["interfaces.settings"] == []
+        hook = types["interfaces.settings"].FINALIZATION_HOOK
+        assert hook == "interfaces_settings_reconfigure"
+        assert hook in provider.get_finalization_hooks()
+
+    def test_interfaces_settings_hook_calls_the_service(self, provider: OPNsenseProvider) -> None:
+        with patch(
+            "infrafoundry.providers.opnsense.services.interfaces_settings"
+            ".InterfacesSettingsService.from_environment"
+        ) as factory:
+            provider.get_finalization_hooks()["interfaces_settings_reconfigure"]("env")
+        factory.return_value.reconfigure.assert_called_once_with()
+
     @pytest.mark.parametrize(
         "resource_type",
         [

@@ -14,6 +14,9 @@ from infrafoundry.providers.opnsense.validators.gateway_validator import Gateway
 from infrafoundry.providers.opnsense.validators.interface_assignment_validator import (
     InterfaceAssignmentValidator,
 )
+from infrafoundry.providers.opnsense.validators.interfaces_settings_validator import (
+    InterfacesSettingsValidator,
+)
 from infrafoundry.providers.opnsense.validators.kea_reservation_validator import (
     KeaReservationValidator,
 )
@@ -53,6 +56,7 @@ __all__ = [
     "FirewallRuleValidator",
     "GatewayValidator",
     "InterfaceAssignmentValidator",
+    "InterfacesSettingsValidator",
     "KeaReservationValidator",
     "NATRuleValidator",
     "RadvdValidator",

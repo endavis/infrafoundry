@@ -28,6 +28,7 @@ EXPECTED_RESOURCE_TYPES = [
     "unbound.forwards",
     "unbound.host_aliases",
     "unbound.host_overrides",
+    "interfaces.settings",
     "interfaces.virtual_ips",
     "interfaces.vlans",
 ]
@@ -40,8 +41,8 @@ def provider(tmp_path: Path) -> OPNsenseProvider:
 
 
 @pytest.mark.usefixtures("provider")
-def test_provider_registers_all_fourteen_components() -> None:
-    """Instantiating the provider registers all 14 expected components."""
+def test_provider_registers_all_fifteen_components() -> None:
+    """Instantiating the provider registers all 15 expected components."""
     registered = list_extractor_resource_types("opnsense")
 
     for resource_type in EXPECTED_RESOURCE_TYPES:

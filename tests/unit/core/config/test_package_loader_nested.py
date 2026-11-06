@@ -428,6 +428,25 @@ class TestParseNestedShapeMismatch:
         with pytest.raises(InvalidConfigurationError, match="declared as a dict"):
             loader._parse_resources_from_data(data, "bad.yaml", "opnsense")
 
+    def test_interfaces_settings_is_a_singleton_dict(self, temp_dir: Path) -> None:
+        """``interfaces.settings`` loads as one singleton."""
+        from infrafoundry.core.config.package_loader import SINGLETON_RESOURCE_TYPES
+
+        assert "interfaces.settings" in SINGLETON_RESOURCE_TYPES
+        loader = PackageLoader(temp_dir)
+        data = {"opnsense": {"interfaces": {"settings": {"vlan_hardware_filtering": "disable"}}}}
+        resources = loader._parse_resources_from_data(data, "t.yaml", "opnsense")
+        found = [r for r in resources if r.type == "interfaces.settings"]
+        assert len(found) == 1
+        assert found[0].name == "interfaces.settings"
+        assert found[0].config == {"vlan_hardware_filtering": "disable"}
+
+    def test_interfaces_settings_list_rejected(self, temp_dir: Path) -> None:
+        loader = PackageLoader(temp_dir)
+        data: dict[str, Any] = {"opnsense": {"interfaces": {"settings": [{"dhcp6_debug": True}]}}}
+        with pytest.raises(InvalidConfigurationError, match="declared as a dict"):
+            loader._parse_resources_from_data(data, "bad.yaml", "opnsense")
+
     def test_known_dict_path_with_list_leaf_rejected(self, temp_dir: Path) -> None:
         """``firewall.log: [...]`` (list where dict expected) errors."""
         loader = PackageLoader(temp_dir)

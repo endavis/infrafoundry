@@ -57,7 +57,10 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<OPNsense>/Hostwatch` | `hostwatch` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#792](https://github.com/endavis/infrafoundry/issues/792) ships. |
 | `<OPNsense>/unboundplus/advanced` (`privatedomain`, `insecuredomain`, `privateaddress`) | `unbound.advanced` | Supported (direct-API; #1254). Only declared fields are compared; the whole `advanced` section is echoed back on write; destroy is a no-op; shares the `unbound_reconfigure` hook. The `set` envelope key is unverified live. |
 | `<OPNsense>/unboundplus/general`, the rest of `<OPNsense>/unboundplus/advanced` | `unbound.settings` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#1091](https://github.com/endavis/infrafoundry/issues/1091) ships. |
-| `<system>/timeservers`, `<system>/lb_use_sticky`, `<system>/pf_share_forward`, `<OPNsense>/Interfaces/settings`, `<OPNsense>/Firewall/Category` | `firewall.settings`, `interfaces.settings`, `firewall.categories`, NTP (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#1092](https://github.com/endavis/infrafoundry/issues/1092) ships. |
+| `<OPNsense>/Interfaces/settings` | `interfaces.settings` | Supported (direct-API; #1092). A singleton over the whole settings model; only declared fields are compared, the whole live object is echoed back on write; destroy is a no-op; the `interfaces_settings_reconfigure` hook fires one reconfigure per apply. **The `set` and `reconfigure` calls are not yet verified against a live box.** See [Interface settings](#interface-settings-1092). |
+| `<system>/lb_use_sticky`, `<system>/pf_share_forward`, `<system>/disablenatreflection`, `<system>/pfdebug` (firewall advanced) | none | **Out of scope.** Exist only on a legacy PHP page (`system_advanced_firewall.php`) with no MVC API, and the usual setup leaves them at the defaults. |
+| `<system>/timeservers` (NTP) | none | **Out of scope.** Same reason: legacy PHP page only (`services_ntpd.php`), usually left at the defaults. |
+| `<OPNsense>/Firewall/Category` | `firewall.categories` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#1286](https://github.com/endavis/infrafoundry/issues/1286) ships. |
 
 Sections intentionally **out of IaC scope** (per ADR-0013): `<hasync>`, `<gres>`, `<gifs>`, `<laggs>`, `<bridges>`, `<ppps>`, `<wireless>`. These are set-once items and are migrated via selective `config.xml` import on the target box.
 
@@ -83,6 +86,35 @@ opnsense:
         - test.example.net
 ```
 
+## Interface settings (#1092)
+
+`opnsense.interfaces.settings` is a singleton dict over the `OPNsense\Interfaces\Settings` model. Every key is optional.
+
+| YAML | wire field | type | model default |
+|---|---|---|---|
+| `disable_checksum_offloading` | `disablechecksumoffloading` | bool | `true` |
+| `disable_segmentation_offloading` | `disablesegmentationoffloading` | bool | `true` |
+| `disable_large_receive_offloading` | `disablelargereceiveoffloading` | bool | `true` |
+| `vlan_hardware_filtering` | `disablevlanhwfilter` | `enable` / `disable` / `default` (wire `0` / `1` / `2`) | `default` |
+| `disable_ipv6` | `disableipv6` | bool | `false` |
+| `dhcp6_no_release` | `dhcp6_norelease` | bool | `false` |
+| `dhcp6_debug` | `dhcp6_debug` | bool | `false` |
+| `dhcp6_duid` | `dhcp6_duid` | string | empty |
+| `dhcp6_ra_timeout` | `dhcp6_ratimeout` | integer >= 0 | `10` |
+
+An omitted key is not managed. `config migrate` exports only the fields that differ from the defaults above (the defaults were read from OPNsense 26.1.6). A live `disablevlanhwfilter` value outside `0`/`1`/`2` is logged and omitted.
+
+```yaml
+opnsense:
+  interfaces:
+    settings:
+      vlan_hardware_filtering: disable
+```
+
+**Not yet verified live.** The `get` shape and the defaults were probed on a test firewall, but the `set` call and the `interfaces/settings/reconfigure` call have not been run against a box. The need for `reconfigure` is inferred from the GUI's Apply button. After the first apply, re-run `infra plan` and expect no update.
+
+**Link reset.** Reconfigure re-applies the hardware flags to every interface, which on some NICs can briefly reset the link. Apply during a maintenance window.
+
 ## How deletes work: the managed set (#1256)
 
 `opnsense_direct` deletes only objects InfraFoundry manages ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). A live object InfraFoundry never applied is kept, whether or not its type has YAML entries. `infra plan` shows those as `N unmanaged (kept)` on the type's summary line.
@@ -95,7 +127,7 @@ opnsense:
 
 - **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets` and `kea.dhcp6.reservations`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
-- **Singletons** (`system.*`, `unbound.advanced`, `radvd`) are unaffected.
+- **Singletons** (`system.*`, `unbound.advanced`, `interfaces.settings`, `radvd`) are unaffected.
 
 **Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
 

@@ -81,3 +81,10 @@ def test_unbound_advanced_registers_the_settings_endpoints() -> None:
     assert endpoints.UNBOUND_SETTINGS_GET in registered
     assert endpoints.UNBOUND_SETTINGS_SET in registered
     assert endpoints.UNBOUND_RECONFIGURE in registered
+
+
+def test_interfaces_settings_registers_the_settings_endpoints() -> None:
+    registered = endpoints.RESOURCE_TYPE_ENDPOINTS["interfaces.settings"]
+    assert endpoints.INTERFACES_SETTINGS_GET in registered
+    assert endpoints.INTERFACES_SETTINGS_SET in registered
+    assert endpoints.INTERFACES_SETTINGS_RECONFIGURE in registered

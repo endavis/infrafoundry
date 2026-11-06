@@ -317,6 +317,9 @@ CATEGORY_ADD = Endpoint("POST", "firewall/category/addItem")
 # --- interfaces -----------------------------------------------------------------------
 INTERFACES_INFO = Endpoint("GET", "interfaces/overview/interfacesInfo")
 INTERFACES_EXPORT = Endpoint("GET", "interfaces/overview/export")
+INTERFACES_SETTINGS_GET = Endpoint("GET", "interfaces/settings/get")
+INTERFACES_SETTINGS_SET = Endpoint("POST", "interfaces/settings/set")
+INTERFACES_SETTINGS_RECONFIGURE = Endpoint("POST", "interfaces/settings/reconfigure")
 # In-tree plugin controller: not in stock specs (see the module docstring).
 ASSIGN_SETTINGS = _crud(
     "interfaces/assign_settings",
@@ -379,6 +382,11 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     ),
     "system.remotebackup": (GDRIVEBACKUP_GET, GDRIVEBACKUP_SET),
     "system.tuning": (TUNABLES_GET, TUNABLES_ADD, TUNABLES_SET, TUNABLES_RECONFIGURE),
+    "interfaces.settings": (
+        INTERFACES_SETTINGS_GET,
+        INTERFACES_SETTINGS_SET,
+        INTERFACES_SETTINGS_RECONFIGURE,
+    ),
     "interfaces.vlans": VLAN.all(),
     "interfaces.assignments": (*ASSIGN_SETTINGS.all(), INTERFACES_INFO),
     "interfaces.virtual_ips": VIP.all(),

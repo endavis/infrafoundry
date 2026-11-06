@@ -25,6 +25,7 @@ tags:
 **Amended:** 2026-10-27 (#1128) — the runner now loads every `provider: opnsense` resource in the environment, including ones declared in other providers' packages (e.g. a proxmox blueprint's DHCP reservations), and a run filtered with `-r`/`-p` is add-only. §5 "Default semantics" records the filtered-run rule.
 **Amended:** 2026-11-05 (#1256) — §5 "Fully-managed by default" no longer applies to unmanaged objects: deletes are limited to the managed set recorded in the state database, and a type with no YAML entries is dispatched to delete its managed objects. See [ADR-0018](0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md).
 **Amended:** 2026-11-06 (#1274) — the interface-assignments controller install resolves its SSH target from `provider_settings.opnsense` (`ssh_host`, `ssh_user`, `ssh_port`, `ssh_key`) instead of env vars only; `OPNSENSE_SSH_HOST` and `OPNSENSE_API_URL` now follow the `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE` gate for the SSH host. §"Runtime credential resolution" gets an "SSH target for controller install" paragraph.
+**Amended:** 2026-11-06 (#1092) — `interfaces.settings` per-component decision recorded (direct-REST singleton against `interfaces/settings/*`; only declared fields compared; own `interfaces_settings_reconfigure` hook; set and reconfigure unverified live)
 **Amended:** 2026-05-06 (#758) — `kea_dhcp6` per-component decision recorded (stock direct-REST against the existing `kea/dhcpv6/*` controller, now driven by `KeaDHCPv6SubnetManager` and `KeaDHCPv6ReservationManager` on `OPNsenseDirectRunner` instead of the legacy `OPNsenseProvider._generate_kea_dhcp6_resources` path that ran under `generate_terraform()`). Adds a new "Finalization hooks" subsection describing a generic runner facility for end-of-apply work shared across managers (e.g., a single Kea reconfigure for both subnets and reservations). Reservation→subnet UUID resolution now raises `ReferenceValidationError` on a missing live subnet rather than silently skipping with a warning — a behavioral upgrade.
 **Amended:** 2026-05-07 (#775) — `firewall_alias` per-component decision recorded (stock direct-REST against `firewall/alias/*` controller; natural-key identity = alias `name` (OPNsense-enforced unique); no controller fork; reconfigure via `firewall/alias/reconfigure`). The legacy terraform write path (`browningluke/opnsense` + `aliases.tf.j2`) is retired in the same PR — no `kind: legacy` shim. Mirrors #724's pattern for `unbound_host_alias`.
 **Amended:** 2026-05-07 (#776) — `unbound_host_override` per-component decision recorded (stock direct-REST against `unbound/settings/HostOverride*`; natural-key identity = `(hostname, domain, rr)`; shared `unbound_reconfigure` finalization hook now coalesces across `unbound_host_alias`, `unbound_forward`, and `unbound_host_override`). Mirrors #724's pattern; legacy terraform path retired in same PR.
@@ -389,6 +390,20 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Rollback strategy:** Same as §1's default.
 - **Cross-reference notes:** Shares `unbound_reconfigure` with the three other Unbound managers.
 
+### `interfaces.settings` (#1092, 2026-11-06)
+
+**Mechanism:** Direct-REST singleton against the `OPNsense\Interfaces\Settings` model: hardware offloading, VLAN hardware filtering, IPv6 and the DHCPv6 client. Only declared YAML keys are compared and written; an omitted key is unmanaged. Destroy is a no-op.
+
+- **Endpoints:** `GET interfaces/settings/get` (response `{"settings": {...}}`), `POST interfaces/settings/set` and `POST interfaces/settings/reconfigure`. The GET shape was probed on 26.1.6_2; the **`set` and `reconfigure` calls are unverified live**. The bundled 26.1 spec names the same `settings` envelope.
+- **Identity:** singleton named `interfaces.settings`. `get_resource_ids()` returns `{"interfaces.settings": "global"}`.
+- **Wire schema:** nine fields (see [the coverage doc](../development/opnsense-resource-coverage.md#interface-settings-1092)). The three-state `disablevlanhwfilter` option becomes `vlan_hardware_filtering: enable | disable | default`. The write sends the whole flattened live `settings` object with the declared fields overwritten.
+- **Apply:** `set_settings` only when a declared field drifted; logs changed field names, never values. A declared field absent from the live object raises `APIError`.
+- **Reconfigure:** `MVC set` only saves `config.xml`; the GUI's Apply button calls reconfigure (inference, not measured). The manager declares `FINALIZATION_HOOK = "interfaces_settings_reconfigure"`, so one `interfaces/settings/reconfigure` call fires per apply, only when the settings changed. Reconfigure re-applies hardware flags to every interface and can briefly reset the link on some NICs.
+- **Validator scope:** `InterfacesSettingsValidator`: unknown keys, boolean fields, the three enum values, `dhcp6_duid` a string, `dhcp6_ra_timeout` a non-negative integer.
+- **Migrate:** exports only fields that differ from the model defaults.
+- **Rollback strategy:** Same as §1's default.
+- **Cross-reference notes:** The firewall-advanced and NTP settings in the same issue have no MVC API and are out of scope; categories moved to #1286.
+
 ### `radvd` (#788, 2026-05-12)
 
 **Mechanism:** **Hybrid YAML-singleton / wire-list** direct-REST against the modern OPNsense 26.x `radvd` MVC controller — IPv6 Router Advertisement emission per interface. The operator authors a single dict-shape `radvd` resource whose `interfaces` mapping holds one inner mapping per interface; the wire stores those as per-UUID records. Mirrors the `system.firmware` (#806) asymmetric "bulk read, per-item write" shape but with full-reconcile semantics on the write side instead of install-missing-only. **Cutover hard blocker** for hands-free IPv6: without per-interface RA emission on `opt1`/`opt2`/`opt3`/`opt6` (Infra/PT/Tailscale-infra/Apps VLANs), every IPv6-enabled host on those VLANs loses its default route the moment cutover finishes.
@@ -521,6 +536,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#709](https://github.com/endavis/infrafoundry/issues/709): feat: add `OPNsenseDirectRunner` and migrate VLAN component to direct-API (first implementation).
 - Issue [#711](https://github.com/endavis/infrafoundry/issues/711): feat: add OPNsense `interface_assignments` component (read-only / migrate; dispatch-table refactor).
 - Issue [#707](https://github.com/endavis/infrafoundry/issues/707): chore: write ADR-0014 codifying OPNsense direct-API apply mechanism (this ADR).
+- Issue [#1092](https://github.com/endavis/infrafoundry/issues/1092): feat: manage OPNsense global interface settings (`interfaces.settings`).
 - Issue [#1254](https://github.com/endavis/infrafoundry/issues/1254): feat: manage Unbound advanced settings (private and insecure domains) on OPNsense.
 - Issue [#1244](https://github.com/endavis/infrafoundry/issues/1244): refactor: remove the unreachable implementation of the five retired OPNsense system types.
 - Issue [#705](https://github.com/endavis/infrafoundry/issues/705): feat: spike direct-API VLAN component to inform ADR-0014 (closed; PR [#706](https://github.com/endavis/infrafoundry/pull/706) merged).
