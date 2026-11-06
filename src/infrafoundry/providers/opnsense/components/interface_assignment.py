@@ -11,9 +11,11 @@ Apply flow:
 1. ``apply()`` lists live state and computes the diff first (the list
    endpoint needs no controller), then checks for lockout conflicts.
 2. Only when the (filtered) diff is non-empty does it run the
-   SSH-credential pre-flight (missing credentials raise ``RuntimeError``
-   with an actionable message, no deep paramiko traceback) and
-   ``installer.ensure_installed()``, which SCPs the controller PHP if its
+   SSH-target resolution (from ``provider_settings.opnsense``: ``ssh_host``,
+   ``ssh_user``, ``ssh_port``, ``ssh_key``, falling back to the ``api_url``
+   host; ``OPNSENSE_SSH_HOST`` only under ``INFRAFOUNDRY_ALLOW_ENV_OVERRIDE``;
+   an unresolved host raises ``RuntimeError`` with an actionable message, #1274)
+   and ``installer.ensure_installed(target)``, which SCPs the controller PHP if its
    on-box checksum doesn't match the local source. Idempotent.
    The runner calls ``apply`` twice (``deletes_only`` first, #1271), so
    each pass installs only when it has writes.
@@ -30,13 +32,14 @@ skipped and reported under ``locked_skipped``.
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any, ClassVar
 
+from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
 
-from ..extensions.interface_assignments import installer
+from ..extensions.interface_assignments import SshTarget, build_ssh_target, installer
+from ..services._credentials import resolve_ssh_settings
 from ..services.interface_assignment import (
     Diff,
     InterfaceAssignmentService,
@@ -55,8 +58,11 @@ logger = logging.getLogger(__name__)
 # manager with a clear actionable message before any diff is computed.
 _SSH_PREFLIGHT_MESSAGE = (
     "interface_assignments writes require SSH credentials for one-time "
-    "controller install; set OPNSENSE_SSH_HOST/KEY/USER (or rely on "
-    "OPNSENSE_API_URL + ssh-agent + ~/.ssh/config). "
+    "controller install, but no SSH host resolved. Set ssh_host (and optionally "
+    "ssh_user, ssh_port, ssh_key) in provider_settings.opnsense, or set api_url "
+    "so the host is derived from it. OPNSENSE_SSH_HOST / OPNSENSE_API_URL apply "
+    "only with INFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1; OPNSENSE_SSH_USER/PORT/KEY "
+    "always apply. Key auth only (ssh-agent or ~/.ssh/config); no password support. "
     "See src/infrafoundry/providers/opnsense/extensions/interface_assignments/PROVENANCE.md."
 )
 
@@ -212,8 +218,7 @@ class InterfaceAssignmentManager(BaseComponentManager):
         # (filtered) diff never installs and the runner's two passes do not
         # repeat the install.
         if not diff.is_empty:
-            self._preflight_ssh_credentials()
-            installer.ensure_installed()
+            installer.ensure_installed(self._resolve_ssh_target(env_name, provider_name))
 
         outcomes = self._build_outcomes(diff)
         apply_result = service.apply_diff(diff)
@@ -270,8 +275,7 @@ class InterfaceAssignmentManager(BaseComponentManager):
         # Pre-flight (matches apply()): the controller must be present
         # before we can dispatch delItem. Idempotent fast-path on
         # repeat destroys.
-        self._preflight_ssh_credentials()
-        installer.ensure_installed()
+        installer.ensure_installed(self._resolve_ssh_target(env_name, provider_name))
 
         service = InterfaceAssignmentService.from_environment(
             env_name, provider_name, self.config_dir
@@ -358,18 +362,41 @@ class InterfaceAssignmentManager(BaseComponentManager):
     # below resolve to the builtin)
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _preflight_ssh_credentials() -> None:
-        """Verify SSH credentials are resolvable before invoking the installer.
+    def _load_provider_settings(self, env_name: str, provider_name: str) -> dict[str, Any]:
+        """Load the env's ``provider_settings`` entry for ``provider_name``.
 
-        Raises ``RuntimeError`` with an actionable message when neither
-        ``OPNSENSE_SSH_HOST`` nor ``OPNSENSE_API_URL`` is set, so the
-        operator gets a coherent failure mode instead of a deep
-        paramiko traceback at SCP time.
+        Args:
+            env_name: Active environment name.
+            provider_name: Provider identifier.
+
+        Returns:
+            The provider's settings dict (empty when none are configured).
         """
-        if os.environ.get("OPNSENSE_SSH_HOST") or os.environ.get("OPNSENSE_API_URL"):
-            return
-        raise RuntimeError(_SSH_PREFLIGHT_MESSAGE)
+        config_manager = ConfigManager(self.config_dir)
+        env_config = config_manager.load_environment(env_name)
+        return dict(env_config.get_provider_settings(provider_name) or {})
+
+    def _resolve_ssh_target(self, env_name: str, provider_name: str) -> SshTarget:
+        """Resolve the installer's SSH target from the env's provider settings.
+
+        Raises ``RuntimeError`` with an actionable message when no host
+        resolves, so the operator gets a coherent failure mode instead of a
+        deep ssh traceback at SCP time.
+
+        Args:
+            env_name: Active environment name.
+            provider_name: Provider identifier.
+
+        Returns:
+            The ``SshTarget`` to pass to ``installer.ensure_installed``.
+
+        Raises:
+            RuntimeError: If no SSH host resolves, or the port / key is invalid.
+        """
+        ssh = resolve_ssh_settings(self._load_provider_settings(env_name, provider_name))
+        if not ssh.host:
+            raise RuntimeError(_SSH_PREFLIGHT_MESSAGE)
+        return build_ssh_target(ssh.host, user=ssh.user, port=ssh.port, key=ssh.key)
 
     @staticmethod
     def _build_outcomes(diff: Diff) -> list[ResourceOutcome]:

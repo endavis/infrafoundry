@@ -87,11 +87,14 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
       api_url: https://fw.example.com
       api_key: xxxxxxxxxxxxxxxxxxxx
       api_secret: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      ssh_host: 172.20.10.250  # optional: only when sshd is not on the api_url host
+      ssh_user: root            # optional, default root
     kubernetes:
       kubeconfig_path: ~/.kube/config
       namespace: infra
   ```
 - **Schema hints:**
+  - `provider_settings.opnsense` SSH keys (all optional): `ssh_host` (default: the `api_url` hostname), `ssh_user` (default `root`), `ssh_port` (default `22`), `ssh_key` (default: ssh-agent / `~/.ssh/config`). The interface-assignments controller install uses them (key auth only). `provider_ssh.opnsense` is not read by the installer. `OPNSENSE_SSH_HOST` applies only with `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1`.
   - `providers` (optional, list[str]): List of provider names to enable. If omitted, all registered providers are enabled.
   - `backend` (optional, dict): Terraform backend configuration for state management. Enables remote state storage and locking for team collaboration. See [State Management](../architecture/state-management.md#backend-configuration) for details.
     - `type` (required if backend specified): Backend type - `s3`, `gcs`, `azurerm`, `postgres`, `remote` (Terraform Cloud), or `local`

@@ -26,9 +26,15 @@ from infrafoundry.providers.opnsense.services._credentials import (
     API_URL_ENV_VAR,
     GATE_ENV_VAR,
     PROXY_ENV_VAR,
+    SSH_HOST_ENV_VAR,
+    SSH_KEY_ENV_VAR,
+    SSH_PORT_ENV_VAR,
+    SSH_USER_ENV_VAR,
     VERIFY_SSL_ENV_VAR,
+    SshSettings,
     reset_warning_state_for_tests,
     resolve_credentials,
+    resolve_ssh_settings,
 )
 
 CREDENTIALS_LOGGER = "infrafoundry.providers.opnsense.services._credentials"
@@ -457,3 +463,87 @@ class TestProxyResolution:
         monkeypatch.setenv(PROXY_ENV_VAR, "http://proxy:3128")
         result = resolve_credentials(_settings())
         assert result[4] == "http://proxy:3128"
+
+
+# ---------------------------------------------------------------------------
+# resolve_ssh_settings (#1274)
+# ---------------------------------------------------------------------------
+
+_SSH_VARS = (
+    SSH_HOST_ENV_VAR,
+    SSH_USER_ENV_VAR,
+    SSH_PORT_ENV_VAR,
+    SSH_KEY_ENV_VAR,
+)
+
+
+class TestResolveSshSettings:
+    @pytest.fixture(autouse=True)
+    def _scrub_ssh_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        for var in _SSH_VARS:
+            monkeypatch.delenv(var, raising=False)
+
+    def test_host_defaults_to_api_url_host(self) -> None:
+        ssh = resolve_ssh_settings({"api_url": "https://172.20.99.1:8443"})
+        assert ssh == SshSettings(host="172.20.99.1", user="root", port="22", key="")
+
+    def test_ssh_host_beats_api_url_host(self) -> None:
+        ssh = resolve_ssh_settings(
+            {"api_url": "https://172.20.99.1", "ssh_host": "172.20.10.250"}
+        )
+        assert ssh.host == "172.20.10.250"
+
+    def test_user_port_key_from_settings(self) -> None:
+        ssh = resolve_ssh_settings(
+            {
+                "api_url": "https://fw.test",
+                "ssh_user": "admin",
+                "ssh_port": 2222,
+                "ssh_key": "~/.ssh/fw",
+            }
+        )
+        assert (ssh.user, ssh.port, ssh.key) == ("admin", "2222", "~/.ssh/fw")
+
+    def test_no_api_url_no_ssh_host_gives_empty_host(self) -> None:
+        assert resolve_ssh_settings({}).host == ""
+
+    def test_ungated_env_host_and_api_url_ignored_with_one_warning(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        monkeypatch.setenv(SSH_HOST_ENV_VAR, "203.0.113.9")
+        monkeypatch.setenv(API_URL_ENV_VAR, "https://203.0.113.10")
+        with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
+            first = resolve_ssh_settings({"api_url": "https://fw.test"})
+            second = resolve_ssh_settings({"api_url": "https://fw.test"})
+        assert first.host == second.host == "fw.test"
+        warnings = [r for r in caplog.records if r.name == CREDENTIALS_LOGGER]
+        assert len(warnings) == 1
+        assert "203.0.113.9" in warnings[0].getMessage()
+
+    def test_gated_env_host_wins_with_one_warning(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        monkeypatch.setenv(GATE_ENV_VAR, "1")
+        monkeypatch.setenv(SSH_HOST_ENV_VAR, "203.0.113.9")
+        with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
+            first = resolve_ssh_settings({"api_url": "https://fw.test", "ssh_host": "172.21.0.1"})
+            resolve_ssh_settings({"api_url": "https://fw.test", "ssh_host": "172.21.0.1"})
+        assert first.host == "203.0.113.9"
+        warnings = [r for r in caplog.records if r.name == CREDENTIALS_LOGGER]
+        assert len(warnings) == 1
+
+    def test_gated_env_api_url_alone_supplies_host(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(GATE_ENV_VAR, "1")
+        monkeypatch.setenv(API_URL_ENV_VAR, "https://mirror.example")
+        assert resolve_ssh_settings({}).host == "mirror.example"
+
+    def test_user_port_key_env_override_with_gate_off(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv(SSH_USER_ENV_VAR, "ops")
+        monkeypatch.setenv(SSH_PORT_ENV_VAR, "2200")
+        monkeypatch.setenv(SSH_KEY_ENV_VAR, "/keys/fw")
+        ssh = resolve_ssh_settings(
+            {"api_url": "https://fw.test", "ssh_user": "admin", "ssh_port": 22, "ssh_key": "/k"}
+        )
+        assert (ssh.user, ssh.port, ssh.key) == ("ops", "2200", "/keys/fw")

@@ -663,10 +663,28 @@ class TestInterfaceAssignments:
             diff = InterfaceAssignmentManager(tmp_path).plan("env", [], managed_resources=[])
         assert diff.deletes == []
 
+    @staticmethod
+    def _settings(monkeypatch: pytest.MonkeyPatch, settings: dict[str, Any]) -> None:
+        """Clear SSH env vars and the gate; make the manager load ``settings``."""
+        for var in (
+            "OPNSENSE_API_URL",
+            "OPNSENSE_SSH_HOST",
+            "OPNSENSE_SSH_KEY",
+            "OPNSENSE_SSH_USER",
+            "OPNSENSE_SSH_PORT",
+            "INFRAFOUNDRY_ALLOW_ENV_OVERRIDE",
+        ):
+            monkeypatch.delenv(var, raising=False)
+        monkeypatch.setattr(
+            InterfaceAssignmentManager,
+            "_load_provider_settings",
+            lambda self, env_name, provider_name: settings,
+        )
+
     def test_apply_without_yaml_lists_then_installs_then_writes(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setenv("OPNSENSE_API_URL", "https://fw-prod")
+        self._settings(monkeypatch, {"api_url": "https://fw-prod"})
         order: list[str] = []
         service = self._service([_live_ifa("opt3")])
 
@@ -681,7 +699,7 @@ class TestInterfaceAssignments:
         service.list.side_effect = _list
         service.apply_diff.side_effect = _apply_diff
         with patch(self.PATH) as svc_cls, patch(self.INSTALLER) as installer:
-            installer.ensure_installed.side_effect = lambda: order.append("install")
+            installer.ensure_installed.side_effect = lambda _target: order.append("install")
             svc_cls.from_environment.return_value = service
             result = InterfaceAssignmentManager(tmp_path).apply(
                 "env", [], managed_resources=self._managed("opt3")
@@ -689,19 +707,10 @@ class TestInterfaceAssignments:
         assert order == ["list", "install", "apply_diff"]
         assert result["resources_deleted"] == 1
 
-    def _no_ssh(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        for var in (
-            "OPNSENSE_API_URL",
-            "OPNSENSE_SSH_HOST",
-            "OPNSENSE_SSH_KEY",
-            "OPNSENSE_SSH_USER",
-        ):
-            monkeypatch.delenv(var, raising=False)
-
     def test_apply_with_nothing_to_write_succeeds_without_ssh(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        self._no_ssh(monkeypatch)
+        self._settings(monkeypatch, {})
         service = self._service([])
         with patch(self.PATH) as svc_cls, patch(self.INSTALLER) as installer:
             svc_cls.from_environment.return_value = service
@@ -711,13 +720,7 @@ class TestInterfaceAssignments:
     def test_apply_without_ssh_credentials_fails_before_any_write(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        for var in (
-            "OPNSENSE_API_URL",
-            "OPNSENSE_SSH_HOST",
-            "OPNSENSE_SSH_KEY",
-            "OPNSENSE_SSH_USER",
-        ):
-            monkeypatch.delenv(var, raising=False)
+        self._settings(monkeypatch, {})
         service = self._service([_live_ifa("opt3")])
         with patch(self.PATH) as svc_cls, patch(self.INSTALLER):
             svc_cls.from_environment.return_value = service

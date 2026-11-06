@@ -44,6 +44,28 @@ The MVC autoloader discovers the file at this path; the URL routing
 maps `AssignSettingsController` to `assign_settings`, so REST calls
 go through `/api/interfaces/assign_settings/<action>`.
 
+### SSH target resolution
+
+The one-time install SCPs the file over SSH. `InterfaceAssignmentManager`
+resolves the target from `provider_settings.opnsense` in the env's
+`settings.yaml` (#1274):
+
+| Field | Precedence |
+| :--- | :--- |
+| host | `OPNSENSE_SSH_HOST` (only with `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1`), then `ssh_host`, then the hostname of the resolved `api_url` |
+| user | `OPNSENSE_SSH_USER`, then `ssh_user`, then `root` |
+| port | `OPNSENSE_SSH_PORT`, then `ssh_port`, then `22` |
+| key | `OPNSENSE_SSH_KEY`, then `ssh_key`, then none (ssh-agent / `~/.ssh/config`) |
+
+Set `ssh_host` when sshd is not on the `api_url` host, for example a box
+whose API listens on the WAN (443) while SSH is only open on the LAN. The
+host follows the same gate as the API credentials, so a stray
+`OPNSENSE_SSH_HOST` or `OPNSENSE_API_URL` export cannot redirect the install;
+a differing, ignored `OPNSENSE_SSH_HOST` logs one WARNING. User, port and key
+cannot pick a different box and are always read. Authentication is by key
+only (agent, `ssh_key` or `~/.ssh/config`); there is no password support.
+`provider_ssh.opnsense` (the terraform SSH tfvars) is not read by the installer.
+
 ## Authn / authz inheritance
 
 Extends `OPNsense\Base\ApiControllerBase`, which inherits OPNsense's
@@ -89,6 +111,7 @@ OPNsense base-class validation helpers.
 - Spike + extension: PR [#716](https://github.com/endavis/infrafoundry/pull/716) (issue #715)
 - ADR-0014 amendment recording the mechanism: PR [#718](https://github.com/endavis/infrafoundry/pull/718) (issue #717)
 - Production conversion (this lift): #720
+- SSH target read from `provider_settings.opnsense`: #1274
 
 ## Re-running the security review
 

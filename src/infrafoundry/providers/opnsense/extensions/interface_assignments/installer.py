@@ -13,7 +13,13 @@ deploy. On checksum mismatch (or first install) it SCPs the file,
 fixes permissions, restarts both daemons, and re-verifies before
 returning ``True``.
 
-Environment variable contract::
+The manager (``InterfaceAssignmentManager``) resolves the SSH target from
+``provider_settings.opnsense`` (``ssh_host``/``ssh_user``/``ssh_port``/
+``ssh_key``, #1274) and builds it with ``build_ssh_target``; the
+environment-variable path below (``load_ssh_target``) serves live tests and
+manual use.
+
+Environment variable contract for ``load_ssh_target``::
 
     OPNSENSE_SSH_HOST         — defaults to the host part of OPNSENSE_API_URL
     OPNSENSE_SSH_USER         — defaults to "root"
@@ -107,28 +113,71 @@ def load_ssh_target(env: dict[str, str] | None = None) -> SshTarget:
     if not host:
         raise RuntimeError("OPNSENSE_SSH_HOST is required (or set OPNSENSE_API_URL to derive it).")
 
-    key_str = source.get("OPNSENSE_SSH_KEY", "").strip()
+    return build_ssh_target(
+        host,
+        user=source.get("OPNSENSE_SSH_USER", "root"),
+        port=source.get("OPNSENSE_SSH_PORT", "22"),
+        key=source.get("OPNSENSE_SSH_KEY", ""),
+        install_path=source.get("OPNSENSE_INSTALL_PATH", "").strip() or DEFAULT_INSTALL_PATH,
+    )
+
+
+def build_ssh_target(
+    host: str,
+    *,
+    user: str = "root",
+    port: int | str = 22,
+    key: str = "",
+    install_path: str | None = None,
+) -> SshTarget:
+    """Build an ``SshTarget`` from already-resolved fields.
+
+    Args:
+        host: SSH host. Must be non-empty.
+        user: SSH user; empty falls back to ``root``.
+        port: SSH port as an int or numeric string; empty falls back to 22.
+        key: Private key path (``~`` is expanded); empty means ssh-agent /
+            ``~/.ssh/config``.
+        install_path: Controller path on the box. ``None`` or empty reads
+            ``OPNSENSE_INSTALL_PATH`` and then the canonical MVC path.
+
+    Returns:
+        A populated ``SshTarget``.
+
+    Raises:
+        RuntimeError: If ``host`` is empty, ``port`` is not an integer, or
+            ``key`` names a path that does not exist.
+    """
+    host = host.strip()
+    if not host:
+        raise RuntimeError("SSH host is required to build an SSH target.")
+
+    key_str = key.strip()
     key_path: Path | None = None
     if key_str:
         key_path = Path(key_str).expanduser()
         if not key_path.exists():
             raise RuntimeError(f"SSH key does not exist: {key_path}")
 
-    user = source.get("OPNSENSE_SSH_USER", "root").strip() or "root"
-    port_raw = source.get("OPNSENSE_SSH_PORT", "22").strip() or "22"
+    user = user.strip() or "root"
+    port_raw = str(port).strip() or "22"
     try:
-        port = int(port_raw)
+        port_int = int(port_raw)
     except ValueError as exc:
         raise RuntimeError(f"OPNSENSE_SSH_PORT must be an integer, got: {port_raw!r}") from exc
 
-    install_path = source.get("OPNSENSE_INSTALL_PATH", "").strip() or DEFAULT_INSTALL_PATH
+    resolved_install = (
+        (install_path or "").strip()
+        or os.environ.get("OPNSENSE_INSTALL_PATH", "").strip()
+        or DEFAULT_INSTALL_PATH
+    )
 
     return SshTarget(
         host=host,
         user=user,
-        port=port,
+        port=port_int,
         key_path=key_path,
-        install_path=install_path,
+        install_path=resolved_install,
     )
 
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 from .installer import (
     DEFAULT_INSTALL_PATH,
     SshTarget,
+    build_ssh_target,
     compute_local_checksum,
     ensure_installed,
     install_controller,
@@ -24,6 +25,7 @@ from .installer import (
 __all__ = [
     "DEFAULT_INSTALL_PATH",
     "SshTarget",
+    "build_ssh_target",
     "compute_local_checksum",
     "ensure_installed",
     "install_controller",

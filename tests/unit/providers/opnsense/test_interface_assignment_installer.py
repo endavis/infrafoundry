@@ -106,6 +106,48 @@ class TestLoadSshTarget:
             installer.load_ssh_target(env)
 
 
+class TestBuildSshTarget:
+    def test_field_mapping(self, tmp_path: Path) -> None:
+        key = tmp_path / "id"
+        key.write_text("dummy", encoding="utf-8")
+        target = installer.build_ssh_target(
+            "fw.lan", user="admin", port=2222, key=str(key), install_path="/x/Foo.php"
+        )
+        assert (target.host, target.user, target.port) == ("fw.lan", "admin", 2222)
+        assert target.key_path == key
+        assert target.install_path == "/x/Foo.php"
+
+    def test_defaults_and_string_port(self) -> None:
+        target = installer.build_ssh_target("fw.lan", port="2200")
+        assert target.user == "root"
+        assert target.port == 2200
+        assert target.key_path is None
+
+    def test_bad_port_raises(self) -> None:
+        with pytest.raises(RuntimeError, match="must be an integer"):
+            installer.build_ssh_target("fw.lan", port="abc")
+
+    def test_missing_key_raises(self, tmp_path: Path) -> None:
+        with pytest.raises(RuntimeError, match="SSH key does not exist"):
+            installer.build_ssh_target("fw.lan", key=str(tmp_path / "nope"))
+
+    def test_tilde_expansion(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        (tmp_path / "id").write_text("dummy", encoding="utf-8")
+        monkeypatch.setenv("HOME", str(tmp_path))
+        target = installer.build_ssh_target("fw.lan", key="~/id")
+        assert target.key_path == tmp_path / "id"
+
+    def test_empty_host_raises(self) -> None:
+        with pytest.raises(RuntimeError, match="host is required"):
+            installer.build_ssh_target("  ")
+
+    def test_install_path_env_and_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("OPNSENSE_INSTALL_PATH", raising=False)
+        assert installer.build_ssh_target("fw").install_path == installer.DEFAULT_INSTALL_PATH
+        monkeypatch.setenv("OPNSENSE_INSTALL_PATH", "/env/Foo.php")
+        assert installer.build_ssh_target("fw").install_path == "/env/Foo.php"
+
+
 class TestSshTargetProperties:
     def test_remote_property(self) -> None:
         t = installer.SshTarget(host="fw", user="root", port=22, key_path=None, install_path="/x")

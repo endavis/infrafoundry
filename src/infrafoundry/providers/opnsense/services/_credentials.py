@@ -49,6 +49,24 @@ If override is active but the resolved ``api_url`` matches
 overridden and no URL change), no warning fires — there is no endpoint
 redirect to flag.
 
+SSH target (controller install, #1274)
+--------------------------------------
+
+``resolve_ssh_settings`` resolves the SSH target the interface-assignment
+controller installer uses, from ``provider_settings.opnsense`` first:
+
+- host: ``OPNSENSE_SSH_HOST`` (only with the gate active) -> ``ssh_host`` ->
+  hostname of the resolved ``api_url`` (so a gated ``OPNSENSE_API_URL`` still
+  counts)
+- user: ``OPNSENSE_SSH_USER`` -> ``ssh_user`` -> ``root``
+- port: ``OPNSENSE_SSH_PORT`` -> ``ssh_port`` -> ``22``
+- key: ``OPNSENSE_SSH_KEY`` -> ``ssh_key`` -> none (ssh-agent / ``~/.ssh/config``)
+
+The host (which picks the box) follows the same gate as the API credentials,
+so a stray export cannot redirect the controller install. User, port and key
+cannot pick a different box and stay always-on. A differing, ignored
+``OPNSENSE_SSH_HOST`` and a gated host redirect each log one WARNING.
+
 Test affordance
 ---------------
 
@@ -64,6 +82,8 @@ References
 - Issue #741: feat — env-var override for OPNsense direct-API runtime
   credentials.
 - ADR-0014 §"Secrets handling" → "Runtime credential resolution" subsection.
+- Issue #1274: bug — the controller installer read its SSH target only from
+  env vars.
 """
 
 from __future__ import annotations
@@ -71,7 +91,9 @@ from __future__ import annotations
 import logging
 import os
 import threading
+from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 # The gate and its parsing are shared with the terraform write path (#783).
 # ``GATE_ENV_VAR`` is re-exported for callers that import it from here.
@@ -87,11 +109,34 @@ API_KEY_ENV_VAR = "OPNSENSE_API_KEY"
 API_SECRET_ENV_VAR = "OPNSENSE_API_SECRET"  # nosec B105
 VERIFY_SSL_ENV_VAR = "OPNSENSE_VERIFY_SSL"
 PROXY_ENV_VAR = "OPNSENSE_PROXY"
+SSH_HOST_ENV_VAR = "OPNSENSE_SSH_HOST"
+SSH_USER_ENV_VAR = "OPNSENSE_SSH_USER"
+SSH_PORT_ENV_VAR = "OPNSENSE_SSH_PORT"
+SSH_KEY_ENV_VAR = "OPNSENSE_SSH_KEY"
 
 # Module-level warning-tracking set, keyed by resolved ``api_url``. One entry
 # per overridden URL per process.
 _warned_urls_lock = threading.Lock()
 _warned_urls: set[str] = set()
+# Warnings already emitted about SSH host redirects / ignored env hosts.
+_warned_ssh: set[str] = set()
+
+
+@dataclass(frozen=True)
+class SshSettings:
+    """Raw SSH fields for the controller installer.
+
+    Attributes:
+        host: SSH host; empty when nothing resolved one.
+        user: SSH user.
+        port: SSH port as a string (validated by ``build_ssh_target``).
+        key: Private key path; empty for ssh-agent / ``~/.ssh/config``.
+    """
+
+    host: str
+    user: str
+    port: str
+    key: str
 
 
 def _parse_verify_ssl(env_value: str, default: bool) -> bool:
@@ -201,8 +246,61 @@ def _warn_once_about_redirect(resolved_url: str) -> None:
     )
 
 
+def _warn_ssh_once(message: str, host: str) -> None:
+    """Log ``message`` at WARNING once per process per message and host."""
+    key = f"{message}|{host}"
+    with _warned_urls_lock:
+        if key in _warned_ssh:
+            return
+        _warned_ssh.add(key)
+    logger.warning(message, host, GATE_ENV_VAR)
+
+
+def resolve_ssh_settings(provider_settings: dict[str, Any]) -> SshSettings:
+    """Resolve the SSH target fields for the controller installer.
+
+    Args:
+        provider_settings: The OPNsense entry of the env's
+            ``provider_settings`` dict. Optional keys: ``ssh_host``,
+            ``ssh_user``, ``ssh_port``, ``ssh_key``, plus ``api_url``.
+
+    Returns:
+        ``SshSettings``; ``host`` is empty when no host could be resolved.
+    """
+    api_url = resolve_credentials(provider_settings)[0]
+    settings_host = str(provider_settings.get("ssh_host") or "").strip()
+    fallback_host = settings_host or (urlparse(api_url).hostname or "").strip()
+    env_host = os.environ.get(SSH_HOST_ENV_VAR, "").strip()
+
+    host = fallback_host
+    if env_host and env_host != fallback_host:
+        if gate_active():
+            host = env_host
+            _warn_ssh_once(
+                "OPNsense SSH host overridden via " + SSH_HOST_ENV_VAR + "=%s (gated by %s=1); "
+                "the controller install will target this host instead of the settings value",
+                env_host,
+            )
+        else:
+            _warn_ssh_once(
+                "Ignoring " + SSH_HOST_ENV_VAR + "=%s because %s is not set; "
+                "the controller install uses the host from provider_settings.opnsense",
+                env_host,
+            )
+
+    user = env_or_default(SSH_USER_ENV_VAR, str(provider_settings.get("ssh_user") or ""))
+    port = env_or_default(SSH_PORT_ENV_VAR, str(provider_settings.get("ssh_port") or ""))
+    key = env_or_default(SSH_KEY_ENV_VAR, str(provider_settings.get("ssh_key") or ""))
+    return SshSettings(
+        host=host,
+        user=user.strip() or "root",
+        port=port.strip() or "22",
+        key=key.strip(),
+    )
+
+
 def reset_warning_state_for_tests() -> None:
-    """Clear the module-level warning-tracking set.
+    """Clear the module-level warning-tracking sets.
 
     Test-only affordance. Call from a ``setup_method`` or autouse fixture
     in test suites that exercise this helper (or services that delegate to
@@ -210,3 +308,4 @@ def reset_warning_state_for_tests() -> None:
     """
     with _warned_urls_lock:
         _warned_urls.clear()
+        _warned_ssh.clear()

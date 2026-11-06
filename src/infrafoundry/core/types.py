@@ -39,6 +39,10 @@ class OPNsenseProviderSettings(TypedDict, total=False):
     api_url: str
     api_key: str
     api_secret: str
+    ssh_host: str
+    ssh_user: str
+    ssh_port: int
+    ssh_key: str
 
 
 class EsxiHostSettings(TypedDict, total=False):

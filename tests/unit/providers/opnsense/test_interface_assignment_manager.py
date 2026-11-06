@@ -25,6 +25,7 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.components.interface_assignment import (
     InterfaceAssignmentManager,
 )
+from infrafoundry.providers.opnsense.services._credentials import reset_warning_state_for_tests
 from infrafoundry.providers.opnsense.services.interface_assignment import (
     ApplyDiffResult,
     Diff,
@@ -91,10 +92,39 @@ def _make_service_mock(
     return service
 
 
+_SSH_ENV_VARS = (
+    "OPNSENSE_SSH_HOST",
+    "OPNSENSE_SSH_USER",
+    "OPNSENSE_SSH_PORT",
+    "OPNSENSE_SSH_KEY",
+    "OPNSENSE_API_URL",
+    "INFRAFOUNDRY_ALLOW_ENV_OVERRIDE",
+)
+
+
+@pytest.fixture(autouse=True)
+def provider_settings(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """Isolate SSH resolution from the real environment and settings files.
+
+    Clears the SSH/API env vars and the override gate, and patches the
+    manager's settings loader to return a mutable dict (initially just an
+    ``api_url``) that tests may edit.
+    """
+    for var in _SSH_ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
+    reset_warning_state_for_tests()
+    settings: dict[str, Any] = {"api_url": "https://fw.test"}
+    monkeypatch.setattr(
+        InterfaceAssignmentManager,
+        "_load_provider_settings",
+        lambda self, env_name, provider_name: settings,
+    )
+    return settings
+
+
 @pytest.fixture
-def ssh_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Set OPNSENSE_API_URL so the SSH pre-flight passes."""
-    monkeypatch.setenv("OPNSENSE_API_URL", "https://fw-prod")
+def ssh_env() -> None:
+    """Marker for tests that write: the autouse settings already carry an ``api_url``."""
 
 
 # ---------------------------------------------------------------------------
@@ -244,16 +274,10 @@ class TestApply:
     # ------------------------------------------------------------------
 
     def test_apply_raises_when_ssh_credentials_missing(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, provider_settings: dict[str, Any]
     ) -> None:
-        # Strip every env that satisfies the pre-flight.
-        for key in (
-            "OPNSENSE_SSH_HOST",
-            "OPNSENSE_API_URL",
-            "OPNSENSE_SSH_KEY",
-            "OPNSENSE_SSH_USER",
-        ):
-            monkeypatch.delenv(key, raising=False)
+        # No ssh_host and no api_url: no host can resolve.
+        provider_settings.clear()
         manager = InterfaceAssignmentManager(tmp_path)
         service_mock = _make_service_mock(diff=Diff(adds=[_cfg("opt5")]))
         with (
@@ -269,14 +293,8 @@ class TestApply:
             inst.ensure_installed.assert_not_called()
             service_mock.apply_diff.assert_not_called()
 
-    def test_apply_passes_when_only_api_url_set(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        # OPNSENSE_API_URL alone is enough — the installer derives the
-        # SSH host from it via urlparse.
-        for key in ("OPNSENSE_SSH_HOST", "OPNSENSE_SSH_KEY", "OPNSENSE_SSH_USER"):
-            monkeypatch.delenv(key, raising=False)
-        monkeypatch.setenv("OPNSENSE_API_URL", "https://fw-prod")
+    def test_apply_passes_when_only_api_url_set(self, tmp_path: Path) -> None:
+        # The settings api_url alone is enough: the SSH host is its hostname.
         manager = InterfaceAssignmentManager(tmp_path)
         service_mock = _make_service_mock(diff=Diff(adds=[_cfg("opt5")]))
         with (
@@ -286,17 +304,47 @@ class TestApply:
             svc_cls.from_environment.return_value = service_mock
             manager.apply("test-env", [_resource("opt5")])
         inst.ensure_installed.assert_called_once()
+        target = inst.ensure_installed.call_args.args[0]
+        assert target.host == "fw.test"
 
-    def test_apply_empty_diff_skips_preflight_and_install(
+    def test_apply_passes_settings_ssh_host_to_installer(
+        self, tmp_path: Path, provider_settings: dict[str, Any]
+    ) -> None:
+        # WAN-443 / LAN-SSH case: the API host is not where sshd listens.
+        provider_settings.update(
+            {"api_url": "https://172.20.99.1", "ssh_host": "172.20.10.250", "ssh_user": "admin"}
+        )
+        manager = InterfaceAssignmentManager(tmp_path)
+        service_mock = _make_service_mock(diff=Diff(adds=[_cfg("opt5")]))
+        with (
+            patch(SERVICE_PATH) as svc_cls,
+            patch(INSTALLER_PATH) as inst,
+        ):
+            svc_cls.from_environment.return_value = service_mock
+            manager.apply("test-env", [_resource("opt5")])
+        inst.ensure_installed.assert_called_once()
+        target = inst.ensure_installed.call_args.args[0]
+        assert target.host == "172.20.10.250"
+        assert target.user == "admin"
+
+    def test_apply_ignores_ungated_env_ssh_host(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        for key in (
-            "OPNSENSE_SSH_HOST",
-            "OPNSENSE_API_URL",
-            "OPNSENSE_SSH_KEY",
-            "OPNSENSE_SSH_USER",
+        monkeypatch.setenv("OPNSENSE_SSH_HOST", "203.0.113.9")
+        manager = InterfaceAssignmentManager(tmp_path)
+        service_mock = _make_service_mock(diff=Diff(adds=[_cfg("opt5")]))
+        with (
+            patch(SERVICE_PATH) as svc_cls,
+            patch(INSTALLER_PATH) as inst,
         ):
-            monkeypatch.delenv(key, raising=False)
+            svc_cls.from_environment.return_value = service_mock
+            manager.apply("test-env", [_resource("opt5")])
+        assert inst.ensure_installed.call_args.args[0].host == "fw.test"
+
+    def test_apply_empty_diff_skips_preflight_and_install(
+        self, tmp_path: Path, provider_settings: dict[str, Any]
+    ) -> None:
+        provider_settings.clear()
         manager = InterfaceAssignmentManager(tmp_path)
         service_mock = _make_service_mock(diff=Diff())
         with (
@@ -328,7 +376,7 @@ class TestApply:
             patch(INSTALLER_PATH) as inst,
         ):
             svc_cls.from_environment.return_value = service_mock
-            inst.ensure_installed.side_effect = lambda: calls.append("install")
+            inst.ensure_installed.side_effect = lambda _target: calls.append("install")
             manager.apply("test-env", [_resource("opt5")])
         assert calls == ["list", "install", "apply_diff"]
 
@@ -401,15 +449,9 @@ class TestDeletesOnly:
         inst.ensure_installed.assert_called_once()
 
     def test_deletes_only_without_deletes_needs_no_ssh(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, provider_settings: dict[str, Any]
     ) -> None:
-        for key in (
-            "OPNSENSE_SSH_HOST",
-            "OPNSENSE_API_URL",
-            "OPNSENSE_SSH_KEY",
-            "OPNSENSE_SSH_USER",
-        ):
-            monkeypatch.delenv(key, raising=False)
+        provider_settings.clear()
         service_mock = _make_service_mock(diff=Diff(adds=[_cfg("opt5")]))
         manager = InterfaceAssignmentManager(tmp_path)
         with (
@@ -516,13 +558,18 @@ class TestDestroy:
         assert result["resources_destroyed"] == 0
 
     def test_destroy_raises_when_ssh_missing(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, tmp_path: Path, provider_settings: dict[str, Any]
     ) -> None:
-        for key in ("OPNSENSE_SSH_HOST", "OPNSENSE_API_URL"):
-            monkeypatch.delenv(key, raising=False)
+        provider_settings.clear()
         manager = InterfaceAssignmentManager(tmp_path)
-        with pytest.raises(RuntimeError, match="SSH credentials"):
+        with (
+            patch(SERVICE_PATH) as svc_cls,
+            patch(INSTALLER_PATH) as inst,
+            pytest.raises(RuntimeError, match="SSH credentials"),
+        ):
             manager.destroy("test-env", [_resource("opt5")])
+        inst.ensure_installed.assert_not_called()
+        svc_cls.from_environment.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
