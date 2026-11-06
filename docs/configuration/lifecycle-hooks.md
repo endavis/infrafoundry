@@ -245,7 +245,7 @@ instance:
 | Script not found | Operation fails with clear error message |
 | Script not executable | Operation fails with clear error message |
 | Script exits non-zero | Operation fails (unless `continue_on_error: true`) |
-| Script times out | Operation fails (unless `continue_on_error: true`) |
+| Script times out | Operation fails (unless `continue_on_error: true`). The script's whole process group gets SIGTERM, then SIGKILL after 10 seconds. On a jumphost run a second ssh signals the remote process group, best effort. |
 | Secret not found | Warning logged, empty string used |
 
 ## Validation

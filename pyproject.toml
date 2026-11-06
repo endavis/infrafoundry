@@ -466,6 +466,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_ontap_cluster_console_restore.py",
     "tests/unit/test_ontap_cluster_dns.py",
     "tests/unit/test_ontap_cluster_mtu.py",
+    "tests/unit/test_ontap_cluster_setup_bounds.py",
     "tests/unit/test_ontap_console_discover.py",
     "tests/unit/test_ontap_password_required.py",
     "tests/unit/test_ontap_svm_routes.py",

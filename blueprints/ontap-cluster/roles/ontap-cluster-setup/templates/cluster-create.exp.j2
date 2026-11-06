@@ -10,6 +10,11 @@ set timeout {{ ontap_setup_timeout }}
 log_user 1
 spawn socat STDIO,rawer UNIX-CONNECT:/var/run/qemu-server/{{ ontap_vmid }}.serial0
 
+# Bound the whole run and never leave socat holding the serial socket.
+set socat_pid [exp_pid]
+exit -onexit { catch { exec kill $::socat_pid } }
+after {{ (ontap_setup_deadline | int) * 1000 }} { puts "\nERROR: cluster create exceeded the {{ ontap_setup_deadline }}s deadline"; exit 1 }
+
 # Nudge console
 send "\r"
 sleep 2

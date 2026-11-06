@@ -143,6 +143,14 @@ any downstream logic that branches on `jumphost` does not attempt a second
 hop and so secrets never appear in the jumphost's `ps` output. The remote tmp
 directory is always cleaned up, including on failure or timeout.
 
+On timeout or interrupt the framework also stops the remote script. The ssh
+wrapper writes its pid to `run.pid` in the remote tmp directory, and a second
+ssh sends SIGTERM to that process group, then SIGKILL after 10 seconds. This is
+best effort: if the second ssh fails, a warning is logged and the run still
+reports the timeout. Processes that start their own session are not reached.
+Locally, the script runs in its own session and the whole process group gets
+SIGTERM, then SIGKILL after 10 seconds.
+
 #### Environment on the jumphost
 
 | Status | Variables |

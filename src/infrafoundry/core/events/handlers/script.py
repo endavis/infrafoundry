@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import json
 import logging
@@ -9,6 +10,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess  # nosec B404  # required for running user scripts
 import tempfile
 import threading
@@ -61,6 +63,41 @@ JUMPHOST_FORWARDED_ENV: frozenset[str] = frozenset(
 
 _ENV_KEY_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 
+_TERMINATE_GRACE_SECONDS = 10
+
+
+def _terminate_process_group(
+    process: subprocess.Popen[str], grace: float = _TERMINATE_GRACE_SECONDS
+) -> None:
+    """Terminate a script's whole process group, then reap the script.
+
+    The script is started in its own session, so its pid is the process group
+    id. SIGTERM goes to the group first; after ``grace`` seconds SIGKILL goes
+    to the group as well, so children that ignored SIGTERM or outlived the
+    script are reached too.
+
+    Args:
+        process: The script process, started with ``start_new_session=True``.
+        grace: Seconds to wait after SIGTERM before sending SIGKILL.
+    """
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        process.kill()
+        process.wait()
+        return
+    with contextlib.suppress(subprocess.TimeoutExpired):
+        process.wait(timeout=grace)
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        process.kill()
+    process.wait()
+
 
 def _build_remote_bash(
     remote_dir: str,
@@ -68,6 +105,7 @@ def _build_remote_bash(
     warnings_file: str | None = None,
     *,
     env: Mapping[str, str] | None = None,
+    pid_file: str | None = None,
 ) -> str:
     """Build the remote bash invocation used by jumphost reexec.
 
@@ -90,6 +128,8 @@ def _build_remote_bash(
       later scp's back and folds into the local summary.
 
     - Exports each entry of ``env`` (shell-quoted) before running the script.
+    - When ``pid_file`` is provided, the wrapper shell writes its own pid to
+      that file first, so a second ssh can later signal its process group.
 
     Args:
         remote_dir: Absolute path of the rsynced script root on the jumphost.
@@ -100,6 +140,8 @@ def _build_remote_bash(
             callers that don't collect warnings simple).
         env: Extra variables to export on the remote side. Keys must match
             ``[A-Z_][A-Z0-9_]*``.
+        pid_file: Optional absolute remote path that receives the wrapper
+            shell's pid (``echo $$ > <path>``).
 
     Returns:
         A single bash command string to pass to ``ssh``.
@@ -122,7 +164,10 @@ def _build_remote_bash(
     else:
         warnings_setup = ""
 
+    pid_setup = f"echo $$ > {shlex.quote(pid_file)}; " if pid_file else ""
+
     return (
+        f"{pid_setup}"
         "command -v python3 >/dev/null 2>&1 || { "
         'echo "infrafoundry: python3 is required on the jumphost '
         'to expand INFRAFOUNDRY_VAR_* env vars" >&2; exit 127; }; '
@@ -153,7 +198,10 @@ class ScriptHandler(BaseHandler):
     Configuration:
         script: Path to script (relative to environment directory)
         env: Additional environment variables
-        timeout: Maximum execution time in seconds (default: 300)
+        timeout: Maximum execution time in seconds (default: 300). On expiry
+            the script's whole process group gets SIGTERM, then SIGKILL after
+            10 seconds. On a jumphost run a second ssh signals the remote
+            process group (best effort).
         continue_on_error: If True, don't abort on failure (default: False)
         description: Optional description for logging
         outputs: Optional list of artifact files the script produces, to be
@@ -362,6 +410,7 @@ class ScriptHandler(BaseHandler):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                start_new_session=True,
             )
 
             stdout_lines: list[str] = []
@@ -383,7 +432,7 @@ class ScriptHandler(BaseHandler):
             try:
                 process.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
-                process.kill()
+                _terminate_process_group(process)
                 stdout_thread.join(timeout=5)
                 stderr_thread.join(timeout=5)
                 duration = time.monotonic() - start_time
@@ -396,6 +445,11 @@ class ScriptHandler(BaseHandler):
                     duration_seconds=duration,
                     handler_name=self.name,
                 )
+            except BaseException:
+                # The script left our foreground group (own session), so a
+                # Ctrl-C would otherwise orphan its tree.
+                _terminate_process_group(process)
+                raise
 
             stdout_thread.join(timeout=5)
             stderr_thread.join(timeout=5)
@@ -523,8 +577,13 @@ class ScriptHandler(BaseHandler):
         # round-trip as shell scalars. Uses null-delimited output from python3
         # so values containing newlines, tabs, or equals signs are safe.
         # Requires python3 on the jumphost (checked by the wrapper itself).
+        remote_pid_file = f"{remote_dir}/run.pid"
         remote_bash = _build_remote_bash(
-            script_root, script_name, warnings_file=remote_warnings_path, env=remote_env
+            script_root,
+            script_name,
+            warnings_file=remote_warnings_path,
+            env=remote_env,
+            pid_file=remote_pid_file,
         )
         ssh_run_cmd = ["ssh", *ssh_opts, jumphost, remote_bash]
         cleanup_cmd = ["ssh", *ssh_opts, jumphost, f"rm -rf {remote_dir}"]
@@ -615,6 +674,7 @@ class ScriptHandler(BaseHandler):
                 process.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
                 process.kill()
+                self._kill_remote_process_group(jumphost, ssh_opts, remote_pid_file)
                 stdout_thread.join(timeout=5)
                 stderr_thread.join(timeout=5)
                 duration = time.monotonic() - start_time
@@ -627,6 +687,10 @@ class ScriptHandler(BaseHandler):
                     duration_seconds=duration,
                     handler_name=self.name,
                 )
+            except BaseException:
+                process.kill()
+                self._kill_remote_process_group(jumphost, ssh_opts, remote_pid_file)
+                raise
 
             stdout_thread.join(timeout=5)
             stderr_thread.join(timeout=5)
@@ -728,6 +792,41 @@ class ScriptHandler(BaseHandler):
                 handler_name=self.name,
             )
         return None
+
+    def _kill_remote_process_group(self, jumphost: str, ssh_opts: list[str], pid_file: str) -> None:
+        """Signal the remote script's process group, swallowing all errors.
+
+        Reads the wrapper shell's pid from ``pid_file`` and sends SIGTERM to
+        its process group, then SIGKILL after 10 seconds. Processes that
+        started their own session are not reached.
+
+        Args:
+            jumphost: SSH destination
+            ssh_opts: Extra ssh options
+            pid_file: Remote path holding the wrapper shell's pid
+        """
+        quoted = shlex.quote(pid_file)
+        remote_cmd = (
+            f"p=$(cat {quoted} 2>/dev/null) || exit 0; "
+            '[ -n "$p" ] || exit 0; '
+            'kill -TERM -- -"$p" 2>/dev/null || kill -TERM "$p" 2>/dev/null; '
+            "sleep 10; "
+            'kill -KILL -- -"$p" 2>/dev/null; '
+            "exit 0"
+        )
+        try:
+            result = subprocess.run(  # nosec B603
+                ["ssh", *ssh_opts, jumphost, remote_cmd],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            if result.returncode != 0:
+                logger.warning(
+                    "Remote process group kill failed (ignored): exit %s", result.returncode
+                )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            logger.warning("Remote process group kill failed (ignored): %s", e)
 
     def _cleanup_remote(self, cleanup_cmd: list[str]) -> None:
         """Run the remote tmp dir cleanup, swallowing all errors.

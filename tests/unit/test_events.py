@@ -2,8 +2,10 @@
 
 import json
 import shutil
+import signal
 import stat
 import subprocess
+import time
 from pathlib import Path
 from typing import Any, Never
 from unittest.mock import MagicMock, patch
@@ -17,6 +19,7 @@ from infrafoundry.core.events.handlers.script import (
     JUMPHOST_FORWARDED_ENV,
     ScriptHandler,
     _build_remote_bash,
+    _terminate_process_group,
 )
 
 
@@ -712,7 +715,7 @@ def _make_fake_process(
     returncode: int = 0,
     stdout: str = "",
     stderr: str = "",
-    wait_raises: Exception | None = None,
+    wait_raises: BaseException | None = None,
 ) -> MagicMock:
     """Build a mock subprocess.Popen result used by jumphost reexec tests.
 
@@ -1924,3 +1927,273 @@ class TestScriptHandlerJumphostLayout:
         """A malformed variable name raises ValueError."""
         with pytest.raises(ValueError, match="invalid environment variable name"):
             _build_remote_bash("/r", "x.sh", env={"bad key": "v"})
+
+    def test_pid_file_prefix(self) -> None:
+        """pid_file makes the wrapper write its pid before anything else."""
+        cmd = _build_remote_bash("/r", "x.sh", pid_file="/r/run.pid")
+        assert cmd.startswith("echo $$ > /r/run.pid; ")
+
+    def test_pid_file_quoted(self) -> None:
+        """A pid_file path with spaces is shell-quoted."""
+        cmd = _build_remote_bash("/r", "x.sh", pid_file="/r d/run.pid")
+        assert cmd.startswith("echo $$ > '/r d/run.pid'; ")
+
+    def test_no_pid_file_by_default(self) -> None:
+        """Without pid_file no pid plumbing is emitted."""
+        assert "echo $$" not in _build_remote_bash("/r", "x.sh")
+
+
+def _pid_gone(pid: int) -> bool:
+    """Return True if ``pid`` no longer exists or is only a zombie."""
+    try:
+        stat_text = Path(f"/proc/{pid}/stat").read_text()
+    except (FileNotFoundError, ProcessLookupError):
+        return True
+    # State is the field after the ``)`` that closes the command name.
+    return stat_text.rsplit(")", 1)[1].split()[0] == "Z"
+
+
+def _wait_pid_gone(pid: int, seconds: float = 5.0) -> bool:
+    """Poll until ``pid`` is gone (or zombie) or ``seconds`` elapse."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if _pid_gone(pid):
+            return True
+        time.sleep(0.05)
+    return _pid_gone(pid)
+
+
+@pytest.mark.unit
+class TestScriptTimeoutProcessGroup:
+    """Timeouts and interrupts terminate the script's whole process group (#1173)."""
+
+    def _handler(self, tmp_path: Path, timeout: int = 1) -> ScriptHandler:
+        return ScriptHandler(
+            {"script": "t.sh", "timeout": timeout},
+            config_base_dir=tmp_path,
+        )
+
+    def _context(self) -> EventContext:
+        return EventContext(event_type=EventType.AFTER_APPLY, environment="dev")
+
+    def test_timeout_kills_grandchildren(self, tmp_path: Path) -> None:
+        """A backgrounded child of the script dies on timeout."""
+        pid_file = tmp_path / "child.pid"
+        _make_script(
+            tmp_path,
+            "t.sh",
+            f"#!/bin/bash\nsleep 300 &\necho $! > {pid_file}\necho partial_out\nwait\n",
+        )
+        result = self._handler(tmp_path).execute(self._context())
+
+        assert result.success is False
+        assert "Timeout" in (result.reason or "")
+        assert "partial_out" in result.stdout
+        child = int(pid_file.read_text().strip())
+        assert _wait_pid_gone(child)
+
+    def test_sigkill_escalation(self, tmp_path: Path) -> None:
+        """A child that ignores SIGTERM is killed after the grace period."""
+        pid_file = tmp_path / "child.pid"
+        _make_script(
+            tmp_path,
+            "t.sh",
+            "#!/bin/bash\n"
+            "trap '' TERM\n"
+            f"( trap '' TERM; exec sleep 300 ) &\n"
+            f"echo $! > {pid_file}\n"
+            "wait\n",
+        )
+        proc = subprocess.Popen(  # nosec B603
+            [str(tmp_path / "envs" / "dev" / "t.sh")],
+            stdout=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+        deadline = time.monotonic() + 5
+        while not pid_file.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        time.sleep(0.2)
+        child = int(pid_file.read_text().strip())
+        _terminate_process_group(proc, grace=0.5)
+        assert proc.returncode is not None
+        assert _wait_pid_gone(child)
+
+    def test_popen_uses_new_session(self, tmp_path: Path) -> None:
+        """The local script is started in its own session."""
+        _make_script(tmp_path, "t.sh", "#!/bin/bash\ntrue\n")
+        with patch("infrafoundry.core.events.handlers.script.subprocess.Popen") as mock_popen:
+            mock_popen.return_value = _make_fake_process(returncode=0)
+            self._handler(tmp_path).execute(self._context())
+        assert mock_popen.call_args.kwargs["start_new_session"] is True
+
+    def test_terminate_tolerates_process_lookup_error(self) -> None:
+        """An already-gone group is not an error."""
+        proc = MagicMock()
+        proc.pid = 4242
+        with patch(
+            "infrafoundry.core.events.handlers.script.os.killpg",
+            side_effect=ProcessLookupError,
+        ):
+            _terminate_process_group(proc, grace=0)
+        proc.wait.assert_called()
+
+    def test_terminate_falls_back_on_permission_error(self) -> None:
+        """PermissionError on killpg falls back to killing the script alone."""
+        proc = MagicMock()
+        proc.pid = 4242
+        with patch(
+            "infrafoundry.core.events.handlers.script.os.killpg",
+            side_effect=PermissionError,
+        ):
+            _terminate_process_group(proc, grace=0)
+        proc.kill.assert_called()
+        proc.wait.assert_called()
+
+    def test_terminate_sends_term_then_kill(self) -> None:
+        """SIGTERM goes first, SIGKILL follows even if the script exited."""
+        proc = MagicMock()
+        proc.pid = 4242
+        with patch("infrafoundry.core.events.handlers.script.os.killpg") as killpg:
+            _terminate_process_group(proc, grace=0)
+        assert [c.args for c in killpg.call_args_list] == [
+            (4242, signal.SIGTERM),
+            (4242, signal.SIGKILL),
+        ]
+
+    def test_local_keyboard_interrupt_terminates_group(self, tmp_path: Path) -> None:
+        """Ctrl-C terminates the group and propagates."""
+        _make_script(tmp_path, "t.sh", "#!/bin/bash\ntrue\n")
+        fake = _make_fake_process(wait_raises=KeyboardInterrupt())
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=fake,
+            ),
+            patch("infrafoundry.core.events.handlers.script._terminate_process_group") as terminate,
+            pytest.raises(KeyboardInterrupt),
+        ):
+            self._handler(tmp_path).execute(self._context())
+        terminate.assert_called_once_with(fake)
+
+
+@pytest.mark.unit
+class TestScriptJumphostRemoteKill:
+    """Jumphost timeouts and interrupts signal the remote process group (#1173)."""
+
+    def _setup(self, tmp_path: Path) -> tuple[ScriptHandler, EventContext]:
+        env_dir = tmp_path / "envs" / "dev"
+        env_dir.mkdir(parents=True, exist_ok=True)
+        script = env_dir / "run.sh"
+        script.write_text("#!/bin/bash\necho hi\n")
+        script.chmod(script.stat().st_mode | stat.S_IEXEC)
+        handler = ScriptHandler({"script": "run.sh", "timeout": 1}, config_base_dir=tmp_path)
+        context = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="dev",
+            package_variables={"jumphost": "jh"},
+        )
+        return handler, context
+
+    @staticmethod
+    def _recorder(
+        calls: list[str], fail_kill: bool = False
+    ) -> Any:  # returns a subprocess.run side effect
+        def run_side_effect(cmd: Any, *_a: Any, **_k: Any) -> MagicMock:
+            remote = cmd[-1]
+            if "rm -rf" in remote:
+                calls.append("cleanup")
+            elif "kill -TERM -- -" in remote:
+                calls.append("kill")
+                if fail_kill:
+                    raise subprocess.TimeoutExpired(cmd="ssh", timeout=60)
+            return MagicMock(returncode=0, stdout=b"", stderr=b"")
+
+        return run_side_effect
+
+    def test_timeout_kills_remote_group_before_cleanup(self, tmp_path: Path) -> None:
+        handler, context = self._setup(tmp_path)
+        calls: list[str] = []
+        kill_cmds: list[str] = []
+        base = self._recorder(calls)
+
+        def run_side_effect(cmd: Any, *a: Any, **k: Any) -> MagicMock:
+            if "kill -TERM -- -" in cmd[-1]:
+                kill_cmds.append(cmd[-1])
+            return base(cmd, *a, **k)  # type: ignore[no-any-return]
+
+        fake = _make_fake_process(wait_raises=subprocess.TimeoutExpired(cmd="ssh", timeout=1))
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=run_side_effect,
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=fake,
+            ) as popen,
+        ):
+            result = handler.execute(context)
+
+        assert "Timeout" in (result.reason or "")
+        fake.kill.assert_called_once()
+        assert calls == ["kill", "cleanup"]
+        assert len(kill_cmds) == 1
+        assert "run.pid" in kill_cmds[0]
+        assert "rm -rf" not in kill_cmds[0]
+        assert "echo $$ > " in popen.call_args[0][0][-1]
+        assert "run.pid" in popen.call_args[0][0][-1]
+
+    def test_success_does_not_kill_remote(self, tmp_path: Path) -> None:
+        handler, context = self._setup(tmp_path)
+        calls: list[str] = []
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=self._recorder(calls),
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=0),
+            ),
+        ):
+            result = handler.execute(context)
+        assert result.success
+        assert calls == ["cleanup"]
+
+    def test_remote_kill_failure_still_times_out_and_cleans_up(self, tmp_path: Path) -> None:
+        handler, context = self._setup(tmp_path)
+        calls: list[str] = []
+        fake = _make_fake_process(wait_raises=subprocess.TimeoutExpired(cmd="ssh", timeout=1))
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=self._recorder(calls, fail_kill=True),
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=fake,
+            ),
+        ):
+            result = handler.execute(context)
+        assert "Timeout" in (result.reason or "")
+        assert calls == ["kill", "cleanup"]
+
+    def test_keyboard_interrupt_kills_remote_and_cleans_up(self, tmp_path: Path) -> None:
+        handler, context = self._setup(tmp_path)
+        calls: list[str] = []
+        fake = _make_fake_process(wait_raises=KeyboardInterrupt())
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=self._recorder(calls),
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=fake,
+            ),
+            pytest.raises(KeyboardInterrupt),
+        ):
+            handler.execute(context)
+        fake.kill.assert_called_once()
+        assert calls == ["kill", "cleanup"]

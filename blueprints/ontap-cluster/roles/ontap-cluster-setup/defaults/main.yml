@@ -34,3 +34,9 @@ ontap_setup_timeout: 600
 
 # Timeout (seconds) to wait for cluster join
 ontap_join_timeout: 300
+
+# Deadlines (seconds) capping the whole expect run. ontap_*_timeout above is
+# per prompt, so a stuck console can otherwise add up to many timeouts.
+# Both must stay well under the on_create handler timeout in blueprint.yaml.
+ontap_setup_deadline: 1200
+ontap_join_deadline: 900

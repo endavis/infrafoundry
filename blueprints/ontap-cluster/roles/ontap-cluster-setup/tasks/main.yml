@@ -23,10 +23,21 @@
     dest: "/tmp/ontap-cluster-create-{{ ontap_vmid }}.exp"
     mode: "0755"
 
+- name: Kill stale socat on the serial socket
+  when: ontap_cluster_create | bool
+  ansible.builtin.command:
+    argv:
+      - pkill
+      - -f
+      - "^socat .*UNIX-CONNECT:/var/run/qemu-server/{{ ontap_vmid }}\\.serial0$"
+  register: stale_socat_create
+  failed_when: stale_socat_create.rc not in [0, 1]
+  changed_when: stale_socat_create.rc == 0
+
 - name: Run cluster create via expect script
   when: ontap_cluster_create | bool
   ansible.builtin.command:
-    cmd: "/tmp/ontap-cluster-create-{{ ontap_vmid }}.exp"
+    cmd: "timeout --kill-after=30 {{ (ontap_setup_deadline | int) + 60 }} /tmp/ontap-cluster-create-{{ ontap_vmid }}.exp"
   register: cluster_create
   changed_when: true
 
@@ -60,10 +71,21 @@
     dest: "/tmp/ontap-cluster-join-{{ ontap_vmid }}.exp"
     mode: "0755"
 
+- name: Kill stale socat on the serial socket
+  when: not (ontap_cluster_create | bool)
+  ansible.builtin.command:
+    argv:
+      - pkill
+      - -f
+      - "^socat .*UNIX-CONNECT:/var/run/qemu-server/{{ ontap_vmid }}\\.serial0$"
+  register: stale_socat_join
+  failed_when: stale_socat_join.rc not in [0, 1]
+  changed_when: stale_socat_join.rc == 0
+
 - name: Run cluster join via expect script
   when: not (ontap_cluster_create | bool)
   ansible.builtin.command:
-    cmd: "/tmp/ontap-cluster-join-{{ ontap_vmid }}.exp"
+    cmd: "timeout --kill-after=30 {{ (ontap_join_deadline | int) + 60 }} /tmp/ontap-cluster-join-{{ ontap_vmid }}.exp"
   register: cluster_join
   changed_when: true
 
