@@ -283,12 +283,12 @@ class OPNsenseProvider(
         # before ``firewall.rules`` so a rule's ``gateway:`` names a gateway that
         # already exists (#1269). Deletes run the other way: every type that depends
         # on another table type declares ``SPLIT_DELETE_PHASE`` (the kea managers,
-        # firewall rules, NAT, gateways, static routes and virtual IPs), so the runner
-        # deletes those types in reverse table order first and only adds and updates in
-        # this order, which removes a child before its parent (#1264, #1269). Exempt
-        # for now: ``interfaces.assignments`` (a second apply would repeat an SSH
-        # preflight), ``radvd`` (``add_only`` drops its updates) and
-        # ``unbound.host_aliases`` (OPNsense cascades the delete). Aliases are
+        # firewall rules, NAT, gateways, static routes, virtual IPs and interface
+        # assignments), so the runner deletes those types in reverse table order first
+        # and only adds and updates in this order, which removes a child before its
+        # parent (#1264, #1269). Assignments split so one is deleted before the VLAN it
+        # uses (#1271). Exempt for now: ``radvd`` (``add_only`` drops its updates, #1272)
+        # and ``unbound.host_aliases`` (OPNsense cascades the delete). Aliases are
         # applied before ``nat_rules`` and ``firewall_rules`` so the alias names those
         # rules reference exist on the box first (#775).
         # ``unbound_host_override`` is applied before ``unbound_host_alias``

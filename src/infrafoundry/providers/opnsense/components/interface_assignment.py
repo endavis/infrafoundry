@@ -8,12 +8,15 @@ this manager once per plan/apply/destroy and delegates.
 
 Apply flow:
 
-1. ``apply()`` runs an SSH-credential pre-flight; missing credentials
-   raise ``RuntimeError`` with an actionable message **before** any
-   diff or REST call (no deep paramiko traceback).
-2. ``installer.ensure_installed()`` SCPs the controller PHP if its
-   on-box checksum doesn't match the local source. Idempotent —
-   subsequent calls fast-path via the checksum probe.
+1. ``apply()`` lists live state and computes the diff first (the list
+   endpoint needs no controller), then checks for lockout conflicts.
+2. Only when the (filtered) diff is non-empty does it run the
+   SSH-credential pre-flight (missing credentials raise ``RuntimeError``
+   with an actionable message, no deep paramiko traceback) and
+   ``installer.ensure_installed()``, which SCPs the controller PHP if its
+   on-box checksum doesn't match the local source. Idempotent.
+   The runner calls ``apply`` twice (``deletes_only`` first, #1271), so
+   each pass installs only when it has writes.
 3. The service ``compute_diff`` + ``apply_diff`` does the actual
    CRUD against the controller's REST endpoints. Each REST call
    triggers ``interface reconfigure all`` server-side via configd;
@@ -67,6 +70,11 @@ class InterfaceAssignmentManager(BaseComponentManager):
 
     #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
     DELETE_SCOPE: ClassVar[str] = "managed_set"
+
+    #: The runner deletes in a separate phase before this type's adds and updates,
+    #: and before the VLAN delete, since OPNsense refuses to delete an assigned
+    #: VLAN (#1271).
+    SPLIT_DELETE_PHASE: ClassVar[bool] = True
 
     # ------------------------------------------------------------------
     # Plan / apply / destroy
@@ -124,19 +132,22 @@ class InterfaceAssignmentManager(BaseComponentManager):
         add_only: bool = False,
         managed_resources: list[ResourceConfig] | None = None,
         provider_name: str = "opnsense",
+        deletes_only: bool = False,
     ) -> dict[str, Any]:
         """Apply the diff: add/update/delete assignments via the gist controller.
 
         Pre-flight order:
 
-        1. SSH credential pre-flight (raises ``RuntimeError`` with
-           an actionable message if credentials are absent).
-        2. ``installer.ensure_installed()`` SCPs the PHP controller
-           if needed. Idempotent.
-        3. Compute the diff against live state.
-        4. Lockout pre-flight refuses application if a planned ``add``
+        1. Compute the diff against live state (``service.list()`` needs
+           no controller). With ``deletes_only`` the adds and updates are
+           dropped.
+        2. Lockout pre-flight refuses application if a planned ``add``
            would collide with an already-bound device.
-        5. Dispatch the diff via ``service.apply_diff``. First HTTP
+        3. Only when the diff is non-empty: SSH credential pre-flight
+           (raises ``RuntimeError`` with an actionable message if
+           credentials are absent), then ``installer.ensure_installed()``
+           SCPs the PHP controller if needed. Idempotent.
+        4. Dispatch the diff via ``service.apply_diff``. First HTTP
            400 stops further ops; the caller-visible ``message``
            names what succeeded so manual continuation is possible.
 
@@ -152,6 +163,9 @@ class InterfaceAssignmentManager(BaseComponentManager):
                 from YAML.
             provider_name: Provider identifier (defaults to
                 ``opnsense``).
+            deletes_only: If ``True``, apply only the deletes. The runner's delete
+                phase (``SPLIT_DELETE_PHASE``) sets it so an assignment goes before
+                the VLAN it uses (#1271).
 
         Returns:
             Dict with ``success``, ``resources_created``,
@@ -164,15 +178,6 @@ class InterfaceAssignmentManager(BaseComponentManager):
                 pre-flight fail.
         """
         del auto_approve  # diff engine is the gate; flag accepted for protocol shape
-
-        # Pre-flight 1: SSH credentials must be resolvable before we do
-        # anything else. Skipping this means a deep paramiko traceback
-        # surfaces from inside install_controller() at apply time.
-        self._preflight_ssh_credentials()
-
-        # Pre-flight 2: ensure the PHP controller is installed. Idempotent
-        # — fast-paths via checksum on every subsequent apply.
-        installer.ensure_installed()
 
         service = InterfaceAssignmentService.from_environment(
             env_name, provider_name, self.config_dir
@@ -192,11 +197,23 @@ class InterfaceAssignmentManager(BaseComponentManager):
             ),
         )
 
-        # Pre-flight 3: lockout check before mutating.
+        if deletes_only:
+            diff.adds = []
+            diff.updates = []
+
+        # Pre-flight 1: lockout check before mutating.
         conflicts = find_lockout_conflicts(diff, live)
         if conflicts:
             joined = "; ".join(conflicts)
             raise RuntimeError(f"interface_assignments lockout conflicts: {joined}")
+
+        # Pre-flight 2: only a write needs SSH credentials and the PHP
+        # controller. Listing uses the core interfaces endpoint, so an empty
+        # (filtered) diff never installs and the runner's two passes do not
+        # repeat the install.
+        if not diff.is_empty:
+            self._preflight_ssh_credentials()
+            installer.ensure_installed()
 
         outcomes = self._build_outcomes(diff)
         apply_result = service.apply_diff(diff)

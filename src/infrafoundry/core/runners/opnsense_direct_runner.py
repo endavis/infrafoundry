@@ -29,9 +29,10 @@ YAML at all, if ``needs_managed_dispatch`` says managed objects remain (#1260).
 
 A manager that declares ``SPLIT_DELETE_PHASE`` (every type that depends on another
 table type: the kea managers, firewall rules, NAT, gateways, static routes and
-virtual IPs) has its deletes run in a separate phase before any adds, in reverse table
-order, so a child type such as reservations is deleted while its parent subnet is still
-live (#1264, #1269). The forward pass then adds and updates only. ``destroy`` uses the same order.
+virtual IPs, interface assignments) has its deletes run in a separate phase before any
+adds, in reverse table order, so a child type such as reservations is deleted while its
+parent subnet is still live (#1264, #1269). Interface assignments delete before their
+VLAN (#1271). The forward pass then adds and updates only. ``destroy`` uses the same order.
 
 Drift detection (``DriftDetectable``) is intentionally not implemented in this
 PR; ``infra plan`` provides equivalent UX via the diff engine, and a full

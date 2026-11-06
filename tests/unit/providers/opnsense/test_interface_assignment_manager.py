@@ -255,18 +255,19 @@ class TestApply:
         ):
             monkeypatch.delenv(key, raising=False)
         manager = InterfaceAssignmentManager(tmp_path)
+        service_mock = _make_service_mock(diff=Diff(adds=[_cfg("opt5")]))
         with (
             patch(SERVICE_PATH) as svc_cls,
             patch(INSTALLER_PATH) as inst,
         ):
+            svc_cls.from_environment.return_value = service_mock
             with pytest.raises(RuntimeError) as exc_info:
                 manager.apply("test-env", [_resource("opt5")])
             assert "SSH credentials" in str(exc_info.value)
             assert "OPNSENSE_SSH_HOST" in str(exc_info.value)
-            # Installer must not have been invoked when the pre-flight raises.
+            # Installer and writes must not run when the pre-flight raises.
             inst.ensure_installed.assert_not_called()
-            # Service must not have been constructed either.
-            svc_cls.from_environment.assert_not_called()
+            service_mock.apply_diff.assert_not_called()
 
     def test_apply_passes_when_only_api_url_set(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -277,7 +278,7 @@ class TestApply:
             monkeypatch.delenv(key, raising=False)
         monkeypatch.setenv("OPNSENSE_API_URL", "https://fw-prod")
         manager = InterfaceAssignmentManager(tmp_path)
-        service_mock = _make_service_mock(diff=Diff())
+        service_mock = _make_service_mock(diff=Diff(adds=[_cfg("opt5")]))
         with (
             patch(SERVICE_PATH) as svc_cls,
             patch(INSTALLER_PATH) as inst,
@@ -285,6 +286,51 @@ class TestApply:
             svc_cls.from_environment.return_value = service_mock
             manager.apply("test-env", [_resource("opt5")])
         inst.ensure_installed.assert_called_once()
+
+    def test_apply_empty_diff_skips_preflight_and_install(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        for key in (
+            "OPNSENSE_SSH_HOST",
+            "OPNSENSE_API_URL",
+            "OPNSENSE_SSH_KEY",
+            "OPNSENSE_SSH_USER",
+        ):
+            monkeypatch.delenv(key, raising=False)
+        manager = InterfaceAssignmentManager(tmp_path)
+        service_mock = _make_service_mock(diff=Diff())
+        with (
+            patch(SERVICE_PATH) as svc_cls,
+            patch(INSTALLER_PATH) as inst,
+        ):
+            svc_cls.from_environment.return_value = service_mock
+            result = manager.apply("test-env", [_resource("opt5")])
+        inst.ensure_installed.assert_not_called()
+        assert result["success"] is True
+
+    def test_apply_lists_before_installing(self, tmp_path: Path, ssh_env: None) -> None:
+        calls: list[str] = []
+        service_mock = _make_service_mock(diff=Diff(adds=[_cfg("opt5")]))
+
+        def _list() -> list[LiveInterfaceAssignment]:
+            calls.append("list")
+            return []
+
+        def _apply_diff(_diff: Diff) -> ApplyDiffResult:
+            calls.append("apply_diff")
+            return ApplyDiffResult(created=1)
+
+        service_mock.list.side_effect = _list
+        service_mock.apply_diff.side_effect = _apply_diff
+        manager = InterfaceAssignmentManager(tmp_path)
+        with (
+            patch(SERVICE_PATH) as svc_cls,
+            patch(INSTALLER_PATH) as inst,
+        ):
+            svc_cls.from_environment.return_value = service_mock
+            inst.ensure_installed.side_effect = lambda: calls.append("install")
+            manager.apply("test-env", [_resource("opt5")])
+        assert calls == ["list", "install", "apply_diff"]
 
     # ------------------------------------------------------------------
     # Lockout pre-flight
@@ -305,6 +351,90 @@ class TestApply:
                 manager.apply("test-env", [_resource("opt5", device="em0")])
         # No add was dispatched — the pre-flight fired before apply_diff.
         service_mock.apply_diff.assert_not_called()
+
+    def test_apply_lockout_conflict_raises_before_install(
+        self, tmp_path: Path, ssh_env: None
+    ) -> None:
+        live = _live("opt9", device="em0")
+        diff = Diff(adds=[_cfg("opt5", device="em0")])
+        service_mock = _make_service_mock(live=[live], diff=diff)
+        manager = InterfaceAssignmentManager(tmp_path)
+        with (
+            patch(SERVICE_PATH) as svc_cls,
+            patch(INSTALLER_PATH) as inst,
+        ):
+            svc_cls.from_environment.return_value = service_mock
+            with pytest.raises(RuntimeError, match="lockout"):
+                manager.apply("test-env", [_resource("opt5", device="em0")])
+        inst.ensure_installed.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# apply — deletes_only (runner delete phase, #1271)
+# ---------------------------------------------------------------------------
+
+
+class TestDeletesOnly:
+    def test_split_marker(self) -> None:
+        assert InterfaceAssignmentManager.SPLIT_DELETE_PHASE is True
+
+    def test_deletes_only_drops_adds_and_updates(self, tmp_path: Path, ssh_env: None) -> None:
+        live = _live("opt9", device="em7")
+        diff = Diff(
+            adds=[_cfg("opt5")],
+            updates=[(_live("opt3"), _cfg("opt3", device="em1"))],
+            deletes=[live],
+        )
+        service_mock = _make_service_mock(diff=diff, apply_result=ApplyDiffResult(deleted=1))
+        manager = InterfaceAssignmentManager(tmp_path)
+        with (
+            patch(SERVICE_PATH) as svc_cls,
+            patch(INSTALLER_PATH) as inst,
+        ):
+            svc_cls.from_environment.return_value = service_mock
+            result = manager.apply("test-env", [_resource("opt5")], deletes_only=True)
+        sent = service_mock.apply_diff.call_args.args[0]
+        assert sent.adds == []
+        assert sent.updates == []
+        assert sent.deletes == [live]
+        assert [o.action for o in result["resource_outcomes"]] == ["delete"]
+        inst.ensure_installed.assert_called_once()
+
+    def test_deletes_only_without_deletes_needs_no_ssh(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        for key in (
+            "OPNSENSE_SSH_HOST",
+            "OPNSENSE_API_URL",
+            "OPNSENSE_SSH_KEY",
+            "OPNSENSE_SSH_USER",
+        ):
+            monkeypatch.delenv(key, raising=False)
+        service_mock = _make_service_mock(diff=Diff(adds=[_cfg("opt5")]))
+        manager = InterfaceAssignmentManager(tmp_path)
+        with (
+            patch(SERVICE_PATH) as svc_cls,
+            patch(INSTALLER_PATH) as inst,
+        ):
+            svc_cls.from_environment.return_value = service_mock
+            result = manager.apply("test-env", [_resource("opt5")], deletes_only=True)
+        inst.ensure_installed.assert_not_called()
+        assert result["resource_outcomes"] == []
+
+    def test_add_only_forward_pass_with_adds_installs_once(
+        self, tmp_path: Path, ssh_env: None
+    ) -> None:
+        service_mock = _make_service_mock(
+            diff=Diff(adds=[_cfg("opt5")]), apply_result=ApplyDiffResult(created=1)
+        )
+        manager = InterfaceAssignmentManager(tmp_path)
+        with (
+            patch(SERVICE_PATH) as svc_cls,
+            patch(INSTALLER_PATH) as inst,
+        ):
+            svc_cls.from_environment.return_value = service_mock
+            manager.apply("test-env", [_resource("opt5")], add_only=True)
+        inst.ensure_installed.assert_called_once()
 
     # ------------------------------------------------------------------
     # Partial-failure path

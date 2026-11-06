@@ -663,7 +663,7 @@ class TestInterfaceAssignments:
             diff = InterfaceAssignmentManager(tmp_path).plan("env", [], managed_resources=[])
         assert diff.deletes == []
 
-    def test_apply_without_yaml_still_runs_preflight_and_installer_before_diffing(
+    def test_apply_without_yaml_lists_then_installs_then_writes(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("OPNSENSE_API_URL", "https://fw-prod")
@@ -674,17 +674,41 @@ class TestInterfaceAssignments:
             order.append("list")
             return [_live_ifa("opt3")]
 
+        def _apply_diff(_diff: Any) -> ApplyDiffResult:
+            order.append("apply_diff")
+            return ApplyDiffResult(deleted=1)
+
         service.list.side_effect = _list
+        service.apply_diff.side_effect = _apply_diff
         with patch(self.PATH) as svc_cls, patch(self.INSTALLER) as installer:
             installer.ensure_installed.side_effect = lambda: order.append("install")
             svc_cls.from_environment.return_value = service
             result = InterfaceAssignmentManager(tmp_path).apply(
                 "env", [], managed_resources=self._managed("opt3")
             )
-        assert order == ["install", "list"]
+        assert order == ["list", "install", "apply_diff"]
         assert result["resources_deleted"] == 1
 
-    def test_apply_without_ssh_credentials_fails_before_any_diff(
+    def _no_ssh(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        for var in (
+            "OPNSENSE_API_URL",
+            "OPNSENSE_SSH_HOST",
+            "OPNSENSE_SSH_KEY",
+            "OPNSENSE_SSH_USER",
+        ):
+            monkeypatch.delenv(var, raising=False)
+
+    def test_apply_with_nothing_to_write_succeeds_without_ssh(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._no_ssh(monkeypatch)
+        service = self._service([])
+        with patch(self.PATH) as svc_cls, patch(self.INSTALLER) as installer:
+            svc_cls.from_environment.return_value = service
+            InterfaceAssignmentManager(tmp_path).apply("env", [], managed_resources=[])
+        installer.ensure_installed.assert_not_called()
+
+    def test_apply_without_ssh_credentials_fails_before_any_write(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         for var in (
@@ -701,4 +725,4 @@ class TestInterfaceAssignments:
                 InterfaceAssignmentManager(tmp_path).apply(
                     "env", [], managed_resources=self._managed("opt3")
                 )
-        service.list.assert_not_called()
+        service.apply_diff.assert_not_called()
