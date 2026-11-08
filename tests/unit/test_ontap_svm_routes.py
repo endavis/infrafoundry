@@ -97,9 +97,7 @@ def test_playbook_adds_a_default_route_via_data_gateway() -> None:
         },
     )
 
-    assert routes == [
-        {"vserver": "svm_data", "destination": "0.0.0.0/0", "gateway": "172.20.99.1"}
-    ]
+    assert routes == [{"vserver": "svm_data", "destination": "0.0.0.0/0", "gateway": "172.20.99.1"}]
 
 
 def test_blueprint_declares_data_gateway_with_an_empty_default() -> None:

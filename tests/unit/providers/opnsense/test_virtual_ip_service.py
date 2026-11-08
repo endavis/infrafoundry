@@ -538,7 +538,12 @@ class TestParserRejection:
             name="bad",
             type="interfaces.virtual_ips",
             provider="opnsense",
-            config={"mode": "ipalias", "interface": "lan", "address": "172.21.0.10", "network": "24"},
+            config={
+                "mode": "ipalias",
+                "interface": "lan",
+                "address": "172.21.0.10",
+                "network": "24",
+            },
         )
         # Bypass pydantic — guard the service-side defensive check.
         r.config = "not-a-dict"  # type: ignore[assignment]

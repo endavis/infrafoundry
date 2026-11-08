@@ -655,9 +655,7 @@ class TestCheckOntapResolvesAiqum:
         assert verdict is True
         assert "aiqum.lab.example" in detail
         req = urlopen_mock.call_args.args[0]
-        assert req.full_url == (
-            "https://192.0.2.220/api/name-services/dns?fields=servers,domains"
-        )
+        assert req.full_url == ("https://192.0.2.220/api/name-services/dns?fields=servers,domains")
         assert urlopen_mock.call_args.kwargs["timeout"] == aiqum_setup.ONTAP_REST_TIMEOUT
 
     def test_wrong_ip_returns_false(self) -> None:

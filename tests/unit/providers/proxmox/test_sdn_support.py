@@ -46,7 +46,12 @@ def _vm(name: str, bridge: str) -> ResourceConfig:
         name=name,
         type="vm",
         provider="proxmox",
-        config={"name": name, "vmid": 9990, "target_node": "node3", "network": [{"bridge": bridge}]},
+        config={
+            "name": name,
+            "vmid": 9990,
+            "target_node": "node3",
+            "network": [{"bridge": bridge}],
+        },
     )
 
 
@@ -126,9 +131,9 @@ class TestOrdering:
     def test_only_vms_on_a_managed_vnet_depend_on_the_applier(
         self, provider: ProxmoxProvider
     ) -> None:
-        vms = _generate(provider, [_zone(), _vnet(), _vm("on-vnet", "demolan"), _vm("off", "vmbr0")])[
-            "vms.tf"
-        ]
+        vms = _generate(
+            provider, [_zone(), _vnet(), _vm("on-vnet", "demolan"), _vm("off", "vmbr0")]
+        )["vms.tf"]
 
         on_vnet = vms.split('"proxmox_virtual_environment_vm" "on_vnet"')[1].split("resource ")[0]
         off = vms.split('"proxmox_virtual_environment_vm" "off"')[1]
