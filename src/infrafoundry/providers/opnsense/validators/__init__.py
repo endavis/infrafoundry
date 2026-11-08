@@ -57,6 +57,9 @@ from infrafoundry.providers.opnsense.validators.unbound_host_alias_validator imp
 from infrafoundry.providers.opnsense.validators.unbound_host_override_validator import (
     UnboundHostOverrideValidator,
 )
+from infrafoundry.providers.opnsense.validators.unbound_settings_validator import (
+    UnboundSettingsValidator,
+)
 from infrafoundry.providers.opnsense.validators.unbound_validator import UnboundValidator
 from infrafoundry.providers.opnsense.validators.virtual_ip_validator import VirtualIPValidator
 from infrafoundry.providers.opnsense.validators.vlan_validator import VLANValidator
@@ -84,6 +87,7 @@ __all__ = [
     "UnboundForwardValidator",
     "UnboundHostAliasValidator",
     "UnboundHostOverrideValidator",
+    "UnboundSettingsValidator",
     "UnboundValidator",
     "VLANValidator",
     "VirtualIPValidator",

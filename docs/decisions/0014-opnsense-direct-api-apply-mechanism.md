@@ -40,6 +40,7 @@ tags:
 **Amended:** 2026-11-04 (#1237) — singleton identity is now the dotted type (`system.tuning`, `radvd`, …) instead of the shared name `settings`, so several singletons coexist in one environment. `resources` rows recorded as `(opnsense, <singleton type>, settings)` are renamed to the dotted type by an idempotent migration in `StateManager.initialize()`; history tables are untouched. `-r settings` is replaced by `-r <dotted type>`.
 **Amended:** 2026-11-05 (#1244) — the unreachable implementation of the five retired types (`system.hostname`, `system.dns`, `system.ssh`, `system.webgui`, `system.remotebackup`) is removed: their components, services and validators (including `components/system_hostname.py` and `validators/_secrets.py`), the matching `SystemClient` methods and tests. `OPNsenseProvider.UNSUPPORTED_RESOURCE_TYPES`, the `DOTTED_RESOURCE_SHAPES` entries and the retired endpoint registry entries stay, so the types are still rejected with their #1149 reason.
 **Amended:** 2026-11-08 (#807) — `trust.cas` and `trust.certs` per-component decision recorded (stock direct-REST against `trust/ca/*` and `trust/cert/*`; identity is the live `descr`; managed-set deletes with in-use and AcmeClient guards; `ca_ref` through the sibling pattern; secrets as `secret://` URIs; write behaviour not yet verified on a box)
+**Amended:** 2026-11-08 (#1091) — `unbound.settings` per-component decision recorded (direct-REST singleton over the `general` and `advanced` sections of `unbound/settings/*`; sparse comparison; the `unbound.advanced` fields stay owned by that type; shares the `unbound_reconfigure` hook)
 **Amended:** 2026-11-08 (#808) — `openvpn.instances` per-component decision recorded (stock direct-REST against `openvpn/instances/*` for client instances only; legacy `os-openvpn-legacy` stays unmanaged; identity is `description`; `ca_ref` through the trust sibling pattern; credentials as `secret://` URIs; reconfigure through the `openvpn_reconfigure` finalization hook; write behaviour not yet verified on a box)
 **Status:** Accepted
 
@@ -417,6 +418,20 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Validator scope:** `SyslogSettingsValidator`: unknown keys, boolean fields, non-negative integer fields.
 - **Rollback strategy:** Same as §1's default.
 
+### `unbound.settings` (#1091, 2026-11-08)
+
+**Mechanism:** Direct-REST singleton against the Unbound settings document. Manages every `general` field and every `advanced` field except `privatedomain`, `insecuredomain` and `privateaddress`, which stay owned by `unbound.advanced`. Only declared fields are compared; an omitted key or section is unmanaged. Destroy is a no-op.
+
+- **Endpoints:** `GET unbound/settings/get` (response `{"unbound": {"general": {...}, "advanced": {...}}}`), `POST unbound/settings/set` and `POST unbound/service/reconfigure`. The `set` envelope is the one `unbound.advanced` uses.
+- **Identity:** singleton named `unbound.settings`. `get_resource_ids()` returns `{"unbound.settings": "global"}`.
+- **Wire schema:** YAML keys are the wire field names under `general` and `advanced` (see [the coverage doc](../development/opnsense-resource-coverage.md#unbound-general-and-advanced-settings-1091)). Booleans map to `"1"`/`"0"`, multi-select lists compare as sets, numeric fields are written as strings. The write sends `{"unbound": {<section>: <whole flattened live section, declared fields overwritten>}}` for declared sections only.
+- **Apply:** `set_settings` only when a declared field drifted; logs changed field names, never values. A declared field absent from the live section raises `APIError`.
+- **Overlap with `unbound.advanced`:** declaring an owned field is a validator ERROR and an `InvalidConfigurationError`. Each manager re-reads live state in `apply()` and echoes the whole section back, so the two managers are safe in either order.
+- **Validator scope:** `UnboundSettingsValidator` reports every problem found by `check_config`, the same check `build_desired` raises on: unknown keys, owned fields, types, ranges and enum values.
+- **Migrate:** exports every supported field present on the box, skipping empty values; owned fields are never exported.
+- **Rollback strategy:** Same as §1's default.
+- **Cross-reference notes:** Shares `unbound_reconfigure` with the four other Unbound managers.
+
 ### `radvd` (#788, 2026-05-12)
 
 **Mechanism:** **Hybrid YAML-singleton / wire-list** direct-REST against the modern OPNsense 26.x `radvd` MVC controller — IPv6 Router Advertisement emission per interface. The operator authors a single dict-shape `radvd` resource whose `interfaces` mapping holds one inner mapping per interface; the wire stores those as per-UUID records. Mirrors the `system.firmware` (#806) asymmetric "bulk read, per-item write" shape but with full-reconcile semantics on the write side instead of install-missing-only. **Cutover hard blocker** for hands-free IPv6: without per-interface RA emission on `opt1`/`opt2`/`opt3`/`opt6` (Infra/PT/Tailscale-infra/Apps VLANs), every IPv6-enabled host on those VLANs loses its default route the moment cutover finishes.
@@ -519,7 +534,7 @@ The contract is opt-in on both sides and graceful in absence:
 
 The first registered hook is `kea_reconfigure`, declared on all four Kea managers — `KeaDHCPv4SubnetManager`, `KeaDHCPv4ReservationManager`, `KeaDHCPv6SubnetManager`, and `KeaDHCPv6ReservationManager` — resolved by `OPNsenseProvider.get_finalization_hooks()` to a closure that calls `KeaDHCPService.reconfigure()`. Subnet and reservation changes across both wire families that land in the same `apply` share a single Kea reconfigure firing — preserving the legacy "one reconfigure per plan/apply" operational behavior. The hook key was originally `kea_dhcp6_reconfigure` when introduced in #758 (DHCPv6 only); it was renamed to `kea_reconfigure` in #777/#778 when DHCPv4 was migrated to direct-API and joined the same hook (the OPNsense `kea/service/reconfigure` endpoint is shared between v4 and v6).
 
-A second hook, `unbound_reconfigure` (#776), is declared on four Unbound managers — `UnboundHostOverrideManager`, `UnboundHostAliasManager`, `UnboundForwardManager`, and `UnboundAdvancedManager` (#1254). The OPNsense Unbound service's reconfigure verb (`unbound/service/reconfigure`) is shared across every Unbound-managed component, so coalescing the hook key across all three managers produces exactly one reconfigure call per apply when any of the three changed state. Before #776 each manager called `service.reconfigure()` inline from its `apply` body, which produced up to three reconfigure calls in a multi-unbound apply; the retrofit removes the inline calls and lets the runner's hook plumbing coalesce them.
+A second hook, `unbound_reconfigure` (#776), is declared on five Unbound managers — `UnboundHostOverrideManager`, `UnboundHostAliasManager`, `UnboundForwardManager`, `UnboundAdvancedManager` (#1254), and `UnboundSettingsManager` (#1091). The OPNsense Unbound service's reconfigure verb (`unbound/service/reconfigure`) is shared across every Unbound-managed component, so coalescing the hook key across all three managers produces exactly one reconfigure call per apply when any of the three changed state. Before #776 each manager called `service.reconfigure()` inline from its `apply` body, which produced up to three reconfigure calls in a multi-unbound apply; the retrofit removes the inline calls and lets the runner's hook plumbing coalesce them.
 
 A third hook, `radvd_reconfigure` (#788), is declared on `RadvdManager`. The radvd controller has its own reconfigure verb (`radvd/service/reconfigure`); since `radvd` is a single dotted resource type the hook only ever has one declarer, but the same hook plumbing is reused for symmetry and so future radvd-adjacent components (e.g., a hypothetical IPv6 prefix-delegation manager) can join the key.
 
@@ -600,6 +615,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#804](https://github.com/endavis/infrafoundry/issues/804): feat: add `syslog.settings` direct-API resource for the OPNsense local syslog daemon.
 - Issue [#807](https://github.com/endavis/infrafoundry/issues/807): feat: add `trust.cas` and `trust.certs` direct-API resources for OPNsense.
 - Issue [#808](https://github.com/endavis/infrafoundry/issues/808): feat: add `openvpn.instances` direct-API resource for OpenVPN client instances on OPNsense.
+- Issue [#1091](https://github.com/endavis/infrafoundry/issues/1091): feat: add `unbound.settings` resource for OPNsense Unbound general and advanced settings.
 - Issue [#1254](https://github.com/endavis/infrafoundry/issues/1254): feat: manage Unbound advanced settings (private and insecure domains) on OPNsense.
 - Issue [#1244](https://github.com/endavis/infrafoundry/issues/1244): refactor: remove the unreachable implementation of the five retired OPNsense system types.
 - Issue [#705](https://github.com/endavis/infrafoundry/issues/705): feat: spike direct-API VLAN component to inform ADR-0014 (closed; PR [#706](https://github.com/endavis/infrafoundry/pull/706) merged).

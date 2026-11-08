@@ -450,6 +450,38 @@ class TestParseNestedShapeMismatch:
         with pytest.raises(InvalidConfigurationError, match="declared as a dict"):
             loader._parse_resources_from_data(data, "bad.yaml", "opnsense")
 
+    def test_unbound_settings_is_a_singleton_dict(self, temp_dir: Path) -> None:
+        """``unbound.settings`` loads as one singleton next to advanced and forwards."""
+        from infrafoundry.core.config.package_loader import SINGLETON_RESOURCE_TYPES
+
+        assert "unbound.settings" in SINGLETON_RESOURCE_TYPES
+        loader = PackageLoader(temp_dir)
+        data = {
+            "opnsense": {
+                "unbound": {
+                    "settings": {
+                        "general": {"enabled": True},
+                        "advanced": {"prefetch": True},
+                    },
+                    "advanced": {"private_domains": ["test.example.net"]},
+                    "forwards": [{"name": "f1", "server": "192.0.2.53"}],
+                }
+            }
+        }
+        resources = loader._parse_resources_from_data(data, "t.yaml", "opnsense")
+        found = [r for r in resources if r.type == "unbound.settings"]
+        assert len(found) == 1
+        assert found[0].name == "unbound.settings"
+        assert found[0].config == {"general": {"enabled": True}, "advanced": {"prefetch": True}}
+        assert any(r.type == "unbound.advanced" for r in resources)
+        assert any(r.type == "unbound.forwards" for r in resources)
+
+    def test_unbound_settings_list_rejected(self, temp_dir: Path) -> None:
+        loader = PackageLoader(temp_dir)
+        data: dict[str, Any] = {"opnsense": {"unbound": {"settings": [{"general": {}}]}}}
+        with pytest.raises(InvalidConfigurationError, match="declared as a dict"):
+            loader._parse_resources_from_data(data, "bad.yaml", "opnsense")
+
     def test_interfaces_settings_is_a_singleton_dict(self, temp_dir: Path) -> None:
         """``interfaces.settings`` loads as one singleton."""
         from infrafoundry.core.config.package_loader import SINGLETON_RESOURCE_TYPES

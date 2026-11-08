@@ -65,6 +65,7 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     "unbound.host_aliases": "list",
     "unbound.forwards": "list",
     "unbound.advanced": "dict",
+    "unbound.settings": "dict",
     "interfaces.settings": "dict",
     "syslog.settings": "dict",  # #804
     "kea.dhcp4.subnets": "list",

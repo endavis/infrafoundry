@@ -242,6 +242,17 @@ class TestOPNsenseResourceTypes:
             == types["unbound.forwards"].FINALIZATION_HOOK
         )
 
+    def test_unbound_settings_is_supported_and_shares_the_unbound_hook(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        types = provider.get_direct_api_resource_types()
+        assert "unbound.settings" in provider.get_resource_types()
+        assert provider.get_dependencies()["unbound.settings"] == []
+        assert (
+            types["unbound.settings"].FINALIZATION_HOOK
+            == types["unbound.forwards"].FINALIZATION_HOOK
+        )
+
     def test_interfaces_settings_is_supported_with_its_own_hook(
         self, provider: OPNsenseProvider
     ) -> None:

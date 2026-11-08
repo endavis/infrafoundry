@@ -467,6 +467,7 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     ),
     "unbound.forwards": (*UNBOUND_FORWARD.all(), UNBOUND_RECONFIGURE),
     "unbound.advanced": (UNBOUND_SETTINGS_GET, UNBOUND_SETTINGS_SET, UNBOUND_RECONFIGURE),
+    "unbound.settings": (UNBOUND_SETTINGS_GET, UNBOUND_SETTINGS_SET, UNBOUND_RECONFIGURE),
     "kea.dhcp4.subnets": (*KEA_CRUD[("dhcpv4", "Subnet")].all(), *_KEA_V4),
     "kea.dhcp4.reservations": (
         *KEA_CRUD[("dhcpv4", "Reservation")].all(),
