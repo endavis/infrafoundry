@@ -12,7 +12,8 @@ Example:
 
 import logging
 import re
-from typing import Any
+import threading
+from typing import TYPE_CHECKING, Any
 
 from infrafoundry.secrets.protocol import (
     SecretBackend,
@@ -20,10 +21,38 @@ from infrafoundry.secrets.protocol import (
     SecretNotFoundError,
 )
 
+if TYPE_CHECKING:
+    from infrafoundry.core.plugin_system import PluginRegistry
+
 logger = logging.getLogger(__name__)
+
+_DISCOVERY_LOCK = threading.Lock()
 
 # Pattern for secret:// URIs
 SECRET_URI_PATTERN = re.compile(r"^secret://([^/]+)/(.+)$")
+
+
+def ensure_secret_backends_registered(registry: "PluginRegistry") -> None:
+    """Discover installed ``secret_backend`` plugins and register missing ones.
+
+    Idempotent: plugins already present in the registry (for example ones a
+    caller registered explicitly) are left untouched, so calling this again
+    never raises or duplicates entries. Safe to call from several threads.
+
+    Args:
+        registry: Plugin registry to populate.
+    """
+    from infrafoundry.core.plugin_system import PluginConflictError, PluginDiscovery
+    from infrafoundry.secrets.plugin_type import SecretBackendPluginType
+
+    with _DISCOVERY_LOCK:
+        for metadata in PluginDiscovery().discover_plugins(SecretBackendPluginType()):
+            if registry.has_plugin(metadata.plugin_type, metadata.name):
+                continue
+            try:
+                registry.register(metadata)
+            except PluginConflictError:
+                continue
 
 
 class SecretResolutionError(Exception):
@@ -119,6 +148,7 @@ class SecretResolver:
             from infrafoundry.core.plugin_system import get_registry
 
             registry = get_registry()
+            ensure_secret_backends_registered(registry)
             metadata = registry.get("secret_backend", backend_name)
             backend_class = metadata.implementation
 

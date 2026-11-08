@@ -415,3 +415,43 @@ class TestGlobalResolver:
         resolver2 = get_resolver()
 
         assert resolver1 is not resolver2
+
+
+class TestRealRegistryDiscovery:
+    """Resolution through the real registry, with no pre-registered backends."""
+
+    @pytest.fixture(autouse=True)
+    def _reset(self) -> object:
+        """Start and end each test with a fresh resolver and registry."""
+        from infrafoundry.core.plugin_system.registry import _reset_registry
+
+        _reset_resolver()
+        _reset_registry()
+        yield
+        _reset_resolver()
+        _reset_registry()
+
+    def test_resolve_env_secrets_via_discovered_backend(self) -> None:
+        """secret://env_secrets/... resolves without any manual registration."""
+        resolver = SecretResolver()
+        resolver.configure_backend("env_secrets", {"secrets": {"a": {"b": "discovered-value"}}})
+
+        assert resolver.resolve("secret://env_secrets/a/b") == "discovered-value"
+
+    def test_discovery_is_idempotent(self) -> None:
+        """Repeated lookups and a second resolver neither raise nor duplicate."""
+        from infrafoundry.core.plugin_system import get_registry
+        from infrafoundry.secrets.resolver import ensure_secret_backends_registered
+
+        registry = get_registry()
+        ensure_secret_backends_registered(registry)
+        names = sorted(m.name for m in registry.list_by_type("secret_backend"))
+        ensure_secret_backends_registered(registry)
+
+        for _ in range(2):
+            resolver = SecretResolver()
+            resolver.configure_backend("env", {})
+            resolver._get_backend("env")
+
+        assert {"env", "env_secrets", "file"} <= set(names)
+        assert sorted(m.name for m in registry.list_by_type("secret_backend")) == names
