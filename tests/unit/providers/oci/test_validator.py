@@ -349,11 +349,19 @@ class TestValidateAPIReferences:
         assert mock_client.list_resources.call_count == 4
 
         # Specialized validators should be called with pre-fetched data
-        validator.compartment_validator.validate.assert_called_once_with(
-            "ocid1.compartment.oc1..example", compartments
-        )
-        validator.network_validator.validate.assert_called_once_with(resources, vcns, subnets)
-        validator.image_validator.validate.assert_called_once_with(resources, images)
+        validator.compartment_validator.validate.assert_called_once()
+        compartment_ctx = validator.compartment_validator.validate.call_args.args[0]
+        assert compartment_ctx.compartment_ocid == "ocid1.compartment.oc1..example"
+        assert compartment_ctx.compartments == compartments
+        validator.network_validator.validate.assert_called_once()
+        network_ctx = validator.network_validator.validate.call_args.args[0]
+        assert network_ctx.resources == resources
+        assert network_ctx.existing_vcns == vcns
+        assert network_ctx.existing_subnets == subnets
+        validator.image_validator.validate.assert_called_once()
+        image_ctx = validator.image_validator.validate.call_args.args[0]
+        assert image_ctx.resources == resources
+        assert image_ctx.existing_images == images
 
 
 class TestSafeList:

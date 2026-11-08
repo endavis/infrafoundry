@@ -8,6 +8,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.oci.validators.context import OCIApiContext
 from infrafoundry.providers.oci.validators.network_validator import NetworkValidator
 
 
@@ -49,7 +50,14 @@ class TestVCNCollisions:
         resources = [_vcn("my-vcn")]
         existing_vcns = [{"displayName": "my-vcn", "id": "ocid1.vcn.oc1..aaa"}]
 
-        validator.validate(resources, existing_vcns, None)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_vcns=existing_vcns,
+                existing_subnets=None,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         vcn_checks = [r for r in report.results if "vcn_collision" in r.check_name]
         assert len(vcn_checks) == 1
@@ -61,7 +69,14 @@ class TestVCNCollisions:
         resources = [_vcn("new-vcn")]
         existing_vcns = [{"displayName": "other-vcn", "id": "ocid1.vcn.oc1..aaa"}]
 
-        validator.validate(resources, existing_vcns, None)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_vcns=existing_vcns,
+                existing_subnets=None,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         vcn_checks = [r for r in report.results if "vcn_collision" in r.check_name]
         assert len(vcn_checks) == 1
@@ -74,7 +89,14 @@ class TestVCNCollisions:
         resources = [_vcn("my-vcn", display_name="Custom VCN Name")]
         existing_vcns = [{"displayName": "Custom VCN Name", "id": "ocid1.vcn.oc1..aaa"}]
 
-        validator.validate(resources, existing_vcns, None)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_vcns=existing_vcns,
+                existing_subnets=None,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         vcn_checks = [r for r in report.results if "vcn_collision" in r.check_name]
         assert len(vcn_checks) == 1
@@ -84,7 +106,14 @@ class TestVCNCollisions:
         """None VCN data skips collision checks."""
         resources = [_vcn("my-vcn")]
 
-        validator.validate(resources, None, None)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_vcns=None,
+                existing_subnets=None,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         vcn_checks = [r for r in report.results if "vcn_collision" in r.check_name]
         assert len(vcn_checks) == 0
@@ -100,7 +129,14 @@ class TestSubnetCollisions:
         resources = [_subnet("my-subnet", "my-vcn")]
         existing_subnets = [{"displayName": "my-subnet", "id": "ocid1.subnet.oc1..aaa"}]
 
-        validator.validate(resources, None, existing_subnets)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_vcns=None,
+                existing_subnets=existing_subnets,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         subnet_checks = [r for r in report.results if "subnet_collision" in r.check_name]
         assert len(subnet_checks) == 1
@@ -113,7 +149,14 @@ class TestSubnetCollisions:
         resources = [_subnet("new-subnet", "my-vcn")]
         existing_subnets = [{"displayName": "other-subnet", "id": "ocid1.subnet.oc1..aaa"}]
 
-        validator.validate(resources, None, existing_subnets)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_vcns=None,
+                existing_subnets=existing_subnets,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         subnet_checks = [r for r in report.results if "subnet_collision" in r.check_name]
         assert len(subnet_checks) == 1
@@ -125,7 +168,14 @@ class TestSubnetCollisions:
         """None subnet data skips collision checks."""
         resources = [_subnet("my-subnet", "my-vcn")]
 
-        validator.validate(resources, None, None)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_vcns=None,
+                existing_subnets=None,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         subnet_checks = [r for r in report.results if "subnet_collision" in r.check_name]
         assert len(subnet_checks) == 0

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from typing import Any, cast
 
 from infrafoundry.core.config.models import EnvironmentConfig
@@ -18,6 +19,7 @@ from infrafoundry.core.validation_helpers import (
 from infrafoundry.providers.oci.api_client import OCIClient
 
 from .validators import CompartmentValidator, ImageValidator, NetworkValidator
+from .validators.context import OCIApiContext
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +226,8 @@ class OCIValidator:
         if not client:
             return
 
+        context = OCIApiContext(resources=resources, compartment_ocid=compartment_ocid)
+
         try:
             # Fetch compartments (uses tenancy_ocid as parent)
             compartments = None
@@ -233,7 +237,8 @@ class OCIValidator:
                     client.identity_url(),
                     f"/20160918/compartments?compartmentId={tenancy_ocid}",
                 )
-                self.compartment_validator.validate(compartment_ocid, compartments)
+                context = replace(context, compartments=compartments)
+                self.compartment_validator.validate(context)
 
             # Fetch VCNs and subnets
             vcns = self._safe_list(
@@ -246,7 +251,8 @@ class OCIValidator:
                 client.iaas_url(),
                 f"/20160918/subnets?compartmentId={compartment_ocid}",
             )
-            self.network_validator.validate(resources, vcns, subnets)
+            context = replace(context, existing_vcns=vcns, existing_subnets=subnets)
+            self.network_validator.validate(context)
 
             # Fetch images
             images = self._safe_list(
@@ -254,7 +260,8 @@ class OCIValidator:
                 client.iaas_url(),
                 f"/20160918/images?compartmentId={compartment_ocid}",
             )
-            self.image_validator.validate(resources, images)
+            context = replace(context, existing_images=images)
+            self.image_validator.validate(context)
 
         except Exception as exc:
             self.api_validator.handle_validation_exception(

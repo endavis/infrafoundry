@@ -8,6 +8,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.oci.validators.context import OCIApiContext
 from infrafoundry.providers.oci.validators.image_validator import ImageValidator
 
 
@@ -42,7 +43,13 @@ class TestImageValidator:
             {"id": "ocid1.image.oc1..bbb", "displayName": "Ubuntu-22.04"},
         ]
 
-        validator.validate(resources, images)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_images=images,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         assert len(report.results) == 1
         result = report.results[0]
@@ -55,7 +62,13 @@ class TestImageValidator:
         resources = [_instance("my-instance", "ocid1.image.oc1..missing")]
         images = [{"id": "ocid1.image.oc1..aaa", "displayName": "Oracle-Linux-8"}]
 
-        validator.validate(resources, images)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_images=images,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         assert len(report.results) == 1
         result = report.results[0]
@@ -68,7 +81,13 @@ class TestImageValidator:
         """None images (API failure) produces no checks."""
         resources = [_instance("my-instance", "ocid1.image.oc1..aaa")]
 
-        validator.validate(resources, None)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_images=None,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         assert len(report.results) == 0
 
@@ -84,7 +103,13 @@ class TestImageValidator:
         ]
         images = [{"id": "ocid1.image.oc1..aaa", "displayName": "Oracle-Linux-8"}]
 
-        validator.validate(resources, images)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_images=images,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         assert len(report.results) == 0
 
@@ -93,7 +118,13 @@ class TestImageValidator:
         resources = [_instance("my-instance")]
         images = [{"id": "ocid1.image.oc1..aaa", "displayName": "Oracle-Linux-8"}]
 
-        validator.validate(resources, images)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_images=images,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         assert len(report.results) == 0
 
@@ -107,7 +138,13 @@ class TestImageValidator:
         ]
         images = [{"id": "ocid1.image.oc1..aaa", "displayName": "Oracle-Linux-8"}]
 
-        validator.validate(resources, images)
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_images=images,
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         assert len(report.results) == 1
         result = report.results[0]
@@ -119,7 +156,13 @@ class TestImageValidator:
         """Empty image list with references produces errors."""
         resources = [_instance("my-instance", "ocid1.image.oc1..aaa")]
 
-        validator.validate(resources, [])
+        validator.validate(
+            OCIApiContext(
+                resources=resources,
+                existing_images=[],
+                compartment_ocid="ocid1.compartment.oc1..example",
+            )
+        )
 
         assert len(report.results) == 1
         assert report.results[0].passed is False
