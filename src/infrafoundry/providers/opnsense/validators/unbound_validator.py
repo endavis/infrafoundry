@@ -1,12 +1,15 @@
 """Unbound DNS host override validation for OPNsense."""
 
 import ipaddress
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 
-class UnboundValidator:
+class UnboundValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense Unbound DNS host override configurations."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -17,15 +20,17 @@ class UnboundValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate Unbound host override resources.
 
         Checks that required fields (hostname, domain) are present and non-empty,
         and that server IP addresses (if provided) are valid.
 
         Args:
-            resources: List of unbound_host_override resources to validate
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        resources = context.resources
         for resource in resources:
             self._validate_hostname(resource)
             self._validate_domain(resource)

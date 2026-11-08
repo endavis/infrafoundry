@@ -21,6 +21,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.static_route_validator import (
     StaticRouteValidator,
 )
@@ -72,10 +73,12 @@ class TestNetwork:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("ok", network="172.21.0.0/24")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", network="172.21.0.0/24")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert not _failures(report, "static_route_ok_network")
 
@@ -83,10 +86,12 @@ class TestNetwork:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("ok", network="2001:db8::/32", gateway="WAN_DHCP6")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP6"},
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", network="2001:db8::/32", gateway="WAN_DHCP6")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP6"},
+            )
         )
         assert not _failures(report, "static_route_ok_network")
 
@@ -100,10 +105,12 @@ class TestNetwork:
             config={"gateway": "WAN_DHCP"},
         )
         validator.validate(
-            [r],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[r],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_network")
 
@@ -111,10 +118,12 @@ class TestNetwork:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", network=12345)],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", network=12345)],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_network")
 
@@ -122,10 +131,12 @@ class TestNetwork:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", network="")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", network="")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_network")
 
@@ -133,10 +144,12 @@ class TestNetwork:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", network="not-a-cidr")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", network="not-a-cidr")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_network")
 
@@ -145,10 +158,12 @@ class TestNetwork:
     ) -> None:
         # ``172.21.0.1/24`` has host bits set; ``strict=True`` rejects it.
         validator.validate(
-            [_route("bad", network="172.21.0.1/24")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", network="172.21.0.1/24")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_network")
 
@@ -156,10 +171,12 @@ class TestNetwork:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", network="2001:db8::1/32", gateway="WAN_DHCP6")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP6"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", network="2001:db8::1/32", gateway="WAN_DHCP6")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP6"},
+            )
         )
         assert _failures(report, "static_route_bad_network")
 
@@ -174,10 +191,12 @@ class TestGateway:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("ok", gateway="my-wan")],
-            managed_gateways=[_gw("my-wan")],
-            gateway_names={"my-wan"},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", gateway="my-wan")],
+                managed_gateways=[_gw("my-wan")],
+                gateway_names={"my-wan"},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "static_route_ok_gateway")
 
@@ -186,10 +205,12 @@ class TestGateway:
     ) -> None:
         # ``WAN_DHCP`` exists live on the box but isn't declared as managed.
         validator.validate(
-            [_route("ok", gateway="WAN_DHCP")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", gateway="WAN_DHCP")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert not _failures(report, "static_route_ok_gateway")
 
@@ -197,10 +218,12 @@ class TestGateway:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", gateway="bogus-gw")],
-            managed_gateways=[],
-            gateway_names={"my-wan"},
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", gateway="bogus-gw")],
+                managed_gateways=[],
+                gateway_names={"my-wan"},
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_gateway")
 
@@ -214,10 +237,12 @@ class TestGateway:
             config={"network": "172.21.0.0/24"},
         )
         validator.validate(
-            [r],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[r],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_gateway")
 
@@ -225,10 +250,12 @@ class TestGateway:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", gateway="")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", gateway="")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_gateway")
 
@@ -236,10 +263,12 @@ class TestGateway:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", gateway=12345)],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", gateway=12345)],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "static_route_bad_gateway")
 
@@ -254,10 +283,12 @@ class TestProtocolMatch:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("ok", network="172.21.0.0/24", gateway="my-wan")],
-            managed_gateways=[_gw("my-wan", protocol="inet")],
-            gateway_names={"my-wan"},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", network="172.21.0.0/24", gateway="my-wan")],
+                managed_gateways=[_gw("my-wan", protocol="inet")],
+                gateway_names={"my-wan"},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "static_route_ok_protocol_match")
 
@@ -265,10 +296,12 @@ class TestProtocolMatch:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("ok", network="2001:db8::/32", gateway="my-wan6")],
-            managed_gateways=[_gw("my-wan6", protocol="inet6")],
-            gateway_names={"my-wan6"},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", network="2001:db8::/32", gateway="my-wan6")],
+                managed_gateways=[_gw("my-wan6", protocol="inet6")],
+                gateway_names={"my-wan6"},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "static_route_ok_protocol_match")
 
@@ -276,10 +309,12 @@ class TestProtocolMatch:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", network="172.21.0.0/24", gateway="my-wan6")],
-            managed_gateways=[_gw("my-wan6", protocol="inet6")],
-            gateway_names={"my-wan6"},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", network="172.21.0.0/24", gateway="my-wan6")],
+                managed_gateways=[_gw("my-wan6", protocol="inet6")],
+                gateway_names={"my-wan6"},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "static_route_bad_protocol_match")
 
@@ -287,10 +322,12 @@ class TestProtocolMatch:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", network="2001:db8::/32", gateway="my-wan")],
-            managed_gateways=[_gw("my-wan", protocol="inet")],
-            gateway_names={"my-wan"},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", network="2001:db8::/32", gateway="my-wan")],
+                managed_gateways=[_gw("my-wan", protocol="inet")],
+                gateway_names={"my-wan"},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "static_route_bad_protocol_match")
 
@@ -299,10 +336,12 @@ class TestProtocolMatch:
     ) -> None:
         # ``WAN_DHCP6`` is heuristically v6 (trailing ``6``).
         validator.validate(
-            [_route("bad", network="172.21.0.0/24", gateway="WAN_DHCP6")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP6"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", network="172.21.0.0/24", gateway="WAN_DHCP6")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP6"},
+            )
         )
         assert _failures(report, "static_route_bad_protocol_match")
 
@@ -311,10 +350,12 @@ class TestProtocolMatch:
     ) -> None:
         # ``WAN_DHCP`` is heuristically v4 (no trailing ``6``).
         validator.validate(
-            [_route("bad", network="2001:db8::/32", gateway="WAN_DHCP")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", network="2001:db8::/32", gateway="WAN_DHCP")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_protocol_match")
 
@@ -322,10 +363,12 @@ class TestProtocolMatch:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("ok", network="172.21.0.0/24", gateway="WAN_DHCP")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", network="172.21.0.0/24", gateway="WAN_DHCP")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert not _failures(report, "static_route_ok_protocol_match")
 
@@ -340,10 +383,12 @@ class TestBoolFields:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", enabled="yes")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", enabled="yes")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_enabled")
 
@@ -351,10 +396,12 @@ class TestBoolFields:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", lock="yes")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", lock="yes")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_lock")
 
@@ -362,10 +409,12 @@ class TestBoolFields:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("ok", enabled=True)],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", enabled=True)],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert not _failures(report, "static_route_ok_enabled")
 
@@ -373,10 +422,12 @@ class TestBoolFields:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("ok", lock=True)],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", lock=True)],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert not _failures(report, "static_route_ok_lock")
 
@@ -389,10 +440,12 @@ class TestBoolFields:
 class TestDescription:
     def test_string_passes(self, validator: StaticRouteValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_route("ok", description="my description")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", description="my description")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert not _failures(report, "static_route_ok_description")
 
@@ -400,10 +453,12 @@ class TestDescription:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_route("bad", description=12345)],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("bad", description=12345)],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "static_route_bad_description")
 
@@ -418,10 +473,9 @@ class TestEdgeCases:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                static_routes=[], managed_gateways=[], gateway_names=set(), existing_gateways=set()
+            )
         )
         assert report.results == []
 
@@ -429,14 +483,16 @@ class TestEdgeCases:
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [
-                _route("a"),
-                _route("b", network="172.16.0.0/24"),
-                _route("c", network="192.168.0.0/24"),
-            ],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[
+                    _route("a"),
+                    _route("b", network="172.16.0.0/24"),
+                    _route("c", network="192.168.0.0/24"),
+                ],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         names = {c.check_name for c in report.results if c.check_name.endswith("_gateway")}
         assert "static_route_a_gateway" in names
@@ -456,10 +512,12 @@ class TestEdgeCases:
             config={"interface": "wan", "protocol": "ipv7", "gateway": "192.0.2.1"},
         )
         validator.validate(
-            [_route("ok", gateway="bad-gw")],
-            managed_gateways=[bad_gw],
-            gateway_names={"bad-gw"},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", gateway="bad-gw")],
+                managed_gateways=[bad_gw],
+                gateway_names={"bad-gw"},
+                existing_gateways=set(),
+            )
         )
         # Gateway ref still resolves — the protocol-match check falls
         # through to the trailing-6 heuristic (no trailing 6 ⇒ v4),
@@ -487,11 +545,13 @@ class TestDottedPathXRefs:
         gw = _gw("WAN_GW", protocol="inet")
         index = build_xref_index([gw])
         validator.validate(
-            [_route("ok", gateway="routing.gateways.WAN_GW")],
-            managed_gateways=[gw],
-            gateway_names={"WAN_GW"},
-            existing_gateways=set(),
-            index=index,
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", gateway="routing.gateways.WAN_GW")],
+                managed_gateways=[gw],
+                gateway_names={"WAN_GW"},
+                existing_gateways=set(),
+                index=index,
+            )
         )
         assert not _failures(report, "static_route_ok_gateway")
 
@@ -503,11 +563,13 @@ class TestDottedPathXRefs:
         gw = _gw("WAN_GW", protocol="inet")
         index = build_xref_index([gw])
         validator.validate(
-            [_route("ok", gateway="gateways.WAN_GW")],
-            managed_gateways=[gw],
-            gateway_names={"WAN_GW"},
-            existing_gateways=set(),
-            index=index,
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", gateway="gateways.WAN_GW")],
+                managed_gateways=[gw],
+                gateway_names={"WAN_GW"},
+                existing_gateways=set(),
+                index=index,
+            )
         )
         assert not _failures(report, "static_route_ok_gateway")
 
@@ -521,11 +583,13 @@ class TestDottedPathXRefs:
         # validate against the live gateway set.
         index = build_xref_index([])
         validator.validate(
-            [_route("ok", gateway="WAN_DHCP")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
-            index=index,
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", gateway="WAN_DHCP")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+                index=index,
+            )
         )
         assert not _failures(report, "static_route_ok_gateway")
 
@@ -535,10 +599,12 @@ class TestDottedPathXRefs:
         # Calling without ``index`` is the pre-#793 contract: bare
         # names only, no dotted-form support.
         validator.validate(
-            [_route("ok", gateway="WAN_DHCP")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", gateway="WAN_DHCP")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert not _failures(report, "static_route_ok_gateway")
 
@@ -551,10 +617,12 @@ class TestDottedPathXRefs:
         # which also misses → final ERROR.
         index = build_xref_index([])
         validator.validate(
-            [_route("ok", gateway="routing.gateways.GHOST")],
-            managed_gateways=[],
-            gateway_names=set(),
-            existing_gateways=set(),
-            index=index,
+            OPNsenseValidationContext(
+                static_routes=[_route("ok", gateway="routing.gateways.GHOST")],
+                managed_gateways=[],
+                gateway_names=set(),
+                existing_gateways=set(),
+                index=index,
+            )
         )
         assert _failures(report, "static_route_ok_gateway")

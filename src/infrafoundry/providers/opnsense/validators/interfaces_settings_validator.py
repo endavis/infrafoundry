@@ -8,13 +8,17 @@ Unknown keys are errors; boolean fields must be ``bool``,
 
 from __future__ import annotations
 
+from typing import override
+
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 from ..services.interfaces_settings import BOOL_FIELDS, FIELD_MAP, VLAN_FILTER_VALUES
 
 
-class InterfacesSettingsValidator:
+class InterfacesSettingsValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates ``interfaces.settings`` singleton resources."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -25,8 +29,14 @@ class InterfacesSettingsValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
-        """Validate ``interfaces.settings`` resources."""
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
+        """Validate ``interfaces.settings`` resources.
+
+        Args:
+            context: Validation context carrying the resources and lookups this validator checks.
+        """
+        resources = context.resources
         for resource in resources:
             self._validate_one(resource)
 

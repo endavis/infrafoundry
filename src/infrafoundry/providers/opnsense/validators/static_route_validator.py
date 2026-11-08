@@ -26,10 +26,13 @@ Cross-reference targets:
 from __future__ import annotations
 
 import ipaddress
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # All xref lookups for the opnsense provider use this dotted type for
 # managed gateways. Pulled out as a constant so the bare-name fallback
@@ -37,7 +40,7 @@ from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_
 _MANAGED_GATEWAY_TYPE = "routing.gateways"
 
 
-class StaticRouteValidator:
+class StaticRouteValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense static-route resources against managed + live state."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -48,31 +51,18 @@ class StaticRouteValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        static_routes: list[ResourceConfig],
-        managed_gateways: list[ResourceConfig],
-        gateway_names: set[str],
-        existing_gateways: set[str],
-        index: XRefIndex | None = None,
-    ) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate static-route resources.
 
         Args:
-            static_routes: ``static_routes`` ``ResourceConfig`` entries.
-            managed_gateways: ``gateways`` ``ResourceConfig`` entries —
-                used to resolve the gateway's IP protocol for the protocol-
-                match check.
-            gateway_names: Set of managed gateway names declared in YAML.
-            existing_gateways: Set of live gateway names returned by
-                OPNsense's ``searchGateway`` (managed + dynamic).
-            index: Optional dotted-type cross-reference index (#793).
-                When provided, the gateway field accepts dotted-path
-                forms like ``routing.gateways.WAN_GW`` in addition to
-                bare names. ``None`` falls back to bare-name lookup
-                only — preserving the pre-#793 behaviour for callers
-                that haven't adopted the new resolver yet.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        static_routes = context.static_routes
+        managed_gateways = context.managed_gateways or []
+        gateway_names = context.gateway_names
+        existing_gateways = context.existing_gateways
+        index = context.index
         gateway_protocols = _index_managed_gateway_protocols(managed_gateways)
         for route in static_routes:
             self._validate_one(

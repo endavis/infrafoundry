@@ -16,6 +16,7 @@ from infrafoundry.providers.opnsense.validators import (
     UnboundValidator,
     VLANValidator,
 )
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.gateway_validator import GatewayValidator
 from infrafoundry.providers.opnsense.validators.nat_rule_validator import NATRuleValidator
 from tests.helpers.env import make_env_config
@@ -489,21 +490,45 @@ class TestGetExistingInterfaces:
             provider="opnsense",
             config={"interface": "wan", "action": "pass", "direction": "in"},
         )
-        FirewallRuleValidator(report).validate([fw], set(), set(), set(), existing, {}, set())
+        FirewallRuleValidator(report).validate(
+            OPNsenseValidationContext(
+                firewall_rules=[fw],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces=existing,
+                existing_aliases={},
+                existing_gateways=set(),
+            )
+        )
         nat = ResourceConfig(
             name="nat1",
             type="firewall.nat_rules",
             provider="opnsense",
             config={"interface": "wan"},
         )
-        NATRuleValidator(report).validate([nat], set(), set(), existing, {})
+        NATRuleValidator(report).validate(
+            OPNsenseValidationContext(
+                nat_rules=[nat],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces=existing,
+                existing_aliases={},
+            )
+        )
         gw = ResourceConfig(
             name="WAN_GW",
             type="routing.gateways",
             provider="opnsense",
             config={"interface": "wan", "protocol": "inet", "gateway": "192.0.2.1"},
         )
-        GatewayValidator(report).validate([gw], set(), existing)
+        GatewayValidator(report).validate(
+            OPNsenseValidationContext(
+                gateways=[gw],
+                interface_assignment_names=set(),
+                existing_interfaces=existing,
+            )
+        )
 
         bad = [r for r in report.results if "unknown interface" in r.message]
         assert not bad

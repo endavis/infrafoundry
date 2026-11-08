@@ -5,6 +5,7 @@ configurations against live API state before deployment.
 """
 
 import logging
+from dataclasses import replace
 from typing import Any, TypedDict, cast
 
 import urllib3
@@ -13,7 +14,7 @@ from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import ReferenceValidationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import OPNsenseProviderSettings
-from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense import endpoints
 from infrafoundry.providers.opnsense.api_client import OPNsenseClient
@@ -38,6 +39,7 @@ from infrafoundry.providers.opnsense.validators import (
     VLANValidator,
     build_xref_index,
 )
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -287,79 +289,72 @@ class OPNsenseValidator:
                 api_url, api_key, api_secret
             )
 
-            # Validate using specialized validators
-            self.firewall_rule_validator.validate(
-                resource_refs["firewall_rules"],
-                reference_refs["alias_names"],
-                reference_refs["interface_assignment_names"],
-                reference_refs["gateway_names"],
-                existing_interfaces,
-                existing_aliases,
-                existing_gateways,
+            # Validate using specialized validators. Each validator reads the
+            # fields it needs from one context; the resource-list validators
+            # get their own slice through ``replace``.
+            context = OPNsenseValidationContext(
+                resources=resources,
+                firewall_rules=resource_refs["firewall_rules"],
+                vlans=resource_refs["vlans"],
+                assignments=resource_refs["interface_assignments"],
+                nat_rules=resource_refs["nat_rules"],
+                gateways=resource_refs["gateways"],
+                static_routes=resource_refs["static_routes"],
+                virtual_ips=resource_refs["virtual_ips"],
+                host_aliases=resource_refs["unbound_host_aliases"],
+                dhcp4_reservations=resource_refs["kea_dhcp4_reservations"],
+                dhcp6_reservations=resource_refs["kea_dhcp6_reservations"],
+                alias_names=reference_refs["alias_names"],
+                interface_assignment_names=reference_refs["interface_assignment_names"],
+                gateway_names=reference_refs["gateway_names"],
+                vlan_names=reference_refs["vlan_names"],
+                managed_host_override_names=reference_refs["unbound_host_override_names"],
+                dhcp4_subnet_names=reference_refs["kea_dhcp4_subnet_names"],
+                dhcp6_subnet_names=reference_refs["kea_dhcp6_subnet_names"],
+                existing_interfaces=existing_interfaces,
+                existing_aliases=existing_aliases,
+                existing_gateways=existing_gateways,
+                existing_host_override_names=existing_unbound_host_overrides,
                 managed_gateways=reference_refs["gateways"],
                 index=xref_index,
             )
-            self.vlan_validator.validate(
-                resource_refs["vlans"],
-                existing_interfaces,
+            run_validators(
+                (
+                    self.firewall_rule_validator,
+                    self.vlan_validator,
+                    self.interface_assignment_validator,
+                    self.nat_rule_validator,
+                    self.gateway_validator,
+                    self.static_route_validator,
+                    self.virtual_ip_validator,
+                ),
+                context,
             )
-            self.interface_assignment_validator.validate(
-                resource_refs["interface_assignments"],
-                reference_refs["vlan_names"],
-                existing_interfaces,
+            self.unbound_validator.validate(
+                replace(context, resources=resource_refs["unbound_host_overrides"])
             )
-            self.nat_rule_validator.validate(
-                resource_refs["nat_rules"],
-                reference_refs["alias_names"],
-                reference_refs["interface_assignment_names"],
-                existing_interfaces,
-                existing_aliases,
-                index=xref_index,
+            run_validators(
+                (self.unbound_host_alias_validator, self.unbound_forward_validator),
+                replace(context, forwards=resource_refs["unbound_forwards"]),
             )
-            self.gateway_validator.validate(
-                resource_refs["gateways"],
-                reference_refs["interface_assignment_names"],
-                existing_interfaces,
+            self.unbound_advanced_validator.validate(
+                replace(context, resources=resource_refs["unbound_advanced"])
             )
-            self.static_route_validator.validate(
-                resource_refs["static_routes"],
-                reference_refs["gateways"],
-                reference_refs["gateway_names"],
-                existing_gateways,
-                index=xref_index,
+            self.interfaces_settings_validator.validate(
+                replace(context, resources=resource_refs["interfaces_settings"])
             )
-            self.virtual_ip_validator.validate(
-                resource_refs["virtual_ips"],
-                reference_refs["interface_assignment_names"],
-                existing_interfaces,
-                index=xref_index,
+            self.kea_reservation_validator.validate(context)
+            self.radvd_validator.validate(replace(context, resources=resource_refs["radvd"]))
+            self.cron_jobs_validator.validate(
+                replace(context, resources=resource_refs["cron_jobs"])
             )
-            self.unbound_validator.validate(resource_refs["unbound_host_overrides"])
-            self.unbound_host_alias_validator.validate(
-                resource_refs["unbound_host_aliases"],
-                reference_refs["unbound_host_override_names"],
-                existing_unbound_host_overrides,
-                index=xref_index,
+            self.system_firmware_validator.validate(
+                replace(context, resources=resource_refs["system_firmware"])
             )
-            self.unbound_forward_validator.validate(resource_refs["unbound_forwards"])
-            self.unbound_advanced_validator.validate(resource_refs["unbound_advanced"])
-            self.interfaces_settings_validator.validate(resource_refs["interfaces_settings"])
-            self.kea_reservation_validator.validate(
-                resource_refs["kea_dhcp4_reservations"],
-                resource_refs["kea_dhcp6_reservations"],
-                reference_refs["kea_dhcp4_subnet_names"],
-                reference_refs["kea_dhcp6_subnet_names"],
-                index=xref_index,
+            self.system_tuning_validator.validate(
+                replace(context, resources=resource_refs["system_tuning"])
             )
-            self.radvd_validator.validate(
-                resource_refs["radvd"],
-                reference_refs["interface_assignment_names"],
-                existing_interfaces,
-            )
-            self.cron_jobs_validator.validate(resource_refs["cron_jobs"])
-            self.system_firmware_validator.validate(resource_refs["system_firmware"])
-            self.system_tuning_validator.validate(resource_refs["system_tuning"])
-            self.resource_name_validator.validate(resources)
+            self.resource_name_validator.validate(context)
 
         except Exception as exc:
             check_name = "opnsense_validation"

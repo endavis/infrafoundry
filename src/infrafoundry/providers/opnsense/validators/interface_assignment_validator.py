@@ -20,10 +20,12 @@ Schema fields validated:
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # ``<nic>_vlan<tag>`` — capture the parent NIC and tag separately. The
 # OPNsense convention is e.g. ``vtnet0_vlan100``; the underscore between
@@ -31,7 +33,7 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 _VLAN_CHILD_PATTERN = re.compile(r"^(?P<nic>[A-Za-z0-9_]+?)_vlan(?P<tag>\d+)$")
 
 
-class InterfaceAssignmentValidator:
+class InterfaceAssignmentValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense interface assignments against live + managed state."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -42,21 +44,16 @@ class InterfaceAssignmentValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        assignments: list[ResourceConfig],
-        vlan_names: set[str],
-        existing_interfaces: dict[str, Any],
-    ) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate interface-assignment resources.
 
         Args:
-            assignments: ``interface_assignments`` ``ResourceConfig`` entries.
-            vlan_names: Set of VLAN resource names declared in the config —
-                a ``device:`` may reference a managed VLAN by name.
-            existing_interfaces: Map of NIC name -> interface metadata
-                returned by ``OPNsenseValidator._get_existing_interfaces``.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        assignments = context.assignments
+        vlan_names = context.vlan_names
+        existing_interfaces = context.existing_interfaces
         for assignment in assignments:
             self._validate_one(assignment, vlan_names, existing_interfaces)
 

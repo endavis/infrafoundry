@@ -6,6 +6,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.unbound_validator import UnboundValidator
 
 
@@ -34,7 +35,7 @@ def test_validate_valid_override(validator: UnboundValidator, report: MagicMock)
         },
     )
 
-    validator.validate([override])
+    validator.validate(OPNsenseValidationContext(resources=[override]))
 
     # hostname, domain, server = 3 checks
     assert report.add_check.call_count == 3
@@ -53,7 +54,7 @@ def test_validate_missing_hostname(validator: UnboundValidator, report: MagicMoc
         },
     )
 
-    validator.validate([override])
+    validator.validate(OPNsenseValidationContext(resources=[override]))
 
     # Find the hostname check
     hostname_call = None
@@ -79,7 +80,7 @@ def test_validate_missing_domain(validator: UnboundValidator, report: MagicMock)
         },
     )
 
-    validator.validate([override])
+    validator.validate(OPNsenseValidationContext(resources=[override]))
 
     # Find the domain check
     domain_call = None
@@ -106,7 +107,7 @@ def test_validate_empty_hostname(validator: UnboundValidator, report: MagicMock)
         },
     )
 
-    validator.validate([override])
+    validator.validate(OPNsenseValidationContext(resources=[override]))
 
     hostname_call = None
     for call in report.add_check.call_args_list:
@@ -131,7 +132,7 @@ def test_validate_invalid_server_ip(validator: UnboundValidator, report: MagicMo
         },
     )
 
-    validator.validate([override])
+    validator.validate(OPNsenseValidationContext(resources=[override]))
 
     server_call = None
     for call in report.add_check.call_args_list:
@@ -158,7 +159,7 @@ def test_validate_valid_ipv6_server(validator: UnboundValidator, report: MagicMo
         },
     )
 
-    validator.validate([override])
+    validator.validate(OPNsenseValidationContext(resources=[override]))
 
     server_call = None
     for call in report.add_check.call_args_list:
@@ -182,7 +183,7 @@ def test_validate_no_server_field(validator: UnboundValidator, report: MagicMock
         },
     )
 
-    validator.validate([override])
+    validator.validate(OPNsenseValidationContext(resources=[override]))
 
     # Only hostname and domain checks (no server check)
     assert report.add_check.call_count == 2
@@ -192,7 +193,7 @@ def test_validate_no_server_field(validator: UnboundValidator, report: MagicMock
 
 def test_validate_empty_resources(validator: UnboundValidator, report: MagicMock) -> None:
     """Test validation with no resources produces no checks."""
-    validator.validate([])
+    validator.validate(OPNsenseValidationContext(resources=[]))
 
     report.add_check.assert_not_called()
 
@@ -222,7 +223,7 @@ def test_validate_multiple_resources(validator: UnboundValidator, report: MagicM
         ),
     ]
 
-    validator.validate(overrides)
+    validator.validate(OPNsenseValidationContext(resources=overrides))
 
     # 3 checks per resource (hostname, domain, server) * 2 resources = 6
     assert report.add_check.call_count == 6
@@ -253,7 +254,7 @@ def test_validate_mixed_valid_and_invalid(validator: UnboundValidator, report: M
         ),
     ]
 
-    validator.validate(overrides)
+    validator.validate(OPNsenseValidationContext(resources=overrides))
 
     # First resource: 3 passes. Second resource: 3 failures.
     assert report.add_check.call_count == 6

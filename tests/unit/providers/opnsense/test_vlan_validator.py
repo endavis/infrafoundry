@@ -16,6 +16,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.vlan_validator import VLANValidator
 
 
@@ -49,7 +50,11 @@ def _vlan(name: str, **config_overrides: Any) -> ResourceConfig:
 
 def test_validate_device_found(validator: VLANValidator, report: MagicMock) -> None:
     """VLAN with existing parent NIC passes the device check."""
-    validator.validate([_vlan("vlan100", device="em0")], {"em0": {"device": "em0"}})
+    validator.validate(
+        OPNsenseValidationContext(
+            vlans=[_vlan("vlan100", device="em0")], existing_interfaces={"em0": {"device": "em0"}}
+        )
+    )
 
     # First call should be the device check (passed=True at INFO level).
     device_calls = [
@@ -65,7 +70,11 @@ def test_validate_device_found(validator: VLANValidator, report: MagicMock) -> N
 
 def test_validate_device_not_found(validator: VLANValidator, report: MagicMock) -> None:
     """Bad device reference is reported as ERROR."""
-    validator.validate([_vlan("vlan100", device="missing")], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(
+            vlans=[_vlan("vlan100", device="missing")], existing_interfaces={"em0": {}}
+        )
+    )
 
     device_calls = [
         call
@@ -86,7 +95,7 @@ def test_validate_no_device_skipped(validator: VLANValidator, report: MagicMock)
         provider="opnsense",
         config={},
     )
-    validator.validate([vlan], {"em0": {}})
+    validator.validate(OPNsenseValidationContext(vlans=[vlan], existing_interfaces={"em0": {}}))
     device_calls = [
         call for call in report.add_check.call_args_list if call[1]["check_name"] == "vlan_v_device"
     ]
@@ -95,7 +104,7 @@ def test_validate_no_device_skipped(validator: VLANValidator, report: MagicMock)
 
 def test_validate_empty_vlans(validator: VLANValidator, report: MagicMock) -> None:
     """Empty VLAN list yields no checks."""
-    validator.validate([], {"em0": {}})
+    validator.validate(OPNsenseValidationContext(vlans=[], existing_interfaces={"em0": {}}))
     report.add_check.assert_not_called()
 
 
@@ -105,7 +114,9 @@ def test_validate_multiple_vlans(validator: VLANValidator, report: MagicMock) ->
         _vlan("vlan100", device="em0"),
         _vlan("vlan200", device="em1"),
     ]
-    validator.validate(vlans, {"em0": {}, "em1": {}})
+    validator.validate(
+        OPNsenseValidationContext(vlans=vlans, existing_interfaces={"em0": {}, "em1": {}})
+    )
 
     device_calls = [
         call
@@ -123,7 +134,7 @@ def test_validate_mixed_results(validator: VLANValidator, report: MagicMock) -> 
         _vlan("vlan100", device="em0"),
         _vlan("vlan200", device="missing"),
     ]
-    validator.validate(vlans, {"em0": {}})
+    validator.validate(OPNsenseValidationContext(vlans=vlans, existing_interfaces={"em0": {}}))
     device_calls = sorted(
         (
             call
@@ -142,27 +153,37 @@ def test_validate_mixed_results(validator: VLANValidator, report: MagicMock) -> 
 
 
 def test_validate_tag_in_range_emits_no_error(validator: VLANValidator, report: MagicMock) -> None:
-    validator.validate([_vlan("v1", tag=100)], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(vlans=[_vlan("v1", tag=100)], existing_interfaces={"em0": {}})
+    )
     tag_errors = [c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_tag"]
     assert tag_errors == []
 
 
 def test_validate_tag_out_of_range_high(validator: VLANValidator, report: MagicMock) -> None:
-    validator.validate([_vlan("v1", tag=5000)], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(vlans=[_vlan("v1", tag=5000)], existing_interfaces={"em0": {}})
+    )
     tag_calls = [c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_tag"]
     assert len(tag_calls) == 1
     assert tag_calls[0][1]["passed"] is False
 
 
 def test_validate_tag_out_of_range_low(validator: VLANValidator, report: MagicMock) -> None:
-    validator.validate([_vlan("v1", tag=0)], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(vlans=[_vlan("v1", tag=0)], existing_interfaces={"em0": {}})
+    )
     tag_calls = [c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_tag"]
     assert len(tag_calls) == 1
     assert tag_calls[0][1]["passed"] is False
 
 
 def test_validate_tag_non_integer(validator: VLANValidator, report: MagicMock) -> None:
-    validator.validate([_vlan("v1", tag="not-int")], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(
+            vlans=[_vlan("v1", tag="not-int")], existing_interfaces={"em0": {}}
+        )
+    )
     tag_calls = [c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_tag"]
     assert len(tag_calls) == 1
     assert tag_calls[0][1]["passed"] is False
@@ -176,7 +197,9 @@ def test_validate_tag_non_integer(validator: VLANValidator, report: MagicMock) -
 def test_validate_priority_in_range_emits_no_error(
     validator: VLANValidator, report: MagicMock
 ) -> None:
-    validator.validate([_vlan("v1", priority=3)], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(vlans=[_vlan("v1", priority=3)], existing_interfaces={"em0": {}})
+    )
     priority_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_priority"
     ]
@@ -184,7 +207,9 @@ def test_validate_priority_in_range_emits_no_error(
 
 
 def test_validate_priority_out_of_range(validator: VLANValidator, report: MagicMock) -> None:
-    validator.validate([_vlan("v1", priority=9)], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(vlans=[_vlan("v1", priority=9)], existing_interfaces={"em0": {}})
+    )
     priority_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_priority"
     ]
@@ -193,7 +218,11 @@ def test_validate_priority_out_of_range(validator: VLANValidator, report: MagicM
 
 
 def test_validate_priority_non_integer(validator: VLANValidator, report: MagicMock) -> None:
-    validator.validate([_vlan("v1", priority="x")], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(
+            vlans=[_vlan("v1", priority="x")], existing_interfaces={"em0": {}}
+        )
+    )
     priority_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_priority"
     ]
@@ -207,7 +236,9 @@ def test_validate_priority_non_integer(validator: VLANValidator, report: MagicMo
 
 
 def test_validate_lock_boolean_true_passes(validator: VLANValidator, report: MagicMock) -> None:
-    validator.validate([_vlan("v1", lock=True)], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(vlans=[_vlan("v1", lock=True)], existing_interfaces={"em0": {}})
+    )
     lock_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_lock"
     ]
@@ -216,7 +247,9 @@ def test_validate_lock_boolean_true_passes(validator: VLANValidator, report: Mag
 
 
 def test_validate_lock_boolean_false_passes(validator: VLANValidator, report: MagicMock) -> None:
-    validator.validate([_vlan("v1", lock=False)], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(vlans=[_vlan("v1", lock=False)], existing_interfaces={"em0": {}})
+    )
     lock_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_lock"
     ]
@@ -224,7 +257,9 @@ def test_validate_lock_boolean_false_passes(validator: VLANValidator, report: Ma
 
 
 def test_validate_lock_must_be_boolean(validator: VLANValidator, report: MagicMock) -> None:
-    validator.validate([_vlan("v1", lock="yes")], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(vlans=[_vlan("v1", lock="yes")], existing_interfaces={"em0": {}})
+    )
     lock_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_lock"
     ]
@@ -234,7 +269,9 @@ def test_validate_lock_must_be_boolean(validator: VLANValidator, report: MagicMo
 
 
 def test_validate_lock_absent_skipped(validator: VLANValidator, report: MagicMock) -> None:
-    validator.validate([_vlan("v1")], {"em0": {}})
+    validator.validate(
+        OPNsenseValidationContext(vlans=[_vlan("v1")], existing_interfaces={"em0": {}})
+    )
     lock_calls = [
         c for c in report.add_check.call_args_list if c[1]["check_name"] == "vlan_v1_lock"
     ]

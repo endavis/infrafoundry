@@ -21,15 +21,19 @@ Cross-reference targets:
 
 from __future__ import annotations
 
+from typing import override
+
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # Cross-reference target type for the host-alias `host` field.
 _MANAGED_HOST_OVERRIDE_TYPE = "unbound.host_overrides"
 
 
-class UnboundHostAliasValidator:
+class UnboundHostAliasValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense Unbound host-alias resources against managed + live state."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -40,29 +44,17 @@ class UnboundHostAliasValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        host_aliases: list[ResourceConfig],
-        managed_host_override_names: set[str],
-        existing_host_override_names: set[str],
-        index: XRefIndex | None = None,
-    ) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate Unbound host-alias resources.
 
         Args:
-            host_aliases: ``unbound_host_alias`` ``ResourceConfig`` entries.
-            managed_host_override_names: Set of managed
-                ``unbound_host_override`` names declared in YAML.
-            existing_host_override_names: Set of live host-override names
-                returned by OPNsense's ``searchHostOverride`` (the
-                ``hostname.domain`` form, plus the bare hostname for
-                short-name references).
-            index: Optional dotted-type cross-reference index (#793).
-                When provided, the ``host`` field accepts dotted-path
-                forms like ``unbound.host_overrides.<name>`` in
-                addition to bare names. ``None`` falls back to bare-
-                name lookup only.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        host_aliases = context.host_aliases
+        managed_host_override_names = context.managed_host_override_names
+        existing_host_override_names = context.existing_host_override_names
+        index = context.index
         seen_keys: dict[tuple[str, str], str] = {}
         for alias in host_aliases:
             self._validate_one(

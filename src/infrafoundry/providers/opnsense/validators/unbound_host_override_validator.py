@@ -28,9 +28,12 @@ Field rules:
 from __future__ import annotations
 
 import ipaddress
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # Allowed values for the ``rr`` discriminator. The parser already rejects
 # the empty string and non-string values; this list narrows further.
@@ -38,7 +41,7 @@ _ALLOWED_RR: tuple[str, ...] = ("A", "AAAA", "MX")
 _DEFAULT_RR = "A"
 
 
-class UnboundHostOverrideValidator:
+class UnboundHostOverrideValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense Unbound host-override resources."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -49,15 +52,17 @@ class UnboundHostOverrideValidator:
         """
         self.report = report
 
-    def validate(self, overrides: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate Unbound host-override resources.
 
         Args:
-            overrides: ``unbound_host_override`` ``ResourceConfig`` entries.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        overrides = context.overrides
         seen_keys: dict[tuple[str, str, str], str] = {}
-        for override in overrides:
-            self._validate_one(override, seen_keys=seen_keys)
+        for host_override in overrides:
+            self._validate_one(host_override, seen_keys=seen_keys)
 
     def _validate_one(
         self,

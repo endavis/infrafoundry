@@ -34,11 +34,13 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from typing import Any
+from typing import Any, override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # Cross-reference target type for the virtual-IP `interface` field.
 _MANAGED_INTERFACE_TYPE = "interfaces.assignments"
@@ -57,7 +59,7 @@ _VHID_MAX = 255
 _SECRET_URI = re.compile(r"^secret://[^/]+/.+$")
 
 
-class VirtualIPValidator:
+class VirtualIPValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense virtual-IP resources against managed + live state."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -68,27 +70,17 @@ class VirtualIPValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        virtual_ips: list[ResourceConfig],
-        managed_interface_names: set[str],
-        existing_interfaces: dict[str, Any],
-        index: XRefIndex | None = None,
-    ) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate virtual-IP resources.
 
         Args:
-            virtual_ips: ``virtual_ips`` ``ResourceConfig`` entries.
-            managed_interface_names: Set of managed
-                ``interface_assignments`` resource names declared in
-                YAML.
-            existing_interfaces: Live interface map from
-                ``OPNsenseValidator._get_existing_interfaces``.
-            index: Optional dotted-type cross-reference index (#793).
-                When provided, the ``interface`` field accepts dotted-
-                path forms in addition to bare names. ``None`` falls
-                back to bare-name lookup only.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        virtual_ips = context.virtual_ips
+        managed_interface_names = context.managed_interface_names
+        existing_interfaces = context.existing_interfaces
+        index = context.index
         seen_keys: dict[tuple[str, str, str, str], str] = {}
         for vip in virtual_ips:
             self._validate_one(

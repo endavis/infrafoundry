@@ -38,11 +38,13 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from typing import Any
+from typing import Any, override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 from ..services.firewall_rule import (
     ACTION_CHOICES,
@@ -84,7 +86,7 @@ _IDENTITY_PROBE = re.compile(r"\[infrafoundry:[^\]]*\]")
 _DESCRIPTION_MAX_LENGTH = 200
 
 
-class FirewallRuleValidator:
+class FirewallRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense firewall-rule resources against managed + live state."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -95,39 +97,22 @@ class FirewallRuleValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        firewall_rules: list[ResourceConfig],
-        alias_names: set[str],
-        interface_assignment_names: set[str],
-        gateway_names: set[str],
-        existing_interfaces: dict[str, Any],
-        existing_aliases: dict[str, Any],
-        existing_gateways: set[str],
-        managed_gateways: list[ResourceConfig] | None = None,
-        index: XRefIndex | None = None,
-    ) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate firewall-rule resources.
 
         Args:
-            firewall_rules: ``firewall_rules`` ``ResourceConfig`` entries.
-            alias_names: Set of managed alias names declared in YAML.
-            interface_assignment_names: Set of managed
-                interface-assignment names declared in YAML.
-            gateway_names: Set of managed gateway names declared in YAML.
-            existing_interfaces: Live interface map.
-            existing_aliases: Live alias map.
-            existing_gateways: Set of live gateway names returned by
-                ``searchGateway``.
-            managed_gateways: ``gateways`` ``ResourceConfig`` entries —
-                used to resolve the gateway's IP protocol for the
-                protocol-match check.
-            index: Optional dotted-type cross-reference index (#793).
-                When provided, alias / interface / gateway fields
-                accept dotted-path forms in addition to bare names.
-                ``None`` falls back to bare-name lookup only,
-                preserving the pre-#793 behaviour.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        firewall_rules = context.firewall_rules
+        alias_names = context.alias_names
+        interface_assignment_names = context.interface_assignment_names
+        gateway_names = context.gateway_names
+        existing_interfaces = context.existing_interfaces
+        existing_aliases = context.existing_aliases
+        existing_gateways = context.existing_gateways
+        managed_gateways = context.managed_gateways
+        index = context.index
         gateway_protocols = _index_managed_gateway_protocols(managed_gateways or [])
         for rule in firewall_rules:
             self._validate_one(

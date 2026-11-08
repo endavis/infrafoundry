@@ -25,6 +25,7 @@ from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.cron_jobs_validator import CronJobsValidator
 
 # ---------------------------------------------------------------------------
@@ -60,7 +61,7 @@ def _failures(report: ValidationReport, check_name: str) -> list[Any]:
 def _run(resources: list[ResourceConfig]) -> ValidationReport:
     report = ValidationReport()
     validator = CronJobsValidator(report)
-    validator.validate(resources)
+    validator.validate(OPNsenseValidationContext(resources=resources))
     return report
 
 

@@ -17,10 +17,12 @@ Static checks only (no live-box access):
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # ---------------------------------------------------------------------------
 # Schedule value grammar
@@ -43,7 +45,7 @@ _TOKEN_RE = re.compile(r"^\*(?:/(\d+))?$|^(\d+)$|^(\d+)-(\d+)(?:/(\d+))?$")
 _IDENTITY_PROBE = re.compile(r"\[infrafoundry:[^\]]*\]")
 
 
-class CronJobsValidator:
+class CronJobsValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense cron-job resource definitions at plan time.
 
     Performs static checks only: no live-box access occurs in this class.
@@ -57,12 +59,14 @@ class CronJobsValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate all cron-job resources.
 
         Args:
-            resources: ``cron.jobs`` ``ResourceConfig`` entries.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        resources = context.resources
         if not resources:
             return
         self._check_unique_names(resources)

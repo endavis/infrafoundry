@@ -16,9 +16,12 @@ all OPNsense validators.
 from __future__ import annotations
 
 import re
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # OPNsense contrib plugins are conventionally named ``os-<slug>`` where
 # ``<slug>`` is lowercase alphanumeric plus hyphens. We warn (don't error)
@@ -27,7 +30,7 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 _PLUGIN_NAME_RE = re.compile(r"^os-[a-z0-9][a-z0-9\-]*$")
 
 
-class SystemFirmwareValidator:
+class SystemFirmwareValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates ``system.firmware`` singleton resources."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -38,8 +41,14 @@ class SystemFirmwareValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
-        """Validate ``system.firmware`` resources."""
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
+        """Validate ``system.firmware`` resources.
+
+        Args:
+            context: Validation context carrying the resources and lookups this validator checks.
+        """
+        resources = context.resources
         for resource in resources:
             self._validate_one(resource)
 

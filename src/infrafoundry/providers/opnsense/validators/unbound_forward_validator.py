@@ -27,16 +27,19 @@ Field rules:
 from __future__ import annotations
 
 import ipaddress
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # Allowed values for the ``type`` discriminator (defensive; the parser
 # already gates this).
 _ALLOWED_TYPES: tuple[str, ...] = ("forward", "dot")
 
 
-class UnboundForwardValidator:
+class UnboundForwardValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense Unbound forward resources."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -47,12 +50,14 @@ class UnboundForwardValidator:
         """
         self.report = report
 
-    def validate(self, forwards: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate Unbound forward resources.
 
         Args:
-            forwards: ``unbound_forward`` ``ResourceConfig`` entries.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        forwards = context.forwards
         seen_keys: dict[tuple[str, str, str, str], str] = {}
         for forward in forwards:
             self._validate_one(forward, seen_keys=seen_keys)

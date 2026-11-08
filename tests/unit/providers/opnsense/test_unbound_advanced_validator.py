@@ -10,19 +10,22 @@ import pytest
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validators import UnboundAdvancedValidator
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 
 def _run(config: dict[str, Any]) -> ValidationReport:
     report = ValidationReport()
     UnboundAdvancedValidator(report).validate(
-        [
-            ResourceConfig(
-                name="unbound.advanced",
-                type="unbound.advanced",
-                provider="opnsense",
-                config=config,
-            )
-        ]
+        OPNsenseValidationContext(
+            resources=[
+                ResourceConfig(
+                    name="unbound.advanced",
+                    type="unbound.advanced",
+                    provider="opnsense",
+                    config=config,
+                )
+            ]
+        )
     )
     return report
 

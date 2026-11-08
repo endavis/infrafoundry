@@ -21,6 +21,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.nat_rule_validator import (
     NATRuleValidator,
 )
@@ -90,11 +91,13 @@ class TestKind:
             config={"interface": "wan", "target": "wanip"},
         )
         validator.validate(
-            [r],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[r],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_kind")
 
@@ -111,21 +114,25 @@ class TestKind:
             config={"kind": "unknown", "interface": "wan"},
         )
         validator.validate(
-            [r],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[r],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_pf_kind")
 
     def test_outbound_passes(self, validator: NATRuleValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_outbound("ok")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_kind")
 
@@ -141,11 +148,13 @@ class TestDescriptionIdentityTag:
     ) -> None:
         # Probe is position-agnostic; suffix-style forging is also rejected.
         validator.validate(
-            [_outbound("evil", description="forged [infrafoundry:other]")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("evil", description="forged [infrafoundry:other]")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_evil_description")
 
@@ -153,11 +162,13 @@ class TestDescriptionIdentityTag:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", description="LAN egress NAT")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", description="LAN egress NAT")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_description")
 
@@ -165,11 +176,13 @@ class TestDescriptionIdentityTag:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("bad", description=123)],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("bad", description=123)],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_description")
 
@@ -184,11 +197,13 @@ class TestInterface:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", interface="lan")],
-            alias_names=set(),
-            interface_assignment_names={"lan"},
-            existing_interfaces={},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", interface="lan")],
+                alias_names=set(),
+                interface_assignment_names={"lan"},
+                existing_interfaces={},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_interface")
 
@@ -196,11 +211,13 @@ class TestInterface:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", interface="wan")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", interface="wan")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_interface")
 
@@ -208,11 +225,13 @@ class TestInterface:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("bad", interface="bogus")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("bad", interface="bogus")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_interface")
 
@@ -220,11 +239,13 @@ class TestInterface:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("bad", interface="")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("bad", interface="")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_interface")
 
@@ -245,11 +266,13 @@ class TestOutboundRequiredFields:
             config={"kind": "outbound", "interface": "wan"},
         )
         validator.validate(
-            [r],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[r],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_target")
 
@@ -265,11 +288,13 @@ class TestOneToOneRequiredFields:
             config={"kind": "one_to_one", "interface": "wan"},
         )
         validator.validate(
-            [r],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[r],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_external")
 
@@ -284,11 +309,13 @@ class TestNetReferences:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", source_net="any", destination_net="any")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", source_net="any", destination_net="any")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_source_net")
         assert not _failures(report, "nat_rule_ok_destination_net")
@@ -297,11 +324,13 @@ class TestNetReferences:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", source_net="lan_subnets")],
-            alias_names={"lan_subnets"},
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", source_net="lan_subnets")],
+                alias_names={"lan_subnets"},
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_source_net")
 
@@ -309,11 +338,13 @@ class TestNetReferences:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", source_net="existing_alias")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={"existing_alias": {"name": "existing_alias"}},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", source_net="existing_alias")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={"existing_alias": {"name": "existing_alias"}},
+            )
         )
         assert not _failures(report, "nat_rule_ok_source_net")
 
@@ -321,11 +352,13 @@ class TestNetReferences:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", source_net="172.21.0.1")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", source_net="172.21.0.1")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_source_net")
 
@@ -333,11 +366,13 @@ class TestNetReferences:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", source_net="172.21.0.0/24")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", source_net="172.21.0.0/24")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_source_net")
 
@@ -345,11 +380,13 @@ class TestNetReferences:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", source_net="fd00::1")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", source_net="fd00::1")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_source_net")
 
@@ -357,11 +394,13 @@ class TestNetReferences:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", source_net="bogus_value")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", source_net="bogus_value")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         # Soft warning — not an ERROR.
         warnings = [
@@ -375,11 +414,13 @@ class TestNetReferences:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", target="vip_pool")],
-            alias_names={"vip_pool"},
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", target="vip_pool")],
+                alias_names={"vip_pool"},
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_target")
 
@@ -392,21 +433,25 @@ class TestNetReferences:
 class TestTypeChecks:
     def test_lock_must_be_bool(self, validator: NATRuleValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_outbound("bad", lock="yes")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("bad", lock="yes")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_lock")
 
     def test_log_must_be_bool(self, validator: NATRuleValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_outbound("bad", log="yes")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("bad", log="yes")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_log")
 
@@ -414,11 +459,13 @@ class TestTypeChecks:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("bad", enabled="yes")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("bad", enabled="yes")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_enabled")
 
@@ -426,11 +473,13 @@ class TestTypeChecks:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("bad", sequence="not-int")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("bad", sequence="not-int")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_sequence")
 
@@ -445,11 +494,13 @@ class TestOneToOneEnums:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_one_to_one("bad", type="bogus")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_one_to_one("bad", type="bogus")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_type")
 
@@ -457,11 +508,13 @@ class TestOneToOneEnums:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_one_to_one("bad", natreflection="not-allowed")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_one_to_one("bad", natreflection="not-allowed")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_natreflection")
 
@@ -472,11 +525,13 @@ class TestOneToOneEnums:
             sub_report = ValidationReport()
             sub_validator = NATRuleValidator(sub_report)
             sub_validator.validate(
-                [_one_to_one("ok", natreflection=value)],
-                alias_names=set(),
-                interface_assignment_names=set(),
-                existing_interfaces={"wan": {}},
-                existing_aliases={},
+                OPNsenseValidationContext(
+                    nat_rules=[_one_to_one("ok", natreflection=value)],
+                    alias_names=set(),
+                    interface_assignment_names=set(),
+                    existing_interfaces={"wan": {}},
+                    existing_aliases={},
+                )
             )
             assert not _failures(sub_report, "nat_rule_ok_natreflection")
 
@@ -493,11 +548,13 @@ class TestPortForwardValidation:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_port_forward("web")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_port_forward("web")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_web_kind")
 
@@ -512,11 +569,13 @@ class TestPortForwardValidation:
             config={"kind": "port_forward", "interface": "wan"},
         )
         validator.validate(
-            [r],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[r],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_target")
 
@@ -530,11 +589,13 @@ class TestPortForwardValidation:
             config={"kind": "port_forward", "target": "172.21.0.10"},
         )
         validator.validate(
-            [r],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[r],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_interface")
 
@@ -542,11 +603,13 @@ class TestPortForwardValidation:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_port_forward("bad", pass_action="bogus")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_port_forward("bad", pass_action="bogus")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_pass_action")
 
@@ -557,11 +620,13 @@ class TestPortForwardValidation:
             sub_report = ValidationReport()
             sub_validator = NATRuleValidator(sub_report)
             sub_validator.validate(
-                [_port_forward("ok", pass_action=value)],
-                alias_names=set(),
-                interface_assignment_names=set(),
-                existing_interfaces={"wan": {}},
-                existing_aliases={},
+                OPNsenseValidationContext(
+                    nat_rules=[_port_forward("ok", pass_action=value)],
+                    alias_names=set(),
+                    interface_assignment_names=set(),
+                    existing_interfaces={"wan": {}},
+                    existing_aliases={},
+                )
             )
             assert not _failures(sub_report, "nat_rule_ok_pass_action")
 
@@ -569,11 +634,13 @@ class TestPortForwardValidation:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_port_forward("bad", poolopts="not-an-algorithm")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_port_forward("bad", poolopts="not-an-algorithm")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_poolopts")
 
@@ -592,11 +659,13 @@ class TestPortForwardValidation:
             sub_report = ValidationReport()
             sub_validator = NATRuleValidator(sub_report)
             sub_validator.validate(
-                [_port_forward("ok", poolopts=value)],
-                alias_names=set(),
-                interface_assignment_names=set(),
-                existing_interfaces={"wan": {}},
-                existing_aliases={},
+                OPNsenseValidationContext(
+                    nat_rules=[_port_forward("ok", poolopts=value)],
+                    alias_names=set(),
+                    interface_assignment_names=set(),
+                    existing_interfaces={"wan": {}},
+                    existing_aliases={},
+                )
             )
             assert not _failures(sub_report, "nat_rule_ok_poolopts")
 
@@ -605,11 +674,13 @@ class TestPortForwardValidation:
     ) -> None:
         # DNat-only value: ``purenat``.
         validator.validate(
-            [_port_forward("ok", natreflection="purenat")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_port_forward("ok", natreflection="purenat")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_natreflection")
 
@@ -618,11 +689,13 @@ class TestPortForwardValidation:
     ) -> None:
         # ``enable`` is the 1:1-only value; DNat must reject it.
         validator.validate(
-            [_port_forward("bad", natreflection="enable")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_port_forward("bad", natreflection="enable")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_natreflection")
 
@@ -631,11 +704,13 @@ class TestPortForwardValidation:
     ) -> None:
         # ``purenat`` is the DNat-only value; 1:1 must reject it.
         validator.validate(
-            [_one_to_one("bad", natreflection="purenat")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_one_to_one("bad", natreflection="purenat")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_bad_natreflection")
 
@@ -645,11 +720,13 @@ class TestPortForwardValidation:
         # Target (redirect destination) cross-refs aliases just like
         # outbound.
         validator.validate(
-            [_port_forward("ok", target="webservers")],
-            alias_names={"webservers"},
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_port_forward("ok", target="webservers")],
+                alias_names={"webservers"},
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_target")
 
@@ -657,11 +734,13 @@ class TestPortForwardValidation:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_port_forward("ok", interface="wan")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_port_forward("ok", interface="wan")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_interface")
 
@@ -669,11 +748,13 @@ class TestPortForwardValidation:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_port_forward("evil", description="forged [infrafoundry:other]")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_port_forward("evil", description="forged [infrafoundry:other]")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         assert _failures(report, "nat_rule_evil_description")
 
@@ -688,11 +769,13 @@ class TestEdgeCases:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={},
+                existing_aliases={},
+            )
         )
         assert report.results == []
 
@@ -700,16 +783,18 @@ class TestEdgeCases:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [
-                _outbound("a"),
-                _outbound("b"),
-                _one_to_one("c"),
-                _port_forward("d"),
-            ],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[
+                    _outbound("a"),
+                    _outbound("b"),
+                    _one_to_one("c"),
+                    _port_forward("d"),
+                ],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+            )
         )
         # Each gets at least an interface check.
         names = {c.check_name for c in report.results if c.check_name.endswith("_interface")}
@@ -743,12 +828,14 @@ class TestDottedPathXRefs:
         )
         index = build_xref_index([admins])
         validator.validate(
-            [_outbound("ok", target="firewall.aliases.vip_pool")],
-            alias_names={"vip_pool"},
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
-            index=index,
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", target="firewall.aliases.vip_pool")],
+                alias_names={"vip_pool"},
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+                index=index,
+            )
         )
         # No warning should appear on target.
         assert not [c for c in report.results if c.check_name == "nat_rule_ok_target"]
@@ -768,12 +855,14 @@ class TestDottedPathXRefs:
         # NAT rule type is ``firewall.nat`` → current_plugin="firewall"
         # → ``aliases.admins`` resolves to ``firewall.aliases.admins``.
         validator.validate(
-            [_outbound("ok", source_net="aliases.admins")],
-            alias_names={"admins"},
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
-            index=index,
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", source_net="aliases.admins")],
+                alias_names={"admins"},
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+                index=index,
+            )
         )
         assert not [c for c in report.results if c.check_name == "nat_rule_ok_source_net"]
 
@@ -790,12 +879,14 @@ class TestDottedPathXRefs:
         )
         index = build_xref_index([iface])
         validator.validate(
-            [_outbound("ok", interface="interfaces.assignments.wan")],
-            alias_names=set(),
-            interface_assignment_names={"wan"},
-            existing_interfaces={},
-            existing_aliases={},
-            index=index,
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", interface="interfaces.assignments.wan")],
+                alias_names=set(),
+                interface_assignment_names={"wan"},
+                existing_interfaces={},
+                existing_aliases={},
+                index=index,
+            )
         )
         assert not _failures(report, "nat_rule_ok_interface")
 
@@ -803,10 +894,12 @@ class TestDottedPathXRefs:
         self, validator: NATRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_outbound("ok", interface="wan")],
-            alias_names=set(),
-            interface_assignment_names={"wan"},
-            existing_interfaces={},
-            existing_aliases={},
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", interface="wan")],
+                alias_names=set(),
+                interface_assignment_names={"wan"},
+                existing_interfaces={},
+                existing_aliases={},
+            )
         )
         assert not _failures(report, "nat_rule_ok_interface")

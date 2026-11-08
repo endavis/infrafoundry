@@ -25,6 +25,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.firewall_rule_validator import (
     FirewallRuleValidator,
 )
@@ -83,13 +84,15 @@ class TestInterface:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", interface="lan")],
-            alias_names=set(),
-            interface_assignment_names={"lan"},
-            gateway_names=set(),
-            existing_interfaces={},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", interface="lan")],
+                alias_names=set(),
+                interface_assignment_names={"lan"},
+                gateway_names=set(),
+                existing_interfaces={},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_interface")
 
@@ -97,13 +100,15 @@ class TestInterface:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", interface="wan")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", interface="wan")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_interface")
 
@@ -111,13 +116,15 @@ class TestInterface:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", interface="bogus")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", interface="bogus")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_interface")
 
@@ -125,13 +132,15 @@ class TestInterface:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", interface="")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", interface="")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_interface")
 
@@ -139,13 +148,15 @@ class TestInterface:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", interface="", state_policy="floating")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", interface="", state_policy="floating")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_interface")
 
@@ -153,13 +164,15 @@ class TestInterface:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", interface=42)],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"wan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", interface=42)],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"wan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_interface")
 
@@ -176,13 +189,15 @@ class TestGateway:
         # Empty gateway is the default (no policy-based routing) and
         # must not trigger any check at all.
         validator.validate(
-            [_rule("ok")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_gateway")
 
@@ -190,13 +205,15 @@ class TestGateway:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", gateway="my-wan")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names={"my-wan"},
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", gateway="my-wan")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names={"my-wan"},
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_gateway")
 
@@ -205,13 +222,15 @@ class TestGateway:
     ) -> None:
         # ``WAN_DHCP`` exists live but isn't declared as a managed gateway.
         validator.validate(
-            [_rule("ok", gateway="WAN_DHCP")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", gateway="WAN_DHCP")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert not _failures(report, "firewall_rule_ok_gateway")
 
@@ -219,13 +238,15 @@ class TestGateway:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", gateway="bogus-gw")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names={"my-wan"},
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", gateway="bogus-gw")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names={"my-wan"},
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert _failures(report, "firewall_rule_bad_gateway")
 
@@ -233,13 +254,15 @@ class TestGateway:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", gateway=42)],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", gateway=42)],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_gateway")
 
@@ -249,14 +272,16 @@ class TestGateway:
         # ipprotocol=inet (default) + managed gateway with protocol=inet6
         # is a soft warning, not an error.
         validator.validate(
-            [_rule("ok", gateway="my-wan6")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names={"my-wan6"},
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
-            managed_gateways=[_gw("my-wan6", protocol="inet6")],
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", gateway="my-wan6")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names={"my-wan6"},
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+                managed_gateways=[_gw("my-wan6", protocol="inet6")],
+            )
         )
         assert _warnings(report, "firewall_rule_ok_gateway_protocol")
 
@@ -264,14 +289,16 @@ class TestGateway:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", gateway="my-wan", ipprotocol="inet")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names={"my-wan"},
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
-            managed_gateways=[_gw("my-wan", protocol="inet")],
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", gateway="my-wan", ipprotocol="inet")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names={"my-wan"},
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+                managed_gateways=[_gw("my-wan", protocol="inet")],
+            )
         )
         assert not _warnings(report, "firewall_rule_ok_gateway_protocol")
 
@@ -281,14 +308,16 @@ class TestGateway:
         # ``inet46`` must short-circuit the protocol-match heuristic
         # (rule applies to both families, so v6 gateway is fine).
         validator.validate(
-            [_rule("ok", gateway="my-wan6", ipprotocol="inet46")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names={"my-wan6"},
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
-            managed_gateways=[_gw("my-wan6", protocol="inet6")],
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", gateway="my-wan6", ipprotocol="inet46")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names={"my-wan6"},
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+                managed_gateways=[_gw("my-wan6", protocol="inet6")],
+            )
         )
         assert not _warnings(report, "firewall_rule_ok_gateway_protocol")
 
@@ -298,13 +327,15 @@ class TestGateway:
         # For live-only gateways, the heuristic falls back to ``endswith("6")``.
         # ipprotocol=inet + ``WAN_DHCP6`` should warn.
         validator.validate(
-            [_rule("ok", gateway="WAN_DHCP6", ipprotocol="inet")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways={"WAN_DHCP6"},
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", gateway="WAN_DHCP6", ipprotocol="inet")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways={"WAN_DHCP6"},
+            )
         )
         assert _warnings(report, "firewall_rule_ok_gateway_protocol")
 
@@ -319,13 +350,15 @@ class TestDescriptionIdentityTag:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("evil", description="forged [infrafoundry:other]")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("evil", description="forged [infrafoundry:other]")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_evil_description")
 
@@ -333,13 +366,15 @@ class TestDescriptionIdentityTag:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", description="LAN allow rule")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", description="LAN allow rule")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_description")
 
@@ -347,13 +382,15 @@ class TestDescriptionIdentityTag:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", description=123)],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", description=123)],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_description")
 
@@ -368,13 +405,15 @@ class TestNetReferences:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", source_net="any", destination_net="any")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", source_net="any", destination_net="any")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_source_net")
         assert not _failures(report, "firewall_rule_ok_destination_net")
@@ -383,13 +422,15 @@ class TestNetReferences:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", source_net="lan_subnets")],
-            alias_names={"lan_subnets"},
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", source_net="lan_subnets")],
+                alias_names={"lan_subnets"},
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_source_net")
 
@@ -397,13 +438,15 @@ class TestNetReferences:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", source_net="existing_alias")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={"existing_alias": {"name": "existing_alias"}},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", source_net="existing_alias")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={"existing_alias": {"name": "existing_alias"}},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_source_net")
 
@@ -411,13 +454,15 @@ class TestNetReferences:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", source_net="172.21.0.1")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", source_net="172.21.0.1")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_source_net")
 
@@ -425,13 +470,15 @@ class TestNetReferences:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", destination_net="172.21.0.0/24")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", destination_net="172.21.0.0/24")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_destination_net")
 
@@ -439,13 +486,15 @@ class TestNetReferences:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", source_net="fd00::1")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", source_net="fd00::1")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_source_net")
 
@@ -458,13 +507,15 @@ class TestNetReferences:
             sub_report = ValidationReport()
             sub_validator = FirewallRuleValidator(sub_report)
             sub_validator.validate(
-                [_rule("ok", source_net=value)],
-                alias_names=set(),
-                interface_assignment_names=set(),
-                gateway_names=set(),
-                existing_interfaces={"lan": {}},
-                existing_aliases={},
-                existing_gateways=set(),
+                OPNsenseValidationContext(
+                    firewall_rules=[_rule("ok", source_net=value)],
+                    alias_names=set(),
+                    interface_assignment_names=set(),
+                    gateway_names=set(),
+                    existing_interfaces={"lan": {}},
+                    existing_aliases={},
+                    existing_gateways=set(),
+                )
             )
             assert not _failures(sub_report, "firewall_rule_ok_source_net")
 
@@ -472,13 +523,15 @@ class TestNetReferences:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", source_net="bogus_value")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", source_net="bogus_value")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         # Soft warning — not an ERROR.
         assert _warnings(report, "firewall_rule_ok_source_net")
@@ -489,13 +542,15 @@ class TestNetReferences:
         # Empty string defaults to ``"any"`` in the parser; the validator
         # must not flag it as an error.
         validator.validate(
-            [_rule("ok", source_net="")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", source_net="")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_source_net")
 
@@ -503,13 +558,15 @@ class TestNetReferences:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", source_net=42)],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", source_net=42)],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_source_net")
 
@@ -524,13 +581,15 @@ class TestEnumChecks:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", action="drop")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", action="drop")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_action")
 
@@ -541,13 +600,15 @@ class TestEnumChecks:
             sub_report = ValidationReport()
             sub_validator = FirewallRuleValidator(sub_report)
             sub_validator.validate(
-                [_rule("ok", action=value)],
-                alias_names=set(),
-                interface_assignment_names=set(),
-                gateway_names=set(),
-                existing_interfaces={"lan": {}},
-                existing_aliases={},
-                existing_gateways=set(),
+                OPNsenseValidationContext(
+                    firewall_rules=[_rule("ok", action=value)],
+                    alias_names=set(),
+                    interface_assignment_names=set(),
+                    gateway_names=set(),
+                    existing_interfaces={"lan": {}},
+                    existing_aliases={},
+                    existing_gateways=set(),
+                )
             )
             assert not _failures(sub_report, "firewall_rule_ok_action")
 
@@ -555,13 +616,15 @@ class TestEnumChecks:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", direction="diagonal")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", direction="diagonal")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_direction")
 
@@ -572,13 +635,15 @@ class TestEnumChecks:
             sub_report = ValidationReport()
             sub_validator = FirewallRuleValidator(sub_report)
             sub_validator.validate(
-                [_rule("ok", direction=value)],
-                alias_names=set(),
-                interface_assignment_names=set(),
-                gateway_names=set(),
-                existing_interfaces={"lan": {}},
-                existing_aliases={},
-                existing_gateways=set(),
+                OPNsenseValidationContext(
+                    firewall_rules=[_rule("ok", direction=value)],
+                    alias_names=set(),
+                    interface_assignment_names=set(),
+                    gateway_names=set(),
+                    existing_interfaces={"lan": {}},
+                    existing_aliases={},
+                    existing_gateways=set(),
+                )
             )
             assert not _failures(sub_report, "firewall_rule_ok_direction")
 
@@ -586,13 +651,15 @@ class TestEnumChecks:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", ipprotocol="ipv7")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", ipprotocol="ipv7")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_ipprotocol")
 
@@ -603,13 +670,15 @@ class TestEnumChecks:
             sub_report = ValidationReport()
             sub_validator = FirewallRuleValidator(sub_report)
             sub_validator.validate(
-                [_rule("ok", ipprotocol=value)],
-                alias_names=set(),
-                interface_assignment_names=set(),
-                gateway_names=set(),
-                existing_interfaces={"lan": {}},
-                existing_aliases={},
-                existing_gateways=set(),
+                OPNsenseValidationContext(
+                    firewall_rules=[_rule("ok", ipprotocol=value)],
+                    alias_names=set(),
+                    interface_assignment_names=set(),
+                    gateway_names=set(),
+                    existing_interfaces={"lan": {}},
+                    existing_aliases={},
+                    existing_gateways=set(),
+                )
             )
             assert not _failures(sub_report, "firewall_rule_ok_ipprotocol")
 
@@ -617,13 +686,15 @@ class TestEnumChecks:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", state_policy="freestyle")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", state_policy="freestyle")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_state_policy")
 
@@ -634,13 +705,15 @@ class TestEnumChecks:
             sub_report = ValidationReport()
             sub_validator = FirewallRuleValidator(sub_report)
             sub_validator.validate(
-                [_rule("ok", state_policy=value)],
-                alias_names=set(),
-                interface_assignment_names=set(),
-                gateway_names=set(),
-                existing_interfaces={"lan": {}},
-                existing_aliases={},
-                existing_gateways=set(),
+                OPNsenseValidationContext(
+                    firewall_rules=[_rule("ok", state_policy=value)],
+                    alias_names=set(),
+                    interface_assignment_names=set(),
+                    gateway_names=set(),
+                    existing_interfaces={"lan": {}},
+                    existing_aliases={},
+                    existing_gateways=set(),
+                )
             )
             assert not _failures(sub_report, "firewall_rule_ok_state_policy")
 
@@ -648,13 +721,15 @@ class TestEnumChecks:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", statetype="frozen")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", statetype="frozen")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_statetype")
 
@@ -665,13 +740,15 @@ class TestEnumChecks:
             sub_report = ValidationReport()
             sub_validator = FirewallRuleValidator(sub_report)
             sub_validator.validate(
-                [_rule("ok", statetype=value)],
-                alias_names=set(),
-                interface_assignment_names=set(),
-                gateway_names=set(),
-                existing_interfaces={"lan": {}},
-                existing_aliases={},
-                existing_gateways=set(),
+                OPNsenseValidationContext(
+                    firewall_rules=[_rule("ok", statetype=value)],
+                    alias_names=set(),
+                    interface_assignment_names=set(),
+                    gateway_names=set(),
+                    existing_interfaces={"lan": {}},
+                    existing_aliases={},
+                    existing_gateways=set(),
+                )
             )
             assert not _failures(sub_report, "firewall_rule_ok_statetype")
 
@@ -703,13 +780,15 @@ class TestBoolTypeChecks:
         local_report = ValidationReport()
         local_validator = FirewallRuleValidator(local_report)
         local_validator.validate(
-            [_rule("bad", **{field_name: "yes"})],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", **{field_name: "yes"})],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(local_report, f"firewall_rule_bad_{field_name}")
 
@@ -724,13 +803,15 @@ class TestIntTypeChecks:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", sequence="not-int")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", sequence="not-int")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_sequence")
 
@@ -738,13 +819,15 @@ class TestIntTypeChecks:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", sequence=200)],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", sequence=200)],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_sequence")
 
@@ -766,13 +849,15 @@ class TestIntTypeChecks:
         local_report = ValidationReport()
         local_validator = FirewallRuleValidator(local_report)
         local_validator.validate(
-            [_rule("bad", **{field_name: "not-an-int"})],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", **{field_name: "not-an-int"})],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(local_report, f"firewall_rule_bad_{field_name}")
 
@@ -781,13 +866,15 @@ class TestIntTypeChecks:
     ) -> None:
         # Empty is the operator's way to say "omit"; must not error.
         validator.validate(
-            [_rule("ok", max="", max_src_conn="")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", max="", max_src_conn="")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_max")
         assert not _failures(report, "firewall_rule_ok_max_src_conn")
@@ -798,13 +885,15 @@ class TestIntTypeChecks:
         # ``bool`` is a subclass of ``int`` in Python — the validator
         # must explicitly reject it.
         validator.validate(
-            [_rule("bad", max_src_conn=True)],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", max_src_conn=True)],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_max_src_conn")
 
@@ -813,13 +902,15 @@ class TestIntTypeChecks:
     ) -> None:
         # OPNsense accepts decimal strings; the validator does too.
         validator.validate(
-            [_rule("ok", max_src_conn="100")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", max_src_conn="100")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_max_src_conn")
 
@@ -834,13 +925,15 @@ class TestTcpFlagsMutex:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", tcpflags_any=True, tcpflags1="syn")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", tcpflags_any=True, tcpflags1="syn")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_tcpflags_mutex")
 
@@ -848,13 +941,15 @@ class TestTcpFlagsMutex:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("bad", tcpflags_any=True, tcpflags2="ack")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", tcpflags_any=True, tcpflags2="ack")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert _failures(report, "firewall_rule_bad_tcpflags_mutex")
 
@@ -862,13 +957,15 @@ class TestTcpFlagsMutex:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", tcpflags_any=True)],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", tcpflags_any=True)],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_tcpflags_mutex")
 
@@ -876,13 +973,15 @@ class TestTcpFlagsMutex:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_rule("ok", tcpflags1="syn,ack")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", tcpflags1="syn,ack")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert not _failures(report, "firewall_rule_ok_tcpflags_mutex")
 
@@ -897,13 +996,15 @@ class TestEdgeCases:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         assert report.results == []
 
@@ -911,17 +1012,19 @@ class TestEdgeCases:
         self, validator: FirewallRuleValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [
-                _rule("a"),
-                _rule("b"),
-                _rule("c"),
-            ],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
+            OPNsenseValidationContext(
+                firewall_rules=[
+                    _rule("a"),
+                    _rule("b"),
+                    _rule("c"),
+                ],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+            )
         )
         # Each rule produces an ``_interface`` check (passing or failing).
         names = {c.check_name for c in report.results if c.check_name.endswith("_interface")}
@@ -935,13 +1038,15 @@ class TestEdgeCases:
         # ``managed_gateways`` is keyword-optional. Omitting it must not
         # crash the validator.
         validator.validate(
-            [_rule("ok", gateway="WAN_DHCP")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", gateway="WAN_DHCP")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert not _failures(report, "firewall_rule_ok_gateway")
 
@@ -970,14 +1075,16 @@ class TestDottedPathXRefs:
         )
         index = build_xref_index([admins])
         validator.validate(
-            [_rule("ok", source_net="firewall.aliases.admins")],
-            alias_names={"admins"},
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
-            index=index,
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", source_net="firewall.aliases.admins")],
+                alias_names={"admins"},
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+                index=index,
+            )
         )
         # No warning surfaced for the dotted alias.
         assert not [c for c in report.results if c.check_name == "firewall_rule_ok_source_net"]
@@ -997,14 +1104,16 @@ class TestDottedPathXRefs:
         # Rule type ``firewall.rules`` → current_plugin="firewall" →
         # ``aliases.admins`` resolves to ``firewall.aliases.admins``.
         validator.validate(
-            [_rule("ok", destination_net="aliases.admins")],
-            alias_names={"admins"},
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
-            index=index,
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", destination_net="aliases.admins")],
+                alias_names={"admins"},
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+                index=index,
+            )
         )
         assert not [c for c in report.results if c.check_name == "firewall_rule_ok_destination_net"]
 
@@ -1016,15 +1125,17 @@ class TestDottedPathXRefs:
         gw = _gw("WAN_GW", protocol="inet")
         index = build_xref_index([gw])
         validator.validate(
-            [_rule("ok", gateway="routing.gateways.WAN_GW")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names={"WAN_GW"},
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways=set(),
-            managed_gateways=[gw],
-            index=index,
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", gateway="routing.gateways.WAN_GW")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names={"WAN_GW"},
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways=set(),
+                managed_gateways=[gw],
+                index=index,
+            )
         )
         assert not _failures(report, "firewall_rule_ok_gateway")
 
@@ -1041,14 +1152,16 @@ class TestDottedPathXRefs:
         )
         index = build_xref_index([iface])
         validator.validate(
-            [_rule("ok", interface="interfaces.assignments.lan")],
-            alias_names=set(),
-            interface_assignment_names={"lan"},
-            gateway_names=set(),
-            existing_interfaces={},
-            existing_aliases={},
-            existing_gateways=set(),
-            index=index,
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", interface="interfaces.assignments.lan")],
+                alias_names=set(),
+                interface_assignment_names={"lan"},
+                gateway_names=set(),
+                existing_interfaces={},
+                existing_aliases={},
+                existing_gateways=set(),
+                index=index,
+            )
         )
         assert not _failures(report, "firewall_rule_ok_interface")
 
@@ -1057,12 +1170,14 @@ class TestDottedPathXRefs:
     ) -> None:
         # Bare-name lookup still works without ``index``.
         validator.validate(
-            [_rule("ok", gateway="WAN_DHCP")],
-            alias_names=set(),
-            interface_assignment_names=set(),
-            gateway_names=set(),
-            existing_interfaces={"lan": {}},
-            existing_aliases={},
-            existing_gateways={"WAN_DHCP"},
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", gateway="WAN_DHCP")],
+                alias_names=set(),
+                interface_assignment_names=set(),
+                gateway_names=set(),
+                existing_interfaces={"lan": {}},
+                existing_aliases={},
+                existing_gateways={"WAN_DHCP"},
+            )
         )
         assert not _failures(report, "firewall_rule_ok_gateway")

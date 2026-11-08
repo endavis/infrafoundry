@@ -27,6 +27,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.gateway_validator import (
     GatewayValidator,
 )
@@ -68,17 +69,21 @@ def _failures(report: ValidationReport, check_name: str) -> list[Any]:
 class TestProtocol:
     def test_inet_passes(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("ok", protocol="inet")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", protocol="inet")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_protocol")
 
     def test_inet6_passes(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("ok", protocol="inet6", gateway="fe80::1")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", protocol="inet6", gateway="fe80::1")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_protocol")
 
@@ -92,9 +97,9 @@ class TestProtocol:
             config={"interface": "wan", "gateway": "192.0.2.1"},
         )
         validator.validate(
-            [r],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[r], interface_assignment_names=set(), existing_interfaces={"wan": {}}
+            )
         )
         assert _failures(report, "gateway_bad_protocol")
 
@@ -102,9 +107,11 @@ class TestProtocol:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", protocol="ipv7")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", protocol="ipv7")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_protocol")
 
@@ -119,9 +126,11 @@ class TestInterface:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("ok", interface="lan")],
-            interface_assignment_names={"lan"},
-            existing_interfaces={},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", interface="lan")],
+                interface_assignment_names={"lan"},
+                existing_interfaces={},
+            )
         )
         assert not _failures(report, "gateway_ok_interface")
 
@@ -129,9 +138,11 @@ class TestInterface:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("ok", interface="wan")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", interface="wan")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_interface")
 
@@ -139,9 +150,11 @@ class TestInterface:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", interface="bogus")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", interface="bogus")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_interface")
 
@@ -149,9 +162,11 @@ class TestInterface:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", interface="")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", interface="")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_interface")
 
@@ -165,9 +180,9 @@ class TestInterface:
             config={"protocol": "inet", "gateway": "192.0.2.1"},
         )
         validator.validate(
-            [r],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[r], interface_assignment_names=set(), existing_interfaces={"wan": {}}
+            )
         )
         assert _failures(report, "gateway_bad_interface")
 
@@ -182,9 +197,11 @@ class TestIpaddr:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("ok", ipaddr="dynamic")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", ipaddr="dynamic")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_ipaddr")
 
@@ -192,9 +209,11 @@ class TestIpaddr:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("ok", ipaddr="192.0.2.5")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", ipaddr="192.0.2.5")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_ipaddr")
 
@@ -202,9 +221,11 @@ class TestIpaddr:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", ipaddr="fe80::1", protocol="inet")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", ipaddr="fe80::1", protocol="inet")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_ipaddr")
 
@@ -212,9 +233,11 @@ class TestIpaddr:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", ipaddr=12345)],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", ipaddr=12345)],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_ipaddr")
 
@@ -227,17 +250,21 @@ class TestIpaddr:
 class TestGatewayField:
     def test_inet_ip_passes(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("ok", gateway="192.0.2.1")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", gateway="192.0.2.1")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_gateway")
 
     def test_inet6_ip_passes(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("ok", gateway="fe80::1", protocol="inet6")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", gateway="fe80::1", protocol="inet6")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_gateway")
 
@@ -245,17 +272,21 @@ class TestGatewayField:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", gateway="fe80::1", protocol="inet")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", gateway="fe80::1", protocol="inet")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_gateway")
 
     def test_non_string_fails(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("bad", gateway=12345)],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", gateway=12345)],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_gateway")
 
@@ -265,9 +296,11 @@ class TestGatewayField:
         # The validator treats "" as benign and lets the parser enforce the
         # dynamic-vs-static contract.
         validator.validate(
-            [_gw("ok", gateway="", ipaddr="dynamic")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", gateway="", ipaddr="dynamic")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_gateway")
 
@@ -280,41 +313,51 @@ class TestGatewayField:
 class TestMonitor:
     def test_ip_literal_passes(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("ok", monitor="1.1.1.1")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", monitor="1.1.1.1")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_monitor")
 
     def test_hostname_passes(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("ok", monitor="dns.example.com")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", monitor="dns.example.com")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_monitor")
 
     def test_bogus_value_fails(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("bad", monitor="not a valid host or ip")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", monitor="not a valid host or ip")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_monitor")
 
     def test_empty_passes(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("ok", monitor="")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", monitor="")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_monitor")
 
     def test_non_string_fails(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("bad", monitor=12345)],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", monitor=12345)],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_monitor")
 
@@ -327,33 +370,41 @@ class TestMonitor:
 class TestPriority:
     def test_in_range_passes(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("ok", priority=128)],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", priority=128)],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_priority")
 
     def test_below_min_fails(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("bad", priority=0)],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", priority=0)],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_priority")
 
     def test_above_max_fails(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("bad", priority=999)],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", priority=999)],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_priority")
 
     def test_non_int_fails(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("bad", priority="high")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", priority="high")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_priority")
 
@@ -361,33 +412,41 @@ class TestPriority:
 class TestWeight:
     def test_one_passes(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("ok", weight=1)],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", weight=1)],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_weight")
 
     def test_zero_fails(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("bad", weight=0)],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", weight=0)],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_weight")
 
     def test_negative_fails(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("bad", weight=-1)],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", weight=-1)],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_weight")
 
     def test_non_int_fails(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("bad", weight="heavy")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", weight="heavy")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_weight")
 
@@ -402,9 +461,11 @@ class TestBoolFields:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", defaultgw="yes")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", defaultgw="yes")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_defaultgw")
 
@@ -412,17 +473,21 @@ class TestBoolFields:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", enabled="yes")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", enabled="yes")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_enabled")
 
     def test_lock_must_be_bool(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("bad", lock="yes")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", lock="yes")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_lock")
 
@@ -430,9 +495,11 @@ class TestBoolFields:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", monitor_disable="yes")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", monitor_disable="yes")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_monitor_disable")
 
@@ -440,9 +507,11 @@ class TestBoolFields:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", monitor_noroute="yes")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", monitor_noroute="yes")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_monitor_noroute")
 
@@ -450,9 +519,11 @@ class TestBoolFields:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", force_down="yes")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", force_down="yes")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_force_down")
 
@@ -460,9 +531,11 @@ class TestBoolFields:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("bad", fargw="yes")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", fargw="yes")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_fargw")
 
@@ -475,17 +548,21 @@ class TestBoolFields:
 class TestDescription:
     def test_string_passes(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("ok", description="WAN default")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("ok", description="WAN default")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert not _failures(report, "gateway_ok_description")
 
     def test_non_string_fails(self, validator: GatewayValidator, report: ValidationReport) -> None:
         validator.validate(
-            [_gw("bad", description=12345)],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("bad", description=12345)],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         assert _failures(report, "gateway_bad_description")
 
@@ -500,9 +577,9 @@ class TestEdgeCases:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [],
-            interface_assignment_names=set(),
-            existing_interfaces={},
+            OPNsenseValidationContext(
+                gateways=[], interface_assignment_names=set(), existing_interfaces={}
+            )
         )
         assert report.results == []
 
@@ -510,9 +587,11 @@ class TestEdgeCases:
         self, validator: GatewayValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_gw("a"), _gw("b"), _gw("c")],
-            interface_assignment_names=set(),
-            existing_interfaces={"wan": {}},
+            OPNsenseValidationContext(
+                gateways=[_gw("a"), _gw("b"), _gw("c")],
+                interface_assignment_names=set(),
+                existing_interfaces={"wan": {}},
+            )
         )
         names = {c.check_name for c in report.results if c.check_name.endswith("_interface")}
         assert "gateway_a_interface" in names

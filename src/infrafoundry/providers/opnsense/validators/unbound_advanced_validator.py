@@ -9,14 +9,17 @@ without commas or whitespace (a comma would split an entry on the wire), and
 from __future__ import annotations
 
 import ipaddress
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 _FIELDS: tuple[str, ...] = ("private_domains", "insecure_domains", "private_addresses")
 
 
-class UnboundAdvancedValidator:
+class UnboundAdvancedValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates ``unbound.advanced`` singleton resources."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -27,8 +30,14 @@ class UnboundAdvancedValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
-        """Validate ``unbound.advanced`` resources."""
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
+        """Validate ``unbound.advanced`` resources.
+
+        Args:
+            context: Validation context carrying the resources and lookups this validator checks.
+        """
+        resources = context.resources
         for resource in resources:
             self._validate_one(resource)
 

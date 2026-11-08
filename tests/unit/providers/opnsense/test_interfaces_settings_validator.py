@@ -11,19 +11,22 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validator import OPNsenseValidator
 from infrafoundry.providers.opnsense.validators import InterfacesSettingsValidator
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 
 def _run(config: dict[str, Any]) -> ValidationReport:
     report = ValidationReport()
     InterfacesSettingsValidator(report).validate(
-        [
-            ResourceConfig(
-                name="interfaces.settings",
-                type="interfaces.settings",
-                provider="opnsense",
-                config=config,
-            )
-        ]
+        OPNsenseValidationContext(
+            resources=[
+                ResourceConfig(
+                    name="interfaces.settings",
+                    type="interfaces.settings",
+                    provider="opnsense",
+                    config=config,
+                )
+            ]
+        )
     )
     return report
 

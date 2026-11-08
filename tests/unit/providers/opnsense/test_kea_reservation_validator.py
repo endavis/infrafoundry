@@ -25,6 +25,7 @@ import pytest
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validators._xref import build_xref_index
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.kea_reservation_validator import (
     KeaReservationValidator,
 )
@@ -119,11 +120,13 @@ class TestSubnetRefV4:
         reservation = _v4_reservation("server1", subnet_ref="lan-dhcp")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(
-            dhcp4_reservations=[reservation],
-            dhcp6_reservations=[],
-            dhcp4_subnet_names={"lan-dhcp"},
-            dhcp6_subnet_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[reservation],
+                dhcp6_reservations=[],
+                dhcp4_subnet_names={"lan-dhcp"},
+                dhcp6_subnet_names=set(),
+                index=index,
+            )
         )
         assert not _failures(report, "kea_reservation_server1_subnet")
         assert _passes(report, "kea_reservation_server1_subnet")
@@ -135,11 +138,13 @@ class TestSubnetRefV4:
         reservation = _v4_reservation("server1", subnet_ref="missing-subnet")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(
-            dhcp4_reservations=[reservation],
-            dhcp6_reservations=[],
-            dhcp4_subnet_names={"lan-dhcp"},
-            dhcp6_subnet_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[reservation],
+                dhcp6_reservations=[],
+                dhcp4_subnet_names={"lan-dhcp"},
+                dhcp6_subnet_names=set(),
+                index=index,
+            )
         )
         failures = _failures(report, "kea_reservation_server1_subnet")
         assert failures, "Expected ERROR for unknown subnet_ref"
@@ -160,11 +165,13 @@ class TestSubnetRefV6:
         reservation = _v6_reservation("server1-v6", subnet_ref="lan-dhcp6")
         index = build_xref_index([v6_subnet, reservation])
         validator.validate(
-            dhcp4_reservations=[],
-            dhcp6_reservations=[reservation],
-            dhcp4_subnet_names=set(),
-            dhcp6_subnet_names={"lan-dhcp6"},
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[],
+                dhcp6_reservations=[reservation],
+                dhcp4_subnet_names=set(),
+                dhcp6_subnet_names={"lan-dhcp6"},
+                index=index,
+            )
         )
         assert not _failures(report, "kea_reservation_server1-v6_subnet")
         assert _passes(report, "kea_reservation_server1-v6_subnet")
@@ -176,11 +183,13 @@ class TestSubnetRefV6:
         reservation = _v6_reservation("server1-v6", subnet_ref="not-a-subnet")
         index = build_xref_index([v6_subnet, reservation])
         validator.validate(
-            dhcp4_reservations=[],
-            dhcp6_reservations=[reservation],
-            dhcp4_subnet_names=set(),
-            dhcp6_subnet_names={"lan-dhcp6"},
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[],
+                dhcp6_reservations=[reservation],
+                dhcp4_subnet_names=set(),
+                dhcp6_subnet_names={"lan-dhcp6"},
+                index=index,
+            )
         )
         failures = _failures(report, "kea_reservation_server1-v6_subnet")
         assert failures, "Expected ERROR for unknown subnet_ref"
@@ -200,11 +209,13 @@ class TestWrongVersionCross:
         reservation = _v4_reservation("server1", subnet_ref="guest")
         index = build_xref_index([v6_subnet, reservation])
         validator.validate(
-            dhcp4_reservations=[reservation],
-            dhcp6_reservations=[],
-            dhcp4_subnet_names=set(),
-            dhcp6_subnet_names={"guest"},
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[reservation],
+                dhcp6_reservations=[],
+                dhcp4_subnet_names=set(),
+                dhcp6_subnet_names={"guest"},
+                index=index,
+            )
         )
         failures = _failures(report, "kea_reservation_server1_subnet")
         assert failures, "Expected ERROR for wrong-version cross"
@@ -219,11 +230,13 @@ class TestWrongVersionCross:
         reservation = _v6_reservation("server1-v6", subnet_ref="lan-dhcp")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(
-            dhcp4_reservations=[],
-            dhcp6_reservations=[reservation],
-            dhcp4_subnet_names={"lan-dhcp"},
-            dhcp6_subnet_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[],
+                dhcp6_reservations=[reservation],
+                dhcp4_subnet_names={"lan-dhcp"},
+                dhcp6_subnet_names=set(),
+                index=index,
+            )
         )
         failures = _failures(report, "kea_reservation_server1-v6_subnet")
         assert failures, "Expected ERROR for wrong-version cross"
@@ -247,11 +260,13 @@ class TestSubnetLiteral:
         reservation = _v6_reservation("legacy-v6", subnet="fd00:1::/64")
         index = build_xref_index([reservation])
         validator.validate(
-            dhcp4_reservations=[],
-            dhcp6_reservations=[reservation],
-            dhcp4_subnet_names=set(),
-            dhcp6_subnet_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[],
+                dhcp6_reservations=[reservation],
+                dhcp4_subnet_names=set(),
+                dhcp6_subnet_names=set(),
+                index=index,
+            )
         )
         assert not _failures(report, "kea_reservation_legacy-v6_subnet")
         assert _passes(report, "kea_reservation_legacy-v6_subnet")
@@ -262,11 +277,13 @@ class TestSubnetLiteral:
         reservation = _v4_reservation("bad", subnet="not-a-cidr")
         index = build_xref_index([reservation])
         validator.validate(
-            dhcp4_reservations=[reservation],
-            dhcp6_reservations=[],
-            dhcp4_subnet_names=set(),
-            dhcp6_subnet_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[reservation],
+                dhcp6_reservations=[],
+                dhcp4_subnet_names=set(),
+                dhcp6_subnet_names=set(),
+                index=index,
+            )
         )
         failures = _failures(report, "kea_reservation_bad_subnet")
         assert failures
@@ -279,11 +296,13 @@ class TestSubnetLiteral:
         reservation = _v4_reservation("wrong-fam", subnet="fd00:1::/64")
         index = build_xref_index([reservation])
         validator.validate(
-            dhcp4_reservations=[reservation],
-            dhcp6_reservations=[],
-            dhcp4_subnet_names=set(),
-            dhcp6_subnet_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[reservation],
+                dhcp6_reservations=[],
+                dhcp4_subnet_names=set(),
+                dhcp6_subnet_names=set(),
+                index=index,
+            )
         )
         failures = _failures(report, "kea_reservation_wrong-fam_subnet")
         assert failures
@@ -312,11 +331,13 @@ class TestFieldPresence:
         )
         index = build_xref_index([reservation])
         validator.validate(
-            dhcp4_reservations=[reservation],
-            dhcp6_reservations=[],
-            dhcp4_subnet_names=set(),
-            dhcp6_subnet_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[reservation],
+                dhcp6_reservations=[],
+                dhcp4_subnet_names=set(),
+                dhcp6_subnet_names=set(),
+                index=index,
+            )
         )
         failures = _failures(report, "kea_reservation_naked_subnet")
         assert failures
@@ -331,11 +352,13 @@ class TestFieldPresence:
         reservation = _v4_reservation("server1", subnet_ref="lan", subnet="10.0.10.0/24")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(
-            dhcp4_reservations=[reservation],
-            dhcp6_reservations=[],
-            dhcp4_subnet_names={"lan"},
-            dhcp6_subnet_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[reservation],
+                dhcp6_reservations=[],
+                dhcp4_subnet_names={"lan"},
+                dhcp6_subnet_names=set(),
+                index=index,
+            )
         )
         assert not _failures(report, "kea_reservation_server1_subnet")
         assert _passes(report, "kea_reservation_server1_subnet")
@@ -347,11 +370,13 @@ class TestFieldPresence:
         reservation = _v4_reservation("server1", subnet_ref="lan", subnet="10.0.20.0/24")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(
-            dhcp4_reservations=[reservation],
-            dhcp6_reservations=[],
-            dhcp4_subnet_names={"lan"},
-            dhcp6_subnet_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[reservation],
+                dhcp6_reservations=[],
+                dhcp4_subnet_names={"lan"},
+                dhcp6_subnet_names=set(),
+                index=index,
+            )
         )
         failures = _failures(report, "kea_reservation_server1_subnet")
         assert failures
@@ -373,11 +398,13 @@ class TestDottedPath:
         reservation = _v4_reservation("server1", subnet_ref="kea.dhcp4.subnets.web")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(
-            dhcp4_reservations=[reservation],
-            dhcp6_reservations=[],
-            dhcp4_subnet_names={"web"},
-            dhcp6_subnet_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                dhcp4_reservations=[reservation],
+                dhcp6_reservations=[],
+                dhcp4_subnet_names={"web"},
+                dhcp6_subnet_names=set(),
+                index=index,
+            )
         )
         assert not _failures(report, "kea_reservation_server1_subnet")
         assert _passes(report, "kea_reservation_server1_subnet")

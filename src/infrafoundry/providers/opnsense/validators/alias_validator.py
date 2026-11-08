@@ -38,10 +38,12 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from typing import Any
+from typing import Any, override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # Recognized alias types per the OPNsense GUI's "Type" dropdown on the
 # Firewall → Aliases form. Unknown values produce a warning (not an
@@ -90,7 +92,7 @@ _GEOIP_RE = re.compile(r"^[A-Z]{2}$")
 _MAC_RE = re.compile(r"^([0-9a-fA-F]{2})(:[0-9a-fA-F]{2}){0,5}$")
 
 
-class AliasValidator:
+class AliasValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense firewall-alias resources."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -101,12 +103,14 @@ class AliasValidator:
         """
         self.report = report
 
-    def validate(self, aliases: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate alias resources.
 
         Args:
-            aliases: ``aliases`` ``ResourceConfig`` entries.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        aliases = context.aliases
         seen_names: dict[str, str] = {}
         for alias in aliases:
             self._validate_one(alias, seen_names=seen_names)

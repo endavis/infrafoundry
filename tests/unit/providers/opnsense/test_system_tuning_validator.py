@@ -8,6 +8,7 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validator import OPNsenseValidator
 from infrafoundry.providers.opnsense.validators import SystemTuningValidator
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 
 def _res(items: list[dict[str, object]]) -> ResourceConfig:
@@ -19,7 +20,9 @@ def _res(items: list[dict[str, object]]) -> ResourceConfig:
 def test_duplicate_tunable_is_error() -> None:
     report = ValidationReport()
     SystemTuningValidator(report).validate(
-        [_res([{"tunable": "a", "value": 1}, {"tunable": "a", "value": 2}])]
+        OPNsenseValidationContext(
+            resources=[_res([{"tunable": "a", "value": 1}, {"tunable": "a", "value": 2}])]
+        )
     )
     failed = [c for c in report.results if not c.passed]
     assert [c.check_name for c in failed] == ["system_tuning_settings_items_duplicate"]
@@ -29,7 +32,9 @@ def test_duplicate_tunable_is_error() -> None:
 def test_distinct_tunables_pass() -> None:
     report = ValidationReport()
     SystemTuningValidator(report).validate(
-        [_res([{"tunable": "a", "value": 1}, {"tunable": "b", "value": 2}])]
+        OPNsenseValidationContext(
+            resources=[_res([{"tunable": "a", "value": 1}, {"tunable": "b", "value": 2}])]
+        )
     )
     assert not report.has_errors()
 
