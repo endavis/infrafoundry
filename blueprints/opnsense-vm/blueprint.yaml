@@ -72,7 +72,12 @@ inputs:
     type: integer
     default: 600
 
-  # Extra Proxmox tags appended to the blueprint's default tags
+  # Base Proxmox tags; extra_tags are appended to them. Changing base_tags on an
+  # existing VM changes its tags, which replaces an OVA-imported VM
+  - name: base_tags
+    description: "Base Proxmox tags for the VM; extra_tags are appended"
+    default: [opnsense, fw-test]
+  # Extra Proxmox tags appended to base_tags
   - name: extra_tags
     default: []
 

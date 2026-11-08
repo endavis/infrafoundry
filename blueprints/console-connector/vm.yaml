@@ -31,5 +31,8 @@ vms:
       - system/hostname
     cloud_init_vars:
       HOSTNAME: "{{ vm_name }}"
+{% if cloud_init_snippets_storage %}
+    cloud_init_snippets_storage: "{{ cloud_init_snippets_storage }}"
+{% endif %}
     tags: {{ ["ontap", "console-connector"] + extra_tags }}
     onboot: true

@@ -78,6 +78,7 @@ infra apply --env <env> --package aiqum
 | `ontap_admin_user` | `admin` | ONTAP admin username |
 | `publish_dns` | `false` | Create an OPNsense Unbound host override for the VM (see Publishing DNS) |
 | `dns_domain` | `""` | Domain for the override; required when `publish_dns` is true |
+| `cloud_init_snippets_storage` | `""` | Proxmox storage for the cloud-init snippet file; empty: provider default |
 | `extra_tags` | `[]` | Additional Proxmox tags to append |
 
 ## Publishing DNS

@@ -109,7 +109,8 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 | `domain` | `lab.local` | Domain |
 | `api_allow_cidr` | `172.20.10.0/24` | Source allowed to reach the web GUI/API on the WAN |
 | `boot_timeout` | `600` | Seconds to wait for the first login prompt, and for the API afterwards |
-| `extra_tags` | `[]` | Extra Proxmox tags |
+| `base_tags` | `[opnsense, fw-test]` | Base Proxmox tags; changing it on an existing VM changes its tags and replaces the VM |
+| `extra_tags` | `[]` | Extra Proxmox tags, appended to `base_tags` |
 
 ## Prerequisites
 

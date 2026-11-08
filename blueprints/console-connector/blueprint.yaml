@@ -97,6 +97,9 @@ inputs:
     default: "default"
 
   # Extra Proxmox tags appended to the blueprint's default tags
+  - name: cloud_init_snippets_storage
+    description: "Proxmox storage for the cloud-init snippet file; empty: provider default"
+    default: ""
   - name: extra_tags
     default: []
 

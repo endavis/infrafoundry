@@ -23,9 +23,7 @@ vms:
     boot_order: [ide0]
     onboot: false
     tags:
-      - opnsense
-      - fw-test
-# {% for tag in extra_tags %}
+# {% for tag in base_tags + extra_tags %}
       - "{{ tag }}"
 # {% endfor %}
     network:

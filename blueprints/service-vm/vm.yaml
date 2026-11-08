@@ -26,5 +26,8 @@ vms:
 {% for key, value in extra_cloud_init_vars.items() %}
       {{ key }}: {{ value | tojson }}
 {% endfor %}
+{% if cloud_init_snippets_storage %}
+    cloud_init_snippets_storage: "{{ cloud_init_snippets_storage }}"
+{% endif %}
     tags: {{ tags | tojson }}
     onboot: {{ onboot }}
