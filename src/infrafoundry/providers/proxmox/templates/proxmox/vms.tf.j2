@@ -19,12 +19,7 @@ module "{{ ts.module_name }}" {
   advertise_routes = {{ ts.advertise_routes | tojson }}
   {% endif %}
 
-  {% if ts.auth_mode == 'auth_key' %}
   auth_key = var.{{ ts.auth_key_var }}
-  {% else %}
-  client_id     = var.{{ ts.oauth_client_id_var }}
-  client_secret = var.{{ ts.oauth_client_secret_var }}
-  {% endif %}
 
   {% if ts.additional_parts %}
   additional_parts = [

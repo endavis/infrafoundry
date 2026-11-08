@@ -77,7 +77,12 @@ variables:
   image: "ocid1.image.oc1.iad.aaaaaaa..."
   ssh_public_key: "ssh-rsa AAAA... user@host"
   tailnet: "tail-abcde.ts.net"
+  ts_tags: ["tag:example"]
 ```
+
+The OAuth client secret (`secrets.tailscale.oauth_client_secret`) is passed to the
+Tailscale cloud-init module as the node auth key. `ts_tags` must be non-empty, because
+Tailscale requires tags for OAuth-generated keys. The OAuth client ID is optional and unused.
 
 ## Directory Layout
 
