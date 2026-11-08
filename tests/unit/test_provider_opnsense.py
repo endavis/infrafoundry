@@ -289,6 +289,24 @@ class TestOPNsenseResourceTypes:
             provider.get_finalization_hooks()["syslog_reconfigure"]("env")
         factory.return_value.reconfigure.assert_called_once_with()
 
+    def test_hostdiscovery_is_supported_with_its_own_hook(self, provider: OPNsenseProvider) -> None:
+        types = provider.get_direct_api_resource_types()
+        assert "hostdiscovery" in provider.get_resource_types()
+        assert provider.get_dependencies()["hostdiscovery"] == ["interfaces.assignments"]
+        keys = list(types)
+        assert keys.index("hostdiscovery") > keys.index("interfaces.assignments")
+        hook = types["hostdiscovery"].FINALIZATION_HOOK
+        assert hook == "hostdiscovery_reconfigure"
+        assert hook in provider.get_finalization_hooks()
+
+    def test_hostdiscovery_hook_calls_the_service(self, provider: OPNsenseProvider) -> None:
+        with patch(
+            "infrafoundry.providers.opnsense.services.hostdiscovery"
+            ".HostDiscoveryService.from_environment"
+        ) as factory:
+            provider.get_finalization_hooks()["hostdiscovery_reconfigure"]("env")
+        factory.return_value.reconfigure.assert_called_once_with()
+
     @pytest.mark.parametrize(
         "resource_type",
         [

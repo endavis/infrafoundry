@@ -99,8 +99,8 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     "monit.alerts": "list",
     "monit.services": "list",
     "monit.tests": "list",
-    # #792 hostwatch (singleton; subshape verified at component-land time)
-    "hostwatch": "dict",
+    # #792 hostdiscovery (singleton; the wire API is /api/hostdiscovery/)
+    "hostdiscovery": "dict",
     # #806 system core (singletons). Each is a self-contained
     # ``opnsense.system.<surface>`` namespace mapping a chunk of the
     # OPNsense ``<system>`` block in ``config.xml`` to a singleton

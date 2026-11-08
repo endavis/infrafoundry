@@ -26,6 +26,7 @@ tags:
 **Amended:** 2026-11-05 (#1256) — §5 "Fully-managed by default" no longer applies to unmanaged objects: deletes are limited to the managed set recorded in the state database, and a type with no YAML entries is dispatched to delete its managed objects. See [ADR-0018](0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md).
 **Amended:** 2026-11-06 (#1274) — the interface-assignments controller install resolves its SSH target from `provider_settings.opnsense` (`ssh_host`, `ssh_user`, `ssh_port`, `ssh_key`) instead of env vars only; `OPNSENSE_SSH_HOST` and `OPNSENSE_API_URL` now follow the `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE` gate for the SSH host. §"Runtime credential resolution" gets an "SSH target for controller install" paragraph.
 **Amended:** 2026-11-06 (#1092) — `interfaces.settings` per-component decision recorded (direct-REST singleton against `interfaces/settings/*`; only declared fields compared; own `interfaces_settings_reconfigure` hook; set and reconfigure unverified live)
+**Amended:** 2026-11-08 (#792) — `hostdiscovery` per-component decision recorded (direct-REST singleton against `hostdiscovery/*`; YAML key renamed from the proposed `hostwatch` to match the wire API; only declared fields compared, list fields as sets; own `hostdiscovery_reconfigure` hook; set and reconfigure verified live)
 **Amended:** 2026-05-06 (#758) — `kea_dhcp6` per-component decision recorded (stock direct-REST against the existing `kea/dhcpv6/*` controller, now driven by `KeaDHCPv6SubnetManager` and `KeaDHCPv6ReservationManager` on `OPNsenseDirectRunner` instead of the legacy `OPNsenseProvider._generate_kea_dhcp6_resources` path that ran under `generate_terraform()`). Adds a new "Finalization hooks" subsection describing a generic runner facility for end-of-apply work shared across managers (e.g., a single Kea reconfigure for both subnets and reservations). Reservation→subnet UUID resolution now raises `ReferenceValidationError` on a missing live subnet rather than silently skipping with a warning — a behavioral upgrade.
 **Amended:** 2026-05-07 (#775) — `firewall_alias` per-component decision recorded (stock direct-REST against `firewall/alias/*` controller; natural-key identity = alias `name` (OPNsense-enforced unique); no controller fork; reconfigure via `firewall/alias/reconfigure`). The legacy terraform write path (`browningluke/opnsense` + `aliases.tf.j2`) is retired in the same PR — no `kind: legacy` shim. Mirrors #724's pattern for `unbound_host_alias`.
 **Amended:** 2026-05-07 (#776) — `unbound_host_override` per-component decision recorded (stock direct-REST against `unbound/settings/HostOverride*`; natural-key identity = `(hostname, domain, rr)`; shared `unbound_reconfigure` finalization hook now coalesces across `unbound_host_alias`, `unbound_forward`, and `unbound_host_override`). Mirrors #724's pattern; legacy terraform path retired in same PR.
@@ -432,6 +433,20 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Rollback strategy:** Same as §1's default.
 - **Cross-reference notes:** Shares `unbound_reconfigure` with the four other Unbound managers.
 
+### `hostdiscovery` (#792, 2026-11-08)
+
+**Mechanism:** Direct-REST singleton against the `OPNsense\Hostdiscovery` model (the passive host-discovery service). The issue proposed the YAML key `hostwatch`; it is `hostdiscovery` so it matches the wire API (`/api/hostwatch/` is not in the 26.1 spec and answers 404 on a test box). Only declared YAML keys are compared and written; list fields compare as sets. Destroy is a no-op.
+
+- **Endpoints:** `GET hostdiscovery/settings/get` (response `{"hostdiscovery": {"general": {...}}}`), `POST hostdiscovery/settings/set` and `POST hostdiscovery/service/reconfigure`. The GET shape was probed read-only; the `set` and `reconfigure` calls were verified live on a test firewall (a `verbose` change applied, re-planned clean and was restored); the wire field names follow the GET shape.
+- **Identity:** singleton named `hostdiscovery`. `get_resource_ids()` returns `{"hostdiscovery": "global"}`.
+- **Wire schema:** seven fields (see [the coverage doc](../development/opnsense-resource-coverage.md#host-discovery-792)). `skip_nets` and `interface` are comma-joined strings on write and selected keys on read. The write sends the whole flattened live `general` section with the declared fields overwritten.
+- **Apply:** `set_settings` only when a declared field drifted; logs changed field names, never values.
+- **Reconfigure:** the manager declares `FINALIZATION_HOOK = "hostdiscovery_reconfigure"`, so one `hostdiscovery/service/reconfigure` call fires per apply, only when the settings changed. A `{"status": "failed"}` answer fails the apply.
+- **Validator scope:** `HostDiscoveryValidator`: unknown keys, boolean fields, non-negative integer intervals, `skip_nets` CIDRs, and `interface` entries resolving to a managed `interfaces.assignments` entry or a live interface.
+- **Migrate:** exports every live field present.
+- **Rollback strategy:** Same as §1's default.
+- **Cross-reference notes:** Depends on `interfaces.assignments` for its interface list.
+
 ### `radvd` (#788, 2026-05-12)
 
 **Mechanism:** **Hybrid YAML-singleton / wire-list** direct-REST against the modern OPNsense 26.x `radvd` MVC controller — IPv6 Router Advertisement emission per interface. The operator authors a single dict-shape `radvd` resource whose `interfaces` mapping holds one inner mapping per interface; the wire stores those as per-UUID records. Mirrors the `system.firmware` (#806) asymmetric "bulk read, per-item write" shape but with full-reconcile semantics on the write side instead of install-missing-only. **Cutover hard blocker** for hands-free IPv6: without per-interface RA emission on `opt1`/`opt2`/`opt3`/`opt6` (Infra/PT/Tailscale-infra/Apps VLANs), every IPv6-enabled host on those VLANs loses its default route the moment cutover finishes.
@@ -613,6 +628,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#707](https://github.com/endavis/infrafoundry/issues/707): chore: write ADR-0014 codifying OPNsense direct-API apply mechanism (this ADR).
 - Issue [#1092](https://github.com/endavis/infrafoundry/issues/1092): feat: manage OPNsense global interface settings (`interfaces.settings`).
 - Issue [#804](https://github.com/endavis/infrafoundry/issues/804): feat: add `syslog.settings` direct-API resource for the OPNsense local syslog daemon.
+- Issue [#792](https://github.com/endavis/infrafoundry/issues/792): feat: add `hostdiscovery` resource type for the OPNsense host discovery service.
 - Issue [#807](https://github.com/endavis/infrafoundry/issues/807): feat: add `trust.cas` and `trust.certs` direct-API resources for OPNsense.
 - Issue [#808](https://github.com/endavis/infrafoundry/issues/808): feat: add `openvpn.instances` direct-API resource for OpenVPN client instances on OPNsense.
 - Issue [#1091](https://github.com/endavis/infrafoundry/issues/1091): feat: add `unbound.settings` resource for OPNsense Unbound general and advanced settings.

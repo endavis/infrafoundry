@@ -387,6 +387,11 @@ ASSIGN_SETTINGS = _crud(
     kind=EndpointKind.EXTENSION,
 )
 
+# --- hostdiscovery (#792) -------------------------------------------------------------
+HOSTDISCOVERY_SETTINGS_GET = Endpoint("GET", "hostdiscovery/settings/get")
+HOSTDISCOVERY_SETTINGS_SET = Endpoint("POST", "hostdiscovery/settings/set")
+HOSTDISCOVERY_RECONFIGURE = Endpoint("POST", "hostdiscovery/service/reconfigure")
+
 # --- core -----------------------------------------------------------------------------
 CORE_MENU_SEARCH = Endpoint("GET", "core/menu/search")
 CORE_SYSTEM_STATUS = Endpoint("GET", "core/system/status")
@@ -487,6 +492,11 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     "trust.cas": TRUST_CA.all(),
     "trust.certs": (*TRUST_CERT.all(), TRUST_CA.search),
     "openvpn.instances": (*OPENVPN_INSTANCE.all(), OPENVPN_RECONFIGURE, TRUST_CA.search),
+    "hostdiscovery": (
+        HOSTDISCOVERY_SETTINGS_GET,
+        HOSTDISCOVERY_SETTINGS_SET,
+        HOSTDISCOVERY_RECONFIGURE,
+    ),
 }
 
 #: Endpoints used outside a single resource type (ISC to Kea migration).

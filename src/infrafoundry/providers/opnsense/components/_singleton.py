@@ -23,7 +23,7 @@ the field maps.
 
 Reused by future singleton components (#786 firewall_log,
 #787 tailscale.settings, #788 radvd, #790 acmeclient.settings,
-#791 monit.settings, #792 hostwatch).
+#791 monit.settings, #792 hostdiscovery).
 """
 
 from __future__ import annotations
