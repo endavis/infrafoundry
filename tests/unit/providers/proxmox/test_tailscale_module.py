@@ -10,11 +10,13 @@ path is unchanged for VMs without a tailscale block.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.proxmox import ProxmoxProvider
 
@@ -56,6 +58,37 @@ def _vm(
 
 def _read_tf(output_dir: Any, filename: str) -> str:
     return cast("str", (output_dir / "test" / "terraform" / "proxmox" / filename).read_text())
+
+
+_SENTINEL_SECRET = "SENTINEL-OAUTH-SECRET"
+_SENTINEL_KEY = "SENTINEL-AUTH-KEY"
+
+
+def _module_block(tf: str, module_name: str) -> str:
+    """Return the text of one ``module "<name>" { ... }`` block."""
+    match = re.search(rf'module "{module_name}" \{{.*?^\}}', tf, re.DOTALL | re.MULTILINE)
+    assert match is not None, f"module {module_name} not found"
+    return match.group(0)
+
+
+def _attr_assigned(block: str, attr: str) -> bool:
+    """Return True if ``attr = <expr>`` is assigned in the block."""
+    return re.search(rf"^\s*{attr}\s*=\s*\S+", block, re.MULTILINE) is not None
+
+
+def _module_precondition_holds(block: str) -> bool:
+    """Model the tailscale/cloudinit 0.0.11 auth precondition over a block.
+
+    A ``var.*`` reference counts as non-empty, a missing attribute as empty.
+    ``client_id`` / ``client_secret`` are only accepted with ``id_token`` or
+    ``audience``; otherwise ``auth_key`` is required.
+    """
+    has_key = _attr_assigned(block, "auth_key")
+    has_client = _attr_assigned(block, "client_id") or _attr_assigned(block, "client_secret")
+    has_federation = _attr_assigned(block, "id_token") or _attr_assigned(block, "audience")
+    if has_client:
+        return has_federation
+    return has_key
 
 
 class TestProxmoxTailscaleAuthKey:
@@ -143,49 +176,134 @@ class TestProxmoxTailscaleAuthKey:
 
 
 class TestProxmoxTailscaleOAuth:
-    """Cover the OAuth client credentials auth mode."""
+    """Cover the OAuth client credentials auth mode.
+
+    The cloudinit module has no OAuth mode of its own, so the OAuth client
+    secret is passed as ``auth_key`` (issue #1311).
+    """
+
+    @staticmethod
+    def _oauth_resource() -> ResourceConfig:
+        return _vm(
+            "ts-control",
+            tailscale={
+                "advertise_tags": ["tag:example"],
+                "auth": {
+                    "oauth": {
+                        "client_id_secret": "tailscale.oauth_client_id",
+                        "client_secret_secret": "tailscale.oauth_client_secret",
+                    },
+                },
+            },
+        )
 
     def test_oauth_module_block_emitted(self, provider: ProxmoxProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
-        vm = _vm(
-            "ts-control",
-            tailscale={
-                "auth": {
-                    "oauth": {
-                        "client_id_secret": "tailscale.oauth_client_id",
-                        "client_secret_secret": "tailscale.oauth_client_secret",
-                    },
-                },
-            },
-        )
-        provider.generate_terraform([vm])
+        provider.generate_terraform([self._oauth_resource()])
         vms_tf = _read_tf(output_dir, "vms.tf")
 
         assert 'module "tailscale_ts_control"' in vms_tf
-        assert "client_id     = var.tailscale_oauth_client_id" in vms_tf
-        assert "client_secret = var.tailscale_oauth_client_secret" in vms_tf
-        assert "auth_key" not in vms_tf
+        block = _module_block(vms_tf, "tailscale_ts_control")
+        assert "auth_key = var.tailscale_oauth_client_secret" in block
+        assert re.search(r"^\s*client_id\s*=", block, re.MULTILINE) is None
+        assert re.search(r"^\s*client_secret\s*=", block, re.MULTILINE) is None
+        assert "tailscale_oauth_client_id" not in vms_tf
 
-    def test_oauth_variables_tf_has_both_secrets(
+    def test_oauth_variables_tf_has_only_client_secret(
         self, provider: ProxmoxProvider, tmp_dirs: Any
     ) -> None:
         _, output_dir = tmp_dirs
-        vm = _vm(
-            "ts-control",
-            tailscale={
-                "auth": {
-                    "oauth": {
-                        "client_id_secret": "tailscale.oauth_client_id",
-                        "client_secret_secret": "tailscale.oauth_client_secret",
-                    },
-                },
-            },
-        )
-        provider.generate_terraform([vm])
+        provider.generate_terraform([self._oauth_resource()])
         variables_tf = _read_tf(output_dir, "variables.tf")
 
-        assert 'variable "tailscale_oauth_client_id"' in variables_tf
+        assert 'variable "tailscale_oauth_client_id"' not in variables_tf
         assert 'variable "tailscale_oauth_client_secret"' in variables_tf
+
+    def test_oauth_without_client_id_secret_renders(
+        self, provider: ProxmoxProvider, tmp_dirs: Any
+    ) -> None:
+        _, output_dir = tmp_dirs
+        resource = _vm(
+            "ts-control",
+            tailscale={
+                "advertise_tags": ["tag:example"],
+                "auth": {"oauth": {"client_secret_secret": "tailscale.oauth_client_secret"}},
+            },
+        )
+        provider.generate_terraform([resource])
+        block = _module_block(_read_tf(output_dir, "vms.tf"), "tailscale_ts_control")
+        assert "auth_key = var.tailscale_oauth_client_secret" in block
+
+
+class TestProxmoxTailscaleModulePrecondition:
+    """The rendered module block satisfies the cloudinit module's auth precondition."""
+
+    def test_oauth_mode_satisfies_precondition(
+        self, provider: ProxmoxProvider, tmp_dirs: Any
+    ) -> None:
+        _, output_dir = tmp_dirs
+        provider.generate_terraform([TestProxmoxTailscaleOAuth._oauth_resource()])
+        block = _module_block(_read_tf(output_dir, "vms.tf"), "tailscale_ts_control")
+        assert _module_precondition_holds(block)
+
+    def test_auth_key_mode_satisfies_precondition(
+        self, provider: ProxmoxProvider, tmp_dirs: Any
+    ) -> None:
+        _, output_dir = tmp_dirs
+        resource = _vm(
+            "ts-control",
+            tailscale={"auth": {"auth_key_secret": "tailscale.auth_key"}},
+        )
+        provider.generate_terraform([resource])
+        block = _module_block(_read_tf(output_dir, "vms.tf"), "tailscale_ts_control")
+        assert _module_precondition_holds(block)
+
+    def test_precondition_model_rejects_old_oauth_output(self) -> None:
+        old = 'module "m" {\n  client_id     = var.a\n  client_secret = var.b\n}'
+        assert not _module_precondition_holds(old)
+
+
+class TestProxmoxTailscaleSecretSafety:
+    """Secret values reach Terraform only through TF_VAR_*, never .tf files."""
+
+    @pytest.mark.parametrize("mode", ["oauth", "auth_key"])
+    def test_no_secret_in_generated_files(
+        self, provider: ProxmoxProvider, tmp_dirs: Any, mode: str
+    ) -> None:
+        _, output_dir = tmp_dirs
+        if mode == "oauth":
+            resource = TestProxmoxTailscaleOAuth._oauth_resource()
+        else:
+            resource = _vm(
+                "ts-control", tailscale={"auth": {"auth_key_secret": "tailscale.auth_key"}}
+            )
+        provider.generate_terraform([resource])
+
+        for tf_file in (output_dir / "test" / "terraform" / "proxmox").glob("*.tf"):
+            text = tf_file.read_text()
+            assert _SENTINEL_SECRET not in text
+            assert _SENTINEL_KEY not in text
+
+    def test_oauth_env_vars_carry_secret_only(
+        self, provider: ProxmoxProvider, tmp_dirs: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        resource = TestProxmoxTailscaleOAuth._oauth_resource()
+        provider.generate_terraform([resource])
+        env = EnvironmentConfig(
+            name="test",
+            provider_settings={},
+            secrets={
+                "tailscale": {
+                    "oauth_client_id": "SENTINEL-OAUTH-ID",
+                    "oauth_client_secret": _SENTINEL_SECRET,
+                }
+            },
+        )
+        monkeypatch.setattr(provider, "_load_environment_config", lambda: env)
+
+        result = provider.get_terraform_env_vars()
+
+        assert result == {"TF_VAR_tailscale_oauth_client_secret": _SENTINEL_SECRET}
 
 
 class TestProxmoxTailscaleAdditionalParts:

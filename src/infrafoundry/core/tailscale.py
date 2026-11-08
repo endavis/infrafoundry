@@ -18,8 +18,11 @@ and is pinned to ``0.0.11`` (pre-1.0; latest as of phase 2 implementation).
 Exactly one of these auth modes must be set on every ``tailscale:`` block:
 
 - ``auth.auth_key_secret: "<dotted.secret.path>"`` — static auth key.
-- ``auth.oauth.client_id_secret: ...`` + ``auth.oauth.client_secret_secret: ...``
-  — OAuth client (ephemeral keys).
+- ``auth.oauth.client_secret_secret: ...`` — OAuth client secret. The module
+  has no OAuth mode of its own (``client_id`` / ``client_secret`` are only
+  valid with ``id_token`` or ``audience``), so the OAuth client secret is
+  passed as the module's ``auth_key``. Tailscale requires ``advertise_tags``
+  for OAuth-generated keys. ``oauth.client_id_secret`` is optional and unused.
 
 Both point into the env's decrypted ``secrets:`` dict via dotted paths, the
 same way Phase 1 declares ``terraform_secrets:`` entries.
@@ -54,7 +57,8 @@ def _validate_auth_block(resource_name: str, auth: Any) -> dict[str, Any]:
     - ``mode``: ``"auth_key"`` or ``"oauth"``
     - ``secret_refs``: list of dotted secret paths that must be resolvable
     - for ``auth_key``: ``auth_key_ref``
-    - for ``oauth``: ``client_id_ref`` and ``client_secret_ref``
+    - for ``oauth``: ``client_secret_ref`` (``client_id_secret`` is optional
+      and unused, but must be a non-empty string when present)
     """
     if not isinstance(auth, dict):
         raise TailscaleSchemaError(
@@ -95,23 +99,25 @@ def _validate_auth_block(resource_name: str, auth: Any) -> dict[str, Any]:
             f"Resource '{resource_name}' tailscale.auth.oauth must be a "
             f"mapping, got {type(oauth).__name__}."
         )
-    client_id = oauth.get("client_id_secret")
     client_secret = oauth.get("client_secret_secret")
-    for field_name, value in (
-        ("client_id_secret", client_id),
-        ("client_secret_secret", client_secret),
-    ):
-        if not isinstance(value, str) or not value:
+    if "client_id_secret" in oauth:
+        client_id = oauth["client_id_secret"]
+        if not isinstance(client_id, str) or not client_id:
             raise TailscaleSchemaError(
                 f"Resource '{resource_name}' tailscale.auth.oauth."
-                f"{field_name} must be a non-empty dotted secret reference "
-                f"string."
+                f"client_id_secret must be a non-empty dotted secret "
+                f"reference string."
             )
+    if not isinstance(client_secret, str) or not client_secret:
+        raise TailscaleSchemaError(
+            f"Resource '{resource_name}' tailscale.auth.oauth."
+            f"client_secret_secret must be a non-empty dotted secret "
+            f"reference string."
+        )
     return {
         "mode": "oauth",
-        "client_id_ref": client_id,
         "client_secret_ref": client_secret,
-        "secret_refs": [client_id, client_secret],
+        "secret_refs": [client_secret],
     }
 
 
@@ -290,6 +296,12 @@ def process_tailscale_config(
     )
 
     advertise_tags = _validate_tags(resource.name, tailscale.get("advertise_tags"))
+    if auth_info["mode"] == "oauth" and not advertise_tags:
+        raise TailscaleSchemaError(
+            f"Resource '{resource.name}' tailscale.advertise_tags must be a "
+            f"non-empty list when auth.oauth is used (Tailscale requires tags "
+            f"for OAuth-generated auth keys)."
+        )
     advertise_routes = _validate_routes(resource.name, tailscale.get("advertise_routes"))
     additional_parts = _validate_additional_parts(resource.name, tailscale.get("additional_parts"))
 
@@ -311,15 +323,9 @@ def process_tailscale_config(
         "auth_mode": auth_info["mode"],
     }
 
-    if auth_info["mode"] == "auth_key":
-        module_config["auth_key_var"] = sanitize_secret_ref_to_tf_var(auth_info["auth_key_ref"])
-    else:
-        module_config["oauth_client_id_var"] = sanitize_secret_ref_to_tf_var(
-            auth_info["client_id_ref"]
-        )
-        module_config["oauth_client_secret_var"] = sanitize_secret_ref_to_tf_var(
-            auth_info["client_secret_ref"]
-        )
+    # OAuth mode passes the client secret as the module's ``auth_key``.
+    auth_ref = auth_info["auth_key_ref" if auth_info["mode"] == "auth_key" else "client_secret_ref"]
+    module_config["auth_key_var"] = sanitize_secret_ref_to_tf_var(auth_ref)
 
     # Auto-populate terraform_secrets so Phase 1's bridge declares the
     # sensitive variables and injects values at apply time. Dedup while

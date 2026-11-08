@@ -8,8 +8,11 @@
 # Terraform module (issue #212). Auth credentials live in the env's
 # sops-encrypted secrets.yaml under secrets.tailscale.* and flow into
 # Terraform via the framework's secrets→TF_VAR_* bridge — values never
-# land in generated/*.tf. The consumer must supply OAuth client
-# credentials in secrets.tailscale.{oauth_client_id,oauth_client_secret}.
+# land in generated/*.tf. The consumer must supply the OAuth client secret
+# in secrets.tailscale.oauth_client_secret; it is passed to the module as the
+# node auth key. ts_tags must be non-empty (Tailscale requires tags for
+# OAuth-generated keys). The client ID (secrets.tailscale.oauth_client_id) is
+# optional and unused.
 instance:
   # --- Control plane (public subnet) ---
   - name: "{{ control_name }}"

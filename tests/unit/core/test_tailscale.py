@@ -15,7 +15,16 @@ without performing any network call.
 
 from __future__ import annotations
 
-from infrafoundry.core.tailscale import TAILSCALE_MODULE_SOURCE
+from typing import Any
+
+import pytest
+
+from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.tailscale import (
+    TAILSCALE_MODULE_SOURCE,
+    TailscaleSchemaError,
+    process_tailscale_config,
+)
 
 
 def test_module_source_has_three_segments() -> None:
@@ -43,3 +52,86 @@ def test_module_source_segments_match_canonical_registry_path() -> None:
     """
     namespace, name, provider = TAILSCALE_MODULE_SOURCE.split("/")
     assert (namespace, name, provider) == ("tailscale", "tailscale", "cloudinit")
+
+
+# ---------------------------------------------------------------------------
+# OAuth auth mode (issue #1311)
+# ---------------------------------------------------------------------------
+
+
+def _oauth_resource(
+    *, tags: Any = ("tag:example",), oauth: dict[str, Any] | None = None
+) -> ResourceConfig:
+    oauth_block: dict[str, Any] = (
+        oauth
+        if oauth is not None
+        else {
+            "client_id_secret": "tailscale.oauth_client_id",
+            "client_secret_secret": "tailscale.oauth_client_secret",
+        }
+    )
+    tailscale: dict[str, Any] = {"auth": {"oauth": oauth_block}}
+    if tags is not None:
+        tailscale["advertise_tags"] = list(tags) if isinstance(tags, tuple) else tags
+    return ResourceConfig(
+        name="node-a", type="instance", provider="oci", config={"tailscale": tailscale}
+    )
+
+
+class TestOAuthMode:
+    def test_client_secret_becomes_auth_key_var(self) -> None:
+        resource = _oauth_resource()
+        cfg = process_tailscale_config(resource, base64_encode=True)
+        assert cfg is not None
+        assert cfg["auth_mode"] == "oauth"
+        assert cfg["auth_key_var"] == "tailscale_oauth_client_secret"
+        assert "oauth_client_id_var" not in cfg
+        assert "oauth_client_secret_var" not in cfg
+
+    def test_only_client_secret_ref_added_to_terraform_secrets(self) -> None:
+        resource = _oauth_resource()
+        process_tailscale_config(resource, base64_encode=True)
+        assert resource.config["terraform_secrets"] == ["tailscale.oauth_client_secret"]
+
+    def test_client_id_secret_is_optional(self) -> None:
+        resource = _oauth_resource(oauth={"client_secret_secret": "tailscale.oauth_client_secret"})
+        cfg = process_tailscale_config(resource, base64_encode=True)
+        assert cfg is not None
+        assert cfg["auth_key_var"] == "tailscale_oauth_client_secret"
+
+    @pytest.mark.parametrize("bad", ["", 5])
+    def test_client_id_secret_invalid_rejected(self, bad: Any) -> None:
+        resource = _oauth_resource(
+            oauth={
+                "client_id_secret": bad,
+                "client_secret_secret": "tailscale.oauth_client_secret",
+            }
+        )
+        with pytest.raises(TailscaleSchemaError, match="client_id_secret"):
+            process_tailscale_config(resource, base64_encode=True)
+
+    def test_client_secret_secret_required(self) -> None:
+        resource = _oauth_resource(oauth={"client_id_secret": "tailscale.oauth_client_id"})
+        with pytest.raises(TailscaleSchemaError, match="client_secret_secret"):
+            process_tailscale_config(resource, base64_encode=True)
+
+    @pytest.mark.parametrize("tags", [None, []])
+    def test_missing_or_empty_tags_rejected(self, tags: Any) -> None:
+        resource = _oauth_resource(tags=tags)
+        with pytest.raises(TailscaleSchemaError, match="advertise_tags"):
+            process_tailscale_config(resource, base64_encode=True)
+
+
+class TestAuthKeyModeUnchanged:
+    def test_auth_key_mode_needs_no_tags(self) -> None:
+        resource = ResourceConfig(
+            name="node-a",
+            type="instance",
+            provider="oci",
+            config={"tailscale": {"auth": {"auth_key_secret": "tailscale.auth_key"}}},
+        )
+        cfg = process_tailscale_config(resource, base64_encode=False)
+        assert cfg is not None
+        assert cfg["auth_mode"] == "auth_key"
+        assert cfg["auth_key_var"] == "tailscale_auth_key"
+        assert resource.config["terraform_secrets"] == ["tailscale.auth_key"]
