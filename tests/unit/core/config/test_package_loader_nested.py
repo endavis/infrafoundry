@@ -542,6 +542,29 @@ class TestParseNestedShapeMismatch:
         SyslogSettingsValidator(report).validate(OPNsenseValidationContext(resources=found))
         assert not [r for r in report.results if r.level == ValidationLevel.ERROR]
 
+    def test_hostdiscovery_is_a_singleton_dict(self, temp_dir: Path) -> None:
+        """``hostdiscovery`` loads as one singleton named and typed ``hostdiscovery``."""
+        from infrafoundry.core.config.package_loader import (
+            DOTTED_RESOURCE_SHAPES,
+            SINGLETON_RESOURCE_TYPES,
+        )
+
+        assert "hostdiscovery" in SINGLETON_RESOURCE_TYPES
+        assert "hostwatch" not in DOTTED_RESOURCE_SHAPES
+        loader = PackageLoader(temp_dir)
+        data = {"opnsense": {"hostdiscovery": {"enabled": True, "skip_nets": ["192.0.2.0/24"]}}}
+        resources = loader._parse_resources_from_data(data, "t.yaml", "opnsense")
+        found = [r for r in resources if r.type == "hostdiscovery"]
+        assert len(found) == 1
+        assert found[0].name == "hostdiscovery"
+        assert found[0].config == {"enabled": True, "skip_nets": ["192.0.2.0/24"]}
+
+    def test_hostdiscovery_list_rejected(self, temp_dir: Path) -> None:
+        loader = PackageLoader(temp_dir)
+        data: dict[str, Any] = {"opnsense": {"hostdiscovery": [{"enabled": True}]}}
+        with pytest.raises(InvalidConfigurationError, match="declared as a dict"):
+            loader._parse_resources_from_data(data, "bad.yaml", "opnsense")
+
     def test_known_dict_path_with_list_leaf_rejected(self, temp_dir: Path) -> None:
         """``firewall.log: [...]`` (list where dict expected) errors."""
         loader = PackageLoader(temp_dir)

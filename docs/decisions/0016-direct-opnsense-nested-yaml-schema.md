@@ -13,6 +13,7 @@ tags:
 **Amended:** 2026-05-10 (#806) — First production validation of the singleton structural-discrimination claim. Issue #806 ships seven `opnsense.system.*` dict-shape singletons (`hostname`, `dns`, `ssh`, `webgui`, `firmware`, `remotebackup`, `tuning`) under the nested namespace. The loader's `DOTTED_RESOURCE_SHAPES` map is extended for each; the new shared scaffolding `components/_singleton.py` (`SingletonDiff`, `diff_singleton`, `enforce_singleton`) is reusable for upcoming singletons in #786, #787, #788, #790, #791, #792. The `name: settings` sentinel pattern remains obviated as described in §"Schema shape — illustrative example".
 **Amended:** 2026-05-12 (#788) — Second production singleton ships under the nested namespace: `opnsense.radvd` registers in `DOTTED_RESOURCE_SHAPES` as a dict-shape singleton with a hybrid YAML-singleton/wire-list pattern (operator authors a single dict whose `interfaces` mapping carries one inner mapping per interface; the wire stores per-UUID records). Unlike #806's seven `opnsense.system.*` singletons (which use `components/_singleton.py`'s `SingletonDiff` for whole-record install/update), `radvd` requires a custom dict-of-dicts diff to reconcile the per-interface inner mapping against the wire's per-UUID records — full-reconcile semantics including DELETE for interfaces missing from YAML. Confirms the structural-discrimination claim holds for singletons whose internal shape diverges from a flat scalar dict.
 **Amended:** 2026-11-04 (#1237) — dict-shaped leaves now take their dotted path as the resource name (`system.tuning`, not `settings`), so several singletons can coexist and each can be targeted with `-r`. The YAML no longer needs, and still does not use, a `name: settings` sentinel.
+**Amended:** 2026-11-08 (#792) — the planned `hostwatch` singleton is registered as `hostdiscovery` (dict shape) so the YAML key matches the wire API `/api/hostdiscovery/`; the plugin's `/api/hostwatch/` path does not exist on 26.1
 **Status:** Accepted
 
 ## Status
@@ -95,7 +96,7 @@ The following starting-proposal table maps the current flat `ResourceConfig.type
 | `kea_dhcp6_subnet` | `kea.dhcp6.subnets` | |
 | `kea_dhcp6_reservation` | `kea.dhcp6.reservations` | |
 
-**Future singletons** from in-flight issues land at: `firewall.log` (#786), `tailscale.settings` / `tailscale.subnets` / `tailscale.auth` (#787), `radvd` (#788), `cron.jobs` (#789), `acmeclient.{settings,accounts,validations,certs,actions}` (#790), `monit.{settings,alerts,services,tests}` (#791), `hostwatch` (#792). Singleton vs list discrimination is structural per the Schema-shape section above.
+**Future singletons** from in-flight issues land at: `firewall.log` (#786), `tailscale.settings` / `tailscale.subnets` / `tailscale.auth` (#787), `radvd` (#788), `cron.jobs` (#789), `acmeclient.{settings,accounts,validations,certs,actions}` (#790), `monit.{settings,alerts,services,tests}` (#791), `hostdiscovery` (#792, renamed from `hostwatch`). Singleton vs list discrimination is structural per the Schema-shape section above.
 
 ### Cross-reference syntax
 
@@ -167,7 +168,7 @@ The following feature issues were drafted against the flat schema and require bo
 | [#789](https://github.com/endavis/infrafoundry/issues/789) | cron_jobs | `opnsense.cron.jobs` (list) |
 | [#790](https://github.com/endavis/infrafoundry/issues/790) | acmeclient | `opnsense.acmeclient.{settings,accounts,validations,certs,actions}` |
 | [#791](https://github.com/endavis/infrafoundry/issues/791) | monit | `opnsense.monit.{settings,alerts,services,tests}` |
-| [#792](https://github.com/endavis/infrafoundry/issues/792) | hostwatch | `opnsense.hostwatch` (singleton; subshape verified Phase 1) |
+| [#792](https://github.com/endavis/infrafoundry/issues/792) | hostdiscovery | `opnsense.hostdiscovery` (singleton; renamed from `hostwatch` to match the wire API) |
 
 ## Verification
 

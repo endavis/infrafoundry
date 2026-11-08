@@ -22,6 +22,7 @@ from infrafoundry.providers.opnsense.validators import (
     CronJobsValidator,
     FirewallRuleValidator,
     GatewayValidator,
+    HostDiscoveryValidator,
     InterfaceAssignmentValidator,
     InterfacesSettingsValidator,
     KeaReservationValidator,
@@ -122,6 +123,7 @@ class OPNsenseValidator:
         self.unbound_settings_validator = UnboundSettingsValidator(report)
         self.interfaces_settings_validator = InterfacesSettingsValidator(report)
         self.syslog_settings_validator = SyslogSettingsValidator(report)  # #804
+        self.hostdiscovery_validator = HostDiscoveryValidator(report)
 
     def validate_endpoint_support(self, resources: list[ResourceConfig]) -> None:
         """Check the in-scope resource types' endpoints against the box's version (#1239).
@@ -362,6 +364,9 @@ class OPNsenseValidator:
             self.syslog_settings_validator.validate(
                 replace(context, resources=resource_refs["syslog_settings"])
             )
+            self.hostdiscovery_validator.validate(
+                replace(context, resources=resource_refs["hostdiscovery"])
+            )
             self.kea_reservation_validator.validate(context)
             self.radvd_validator.validate(replace(context, resources=resource_refs["radvd"]))
             self.cron_jobs_validator.validate(
@@ -414,6 +419,7 @@ class OPNsenseValidator:
         unbound_settings = [r for r in resources if r.type == "unbound.settings"]
         interfaces_settings = [r for r in resources if r.type == "interfaces.settings"]
         syslog_settings = [r for r in resources if r.type == "syslog.settings"]  # #804
+        hostdiscovery = [r for r in resources if r.type == "hostdiscovery"]
         interface_assignments = [r for r in resources if r.type == "interfaces.assignments"]
         nat_rules = [r for r in resources if r.type == "firewall.nat"]
         gateways = [r for r in resources if r.type == "routing.gateways"]
@@ -460,6 +466,7 @@ class OPNsenseValidator:
             "unbound_settings": unbound_settings,
             "interfaces_settings": interfaces_settings,
             "syslog_settings": syslog_settings,  # #804
+            "hostdiscovery": hostdiscovery,
             "interface_assignments": interface_assignments,
             "interface_assignment_names": interface_assignment_names,
             "nat_rules": nat_rules,

@@ -11,6 +11,9 @@ from infrafoundry.providers.opnsense.validators.firewall_rule_validator import (
     FirewallRuleValidator,
 )
 from infrafoundry.providers.opnsense.validators.gateway_validator import GatewayValidator
+from infrafoundry.providers.opnsense.validators.hostdiscovery_validator import (
+    HostDiscoveryValidator,
+)
 from infrafoundry.providers.opnsense.validators.interface_assignment_validator import (
     InterfaceAssignmentValidator,
 )
@@ -69,6 +72,7 @@ __all__ = [
     "CronJobsValidator",
     "FirewallRuleValidator",
     "GatewayValidator",
+    "HostDiscoveryValidator",
     "InterfaceAssignmentValidator",
     "InterfacesSettingsValidator",
     "KeaReservationValidator",

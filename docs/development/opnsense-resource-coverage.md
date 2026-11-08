@@ -56,7 +56,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<OPNsense>/tailscale` | `tailscale_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#787](https://github.com/endavis/infrafoundry/issues/787) ships. |
 | `<OPNsense>/Syslog` | `syslog.settings` | Supported (direct-API; #804). A singleton over the `general` section of the syslog model (local logging switch and log rotation); only declared fields are compared, the whole live `general` object is echoed back on write; destroy is a no-op; the `syslog_reconfigure` hook fires one reconfigure per apply. Remote `destinations` are not managed. The `set` and `reconfigure` calls are verified live. See [Syslog settings](#syslog-settings-804). |
 | `<OPNsense>/monit` | `monit_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#791](https://github.com/endavis/infrafoundry/issues/791) ships. |
-| `<OPNsense>/Hostwatch` | `hostwatch` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#792](https://github.com/endavis/infrafoundry/issues/792) ships. |
+| `<OPNsense>/Hostwatch` | `hostdiscovery` | Supported (direct-API; #792). The YAML key is `hostdiscovery`, not `hostwatch`, to match the wire API. A singleton; only declared fields are compared (lists as sets), the whole live `general` section is echoed back on write; destroy is a no-op; the `hostdiscovery_reconfigure` hook fires one reconfigure per apply. **The `set` and `reconfigure` calls are not yet verified against a live box.** See [Host discovery](#host-discovery-792). |
 | `<OPNsense>/unboundplus/advanced` (`privatedomain`, `insecuredomain`, `privateaddress`) | `unbound.advanced` | Supported (direct-API; #1254). Only declared fields are compared; the whole `advanced` section is echoed back on write; destroy is a no-op; shares the `unbound_reconfigure` hook. The `set` envelope key `unbound` is verified live through `unbound.settings` (#1091). |
 | `<OPNsense>/unboundplus/general`, the rest of `<OPNsense>/unboundplus/advanced` | `unbound.settings` | Supported (direct-API; #1091). Singleton with optional `general:` and `advanced:` mappings keyed by wire field name; only declared fields are compared, each declared live section is echoed back whole on write; destroy is a no-op; shares the `unbound_reconfigure` hook. See [Unbound general and advanced settings](#unbound-general-and-advanced-settings-1091). |
 | `<OPNsense>/Interfaces/settings` | `interfaces.settings` | Supported (direct-API; #1092). A singleton over the whole settings model; only declared fields are compared, the whole live object is echoed back on write; destroy is a no-op; the `interfaces_settings_reconfigure` hook fires one reconfigure per apply. **The `set` and `reconfigure` calls are not yet verified against a live box.** See [Interface settings](#interface-settings-1092). |
@@ -298,6 +298,40 @@ opnsense:
 
 **Verified live** on a test firewall: `syslog/settings/set` with the `syslog` envelope changed `max_preserve` and left the other `general` fields and the `destinations` list unchanged; `syslog/service/reconfigure` ran and the service stayed running; a re-plan after apply showed no update.
 
+## Host discovery (#792)
+
+`opnsense.hostdiscovery` is a singleton dict over the `OPNsense\Hostdiscovery` model, the passive host-discovery service. Every key is optional.
+
+**Rename.** The issue proposed the key `hostwatch`. It is `hostdiscovery` because the wire API is `/api/hostdiscovery/`; `/api/hostwatch/` is not in the 26.1 spec and answers 404.
+
+| YAML | wire field (under `hostdiscovery.general`) | type |
+|---|---|---|
+| `enabled` | `enabled` | bool |
+| `promisc` | `promisc` | bool |
+| `verbose` | `verbose` | bool |
+| `skip_nets` | `skip_nets` | list of CIDRs |
+| `interface` | `interface` | list of interface keys |
+| `expire4_interval` | `expire4_interval` | integer >= 0 |
+| `expire6_interval` | `expire6_interval` | integer >= 0 |
+
+An omitted key is not managed. List fields compare as sets; `[]` clears the list. Each `interface` entry must be a managed `interfaces.assignments` name or a live interface. `config migrate` exports every live field present.
+
+```yaml
+opnsense:
+  hostdiscovery:
+    enabled: true
+    promisc: false
+    verbose: false
+    skip_nets:
+      - 192.0.2.0/24
+    interface:
+      - lan
+    expire4_interval: 3600
+    expire6_interval: 3600
+```
+
+**Not yet verified live.** The `set` call and the `hostdiscovery/service/reconfigure` call have not been run against a box, and the wire field names follow the YAML names by assumption. After the first apply, re-run `infra plan` and expect no update.
+
 ## How deletes work: the managed set (#1256)
 
 `opnsense_direct` deletes only objects InfraFoundry manages ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). A live object InfraFoundry never applied is kept, whether or not its type has YAML entries. `infra plan` shows those as `N unmanaged (kept)` on the type's summary line.
@@ -310,7 +344,7 @@ opnsense:
 
 - **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs` and `openvpn.instances`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
-- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `radvd`) are unaffected.
+- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `radvd`) are unaffected.
 
 **Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
 

@@ -146,6 +146,7 @@ class OPNsenseProvider(
         from .components.cron_jobs import CronJobsManager
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
+        from .components.hostdiscovery import HostDiscoveryManager
         from .components.interface_assignment import InterfaceAssignmentManager
         from .components.interfaces_settings import InterfacesSettingsManager
         from .components.isc_to_kea_migration import ISCToKeaMigrationManager
@@ -178,6 +179,7 @@ class OPNsenseProvider(
             ("kea_dhcp", KeaDHCPManager),
             ("isc_to_kea", ISCToKeaMigrationManager),
             ("cron.jobs", CronJobsManager),
+            ("hostdiscovery", HostDiscoveryManager),
         ]
         for resource_type, manager_class in components:
             register_extractor(
@@ -259,6 +261,7 @@ class OPNsenseProvider(
         from .components.cron_jobs import CronJobsManager
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
+        from .components.hostdiscovery import HostDiscoveryManager
         from .components.interface_assignment import InterfaceAssignmentManager
         from .components.interfaces_settings import InterfacesSettingsManager
         from .components.kea_dhcp4_reservation import KeaDHCPv4ReservationManager
@@ -341,6 +344,8 @@ class OPNsenseProvider(
             "trust.certs": TrustCertManager,
             # #808: client instances resolve ``ca_ref`` against trust.cas.
             "openvpn.instances": OpenVpnInstanceManager,
+            # #792: depends on interfaces.assignments for its interface list.
+            "hostdiscovery": HostDiscoveryManager,
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
@@ -370,6 +375,8 @@ class OPNsenseProvider(
           :class:`InterfacesSettingsManager` when the interface settings changed.
 
         - ``syslog_reconfigure`` (#804) — fired by :class:`SyslogSettingsManager`.
+        - ``hostdiscovery_reconfigure`` (#792) — fired by :class:`HostDiscoveryManager`
+          when the host-discovery settings changed.
 
         - ``openvpn_reconfigure`` (#808) — fired by :class:`OpenVpnInstanceManager`
           so a single ``openvpn/service/reconfigure`` call fires per apply.
@@ -390,6 +397,7 @@ class OPNsenseProvider(
             "tunables_reconfigure": self._reconfigure_tunables,
             "interfaces_settings_reconfigure": self._reconfigure_interfaces_settings,
             "syslog_reconfigure": self._reconfigure_syslog,  # #804
+            "hostdiscovery_reconfigure": self._reconfigure_hostdiscovery,
         }
 
     def check_endpoint_support(
@@ -559,6 +567,22 @@ class OPNsenseProvider(
         service = SyslogSettingsService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
+    def _reconfigure_hostdiscovery(self, env_name: str) -> None:
+        """Reconfigure host discovery after a settings change (#792).
+
+        Used by :meth:`get_finalization_hooks` so one
+        ``hostdiscovery/service/reconfigure`` call fires per apply, only when the
+        settings changed. Unverified against a live box. Hook errors propagate,
+        failing the apply.
+
+        Args:
+            env_name: Active environment name.
+        """
+        from .services.hostdiscovery import HostDiscoveryService
+
+        service = HostDiscoveryService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
     # All OPNsense components are now managed by ``OPNsenseDirectRunner``
     # (ADR-0014). Per-component history:
     # - ``firewall_rules`` (#724, ADR-0015), ``aliases`` (#775, firewall_alias),
@@ -659,6 +683,7 @@ class OPNsenseProvider(
             "system.groups": ["system.users"],
             "interfaces.settings": [],
             "syslog.settings": [],  # #804
+            "hostdiscovery": ["interfaces.assignments"],
         }
 
     @override

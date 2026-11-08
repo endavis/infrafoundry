@@ -33,6 +33,7 @@ EXPECTED_RESOURCE_TYPES = [
     "syslog.settings",
     "interfaces.virtual_ips",
     "interfaces.vlans",
+    "hostdiscovery",
 ]
 
 

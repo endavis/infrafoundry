@@ -97,6 +97,14 @@ def test_interfaces_settings_registers_the_settings_endpoints() -> None:
     assert endpoints.INTERFACES_SETTINGS_RECONFIGURE in registered
 
 
+def test_hostdiscovery_registers_its_endpoints() -> None:
+    registered = endpoints.RESOURCE_TYPE_ENDPOINTS["hostdiscovery"]
+    assert endpoints.HOSTDISCOVERY_SETTINGS_GET in registered
+    assert endpoints.HOSTDISCOVERY_SETTINGS_SET in registered
+    assert endpoints.HOSTDISCOVERY_RECONFIGURE in registered
+    assert endpoints.HOSTDISCOVERY_RECONFIGURE.template == "hostdiscovery/service/reconfigure"
+
+
 def test_trust_types_register_their_endpoints() -> None:
     cas = endpoints.RESOURCE_TYPE_ENDPOINTS["trust.cas"]
     certs = endpoints.RESOURCE_TYPE_ENDPOINTS["trust.certs"]
