@@ -37,7 +37,6 @@ Mutex constraints:
 from __future__ import annotations
 
 import ipaddress
-import re
 from typing import Any, override
 
 from infrafoundry.core.protocols import SpecializedValidator
@@ -46,13 +45,13 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
+from ..services._identity import encode_identity, has_identity_marker
 from ..services.firewall_rule import (
     ACTION_CHOICES,
     DIRECTION_CHOICES,
     IPPROTOCOL_CHOICES,
     STATE_POLICY_CHOICES,
     STATETYPE_CHOICES,
-    encode_identity,
 )
 
 # Dotted types referenced by the firewall-rule cross-reference fields.
@@ -77,8 +76,6 @@ _NET_KEYWORDS: frozenset[str] = frozenset(
         "wan_subnets",
     }
 )
-
-_IDENTITY_PROBE = re.compile(r"\[infrafoundry:[^\]]*\]")
 
 # Soft cap on the encoded description length (operator description +
 # identity suffix tag). Some OPNsense versions silently truncate around
@@ -220,7 +217,7 @@ class FirewallRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 level=ValidationLevel.ERROR,
             )
             return
-        if _IDENTITY_PROBE.search(description):
+        if has_identity_marker(description):
             self.report.add_check(
                 check_name=f"firewall_rule_{rule.name}_description",
                 passed=False,

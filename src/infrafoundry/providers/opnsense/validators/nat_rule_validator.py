@@ -34,12 +34,12 @@ Per-kind dispatch:
 from __future__ import annotations
 
 import ipaddress
-import re
 from typing import Any, override
 
 from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.services._identity import has_identity_marker
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
@@ -65,8 +65,6 @@ _NET_KEYWORDS: frozenset[str] = frozenset(
         "wan_subnets",
     }
 )
-
-_IDENTITY_PROBE = re.compile(r"\[infrafoundry:[^\]]*\]")
 
 
 class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
@@ -230,7 +228,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 level=ValidationLevel.ERROR,
             )
             return
-        if _IDENTITY_PROBE.search(description):
+        if has_identity_marker(description):
             self.report.add_check(
                 check_name=f"nat_rule_{rule.name}_description",
                 passed=False,

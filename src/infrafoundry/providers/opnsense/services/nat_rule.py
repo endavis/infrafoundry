@@ -47,16 +47,19 @@ controllers; same name allowed).
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from infrafoundry.core.exceptions import APIError, InfraFoundryError
+from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.provider import ResourceConfig
 
 from .. import endpoints
 from ._category_marker import INFRAFOUNDRY_CATEGORY_NAME as _SHARED_CATEGORY_NAME
 from ._category_marker import ensure_infrafoundry_category
+from ._identity import OpnsenseDriftError as OpnsenseDriftError
+from ._identity import encode_identity as encode_identity
+from ._identity import has_identity_marker
+from ._identity import parse_identity as parse_identity
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
@@ -66,84 +69,10 @@ logger = logging.getLogger(__name__)
 NATRuleKind = Literal["outbound", "one_to_one", "port_forward"]
 ALLOWED_KINDS: tuple[NATRuleKind, ...] = ("outbound", "one_to_one", "port_forward")
 
-# Strict regex for parsing the description-suffix identity tag. The
-# (optional) free-form user description leads, followed by whitespace,
-# followed by ``\[infrafoundry:<name>\]`` at the end of the string. The
-# resource name must be a non-empty match of ``[a-z0-9-]+``; live rows
-# without the tag are unmanaged, and rows with a malformed tag — empty
-# name, wrong position, trailing text after the tag, etc. — raise
-# ``OpnsenseDriftError``. ``_IDENTITY_PROBE`` is a position-agnostic
-# detector used both by the parser (to flag malformed tags) and by the
-# validator (to reject operator-set descriptions that include the tag
-# pattern, since InfraFoundry adds it automatically).
-_IDENTITY_PATTERN = re.compile(r"^(?:(.+?)\s+)?\[infrafoundry:([a-z0-9-]+)\]\s*$")
-_IDENTITY_PROBE = re.compile(r"\[infrafoundry:[^\]]*\]")
-
 # Controller paths live in ``..endpoints`` (``SOURCE_NAT``, ``ONE_TO_ONE``, ``D_NAT``).
 
 # Default sequence for new rules — matches the OPNsense schema default.
 DEFAULT_SEQUENCE = 100
-
-
-class OpnsenseDriftError(InfraFoundryError):
-    """A managed rule's identity tag is malformed on the live box.
-
-    Raised by the diff engine when a live rule's ``description`` looks like
-    it carries an InfraFoundry prefix (begins with ``[infrafoundry:``) but
-    does not match the strict identity regex. The operator must repair the
-    description in the GUI (or via API) before the next plan/apply.
-    """
-
-
-# ---------------------------------------------------------------------------
-# Identity-prefix helpers
-# ---------------------------------------------------------------------------
-
-
-def encode_identity(resource_name: str, user_description: str) -> str:
-    """Encode the description with the InfraFoundry identity suffix.
-
-    Args:
-        resource_name: Operator-facing YAML name; becomes the diff key.
-        user_description: Free-form description from YAML (may be empty).
-
-    Returns:
-        ``"<user_description> [infrafoundry:<name>]"`` when the user
-        description is non-empty; ``"[infrafoundry:<name>]"`` otherwise.
-    """
-    if user_description:
-        return f"{user_description} [infrafoundry:{resource_name}]"
-    return f"[infrafoundry:{resource_name}]"
-
-
-def parse_identity(description: str) -> tuple[str | None, str]:
-    """Parse the description-suffix identity tag.
-
-    Args:
-        description: ``description`` field from a live rule row.
-
-    Returns:
-        ``(resource_name, user_description)``. ``resource_name`` is ``None``
-        when the description has no tag (unmanaged rule).
-
-    Raises:
-        OpnsenseDriftError: If the description contains the
-            ``[infrafoundry:...]`` marker but does not match the strict
-            suffix-only regex — empty name, uppercase, tag in the middle
-            with text after, etc.
-    """
-    match = _IDENTITY_PATTERN.match(description)
-    if match is not None:
-        user_desc = match.group(1) or ""
-        return match.group(2), user_desc
-    if _IDENTITY_PROBE.search(description):
-        raise OpnsenseDriftError(
-            f"NAT rule description contains an InfraFoundry identity tag but is malformed: "
-            f"{description!r}. Expected '<user description> [infrafoundry:<name>]' (or just "
-            f"'[infrafoundry:<name>]') where <name> matches [a-z0-9-]+ (non-empty) and the "
-            f"tag is the LAST token in the description."
-        )
-    return None, description
 
 
 # ---------------------------------------------------------------------------
@@ -594,7 +523,7 @@ def nat_rule_configs_from_resources(
         description = config.get("description", "")
         if not isinstance(description, str):
             raise ValueError(f"nat_rule '{resource.name}' description must be a string")
-        if _IDENTITY_PROBE.search(description):
+        if has_identity_marker(description):
             raise ValueError(
                 f"nat_rule '{resource.name}' description must not contain "
                 f"'[infrafoundry:<name>]' — that tag is reserved for InfraFoundry's "
@@ -1190,7 +1119,7 @@ def _row_to_live(row: dict[str, Any], kind: NATRuleKind) -> LiveNATRule:
         description = str(row.get("descr", row.get("description", "")) or "")
     else:
         description = str(row.get("description", "") or "")
-    managed_name, user_description = parse_identity(description)
+    managed_name, user_description = parse_identity(description, record_label="NAT rule")
     return LiveNATRule(
         uuid=uuid,
         kind=kind,
