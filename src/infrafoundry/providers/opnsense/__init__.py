@@ -268,6 +268,8 @@ class OPNsenseProvider(
         from .components.system_groups import GroupManager
         from .components.system_tuning import SystemTuningManager
         from .components.system_users import UserManager
+        from .components.trust_ca import TrustCaManager
+        from .components.trust_cert import TrustCertManager
         from .components.unbound_advanced import UnboundAdvancedManager
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
@@ -325,6 +327,8 @@ class OPNsenseProvider(
             "kea.dhcp6.reservations": KeaDHCPv6ReservationManager,
             "radvd": RadvdManager,
             "cron.jobs": CronJobsManager,
+            "trust.cas": TrustCaManager,
+            "trust.certs": TrustCertManager,
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
@@ -593,6 +597,8 @@ class OPNsenseProvider(
             "unbound.advanced": [],
             "radvd": ["interfaces.assignments"],
             "cron.jobs": [],
+            "trust.cas": [],
+            "trust.certs": ["trust.cas"],
             "system.firmware": [],
             "system.tuning": [],
             # #805

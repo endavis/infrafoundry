@@ -197,6 +197,15 @@ class TestOPNsenseResourceTypes:
     ) -> None:
         assert resource_type in provider.get_resource_types()
 
+    def test_trust_types_are_dispatched_in_order_with_dependency(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        types = list(provider.get_direct_api_resource_types())
+        assert types.index("trust.cas") < types.index("trust.certs")
+        assert provider.get_dependencies()["trust.cas"] == []
+        assert provider.get_dependencies()["trust.certs"] == ["trust.cas"]
+        assert "trust.certs" in provider.get_resource_types()
+
     @pytest.mark.parametrize("resource_type", ["system.firmware", "system.tuning"])
     def test_firmware_and_tuning_are_supported(
         self, provider: OPNsenseProvider, resource_type: str

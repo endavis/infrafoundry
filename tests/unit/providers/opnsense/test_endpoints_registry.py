@@ -88,3 +88,23 @@ def test_interfaces_settings_registers_the_settings_endpoints() -> None:
     assert endpoints.INTERFACES_SETTINGS_GET in registered
     assert endpoints.INTERFACES_SETTINGS_SET in registered
     assert endpoints.INTERFACES_SETTINGS_RECONFIGURE in registered
+
+
+def test_trust_types_register_their_endpoints() -> None:
+    cas = endpoints.RESOURCE_TYPE_ENDPOINTS["trust.cas"]
+    certs = endpoints.RESOURCE_TYPE_ENDPOINTS["trust.certs"]
+    assert {e.template for e in cas} == {
+        "trust/ca/search",
+        "trust/ca/get/{uuid}",
+        "trust/ca/add",
+        "trust/ca/set/{uuid}",
+        "trust/ca/del/{uuid}",
+    }
+    assert endpoints.TRUST_CA.search in certs
+    assert {e.template for e in certs if e.template.startswith("trust/cert/")} == {
+        "trust/cert/search",
+        "trust/cert/get/{uuid}",
+        "trust/cert/add",
+        "trust/cert/set/{uuid}",
+        "trust/cert/del/{uuid}",
+    }
