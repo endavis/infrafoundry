@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794161965781,
+  "lastUpdate": 1794162574099,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -372,6 +372,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001599862429175935",
             "extra": "mean: 63.67249416802689 usec\nrounds: 16804"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "078bb284df51930353dc2efa427556111c345957",
+          "message": "feat: add hostdiscovery direct-API singleton for opnsense (merges PR #1325, addresses #792)\n\n* feat: add hostdiscovery direct-API singleton for opnsense\n\nAdd opnsense.hostdiscovery (renamed from the proposed hostwatch to match the\n/api/hostdiscovery/ wire API): enabled, promisc, verbose, skip_nets,\ninterface, expire4_interval and expire6_interval, with a validator,\nreconfigure finalization hook, extractor, docs and ADR-0014/0016 updates.\n\nAddresses #792\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: accept deletes_only in HostDiscoveryManager.apply\n\nHostDiscoveryManager sets SPLIT_DELETE_PHASE, so the direct runner calls\napply() with deletes_only. The method did not accept it, and a live apply\nfailed with a TypeError before writing anything. The delete phase is now a\nno-op that neither reads nor writes the box.\n\nA registry-wide test checks that every SPLIT_DELETE_PHASE manager's apply()\ntakes deletes_only, so this mismatch is caught in unit tests.\n\nAddresses #792\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* docs: record live verification of hostdiscovery set and reconfigure\n\nOn a test firewall, config migrate output planned with no update, and a\nverbose change went through set and reconfigure, re-planned clean, and was\nrestored. The wire field names are confirmed by the same run.\n\nAddresses #792\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-08T18:28:56Z",
+          "tree_id": "a96eda1b058c1e79c8c64ceb7557090b9c129e1c",
+          "url": "https://github.com/endavis/infrafoundry/commit/078bb284df51930353dc2efa427556111c345957"
+        },
+        "date": 1794162573531,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7843.513397102886,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008283177652925946",
+            "extra": "mean: 127.49388563157989 usec\nrounds: 8289"
           }
         ]
       }
