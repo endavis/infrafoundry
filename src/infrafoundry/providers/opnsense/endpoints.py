@@ -371,6 +371,11 @@ INTERFACES_EXPORT = Endpoint("GET", "interfaces/overview/export")
 INTERFACES_SETTINGS_GET = Endpoint("GET", "interfaces/settings/get")
 INTERFACES_SETTINGS_SET = Endpoint("POST", "interfaces/settings/set")
 INTERFACES_SETTINGS_RECONFIGURE = Endpoint("POST", "interfaces/settings/reconfigure")
+
+# --- syslog (#804) ---
+SYSLOG_SETTINGS_GET = Endpoint("GET", "syslog/settings/get")
+SYSLOG_SETTINGS_SET = Endpoint("POST", "syslog/settings/set")
+SYSLOG_RECONFIGURE = Endpoint("POST", "syslog/service/reconfigure")
 # In-tree plugin controller: not in stock specs (see the module docstring).
 ASSIGN_SETTINGS = _crud(
     "interfaces/assign_settings",
@@ -438,6 +443,8 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
         INTERFACES_SETTINGS_SET,
         INTERFACES_SETTINGS_RECONFIGURE,
     ),
+    # #804
+    "syslog.settings": (SYSLOG_SETTINGS_GET, SYSLOG_SETTINGS_SET, SYSLOG_RECONFIGURE),
     "interfaces.vlans": VLAN.all(),
     "interfaces.assignments": (*ASSIGN_SETTINGS.all(), INTERFACES_INFO),
     "interfaces.virtual_ips": VIP.all(),

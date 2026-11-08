@@ -31,6 +31,9 @@ from infrafoundry.providers.opnsense.validators.resource_name_validator import (
 from infrafoundry.providers.opnsense.validators.static_route_validator import (
     StaticRouteValidator,
 )
+from infrafoundry.providers.opnsense.validators.syslog_settings_validator import (
+    SyslogSettingsValidator,
+)
 from infrafoundry.providers.opnsense.validators.system_auth_validator import (
     SystemGroupValidator,
     SystemUserValidator,
@@ -71,6 +74,7 @@ __all__ = [
     "RadvdValidator",
     "ResourceNameValidator",
     "StaticRouteValidator",
+    "SyslogSettingsValidator",  # #804
     "SystemFirmwareValidator",
     "SystemGroupValidator",
     "SystemTuningValidator",

@@ -152,6 +152,7 @@ class OPNsenseProvider(
         from .components.kea_dhcp import KeaDHCPManager
         from .components.nat_rule import NATRuleManager
         from .components.static_route import StaticRouteManager
+        from .components.syslog_settings import SyslogSettingsManager  # #804
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
         from .components.unbound_host_override import UnboundHostOverrideManager
@@ -162,6 +163,7 @@ class OPNsenseProvider(
             ("interfaces.vlans", VlanManager),
             ("interfaces.assignments", InterfaceAssignmentManager),
             ("interfaces.settings", InterfacesSettingsManager),
+            ("syslog.settings", SyslogSettingsManager),  # #804
             ("firewall.aliases", AliasManager),
             ("firewall.nat", NATRuleManager),
             ("firewall.rules", FirewallRuleManager),
@@ -265,6 +267,7 @@ class OPNsenseProvider(
         from .components.openvpn_instances import OpenVpnInstanceManager
         from .components.radvd import RadvdManager
         from .components.static_route import StaticRouteManager
+        from .components.syslog_settings import SyslogSettingsManager  # #804
         from .components.system_firmware import SystemFirmwareManager
         from .components.system_groups import GroupManager
         from .components.system_tuning import SystemTuningManager
@@ -311,6 +314,7 @@ class OPNsenseProvider(
             "system.users": UserManager,
             "system.groups": GroupManager,
             "interfaces.settings": InterfacesSettingsManager,
+            "syslog.settings": SyslogSettingsManager,  # #804
             "interfaces.vlans": VlanManager,
             "interfaces.assignments": InterfaceAssignmentManager,
             "firewall.aliases": AliasManager,
@@ -360,6 +364,8 @@ class OPNsenseProvider(
         - ``interfaces_settings_reconfigure`` (#1092) — fired by
           :class:`InterfacesSettingsManager` when the interface settings changed.
 
+        - ``syslog_reconfigure`` (#804) — fired by :class:`SyslogSettingsManager`.
+
         - ``openvpn_reconfigure`` (#808) — fired by :class:`OpenVpnInstanceManager`
           so a single ``openvpn/service/reconfigure`` call fires per apply.
 
@@ -378,6 +384,7 @@ class OPNsenseProvider(
             "openvpn_reconfigure": self._reconfigure_openvpn,
             "tunables_reconfigure": self._reconfigure_tunables,
             "interfaces_settings_reconfigure": self._reconfigure_interfaces_settings,
+            "syslog_reconfigure": self._reconfigure_syslog,  # #804
         }
 
     def check_endpoint_support(
@@ -532,6 +539,21 @@ class OPNsenseProvider(
         service = InterfacesSettingsService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
+    def _reconfigure_syslog(self, env_name: str) -> None:
+        """Reconfigure the syslog daemon after a settings change (#804).
+
+        Used by :meth:`get_finalization_hooks` so one ``syslog/service/reconfigure``
+        call fires per apply, only when the settings changed. Unverified against a
+        live box. Hook errors propagate, failing the apply.
+
+        Args:
+            env_name: Active environment name.
+        """
+        from .services.syslog_settings import SyslogSettingsService
+
+        service = SyslogSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
     # All OPNsense components are now managed by ``OPNsenseDirectRunner``
     # (ADR-0014). Per-component history:
     # - ``firewall_rules`` (#724, ADR-0015), ``aliases`` (#775, firewall_alias),
@@ -630,6 +652,7 @@ class OPNsenseProvider(
             "system.users": [],
             "system.groups": ["system.users"],
             "interfaces.settings": [],
+            "syslog.settings": [],  # #804
         }
 
     @override

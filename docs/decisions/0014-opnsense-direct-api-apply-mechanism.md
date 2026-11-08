@@ -406,6 +406,17 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Rollback strategy:** Same as §1's default.
 - **Cross-reference notes:** The firewall-advanced and NTP settings in the same issue have no MVC API and are out of scope; categories moved to #1286.
 
+### `syslog.settings` (#804)
+
+**Mechanism:** Direct-REST singleton over the `general` section of the `OPNsense\Syslog` model. Only declared YAML keys are compared and written; an omitted key is unmanaged. Destroy is a no-op. Applies ADR-0014 and ADR-0016 unchanged.
+
+- **Endpoints:** `GET syslog/settings/get` (response `{"syslog": {"general": {...}, "destinations": ...}}`), `POST syslog/settings/set` and `POST syslog/service/reconfigure`. The GET shape was probed live; the **`set` and `reconfigure` calls are unverified live**.
+- **Identity:** singleton named `syslog.settings`. `get_resource_ids()` returns `{"syslog.settings": "global"}`.
+- **Wire schema:** four fields (see [the coverage doc](../development/opnsense-resource-coverage.md#syslog-settings-804)). The write sends the whole flattened live `general` object with the declared fields overwritten; `destinations` is never sent.
+- **Reconfigure:** the manager declares `FINALIZATION_HOOK = "syslog_reconfigure"`, so one `syslog/service/reconfigure` call fires per apply, only when the settings changed.
+- **Validator scope:** `SyslogSettingsValidator`: unknown keys, boolean fields, non-negative integer fields.
+- **Rollback strategy:** Same as §1's default.
+
 ### `radvd` (#788, 2026-05-12)
 
 **Mechanism:** **Hybrid YAML-singleton / wire-list** direct-REST against the modern OPNsense 26.x `radvd` MVC controller — IPv6 Router Advertisement emission per interface. The operator authors a single dict-shape `radvd` resource whose `interfaces` mapping holds one inner mapping per interface; the wire stores those as per-UUID records. Mirrors the `system.firmware` (#806) asymmetric "bulk read, per-item write" shape but with full-reconcile semantics on the write side instead of install-missing-only. **Cutover hard blocker** for hands-free IPv6: without per-interface RA emission on `opt1`/`opt2`/`opt3`/`opt6` (Infra/PT/Tailscale-infra/Apps VLANs), every IPv6-enabled host on those VLANs loses its default route the moment cutover finishes.
@@ -586,6 +597,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#711](https://github.com/endavis/infrafoundry/issues/711): feat: add OPNsense `interface_assignments` component (read-only / migrate; dispatch-table refactor).
 - Issue [#707](https://github.com/endavis/infrafoundry/issues/707): chore: write ADR-0014 codifying OPNsense direct-API apply mechanism (this ADR).
 - Issue [#1092](https://github.com/endavis/infrafoundry/issues/1092): feat: manage OPNsense global interface settings (`interfaces.settings`).
+- Issue [#804](https://github.com/endavis/infrafoundry/issues/804): feat: add `syslog.settings` direct-API resource for the OPNsense local syslog daemon.
 - Issue [#807](https://github.com/endavis/infrafoundry/issues/807): feat: add `trust.cas` and `trust.certs` direct-API resources for OPNsense.
 - Issue [#808](https://github.com/endavis/infrafoundry/issues/808): feat: add `openvpn.instances` direct-API resource for OpenVPN client instances on OPNsense.
 - Issue [#1254](https://github.com/endavis/infrafoundry/issues/1254): feat: manage Unbound advanced settings (private and insecure domains) on OPNsense.

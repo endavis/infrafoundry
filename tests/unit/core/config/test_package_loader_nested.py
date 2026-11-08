@@ -469,6 +469,47 @@ class TestParseNestedShapeMismatch:
         with pytest.raises(InvalidConfigurationError, match="declared as a dict"):
             loader._parse_resources_from_data(data, "bad.yaml", "opnsense")
 
+    def test_syslog_settings_is_a_singleton_dict(self, temp_dir: Path) -> None:
+        """``syslog.settings`` loads as one singleton."""
+        from infrafoundry.core.config.package_loader import SINGLETON_RESOURCE_TYPES
+
+        assert "syslog.settings" in SINGLETON_RESOURCE_TYPES
+        loader = PackageLoader(temp_dir)
+        data = {"opnsense": {"syslog": {"settings": {"enabled": True, "max_preserve": 7}}}}
+        resources = loader._parse_resources_from_data(data, "t.yaml", "opnsense")
+        found = [r for r in resources if r.type == "syslog.settings"]
+        assert len(found) == 1
+        assert found[0].name == "syslog.settings"
+        assert found[0].config == {"enabled": True, "max_preserve": 7}
+
+    def test_syslog_settings_list_rejected(self, temp_dir: Path) -> None:
+        loader = PackageLoader(temp_dir)
+        data: dict[str, Any] = {"opnsense": {"syslog": {"settings": [{"enabled": True}]}}}
+        with pytest.raises(InvalidConfigurationError, match="declared as a dict"):
+            loader._parse_resources_from_data(data, "bad.yaml", "opnsense")
+
+    def test_syslog_settings_docs_example_loads_and_validates(self, temp_dir: Path) -> None:
+        """The coverage doc's syslog example parses through the loader and the validator."""
+        import re
+
+        import yaml
+
+        from infrafoundry.core.validation import ValidationLevel, ValidationReport
+        from infrafoundry.providers.opnsense.validators import SyslogSettingsValidator
+        from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
+
+        doc = Path(__file__).parents[4] / "docs" / "development" / "opnsense-resource-coverage.md"
+        section = doc.read_text().split("## Syslog settings (#804)", 1)[1]
+        match = re.search(r"```yaml\n(.*?)```", section, re.DOTALL)
+        assert match is not None
+        data = yaml.safe_load(match.group(1))
+        resources = PackageLoader(temp_dir)._parse_resources_from_data(data, "t.yaml", "opnsense")
+        found = [r for r in resources if r.type == "syslog.settings"]
+        assert len(found) == 1
+        report = ValidationReport()
+        SyslogSettingsValidator(report).validate(OPNsenseValidationContext(resources=found))
+        assert not [r for r in report.results if r.level == ValidationLevel.ERROR]
+
     def test_known_dict_path_with_list_leaf_rejected(self, temp_dir: Path) -> None:
         """``firewall.log: [...]`` (list where dict expected) errors."""
         loader = PackageLoader(temp_dir)
