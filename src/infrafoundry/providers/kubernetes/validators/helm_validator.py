@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from infrafoundry.core.provider import ResourceConfig
+from typing import override
+
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.kubernetes.validators.context import KubernetesHelmContext
 
 
-class HelmValidator:
+class HelmValidator(SpecializedValidator[KubernetesHelmContext]):
     """Validates Helm release resource configurations.
 
     Performs local (report-only) validation that helm_release resources
@@ -21,12 +24,14 @@ class HelmValidator:
         """
         self.report = report
 
-    def validate(self, helm_releases: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: KubernetesHelmContext) -> None:
         """Validate helm release resources have required fields.
 
         Args:
-            helm_releases: Helm release resources to validate
+            context: Helm release resources to validate.
         """
+        helm_releases = context.helm_releases
         if not helm_releases:
             return
 

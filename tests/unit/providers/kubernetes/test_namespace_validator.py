@@ -9,6 +9,7 @@ import pytest
 
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.kubernetes.validators.context import KubernetesApiContext
 from infrafoundry.providers.kubernetes.validators.namespace_validator import (
     NamespaceValidator,
 )
@@ -61,11 +62,13 @@ class TestNamespaceValidator:
             return_value=_namespace_api_response(["default", "kube-system", "my-ns"])
         )
         validator.validate(
-            server_url="https://k8s:6443",
-            headers={"Authorization": "Bearer tok"},
-            verify_ssl=False,
-            referenced_namespaces={"my-ns"},
-            config_namespaces=set(),
+            KubernetesApiContext(
+                server_url="https://k8s:6443",
+                headers={"Authorization": "Bearer tok"},
+                verify_ssl=False,
+                referenced_namespaces={"my-ns"},
+                config_namespaces=set(),
+            )
         )
         assert any(
             "exists in cluster" in r.message and r.check_name == "kubernetes_namespace_my-ns"
@@ -81,11 +84,13 @@ class TestNamespaceValidator:
         """Test that namespaces in config produce 'will be created' INFO."""
         api_validator.fetch_json = MagicMock(return_value=_namespace_api_response(["default"]))  # type: ignore[method-assign]
         validator.validate(
-            server_url="https://k8s:6443",
-            headers={"Authorization": "Bearer tok"},
-            verify_ssl=False,
-            referenced_namespaces={"new-ns"},
-            config_namespaces={"new-ns"},
+            KubernetesApiContext(
+                server_url="https://k8s:6443",
+                headers={"Authorization": "Bearer tok"},
+                verify_ssl=False,
+                referenced_namespaces={"new-ns"},
+                config_namespaces={"new-ns"},
+            )
         )
         assert any("will be created" in r.message for r in validation_report.results)
 
@@ -98,11 +103,13 @@ class TestNamespaceValidator:
         """Test that missing namespaces produce WARNING."""
         api_validator.fetch_json = MagicMock(return_value=_namespace_api_response(["default"]))  # type: ignore[method-assign]
         validator.validate(
-            server_url="https://k8s:6443",
-            headers={"Authorization": "Bearer tok"},
-            verify_ssl=False,
-            referenced_namespaces={"unknown-ns"},
-            config_namespaces=set(),
+            KubernetesApiContext(
+                server_url="https://k8s:6443",
+                headers={"Authorization": "Bearer tok"},
+                verify_ssl=False,
+                referenced_namespaces={"unknown-ns"},
+                config_namespaces=set(),
+            )
         )
         assert any(
             r.level == ValidationLevel.WARNING and "not found" in r.message
@@ -118,11 +125,13 @@ class TestNamespaceValidator:
         """Test graceful handling of API failure."""
         api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
         validator.validate(
-            server_url="https://k8s:6443",
-            headers={"Authorization": "Bearer tok"},
-            verify_ssl=False,
-            referenced_namespaces={"my-ns"},
-            config_namespaces=set(),
+            KubernetesApiContext(
+                server_url="https://k8s:6443",
+                headers={"Authorization": "Bearer tok"},
+                verify_ssl=False,
+                referenced_namespaces={"my-ns"},
+                config_namespaces=set(),
+            )
         )
         # Should not have namespace-specific checks since API failed
         ns_checks = [
@@ -139,10 +148,12 @@ class TestNamespaceValidator:
         """Test that empty namespaces set makes no API calls."""
         api_validator.fetch_json = MagicMock()  # type: ignore[method-assign]
         validator.validate(
-            server_url="https://k8s:6443",
-            headers={"Authorization": "Bearer tok"},
-            verify_ssl=False,
-            referenced_namespaces=set(),
-            config_namespaces=set(),
+            KubernetesApiContext(
+                server_url="https://k8s:6443",
+                headers={"Authorization": "Bearer tok"},
+                verify_ssl=False,
+                referenced_namespaces=set(),
+                config_namespaces=set(),
+            )
         )
         api_validator.fetch_json.assert_not_called()

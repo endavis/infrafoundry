@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from typing import override
+
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.kubernetes.validators.context import KubernetesApiContext
 
 
-class NamespaceValidator:
+class NamespaceValidator(SpecializedValidator[KubernetesApiContext]):
     """Validates that referenced namespaces exist in the cluster.
 
     Queries the Kubernetes API for existing namespaces and checks
@@ -24,23 +28,18 @@ class NamespaceValidator:
         self.api_validator = api_validator
         self.report = report
 
-    def validate(
-        self,
-        server_url: str,
-        headers: dict[str, str],
-        verify_ssl: bool,
-        referenced_namespaces: set[str],
-        config_namespaces: set[str],
-    ) -> None:
+    @override
+    def validate(self, context: KubernetesApiContext) -> None:
         """Validate that referenced namespaces exist or will be created.
 
         Args:
-            server_url: Kubernetes API server URL
-            headers: HTTP headers with authorization
-            verify_ssl: Whether to verify SSL certificates
-            referenced_namespaces: Namespaces referenced by resources
-            config_namespaces: Namespaces defined in the configuration
+            context: API connection details and the namespaces to check.
         """
+        server_url = context.server_url
+        headers = context.headers
+        verify_ssl = context.verify_ssl
+        referenced_namespaces = context.referenced_namespaces
+        config_namespaces = context.config_namespaces
         if not referenced_namespaces:
             return
 

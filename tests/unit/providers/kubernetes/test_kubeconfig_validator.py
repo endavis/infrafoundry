@@ -10,6 +10,7 @@ import pytest
 
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.kubernetes.validators.context import KubeconfigContext
 from infrafoundry.providers.kubernetes.validators.kubeconfig_validator import (
     KubeconfigValidator,
 )
@@ -93,14 +94,14 @@ class TestKubeconfigValidatorResolve:
         kubeconfig = tmp_path / "config"
         kubeconfig.write_text("apiVersion: v1\nkind: Config\ncurrent-context: x\n")
         # Will fail on context parsing but path check should pass
-        validator.validate(str(kubeconfig))
+        validator.validate(KubeconfigContext(kubeconfig_path=str(kubeconfig)))
         assert any(r.passed and "Kubeconfig found" in r.message for r in validation_report.results)
 
     def test_missing_kubeconfig(
         self, validator: KubeconfigValidator, validation_report: ValidationReport
     ) -> None:
         """Test with a missing kubeconfig file."""
-        validator.validate("/nonexistent/kubeconfig")
+        validator.validate(KubeconfigContext(kubeconfig_path="/nonexistent/kubeconfig"))
         assert any(not r.passed and "not found" in r.message for r in validation_report.results)
 
     def test_no_path_default_exists(
@@ -108,7 +109,7 @@ class TestKubeconfigValidatorResolve:
     ) -> None:
         """Test fallback to default kubeconfig when it exists."""
         with patch.object(Path, "exists", return_value=True):
-            validator.validate(None)
+            validator.validate(KubeconfigContext(kubeconfig_path=None))
         assert any("default kubeconfig" in r.message for r in validation_report.results)
 
     def test_no_path_no_default(
@@ -116,7 +117,7 @@ class TestKubeconfigValidatorResolve:
     ) -> None:
         """Test warning when no kubeconfig path and no default."""
         with patch.object(Path, "exists", return_value=False):
-            validator.validate(None)
+            validator.validate(KubeconfigContext(kubeconfig_path=None))
         assert any(
             r.level == ValidationLevel.WARNING and not r.passed for r in validation_report.results
         )
@@ -132,7 +133,7 @@ class TestKubeconfigValidatorParsing:
         """Test error on invalid YAML."""
         kubeconfig = tmp_path / "config"
         kubeconfig.write_text("{{invalid yaml")
-        validator.validate(str(kubeconfig))
+        validator.validate(KubeconfigContext(kubeconfig_path=str(kubeconfig)))
         assert any(not r.passed and "parse" in r.message.lower() for r in validation_report.results)
 
     def test_missing_current_context(
@@ -141,7 +142,7 @@ class TestKubeconfigValidatorParsing:
         """Test error when current-context is missing."""
         kubeconfig = tmp_path / "config"
         kubeconfig.write_text("apiVersion: v1\nkind: Config\n")
-        validator.validate(str(kubeconfig))
+        validator.validate(KubeconfigContext(kubeconfig_path=str(kubeconfig)))
         assert any(
             not r.passed and "current-context" in r.message for r in validation_report.results
         )
@@ -155,7 +156,9 @@ class TestKubeconfigValidatorParsing:
         import yaml
 
         kubeconfig.write_text(yaml.dump(data))
-        validator.validate(str(kubeconfig), context_override="nonexistent")
+        validator.validate(
+            KubeconfigContext(kubeconfig_path=str(kubeconfig), context_override="nonexistent")
+        )
         assert any(not r.passed and "nonexistent" in r.message for r in validation_report.results)
 
     def test_explicit_context_override(
@@ -169,7 +172,9 @@ class TestKubeconfigValidatorParsing:
         kubeconfig.write_text(yaml.dump(data))
         # Mock connectivity to avoid real API calls
         validator.api_validator.check_api_connectivity = MagicMock(return_value=False)  # type: ignore[method-assign]
-        validator.validate(str(kubeconfig), context_override="override-ctx")
+        validator.validate(
+            KubeconfigContext(kubeconfig_path=str(kubeconfig), context_override="override-ctx")
+        )
         # Should not fail on context lookup
         context_errors = [
             r for r in validation_report.results if not r.passed and "context" in r.check_name
@@ -191,7 +196,7 @@ class TestKubeconfigValidatorAuth:
 
         kubeconfig.write_text(yaml.dump(data))
         validator.api_validator.check_api_connectivity = MagicMock(return_value=False)  # type: ignore[method-assign]
-        validator.validate(str(kubeconfig))
+        validator.validate(KubeconfigContext(kubeconfig_path=str(kubeconfig)))
         assert validator.connection_info.headers.get("Authorization") == "Bearer my-secret-token"
 
     def test_token_file(
@@ -207,7 +212,7 @@ class TestKubeconfigValidatorAuth:
 
         kubeconfig.write_text(yaml.dump(data))
         validator.api_validator.check_api_connectivity = MagicMock(return_value=False)  # type: ignore[method-assign]
-        validator.validate(str(kubeconfig))
+        validator.validate(KubeconfigContext(kubeconfig_path=str(kubeconfig)))
         assert validator.connection_info.headers.get("Authorization") == "Bearer file-based-token"
 
     def test_exec_auth_warning(
@@ -220,7 +225,7 @@ class TestKubeconfigValidatorAuth:
 
         kubeconfig.write_text(yaml.dump(data))
         validator.api_validator.check_api_connectivity = MagicMock(return_value=False)  # type: ignore[method-assign]
-        validator.validate(str(kubeconfig))
+        validator.validate(KubeconfigContext(kubeconfig_path=str(kubeconfig)))
         assert any(
             "exec-based auth" in r.message and r.level == ValidationLevel.WARNING
             for r in validation_report.results
@@ -243,7 +248,7 @@ class TestKubeconfigValidatorConnectivity:
 
         validator.api_validator.check_api_connectivity = MagicMock(return_value=True)  # type: ignore[method-assign]
         validator.api_validator.fetch_json = MagicMock(return_value={"gitVersion": "v1.28.0"})  # type: ignore[method-assign]
-        validator.validate(str(kubeconfig))
+        validator.validate(KubeconfigContext(kubeconfig_path=str(kubeconfig)))
         assert validator.is_connected
 
     def test_connectivity_failure(
@@ -257,7 +262,7 @@ class TestKubeconfigValidatorConnectivity:
         kubeconfig.write_text(yaml.dump(data))
 
         validator.api_validator.check_api_connectivity = MagicMock(return_value=False)  # type: ignore[method-assign]
-        validator.validate(str(kubeconfig))
+        validator.validate(KubeconfigContext(kubeconfig_path=str(kubeconfig)))
         assert not validator.is_connected
         assert any(
             "skipped" in r.message.lower() and r.level == ValidationLevel.WARNING
@@ -273,6 +278,6 @@ class TestKubeconfigValidatorConnectivity:
         import yaml
 
         kubeconfig.write_text(yaml.dump(data))
-        validator.validate(str(kubeconfig))
+        validator.validate(KubeconfigContext(kubeconfig_path=str(kubeconfig)))
         assert not validator.is_connected
         assert any("No auth" in r.message for r in validation_report.results)
