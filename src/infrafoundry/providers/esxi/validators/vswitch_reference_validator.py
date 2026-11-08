@@ -1,10 +1,12 @@
 """Vswitch reference validation for ESXi portgroups."""
 
-from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from typing import override
+
+from infrafoundry.core.protocols import SpecializedValidator
+from infrafoundry.core.validation import ValidationContext, ValidationLevel, ValidationReport
 
 
-class VswitchReferenceValidator:
+class VswitchReferenceValidator(SpecializedValidator[ValidationContext]):
     """Validates that portgroups reference vswitches on the same host.
 
     Checks that every portgroup's 'vswitch' field references a vswitch
@@ -19,12 +21,14 @@ class VswitchReferenceValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: ValidationContext) -> None:
         """Validate portgroup-to-vswitch references.
 
         Args:
-            resources: List of all resources to cross-reference
+            context: Context whose resources are cross-referenced.
         """
+        resources = context.resources
         # Build a set of (host, vswitch_name) from vswitch resources
         vswitch_set: set[tuple[str, str]] = set()
         for resource in resources:

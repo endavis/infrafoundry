@@ -1,12 +1,12 @@
 """Portgroup reference validation for ESXi VMs."""
 
-from typing import Any
+from typing import Any, override
 
-from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.core.protocols import SpecializedValidator
+from infrafoundry.core.validation import ValidationContext, ValidationLevel, ValidationReport
 
 
-class PortgroupReferenceValidator:
+class PortgroupReferenceValidator(SpecializedValidator[ValidationContext]):
     """Validates that VMs reference portgroups on the same host.
 
     Checks that every VM's network interface references a portgroup
@@ -21,12 +21,14 @@ class PortgroupReferenceValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: ValidationContext) -> None:
         """Validate VM-to-portgroup references.
 
         Args:
-            resources: List of all resources to cross-reference
+            context: Context whose resources are cross-referenced.
         """
+        resources = context.resources
         # Build a set of (host, portgroup_name) from portgroup resources
         portgroup_set: set[tuple[str, str]] = set()
         for resource in resources:

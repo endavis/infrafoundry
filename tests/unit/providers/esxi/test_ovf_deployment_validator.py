@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.core.validation import ValidationContext, ValidationLevel, ValidationReport
 from infrafoundry.providers.esxi.validators.ovf_deployment_validator import (
     OvfDeploymentValidator,
 )
@@ -48,7 +48,7 @@ class TestOvfDeploymentValidatorRequired:
         self, validator: OvfDeploymentValidator, report: MagicMock
     ) -> None:
         """Valid OVF deployment config should pass all checks."""
-        validator.validate([_make_ovf_deployment()])
+        validator.validate(ValidationContext(resources=[_make_ovf_deployment()]))
 
         calls = [c[1] for c in report.add_check.call_args_list]
         failed = [c for c in calls if not c["passed"]]
@@ -58,7 +58,7 @@ class TestOvfDeploymentValidatorRequired:
 
     def test_missing_host_error(self, validator: OvfDeploymentValidator, report: MagicMock) -> None:
         """Missing host should produce an error."""
-        validator.validate([_make_ovf_deployment(host="")])
+        validator.validate(ValidationContext(resources=[_make_ovf_deployment(host="")]))
 
         calls = [c[1] for c in report.add_check.call_args_list]
         host_check = [
@@ -79,7 +79,7 @@ class TestOvfDeploymentValidatorRequired:
         self, validator: OvfDeploymentValidator, report: MagicMock
     ) -> None:
         """Missing ovf_source should produce an error."""
-        validator.validate([_make_ovf_deployment(ovf_source="")])
+        validator.validate(ValidationContext(resources=[_make_ovf_deployment(ovf_source="")]))
 
         calls = [c[1] for c in report.add_check.call_args_list]
         source_check = [
@@ -93,7 +93,7 @@ class TestOvfDeploymentValidatorRequired:
         self, validator: OvfDeploymentValidator, report: MagicMock
     ) -> None:
         """Missing disk_store should produce an error."""
-        validator.validate([_make_ovf_deployment(disk_store="")])
+        validator.validate(ValidationContext(resources=[_make_ovf_deployment(disk_store="")]))
 
         calls = [c[1] for c in report.add_check.call_args_list]
         store_check = [c for c in calls if "disk_store" in c["check_name"]]
@@ -107,7 +107,7 @@ class TestOvfDeploymentValidatorRequired:
         """Missing network_map should produce an error."""
         resource = _make_ovf_deployment()
         del resource.config["network_map"]
-        validator.validate([resource])
+        validator.validate(ValidationContext(resources=[resource]))
 
         calls = [c[1] for c in report.add_check.call_args_list]
         map_check = [c for c in calls if "network_map" in c["check_name"]]
@@ -119,7 +119,7 @@ class TestOvfDeploymentValidatorRequired:
         self, validator: OvfDeploymentValidator, report: MagicMock
     ) -> None:
         """Empty network_map dict should produce an error."""
-        validator.validate([_make_ovf_deployment(network_map={})])
+        validator.validate(ValidationContext(resources=[_make_ovf_deployment(network_map={})]))
 
         calls = [c[1] for c in report.add_check.call_args_list]
         map_check = [c for c in calls if "network_map" in c["check_name"]]
@@ -130,7 +130,11 @@ class TestOvfDeploymentValidatorRequired:
         self, validator: OvfDeploymentValidator, report: MagicMock
     ) -> None:
         """Network map with empty port group names should produce an error."""
-        validator.validate([_make_ovf_deployment(network_map={"hostonly": "", "nat": "PG-Mgmt"})])
+        validator.validate(
+            ValidationContext(
+                resources=[_make_ovf_deployment(network_map={"hostonly": "", "nat": "PG-Mgmt"})]
+            )
+        )
 
         calls = [c[1] for c in report.add_check.call_args_list]
         map_check = [c for c in calls if "network_map" in c["check_name"]]
@@ -146,7 +150,9 @@ class TestOvfDeploymentValidatorWarnings:
         self, validator: OvfDeploymentValidator, report: MagicMock
     ) -> None:
         """Non-existent ovf_source file should produce a warning."""
-        validator.validate([_make_ovf_deployment(ovf_source="/nonexistent/path.ovf")])
+        validator.validate(
+            ValidationContext(resources=[_make_ovf_deployment(ovf_source="/nonexistent/path.ovf")])
+        )
 
         calls = [c[1] for c in report.add_check.call_args_list]
         exists_check = [c for c in calls if "exists" in c["check_name"]]
@@ -160,7 +166,9 @@ class TestOvfDeploymentValidatorWarnings:
         """Existing ovf_source file should not produce a warning."""
         ovf_file = tmp_path / "test.ovf"
         ovf_file.touch()
-        validator.validate([_make_ovf_deployment(ovf_source=str(ovf_file))])
+        validator.validate(
+            ValidationContext(resources=[_make_ovf_deployment(ovf_source=str(ovf_file))])
+        )
 
         calls = [c[1] for c in report.add_check.call_args_list]
         exists_check = [c for c in calls if "exists" in c["check_name"]]
@@ -180,12 +188,12 @@ class TestOvfDeploymentValidatorEdgeCases:
             provider="esxi",
             config={"host": "esxi-01"},
         )
-        validator.validate([vm])
+        validator.validate(ValidationContext(resources=[vm]))
         report.add_check.assert_not_called()
 
     def test_empty_resources(self, validator: OvfDeploymentValidator, report: MagicMock) -> None:
         """Empty resource list should produce no checks."""
-        validator.validate([])
+        validator.validate(ValidationContext(resources=[]))
         report.add_check.assert_not_called()
 
     def test_multiple_deployments(
@@ -196,7 +204,7 @@ class TestOvfDeploymentValidatorEdgeCases:
             _make_ovf_deployment("node-01"),
             _make_ovf_deployment("node-02"),
         ]
-        validator.validate(resources)
+        validator.validate(ValidationContext(resources=resources))
 
         calls = [c[1] for c in report.add_check.call_args_list]
         node01_checks = [
@@ -214,7 +222,11 @@ class TestOvfDeploymentValidatorMacMap:
 
     def test_mac_map_valid(self, validator: OvfDeploymentValidator, report: MagicMock) -> None:
         """Valid mac_map with ethernet names and correct format should pass."""
-        validator.validate([_make_ovf_deployment(mac_map={"ethernet0": "02:00:00:0A:01:01"})])
+        validator.validate(
+            ValidationContext(
+                resources=[_make_ovf_deployment(mac_map={"ethernet0": "02:00:00:0A:01:01"})]
+            )
+        )
 
         calls = [c[1] for c in report.add_check.call_args_list]
         mac_checks = [c for c in calls if "mac_map" in c["check_name"]]
@@ -226,7 +238,11 @@ class TestOvfDeploymentValidatorMacMap:
         self, validator: OvfDeploymentValidator, report: MagicMock
     ) -> None:
         """mac_map keys not matching ethernetN format should produce an error."""
-        validator.validate([_make_ovf_deployment(mac_map={"not_ethernet": "02:00:00:0A:01:01"})])
+        validator.validate(
+            ValidationContext(
+                resources=[_make_ovf_deployment(mac_map={"not_ethernet": "02:00:00:0A:01:01"})]
+            )
+        )
 
         calls = [c[1] for c in report.add_check.call_args_list]
         key_checks = [c for c in calls if "mac_map_keys" in c["check_name"]]
@@ -239,7 +255,9 @@ class TestOvfDeploymentValidatorMacMap:
         self, validator: OvfDeploymentValidator, report: MagicMock
     ) -> None:
         """Invalid MAC address format should produce an error."""
-        validator.validate([_make_ovf_deployment(mac_map={"ethernet0": "not-a-mac"})])
+        validator.validate(
+            ValidationContext(resources=[_make_ovf_deployment(mac_map={"ethernet0": "not-a-mac"})])
+        )
 
         calls = [c[1] for c in report.add_check.call_args_list]
         format_checks = [c for c in calls if "mac_map_format" in c["check_name"]]
@@ -250,7 +268,7 @@ class TestOvfDeploymentValidatorMacMap:
 
     def test_mac_map_empty_dict(self, validator: OvfDeploymentValidator, report: MagicMock) -> None:
         """Empty mac_map dict should be treated as no mac_map (no validation)."""
-        validator.validate([_make_ovf_deployment(mac_map={})])
+        validator.validate(ValidationContext(resources=[_make_ovf_deployment(mac_map={})]))
 
         calls = [c[1] for c in report.add_check.call_args_list]
         mac_checks = [c for c in calls if "mac_map" in c["check_name"]]
@@ -258,7 +276,7 @@ class TestOvfDeploymentValidatorMacMap:
 
     def test_no_mac_map(self, validator: OvfDeploymentValidator, report: MagicMock) -> None:
         """Omitting mac_map should pass without mac_map validation."""
-        validator.validate([_make_ovf_deployment()])
+        validator.validate(ValidationContext(resources=[_make_ovf_deployment()]))
 
         calls = [c[1] for c in report.add_check.call_args_list]
         mac_checks = [c for c in calls if "mac_map" in c["check_name"]]
@@ -269,16 +287,18 @@ class TestOvfDeploymentValidatorMacMap:
     ) -> None:
         """Multiple valid mac_map entries should all pass."""
         validator.validate(
-            [
-                _make_ovf_deployment(
-                    mac_map={
-                        "ethernet0": "02:00:00:0A:01:01",
-                        "ethernet1": "02:00:00:0A:01:02",
-                        "ethernet2": "02:00:00:0A:01:03",
-                        "ethernet3": "02:00:00:0A:01:04",
-                    }
-                )
-            ]
+            ValidationContext(
+                resources=[
+                    _make_ovf_deployment(
+                        mac_map={
+                            "ethernet0": "02:00:00:0A:01:01",
+                            "ethernet1": "02:00:00:0A:01:02",
+                            "ethernet2": "02:00:00:0A:01:03",
+                            "ethernet3": "02:00:00:0A:01:04",
+                        }
+                    )
+                ]
+            )
         )
 
         calls = [c[1] for c in report.add_check.call_args_list]
@@ -291,7 +311,11 @@ class TestOvfDeploymentValidatorMacMap:
         self, validator: OvfDeploymentValidator, report: MagicMock
     ) -> None:
         """Lowercase MAC addresses should be accepted."""
-        validator.validate([_make_ovf_deployment(mac_map={"ethernet0": "02:00:00:0a:01:01"})])
+        validator.validate(
+            ValidationContext(
+                resources=[_make_ovf_deployment(mac_map={"ethernet0": "02:00:00:0a:01:01"})]
+            )
+        )
 
         calls = [c[1] for c in report.add_check.call_args_list]
         format_checks = [c for c in calls if "mac_map_format" in c["check_name"]]

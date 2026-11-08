@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation import ValidationContext, ValidationReport, run_validators
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 
 from .validators import (
@@ -13,6 +13,7 @@ from .validators import (
     PortgroupReferenceValidator,
     VswitchReferenceValidator,
 )
+from .validators.context import EsxiHostContext
 
 
 class EsxiValidator:
@@ -57,7 +58,7 @@ class EsxiValidator:
 
         for host_name, host_settings in hosts_config.items():
             hostname = host_settings.get("hostname", host_name)
-            self.host_connectivity_validator.validate(hostname)
+            self.host_connectivity_validator.validate(EsxiHostContext(hostname=hostname))
 
     def validate_references(self, resources: list[ResourceConfig]) -> None:
         """Validate cross-references between ESXi resources.
@@ -69,6 +70,11 @@ class EsxiValidator:
         Args:
             resources: List of resources to validate
         """
-        self.vswitch_reference_validator.validate(resources)
-        self.portgroup_reference_validator.validate(resources)
-        self.ovf_deployment_validator.validate(resources)
+        run_validators(
+            (
+                self.vswitch_reference_validator,
+                self.portgroup_reference_validator,
+                self.ovf_deployment_validator,
+            ),
+            ValidationContext(resources=resources),
+        )

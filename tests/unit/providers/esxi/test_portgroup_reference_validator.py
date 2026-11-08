@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation import ValidationContext, ValidationReport
 from infrafoundry.providers.esxi.validators.portgroup_reference_validator import (
     PortgroupReferenceValidator,
 )
@@ -50,7 +50,7 @@ def test_valid_reference(validator: PortgroupReferenceValidator, report: MagicMo
         _make_portgroup("VM Network", "esxi-01"),
         _make_vm("vm1", network=[{"portgroup": "VM Network"}], host="esxi-01"),
     ]
-    validator.validate(resources)
+    validator.validate(ValidationContext(resources=resources))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -66,7 +66,7 @@ def test_invalid_reference_wrong_host(
         _make_portgroup("VM Network", "esxi-01"),
         _make_vm("vm1", network=[{"portgroup": "VM Network"}], host="esxi-02"),
     ]
-    validator.validate(resources)
+    validator.validate(ValidationContext(resources=resources))
 
     call_args = report.add_check.call_args[1]
     assert call_args["passed"] is False
@@ -80,7 +80,7 @@ def test_invalid_reference_missing_portgroup(
     resources = [
         _make_vm("vm1", network=[{"portgroup": "ghost-pg"}], host="esxi-01"),
     ]
-    validator.validate(resources)
+    validator.validate(ValidationContext(resources=resources))
 
     call_args = report.add_check.call_args[1]
     assert call_args["passed"] is False
@@ -93,7 +93,7 @@ def test_vm_with_no_network(validator: PortgroupReferenceValidator, report: Magi
         _make_portgroup("VM Network", "esxi-01"),
         _make_vm("vm1", network=None, host="esxi-01"),
     ]
-    validator.validate(resources)
+    validator.validate(ValidationContext(resources=resources))
     report.add_check.assert_not_called()
 
 
@@ -103,7 +103,7 @@ def test_vm_with_dict_network(validator: PortgroupReferenceValidator, report: Ma
         _make_portgroup("VM Network", "esxi-01"),
         _make_vm("vm1", network={"portgroup": "VM Network"}, host="esxi-01"),
     ]
-    validator.validate(resources)
+    validator.validate(ValidationContext(resources=resources))
 
     call_args = report.add_check.call_args[1]
     assert call_args["passed"] is True
@@ -123,7 +123,7 @@ def test_vm_with_multiple_nics(validator: PortgroupReferenceValidator, report: M
             host="esxi-01",
         ),
     ]
-    validator.validate(resources)
+    validator.validate(ValidationContext(resources=resources))
     assert report.add_check.call_count == 2
     for call in report.add_check.call_args_list:
         assert call[1]["passed"] is True
@@ -136,18 +136,18 @@ def test_vm_nic_without_portgroup_ref(
     resources = [
         _make_vm("vm1", network=[{"virtual_network": "VM Network"}], host="esxi-01"),
     ]
-    validator.validate(resources)
+    validator.validate(ValidationContext(resources=resources))
     report.add_check.assert_not_called()
 
 
 def test_no_vms(validator: PortgroupReferenceValidator, report: MagicMock) -> None:
     """Test with no VM resources."""
     resources = [_make_portgroup("VM Network")]
-    validator.validate(resources)
+    validator.validate(ValidationContext(resources=resources))
     report.add_check.assert_not_called()
 
 
 def test_no_resources(validator: PortgroupReferenceValidator, report: MagicMock) -> None:
     """Test with empty resource list."""
-    validator.validate([])
+    validator.validate(ValidationContext(resources=[]))
     report.add_check.assert_not_called()
