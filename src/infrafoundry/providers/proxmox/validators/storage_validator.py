@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from infrafoundry.core.exceptions import APIError
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxLiveContext
 
 if TYPE_CHECKING:
-    from infrafoundry.providers.proxmox.api_client import ProxmoxClient
+    pass
 
 
-class StorageValidator:
+class StorageValidator(SpecializedValidator[ProxmoxLiveContext]):
     """Validates Proxmox storage pool availability and status."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -22,13 +24,15 @@ class StorageValidator:
         """
         self.report = report
 
-    def validate(self, client: ProxmoxClient, storage_pools: set[tuple[str, str]]) -> None:
+    @override
+    def validate(self, context: ProxmoxLiveContext) -> None:
         """Validate that storage pools exist and are active.
 
         Args:
-            client: Proxmox API client
-            storage_pools: Set of (node, storage) tuples to validate
+            context: Validation context carrying the inputs this validator checks.
         """
+        client = context.client
+        storage_pools = context.storage_pools
         checked_storage: set[tuple[str, str]] = set()
         for node, storage in storage_pools:
             if (node, storage) in checked_storage:

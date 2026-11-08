@@ -6,16 +6,18 @@ A bridge passes when it is a Linux bridge on the node or an applied SDN vnet
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from infrafoundry.core.exceptions import APIError
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxLiveContext
 
 if TYPE_CHECKING:
     from infrafoundry.providers.proxmox.api_client import ProxmoxClient
 
 
-class NetworkValidator:
+class NetworkValidator(SpecializedValidator[ProxmoxLiveContext]):
     """Validates Proxmox network bridge availability."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -26,21 +28,16 @@ class NetworkValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        client: ProxmoxClient,
-        bridges: set[tuple[str, str]],
-        declared_vnets: frozenset[str] = frozenset(),
-    ) -> None:
+    @override
+    def validate(self, context: ProxmoxLiveContext) -> None:
         """Validate that network bridges exist.
 
         Args:
-            client: Proxmox API client
-            bridges: Set of (node, bridge) tuples to validate
-            declared_vnets: IDs of ``sdn_vnet`` resources in the validated set.
-                A bridge that is one of these but not applied yet is a warning,
-                not an error, since the same apply creates it.
+            context: Validation context carrying the inputs this validator checks.
         """
+        client = context.client
+        bridges = context.bridges
+        declared_vnets = context.declared_vnets
         applied_vnets: set[str] | None = None
         checked_bridges: set[tuple[str, str]] = set()
         for node, bridge in sorted(bridges):

@@ -6,6 +6,7 @@ import pytest
 
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.proxmox.validator import ClusterVM
+from infrafoundry.providers.proxmox.validators.context import ProxmoxClusterContext
 from infrafoundry.providers.proxmox.validators.vmid_validator import VMIDValidator
 
 
@@ -27,7 +28,7 @@ def test_validate_vmid_available(validator: VMIDValidator, report: MagicMock) ->
         {"vmid": 100, "name": "existing-vm"},
     ]
 
-    validator.validate(cluster_vms, {200: "new-vm"})
+    validator.validate(ProxmoxClusterContext(cluster_vms=cluster_vms, vmids={200: "new-vm"}))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -42,7 +43,7 @@ def test_validate_vmid_conflict_different_name(validator: VMIDValidator, report:
         {"vmid": 100, "name": "existing-vm"},
     ]
 
-    validator.validate(cluster_vms, {100: "new-vm"})
+    validator.validate(ProxmoxClusterContext(cluster_vms=cluster_vms, vmids={100: "new-vm"}))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -58,7 +59,7 @@ def test_validate_vmid_exists_same_name(validator: VMIDValidator, report: MagicM
         {"vmid": 100, "name": "my-vm"},
     ]
 
-    validator.validate(cluster_vms, {100: "my-vm"})
+    validator.validate(ProxmoxClusterContext(cluster_vms=cluster_vms, vmids={100: "my-vm"}))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -74,14 +75,14 @@ def test_validate_empty_vmids(validator: VMIDValidator, report: MagicMock) -> No
         {"vmid": 100, "name": "existing-vm"},
     ]
 
-    validator.validate(cluster_vms, {})
+    validator.validate(ProxmoxClusterContext(cluster_vms=cluster_vms, vmids={}))
 
     report.add_check.assert_not_called()
 
 
 def test_validate_cluster_vms_none(validator: VMIDValidator, report: MagicMock) -> None:
     """Test validation when cluster VMs fetch failed."""
-    validator.validate(None, {200: "new-vm"})
+    validator.validate(ProxmoxClusterContext(cluster_vms=None, vmids={200: "new-vm"}))
 
     report.add_check.assert_not_called()
 
@@ -93,12 +94,14 @@ def test_validate_multiple_vmids(validator: VMIDValidator, report: MagicMock) ->
     ]
 
     validator.validate(
-        cluster_vms,
-        {
-            100: "existing-vm",  # Update
-            200: "new-vm1",  # Available
-            300: "new-vm2",  # Available
-        },
+        ProxmoxClusterContext(
+            cluster_vms=cluster_vms,
+            vmids={
+                100: "existing-vm",  # Update
+                200: "new-vm1",  # Available
+                300: "new-vm2",  # Available
+            },
+        )
     )
 
     assert report.add_check.call_count == 3
@@ -110,7 +113,7 @@ def test_validate_vm_without_name(validator: VMIDValidator, report: MagicMock) -
         {"vmid": 100},  # No name field
     ]
 
-    validator.validate(cluster_vms, {100: "new-vm"})
+    validator.validate(ProxmoxClusterContext(cluster_vms=cluster_vms, vmids={100: "new-vm"}))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -125,12 +128,14 @@ def test_validate_all_vmids_available(validator: VMIDValidator, report: MagicMoc
     ]
 
     validator.validate(
-        cluster_vms,
-        {
-            200: "new-vm1",
-            300: "new-vm2",
-            400: "new-vm3",
-        },
+        ProxmoxClusterContext(
+            cluster_vms=cluster_vms,
+            vmids={
+                200: "new-vm1",
+                300: "new-vm2",
+                400: "new-vm3",
+            },
+        )
     )
 
     assert report.add_check.call_count == 3
@@ -147,11 +152,13 @@ def test_validate_all_vmids_conflicts(validator: VMIDValidator, report: MagicMoc
     ]
 
     validator.validate(
-        cluster_vms,
-        {
-            100: "different-name1",
-            200: "different-name2",
-        },
+        ProxmoxClusterContext(
+            cluster_vms=cluster_vms,
+            vmids={
+                100: "different-name1",
+                200: "different-name2",
+            },
+        )
     )
 
     assert report.add_check.call_count == 2
@@ -169,7 +176,7 @@ def test_validate_skips_cluster_entries_without_vmid(
         {"vmid": 100, "name": "existing-vm"},
     ]
 
-    validator.validate(cluster_vms, {200: "new-vm"})
+    validator.validate(ProxmoxClusterContext(cluster_vms=cluster_vms, vmids={200: "new-vm"}))
 
     report.add_check.assert_called_once()
     assert report.add_check.call_args.kwargs["passed"] is True

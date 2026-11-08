@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, override
 
-from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 
 # Known valid values for advisory warnings
 KNOWN_CPU_TYPES = frozenset(
@@ -37,7 +38,7 @@ DISK_IMAGE_SOURCE_PATTERN = re.compile(r"^(/|https?://).+\.img(\.bz2)?$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
-class VMConfigValidator:
+class VMConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
     """Validates VM configuration fields before Terraform generation.
 
     Performs field-level validation with appropriate severity levels:
@@ -53,12 +54,14 @@ class VMConfigValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: ProxmoxConfigContext) -> None:
         """Validate VM-specific configuration fields.
 
         Args:
-            resources: List of VM resources to validate.
+            context: Validation context carrying the inputs this validator checks.
         """
+        resources = context.vms
         for resource in resources:
             if resource.type != "vm":
                 continue

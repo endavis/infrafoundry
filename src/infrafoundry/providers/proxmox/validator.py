@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, TypedDict, cast
+from typing import Any, cast
 
 import urllib3
 
@@ -12,7 +12,7 @@ from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.tailscale import TailscaleSchemaError, process_tailscale_config
 from infrafoundry.core.types import ProxmoxProviderSettings
-from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
 from infrafoundry.core.validation_helpers import (
     BaseAPIValidator,
     validate_terraform_secrets_references,
@@ -25,18 +25,14 @@ from infrafoundry.providers.proxmox.validators import (
     TemplateValidator,
     VMIDValidator,
 )
+from infrafoundry.providers.proxmox.validators.context import (
+    ClusterVM,
+    ProxmoxClusterContext,
+    ProxmoxLiveContext,
+)
 from infrafoundry.providers.proxmox.validators.sdn_config_validator import sdn_id
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-
-class ClusterVM(TypedDict, total=False):
-    """Typed representation of a VM entry in the Proxmox cluster listing."""
-
-    vmid: int
-    name: str
-    template: int
-    type: str
 
 
 @dataclass
@@ -176,12 +172,25 @@ class ProxmoxValidator:
             cluster_vms = self._get_cluster_vms(client)
 
             # Validate each type of reference using specialized validators
-            self.node_validator.validate(client, resource_refs.nodes)
-            self.storage_validator.validate(client, resource_refs.storage_pools)
             declared_vnets = frozenset(sdn_id(r) for r in resources if r.type == "sdn_vnet")
-            self.network_validator.validate(client, resource_refs.bridges, declared_vnets)
-            self.template_validator.validate(cluster_vms, resource_refs.template_refs)
-            self.vmid_validator.validate(cluster_vms, resource_refs.vmids)
+            run_validators(
+                (self.node_validator, self.storage_validator, self.network_validator),
+                ProxmoxLiveContext(
+                    client=client,
+                    nodes=resource_refs.nodes,
+                    storage_pools=resource_refs.storage_pools,
+                    bridges=resource_refs.bridges,
+                    declared_vnets=declared_vnets,
+                ),
+            )
+            run_validators(
+                (self.template_validator, self.vmid_validator),
+                ProxmoxClusterContext(
+                    cluster_vms=cluster_vms,
+                    template_refs=resource_refs.template_refs,
+                    vmids=resource_refs.vmids,
+                ),
+            )
 
         except Exception as exc:
             self.api_validator.handle_validation_exception(

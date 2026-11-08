@@ -7,6 +7,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 from infrafoundry.providers.proxmox.validators.vm_config_validator import VMConfigValidator
 
 
@@ -39,14 +40,14 @@ class TestCPUTypeValidation:
         self, validator: VMConfigValidator, report: MagicMock
     ) -> None:
         """Known cpu_type should not trigger a warning."""
-        validator.validate([_vm(cpu_type="host")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(cpu_type="host")]))
         report.add_check.assert_not_called()
 
     def test_unknown_cpu_type_warning(
         self, validator: VMConfigValidator, report: MagicMock
     ) -> None:
         """Unknown cpu_type should trigger a warning (not error)."""
-        validator.validate([_vm(cpu_type="custom-cpu")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(cpu_type="custom-cpu")]))
         report.add_check.assert_called_once()
         call_args = report.add_check.call_args[1]
         assert call_args["passed"] is True  # Warning, not error
@@ -55,7 +56,7 @@ class TestCPUTypeValidation:
 
     def test_no_cpu_type_no_check(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """No cpu_type should not trigger any check."""
-        validator.validate([_vm()])
+        validator.validate(ProxmoxConfigContext(vms=[_vm()]))
         # No cpu_type-related check should be added
         for call in report.add_check.call_args_list:
             assert "cpu_type" not in call[1].get("check_name", "")
@@ -66,17 +67,17 @@ class TestMachineValidation:
 
     def test_valid_machine_q35(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """q35 machine type should not trigger an error."""
-        validator.validate([_vm(machine="q35")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(machine="q35")]))
         report.add_check.assert_not_called()
 
     def test_valid_machine_i440fx(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """i440fx machine type should not trigger an error."""
-        validator.validate([_vm(machine="i440fx")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(machine="i440fx")]))
         report.add_check.assert_not_called()
 
     def test_invalid_machine(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """Invalid machine type should trigger an error."""
-        validator.validate([_vm(machine="invalid")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(machine="invalid")]))
         report.add_check.assert_called_once()
         call_args = report.add_check.call_args[1]
         assert call_args["passed"] is False
@@ -89,12 +90,12 @@ class TestBIOSValidation:
 
     def test_valid_bios_seabios(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """seabios should not trigger an error."""
-        validator.validate([_vm(bios="seabios")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(bios="seabios")]))
         report.add_check.assert_not_called()
 
     def test_valid_bios_ovmf(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """ovmf should not trigger an error (but may trigger efi_disk warning)."""
-        validator.validate([_vm(bios="ovmf")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(bios="ovmf")]))
         # Only the ovmf_efi_disk warning, not a bios error
         for call in report.add_check.call_args_list:
             assert "bios" not in call[1].get("check_name", "") or "ovmf_efi_disk" in call[1].get(
@@ -103,7 +104,7 @@ class TestBIOSValidation:
 
     def test_invalid_bios(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """Invalid BIOS should trigger an error."""
-        validator.validate([_vm(bios="legacy")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(bios="legacy")]))
         calls = [c[1] for c in report.add_check.call_args_list]
         bios_calls = [
             c for c in calls if "bios" in c["check_name"] and "efi" not in c["check_name"]
@@ -118,19 +119,19 @@ class TestBalloonValidation:
 
     def test_valid_balloon_zero(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """Balloon = 0 (disabled) should be valid."""
-        validator.validate([_vm(balloon=0)])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(balloon=0)]))
         report.add_check.assert_not_called()
 
     def test_valid_balloon_positive(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """Positive balloon value should be valid."""
-        validator.validate([_vm(balloon=2048)])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(balloon=2048)]))
         report.add_check.assert_not_called()
 
     def test_invalid_balloon_negative(
         self, validator: VMConfigValidator, report: MagicMock
     ) -> None:
         """Negative balloon should trigger an error."""
-        validator.validate([_vm(balloon=-1)])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(balloon=-1)]))
         report.add_check.assert_called_once()
         call_args = report.add_check.call_args[1]
         assert call_args["passed"] is False
@@ -138,7 +139,7 @@ class TestBalloonValidation:
 
     def test_invalid_balloon_string(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """Non-integer balloon should trigger an error."""
-        validator.validate([_vm(balloon="not-a-number")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(balloon="not-a-number")]))
         report.add_check.assert_called_once()
         call_args = report.add_check.call_args[1]
         assert call_args["passed"] is False
@@ -149,19 +150,19 @@ class TestISOValidation:
 
     def test_valid_iso_path(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """Valid ISO path should not trigger an error."""
-        validator.validate([_vm(iso="local:iso/ubuntu-24.04.iso")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(iso="local:iso/ubuntu-24.04.iso")]))
         report.add_check.assert_not_called()
 
     def test_valid_iso_path_with_dashes(
         self, validator: VMConfigValidator, report: MagicMock
     ) -> None:
         """ISO path with dashes and underscores should be valid."""
-        validator.validate([_vm(iso="nas-01:iso/my_image.iso")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(iso="nas-01:iso/my_image.iso")]))
         report.add_check.assert_not_called()
 
     def test_invalid_iso_path(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """Invalid ISO path should trigger an error."""
-        validator.validate([_vm(iso="/path/to/ubuntu.iso")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(iso="/path/to/ubuntu.iso")]))
         report.add_check.assert_called_once()
         call_args = report.add_check.call_args[1]
         assert call_args["passed"] is False
@@ -171,7 +172,7 @@ class TestISOValidation:
         self, validator: VMConfigValidator, report: MagicMock
     ) -> None:
         """ISO path without .iso extension should trigger an error."""
-        validator.validate([_vm(iso="local:iso/ubuntu")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(iso="local:iso/ubuntu")]))
         report.add_check.assert_called_once()
 
 
@@ -182,12 +183,16 @@ class TestDiskTypeValidation:
         """All valid disk types should pass."""
         for disk_type in ("virtio", "scsi", "sata"):
             report.reset_mock()
-            validator.validate([_vm(disk={"storage": "local-lvm", "type": disk_type})])
+            validator.validate(
+                ProxmoxConfigContext(vms=[_vm(disk={"storage": "local-lvm", "type": disk_type})])
+            )
             report.add_check.assert_not_called()
 
     def test_invalid_disk_type(self, validator: VMConfigValidator, report: MagicMock) -> None:
         """Invalid disk type should trigger an error."""
-        validator.validate([_vm(disk={"storage": "local-lvm", "type": "ide"})])
+        validator.validate(
+            ProxmoxConfigContext(vms=[_vm(disk={"storage": "local-lvm", "type": "ide"})])
+        )
         report.add_check.assert_called_once()
         call_args = report.add_check.call_args[1]
         assert call_args["passed"] is False
@@ -201,14 +206,18 @@ class TestNetworkModelValidation:
         """All valid NIC models should not trigger warnings."""
         for model in ("virtio", "e1000", "e1000e", "rtl8139", "vmxnet3"):
             report.reset_mock()
-            validator.validate([_vm(network=[{"bridge": "vmbr0", "model": model}])])
+            validator.validate(
+                ProxmoxConfigContext(vms=[_vm(network=[{"bridge": "vmbr0", "model": model}])])
+            )
             report.add_check.assert_not_called()
 
     def test_unknown_nic_model_warning(
         self, validator: VMConfigValidator, report: MagicMock
     ) -> None:
         """Unknown NIC model should trigger a warning."""
-        validator.validate([_vm(network=[{"bridge": "vmbr0", "model": "ne2k_pci"}])])
+        validator.validate(
+            ProxmoxConfigContext(vms=[_vm(network=[{"bridge": "vmbr0", "model": "ne2k_pci"}])])
+        )
         report.add_check.assert_called_once()
         call_args = report.add_check.call_args[1]
         assert call_args["passed"] is True  # Warning, not error
@@ -218,7 +227,7 @@ class TestNetworkModelValidation:
         self, validator: VMConfigValidator, report: MagicMock
     ) -> None:
         """NIC without model should not trigger any model check."""
-        validator.validate([_vm(network=[{"bridge": "vmbr0"}])])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(network=[{"bridge": "vmbr0"}])]))
         model_calls = [
             c for c in report.add_check.call_args_list if "model" in str(c[1].get("check_name", ""))
         ]
@@ -229,14 +238,16 @@ class TestNetworkModelValidation:
     ) -> None:
         """Multiple NICs with unknown models should each get a warning."""
         validator.validate(
-            [
-                _vm(
-                    network=[
-                        {"bridge": "vmbr0", "model": "unknown1"},
-                        {"bridge": "vmbr1", "model": "unknown2"},
-                    ]
-                )
-            ]
+            ProxmoxConfigContext(
+                vms=[
+                    _vm(
+                        network=[
+                            {"bridge": "vmbr0", "model": "unknown1"},
+                            {"bridge": "vmbr1", "model": "unknown2"},
+                        ]
+                    )
+                ]
+            )
         )
         model_calls = [
             c for c in report.add_check.call_args_list if "nic" in str(c[1].get("check_name", ""))
@@ -247,7 +258,9 @@ class TestNetworkModelValidation:
         self, validator: VMConfigValidator, report: MagicMock
     ) -> None:
         """Single dict network with unknown model should trigger warning."""
-        validator.validate([_vm(network={"bridge": "vmbr0", "model": "unknown"})])
+        validator.validate(
+            ProxmoxConfigContext(vms=[_vm(network={"bridge": "vmbr0", "model": "unknown"})])
+        )
         report.add_check.assert_called_once()
         assert report.add_check.call_args[1]["level"] == ValidationLevel.WARNING
 
@@ -259,7 +272,7 @@ class TestOVMFEFIDiskWarning:
         self, validator: VMConfigValidator, report: MagicMock
     ) -> None:
         """OVMF without efi_disk should produce a warning."""
-        validator.validate([_vm(bios="ovmf")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(bios="ovmf")]))
         calls = [c[1] for c in report.add_check.call_args_list]
         efi_calls = [c for c in calls if "ovmf_efi_disk" in c["check_name"]]
         assert len(efi_calls) == 1
@@ -270,7 +283,9 @@ class TestOVMFEFIDiskWarning:
         self, validator: VMConfigValidator, report: MagicMock
     ) -> None:
         """OVMF with efi_disk should not produce the warning."""
-        validator.validate([_vm(bios="ovmf", efi_disk={"storage": "local-lvm"})])
+        validator.validate(
+            ProxmoxConfigContext(vms=[_vm(bios="ovmf", efi_disk={"storage": "local-lvm"})])
+        )
         calls = [c[1] for c in report.add_check.call_args_list]
         efi_calls = [c for c in calls if "ovmf_efi_disk" in c["check_name"]]
         assert len(efi_calls) == 0
@@ -279,7 +294,7 @@ class TestOVMFEFIDiskWarning:
         self, validator: VMConfigValidator, report: MagicMock
     ) -> None:
         """SeaBIOS without efi_disk should not produce a warning."""
-        validator.validate([_vm(bios="seabios")])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(bios="seabios")]))
         report.add_check.assert_not_called()
 
 
@@ -296,7 +311,7 @@ class TestNonVMResourcesSkipped:
             provider="proxmox",
             config={"name": "test", "machine": "invalid"},
         )
-        validator.validate([resource])
+        validator.validate(ProxmoxConfigContext(vms=[resource]))
         report.add_check.assert_not_called()
 
 
@@ -309,7 +324,9 @@ class TestDiskImageValidation:
     def test_valid_sources_pass(
         self, validator: VMConfigValidator, report: MagicMock, source: str
     ) -> None:
-        validator.validate([_vm(disk_image_source=source, disk_image_sha256="0" * 64)])
+        validator.validate(
+            ProxmoxConfigContext(vms=[_vm(disk_image_source=source, disk_image_sha256="0" * 64)])
+        )
         report.add_check.assert_not_called()
 
     @pytest.mark.parametrize(
@@ -334,7 +351,7 @@ class TestDiskImageValidation:
         check: str,
         fragment: str,
     ) -> None:
-        validator.validate([_vm(**config)])
+        validator.validate(ProxmoxConfigContext(vms=[_vm(**config)]))
 
         call = report.add_check.call_args.kwargs
         assert call["check_name"] == f"proxmox_vm_test-vm_{check}"

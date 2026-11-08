@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from infrafoundry.core.exceptions import APIError
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxLiveContext
 
 if TYPE_CHECKING:
-    from infrafoundry.providers.proxmox.api_client import ProxmoxClient
+    pass
 
 
-class NodeValidator:
+class NodeValidator(SpecializedValidator[ProxmoxLiveContext]):
     """Validates Proxmox node availability and status."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -22,13 +24,15 @@ class NodeValidator:
         """
         self.report = report
 
-    def validate(self, client: ProxmoxClient, nodes: set[str]) -> None:
+    @override
+    def validate(self, context: ProxmoxLiveContext) -> None:
         """Validate that nodes exist and are online.
 
         Args:
-            client: Proxmox API client
-            nodes: Set of node names to validate
+            context: Validation context carrying the inputs this validator checks.
         """
+        client = context.client
+        nodes = context.nodes
         for node in nodes:
             try:
                 status_data = client.get_json(f"nodes/{node}/status")

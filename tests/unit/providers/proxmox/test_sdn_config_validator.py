@@ -7,6 +7,7 @@ import pytest
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.proxmox.validators import SDNConfigValidator
+from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 
 PEERS = ["172.20.10.100", "172.20.10.101"]
 
@@ -28,7 +29,7 @@ def _vnet(name: str = "demolan", **config: Any) -> ResourceConfig:
 
 def _errors(zones: list[ResourceConfig], vnets: list[ResourceConfig]) -> list[str]:
     report = ValidationReport()
-    SDNConfigValidator(report).validate(zones, vnets)
+    SDNConfigValidator(report).validate(ProxmoxConfigContext(sdn_zones=zones, sdn_vnets=vnets))
     return [r.check_name for r in report.results if not r.passed]
 
 

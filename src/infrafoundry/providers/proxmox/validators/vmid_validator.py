@@ -1,20 +1,13 @@
 """VMID validation for Proxmox."""
 
-from typing import TypedDict
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxClusterContext
 
 
-class ClusterVM(TypedDict, total=False):
-    """Typed representation of a VM entry in the Proxmox cluster listing."""
-
-    vmid: int
-    name: str
-    template: int
-    type: str
-
-
-class VMIDValidator:
+class VMIDValidator(SpecializedValidator[ProxmoxClusterContext]):
     """Validates Proxmox VMID availability and conflicts."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -25,17 +18,15 @@ class VMIDValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        cluster_vms: list[ClusterVM] | None,
-        vmids: dict[int, str],
-    ) -> None:
+    @override
+    def validate(self, context: ProxmoxClusterContext) -> None:
         """Validate that VMIDs are available (not already in use).
 
         Args:
-            cluster_vms: List of cluster VM data (None if fetch failed)
-            vmids: Dict of {vmid: resource_name}
+            context: Validation context carrying the inputs this validator checks.
         """
+        cluster_vms = context.cluster_vms
+        vmids = context.vmids
         if not vmids:
             return
 

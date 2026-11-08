@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
-from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 
 # Valid storage backends
 VALID_BACKENDS = frozenset({"nfs", "cifs", "dir"})
@@ -23,7 +24,7 @@ BACKEND_REQUIRED_FIELDS: dict[str, list[str]] = {
 }
 
 
-class StorageConfigValidator:
+class StorageConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
     """Validates storage configuration fields before Terraform generation.
 
     Performs field-level validation with appropriate severity levels:
@@ -39,12 +40,14 @@ class StorageConfigValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: ProxmoxConfigContext) -> None:
         """Validate storage-specific configuration fields.
 
         Args:
-            resources: List of resources to validate.
+            context: Validation context carrying the inputs this validator checks.
         """
+        resources = context.storage
         for resource in resources:
             if resource.type != "storage":
                 continue

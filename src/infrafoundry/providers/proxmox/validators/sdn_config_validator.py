@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from typing import Any
+from typing import Any, override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 
 # Zone kinds the provider can render
 VALID_ZONE_KINDS = frozenset({"vxlan"})
@@ -24,7 +26,7 @@ def sdn_id(resource: ResourceConfig) -> str:
     return str((resource.config or {}).get("id") or resource.name)
 
 
-class SDNConfigValidator:
+class SDNConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
     """Validates SDN zone and vnet configuration before Terraform generation.
 
     Errors are reported for values Proxmox or terraform would reject: malformed
@@ -40,13 +42,15 @@ class SDNConfigValidator:
         """
         self.report = report
 
-    def validate(self, zones: list[ResourceConfig], vnets: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: ProxmoxConfigContext) -> None:
         """Validate SDN zones and the vnets that use them.
 
         Args:
-            zones: ``sdn_zone`` resources.
-            vnets: ``sdn_vnet`` resources.
+            context: Validation context carrying the inputs this validator checks.
         """
+        zones = context.sdn_zones
+        vnets = context.sdn_vnets
         zone_kinds: dict[str, str] = {}
         for zone in zones:
             config = zone.config or {}

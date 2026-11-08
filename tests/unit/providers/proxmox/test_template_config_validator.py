@@ -12,6 +12,7 @@ from infrafoundry.core.exceptions import SchemaValidationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.proxmox import ProxmoxProvider
+from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 from infrafoundry.providers.proxmox.validators.template_config_validator import (
     TemplateConfigValidator,
 )
@@ -52,11 +53,15 @@ class TestDownloadFilename:
         ["a.qcow2", "a.raw", "a.vmdk", "a.ova", "a.ovf", "A.QCOW2", "Ubuntu.Raw"],
     )
     def test_accepted(self, report: MagicMock, filename: str) -> None:
-        TemplateConfigValidator(report).validate([_tpl(**_dl(filename))])
+        TemplateConfigValidator(report).validate(
+            ProxmoxConfigContext(templates=[_tpl(**_dl(filename))])
+        )
         report.add_check.assert_not_called()
 
     def test_img_rejected_with_hint(self, report: MagicMock) -> None:
-        TemplateConfigValidator(report).validate([_tpl(**_dl("noble.img"))])
+        TemplateConfigValidator(report).validate(
+            ProxmoxConfigContext(templates=[_tpl(**_dl("noble.img"))])
+        )
         kwargs = report.add_check.call_args.kwargs
         assert kwargs["passed"] is False
         assert kwargs["level"] == ValidationLevel.ERROR
@@ -65,7 +70,9 @@ class TestDownloadFilename:
         assert "noble.qcow2" in kwargs["message"]
 
     def test_other_extension_rejected_without_hint(self, report: MagicMock) -> None:
-        TemplateConfigValidator(report).validate([_tpl(**_dl("a.iso"))])
+        TemplateConfigValidator(report).validate(
+            ProxmoxConfigContext(templates=[_tpl(**_dl("a.iso"))])
+        )
         kwargs = report.add_check.call_args.kwargs
         assert kwargs["passed"] is False
         assert "try" not in kwargs["message"]
@@ -73,13 +80,17 @@ class TestDownloadFilename:
 
     @pytest.mark.parametrize("filename", [None, "", "   "])
     def test_missing_filename(self, report: MagicMock, filename: Any) -> None:
-        TemplateConfigValidator(report).validate([_tpl(**_dl(filename))])
+        TemplateConfigValidator(report).validate(
+            ProxmoxConfigContext(templates=[_tpl(**_dl(filename))])
+        )
         kwargs = report.add_check.call_args.kwargs
         assert kwargs["passed"] is False
         assert "required" in kwargs["message"]
 
     def test_no_download_image_ignored(self, report: MagicMock) -> None:
-        TemplateConfigValidator(report).validate([_tpl(clone={"source": "x"})])
+        TemplateConfigValidator(report).validate(
+            ProxmoxConfigContext(templates=[_tpl(clone={"source": "x"})])
+        )
         report.add_check.assert_not_called()
 
 

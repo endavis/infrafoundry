@@ -10,6 +10,7 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.proxmox.validators.container_config_validator import (
     ContainerConfigValidator,
 )
+from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 
 
 @pytest.fixture
@@ -40,7 +41,11 @@ class TestOSTemplateValidation:
     def test_valid_ostemplate(self, validator: ContainerConfigValidator, report: MagicMock) -> None:
         """Valid ostemplate should not trigger an error."""
         validator.validate(
-            [_ct(ostemplate="stor01:vztmpl/alpine-3.21-default_20250108_amd64.tar.xz")]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(ostemplate="stor01:vztmpl/alpine-3.21-default_20250108_amd64.tar.xz")
+                ]
+            )
         )
         report.add_check.assert_not_called()
 
@@ -49,7 +54,11 @@ class TestOSTemplateValidation:
     ) -> None:
         """Zstandard-compressed ostemplate should be valid."""
         validator.validate(
-            [_ct(ostemplate="local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst")]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(ostemplate="local:vztmpl/ubuntu-24.04-standard_24.04-2_amd64.tar.zst")
+                ]
+            )
         )
         report.add_check.assert_not_called()
 
@@ -57,7 +66,9 @@ class TestOSTemplateValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Invalid ostemplate format should trigger an error."""
-        validator.validate([_ct(ostemplate="/path/to/template.tar.xz")])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="/path/to/template.tar.xz")])
+        )
         report.add_check.assert_called_once()
         call_args = report.add_check.call_args[1]
         assert call_args["passed"] is False
@@ -68,7 +79,7 @@ class TestOSTemplateValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Missing ostemplate without clone should trigger an error."""
-        validator.validate([_ct()])
+        validator.validate(ProxmoxConfigContext(containers=[_ct()]))
         calls = [
             c[1]
             for c in report.add_check.call_args_list
@@ -82,7 +93,7 @@ class TestOSTemplateValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Missing ostemplate with clone should not trigger ostemplate error."""
-        validator.validate([_ct(clone={"vm_id": 100})])
+        validator.validate(ProxmoxConfigContext(containers=[_ct(clone={"vm_id": 100})]))
         ostemplate_calls = [
             c[1]
             for c in report.add_check.call_args_list
@@ -100,7 +111,11 @@ class TestOSTypeValidation:
         """Known ostype should not trigger a warning."""
         for ostype in ("alpine", "debian", "ubuntu", "centos"):
             report.reset_mock()
-            validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", ostype=ostype)])
+            validator.validate(
+                ProxmoxConfigContext(
+                    containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", ostype=ostype)]
+                )
+            )
             ostype_calls = [
                 c[1]
                 for c in report.add_check.call_args_list
@@ -112,7 +127,9 @@ class TestOSTypeValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Unknown ostype should trigger a warning."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", ostype="freebsd")])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", ostype="freebsd")])
+        )
         calls = [
             c[1] for c in report.add_check.call_args_list if "ostype" in c[1].get("check_name", "")
         ]
@@ -124,7 +141,7 @@ class TestOSTypeValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """No ostype should not trigger any check."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz")])
+        validator.validate(ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz")]))
         ostype_calls = [
             c[1] for c in report.add_check.call_args_list if "ostype" in c[1].get("check_name", "")
         ]
@@ -139,7 +156,11 @@ class TestRootfsValidation:
     ) -> None:
         """Valid rootfs size should not trigger an error."""
         validator.validate(
-            [_ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": 8})]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": 8})
+                ]
+            )
         )
         rootfs_calls = [
             c[1] for c in report.add_check.call_args_list if "rootfs" in c[1].get("check_name", "")
@@ -151,7 +172,11 @@ class TestRootfsValidation:
     ) -> None:
         """Rootfs size of 0 should trigger an error."""
         validator.validate(
-            [_ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": 0})]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": 0})
+                ]
+            )
         )
         report.add_check.assert_called()
         calls = [
@@ -165,7 +190,11 @@ class TestRootfsValidation:
     ) -> None:
         """Negative rootfs size should trigger an error."""
         validator.validate(
-            [_ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": -1})]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": -1})
+                ]
+            )
         )
         calls = [
             c[1] for c in report.add_check.call_args_list if "rootfs" in c[1].get("check_name", "")
@@ -179,7 +208,11 @@ class TestRootfsValidation:
     ) -> None:
         """String rootfs size should trigger an error."""
         validator.validate(
-            [_ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": "8G"})]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(ostemplate="s:vztmpl/t.tar.xz", rootfs={"storage": "local", "size": "8G"})
+                ]
+            )
         )
         calls = [
             c[1] for c in report.add_check.call_args_list if "rootfs" in c[1].get("check_name", "")
@@ -196,7 +229,14 @@ class TestNetworkNameValidation:
     ) -> None:
         """Network with name should not trigger an error."""
         validator.validate(
-            [_ct(ostemplate="s:vztmpl/t.tar.xz", network=[{"name": "eth0", "bridge": "vmbr0"}])]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(
+                        ostemplate="s:vztmpl/t.tar.xz",
+                        network=[{"name": "eth0", "bridge": "vmbr0"}],
+                    )
+                ]
+            )
         )
         nic_calls = [
             c[1] for c in report.add_check.call_args_list if "nic" in c[1].get("check_name", "")
@@ -207,7 +247,11 @@ class TestNetworkNameValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Network without name should trigger an error."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", network=[{"bridge": "vmbr0"}])])
+        validator.validate(
+            ProxmoxConfigContext(
+                containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", network=[{"bridge": "vmbr0"}])]
+            )
+        )
         calls = [
             c[1] for c in report.add_check.call_args_list if "nic" in c[1].get("check_name", "")
         ]
@@ -220,7 +264,11 @@ class TestNetworkNameValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Single dict network without name should trigger an error."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", network={"bridge": "vmbr0"})])
+        validator.validate(
+            ProxmoxConfigContext(
+                containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", network={"bridge": "vmbr0"})]
+            )
+        )
         calls = [
             c[1] for c in report.add_check.call_args_list if "nic" in c[1].get("check_name", "")
         ]
@@ -236,12 +284,14 @@ class TestMountPointValidation:
     ) -> None:
         """Valid mount_point should not trigger an error."""
         validator.validate(
-            [
-                _ct(
-                    ostemplate="s:vztmpl/t.tar.xz",
-                    mount_point=[{"volume": "nas:data", "path": "/mnt/data"}],
-                )
-            ]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(
+                        ostemplate="s:vztmpl/t.tar.xz",
+                        mount_point=[{"volume": "nas:data", "path": "/mnt/data"}],
+                    )
+                ]
+            )
         )
         mp_calls = [
             c[1] for c in report.add_check.call_args_list if "mp" in c[1].get("check_name", "")
@@ -253,7 +303,11 @@ class TestMountPointValidation:
     ) -> None:
         """Mount point without volume should trigger an error."""
         validator.validate(
-            [_ct(ostemplate="s:vztmpl/t.tar.xz", mount_point=[{"path": "/mnt/data"}])]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(ostemplate="s:vztmpl/t.tar.xz", mount_point=[{"path": "/mnt/data"}])
+                ]
+            )
         )
         calls = [
             c[1] for c in report.add_check.call_args_list if "volume" in c[1].get("check_name", "")
@@ -266,7 +320,11 @@ class TestMountPointValidation:
     ) -> None:
         """Mount point without path should trigger an error."""
         validator.validate(
-            [_ct(ostemplate="s:vztmpl/t.tar.xz", mount_point=[{"volume": "nas:data"}])]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(ostemplate="s:vztmpl/t.tar.xz", mount_point=[{"volume": "nas:data"}])
+                ]
+            )
         )
         calls = [
             c[1] for c in report.add_check.call_args_list if "path" in c[1].get("check_name", "")
@@ -278,7 +336,9 @@ class TestMountPointValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Mount point without volume and path should trigger two errors."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", mount_point=[{}])])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", mount_point=[{}])])
+        )
         mp_calls = [
             c[1] for c in report.add_check.call_args_list if "mp" in c[1].get("check_name", "")
         ]
@@ -289,12 +349,14 @@ class TestMountPointValidation:
     ) -> None:
         """Single dict mount_point should be handled."""
         validator.validate(
-            [
-                _ct(
-                    ostemplate="s:vztmpl/t.tar.xz",
-                    mount_point={"volume": "nas:data", "path": "/mnt/data"},
-                )
-            ]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(
+                        ostemplate="s:vztmpl/t.tar.xz",
+                        mount_point={"volume": "nas:data", "path": "/mnt/data"},
+                    )
+                ]
+            )
         )
         mp_calls = [
             c[1] for c in report.add_check.call_args_list if "mp" in c[1].get("check_name", "")
@@ -310,12 +372,14 @@ class TestFeaturesMountValidation:
     ) -> None:
         """Known mount types should not trigger a warning."""
         validator.validate(
-            [
-                _ct(
-                    ostemplate="s:vztmpl/t.tar.xz",
-                    features={"mount": ["nfs", "cifs"]},
-                )
-            ]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(
+                        ostemplate="s:vztmpl/t.tar.xz",
+                        features={"mount": ["nfs", "cifs"]},
+                    )
+                ]
+            )
         )
         mount_calls = [
             c[1]
@@ -329,7 +393,11 @@ class TestFeaturesMountValidation:
     ) -> None:
         """Unknown mount type should trigger a warning."""
         validator.validate(
-            [_ct(ostemplate="s:vztmpl/t.tar.xz", features={"mount": ["nfs", "gluster"]})]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(ostemplate="s:vztmpl/t.tar.xz", features={"mount": ["nfs", "gluster"]})
+                ]
+            )
         )
         calls = [
             c[1]
@@ -347,7 +415,9 @@ class TestNumericFieldValidation:
 
     def test_valid_cores(self, validator: ContainerConfigValidator, report: MagicMock) -> None:
         """Valid cores should not trigger an error."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", cores=2)])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", cores=2)])
+        )
         cores_calls = [
             c[1] for c in report.add_check.call_args_list if "cores" in c[1].get("check_name", "")
         ]
@@ -357,7 +427,9 @@ class TestNumericFieldValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Zero cores should trigger an error."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", cores=0)])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", cores=0)])
+        )
         calls = [
             c[1] for c in report.add_check.call_args_list if "cores" in c[1].get("check_name", "")
         ]
@@ -368,7 +440,9 @@ class TestNumericFieldValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Negative cores should trigger an error."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", cores=-1)])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", cores=-1)])
+        )
         calls = [
             c[1] for c in report.add_check.call_args_list if "cores" in c[1].get("check_name", "")
         ]
@@ -378,7 +452,9 @@ class TestNumericFieldValidation:
 
     def test_valid_memory(self, validator: ContainerConfigValidator, report: MagicMock) -> None:
         """Valid memory should not trigger an error."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", memory=512)])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", memory=512)])
+        )
         memory_calls = [
             c[1] for c in report.add_check.call_args_list if "memory" in c[1].get("check_name", "")
         ]
@@ -388,7 +464,9 @@ class TestNumericFieldValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Zero memory should trigger an error."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", memory=0)])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", memory=0)])
+        )
         calls = [
             c[1] for c in report.add_check.call_args_list if "memory" in c[1].get("check_name", "")
         ]
@@ -397,7 +475,9 @@ class TestNumericFieldValidation:
 
     def test_valid_swap_zero(self, validator: ContainerConfigValidator, report: MagicMock) -> None:
         """Zero swap (disabled) should be valid."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", swap=0)])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", swap=0)])
+        )
         swap_calls = [
             c[1] for c in report.add_check.call_args_list if "swap" in c[1].get("check_name", "")
         ]
@@ -407,7 +487,9 @@ class TestNumericFieldValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Negative swap should trigger an error."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", swap=-1)])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", swap=-1)])
+        )
         calls = [
             c[1] for c in report.add_check.call_args_list if "swap" in c[1].get("check_name", "")
         ]
@@ -421,7 +503,9 @@ class TestCPUArchitectureValidation:
 
     def test_known_arch(self, validator: ContainerConfigValidator, report: MagicMock) -> None:
         """Known architecture should not trigger a warning."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", arch="amd64")])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", arch="amd64")])
+        )
         arch_calls = [
             c[1] for c in report.add_check.call_args_list if "arch" in c[1].get("check_name", "")
         ]
@@ -431,7 +515,9 @@ class TestCPUArchitectureValidation:
         self, validator: ContainerConfigValidator, report: MagicMock
     ) -> None:
         """Unknown architecture should trigger a warning."""
-        validator.validate([_ct(ostemplate="s:vztmpl/t.tar.xz", arch="mips")])
+        validator.validate(
+            ProxmoxConfigContext(containers=[_ct(ostemplate="s:vztmpl/t.tar.xz", arch="mips")])
+        )
         calls = [
             c[1] for c in report.add_check.call_args_list if "arch" in c[1].get("check_name", "")
         ]
@@ -453,7 +539,7 @@ class TestNonContainerResourcesSkipped:
             provider="proxmox",
             config={"name": "test", "cores": -1},
         )
-        validator.validate([resource])
+        validator.validate(ProxmoxConfigContext(containers=[resource]))
         report.add_check.assert_not_called()
 
     def test_template_resource_skipped(
@@ -466,7 +552,7 @@ class TestNonContainerResourcesSkipped:
             provider="proxmox",
             config={"name": "test"},
         )
-        validator.validate([resource])
+        validator.validate(ProxmoxConfigContext(containers=[resource]))
         report.add_check.assert_not_called()
 
 
@@ -478,18 +564,20 @@ class TestValidContainerPasses:
     ) -> None:
         """A fully configured valid container should produce no errors."""
         validator.validate(
-            [
-                _ct(
-                    ostemplate="stor01:vztmpl/alpine-3.21-default_20250108_amd64.tar.xz",
-                    ostype="alpine",
-                    cores=2,
-                    memory=256,
-                    swap=0,
-                    rootfs={"storage": "local-lvm", "size": 4},
-                    network=[{"name": "eth0", "bridge": "vmbr0"}],
-                    mount_point=[{"volume": "nas:data", "path": "/mnt/data"}],
-                    features={"nesting": True, "mount": ["nfs"]},
-                )
-            ]
+            ProxmoxConfigContext(
+                containers=[
+                    _ct(
+                        ostemplate="stor01:vztmpl/alpine-3.21-default_20250108_amd64.tar.xz",
+                        ostype="alpine",
+                        cores=2,
+                        memory=256,
+                        swap=0,
+                        rootfs={"storage": "local-lvm", "size": 4},
+                        network=[{"name": "eth0", "bridge": "vmbr0"}],
+                        mount_point=[{"volume": "nas:data", "path": "/mnt/data"}],
+                        features={"nesting": True, "mount": ["nfs"]},
+                    )
+                ]
+            )
         )
         report.add_check.assert_not_called()

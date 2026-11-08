@@ -6,6 +6,7 @@ import pytest
 
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.proxmox.validator import ClusterVM
+from infrafoundry.providers.proxmox.validators.context import ProxmoxClusterContext
 from infrafoundry.providers.proxmox.validators.template_validator import TemplateValidator
 
 
@@ -28,7 +29,9 @@ def test_validate_template_by_vmid_found(validator: TemplateValidator, report: M
         {"vmid": 101, "name": "debian-12", "template": 1},
     ]
 
-    validator.validate(cluster_vms, {"100": ["vm1"]})
+    validator.validate(
+        ProxmoxClusterContext(cluster_vms=cluster_vms, template_refs={"100": ["vm1"]})
+    )
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -45,7 +48,9 @@ def test_validate_template_by_vmid_not_found(
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
     ]
 
-    validator.validate(cluster_vms, {"999": ["vm1", "vm2"]})
+    validator.validate(
+        ProxmoxClusterContext(cluster_vms=cluster_vms, template_refs={"999": ["vm1", "vm2"]})
+    )
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -61,7 +66,9 @@ def test_validate_template_by_name_found(validator: TemplateValidator, report: M
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
     ]
 
-    validator.validate(cluster_vms, {"ubuntu-22.04": ["vm1"]})
+    validator.validate(
+        ProxmoxClusterContext(cluster_vms=cluster_vms, template_refs={"ubuntu-22.04": ["vm1"]})
+    )
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -78,7 +85,9 @@ def test_validate_template_by_name_not_found(
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
     ]
 
-    validator.validate(cluster_vms, {"missing-template": ["vm1"]})
+    validator.validate(
+        ProxmoxClusterContext(cluster_vms=cluster_vms, template_refs={"missing-template": ["vm1"]})
+    )
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -94,7 +103,9 @@ def test_validate_ignores_non_templates(validator: TemplateValidator, report: Ma
         {"vmid": 200, "name": "regular-vm", "template": 0},
     ]
 
-    validator.validate(cluster_vms, {"ubuntu-22.04": ["vm1"]})
+    validator.validate(
+        ProxmoxClusterContext(cluster_vms=cluster_vms, template_refs={"ubuntu-22.04": ["vm1"]})
+    )
 
     # Should find the template, not the regular VM
     call_args = report.add_check.call_args[1]
@@ -107,14 +118,14 @@ def test_validate_empty_template_refs(validator: TemplateValidator, report: Magi
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
     ]
 
-    validator.validate(cluster_vms, {})
+    validator.validate(ProxmoxClusterContext(cluster_vms=cluster_vms, template_refs={}))
 
     report.add_check.assert_not_called()
 
 
 def test_validate_cluster_vms_none(validator: TemplateValidator, report: MagicMock) -> None:
     """Test validation when cluster VMs fetch failed."""
-    validator.validate(None, {"100": ["vm1"]})
+    validator.validate(ProxmoxClusterContext(cluster_vms=None, template_refs={"100": ["vm1"]}))
 
     report.add_check.assert_not_called()
 
@@ -127,11 +138,13 @@ def test_validate_multiple_templates(validator: TemplateValidator, report: Magic
     ]
 
     validator.validate(
-        cluster_vms,
-        {
-            "100": ["vm1"],
-            "debian-12": ["vm2", "vm3"],
-        },
+        ProxmoxClusterContext(
+            cluster_vms=cluster_vms,
+            template_refs={
+                "100": ["vm1"],
+                "debian-12": ["vm2", "vm3"],
+            },
+        )
     )
 
     assert report.add_check.call_count == 2
@@ -145,7 +158,9 @@ def test_validate_template_used_by_multiple_resources(
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
     ]
 
-    validator.validate(cluster_vms, {"100": ["vm1", "vm2", "vm3"]})
+    validator.validate(
+        ProxmoxClusterContext(cluster_vms=cluster_vms, template_refs={"100": ["vm1", "vm2", "vm3"]})
+    )
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -162,7 +177,12 @@ def test_validate_skips_templates_missing_a_key(
         {"vmid": 100, "name": "ubuntu-22.04", "template": 1},
     ]
 
-    validator.validate(cluster_vms, {"100": ["vm1"], "101": ["vm2"], "ubuntu-22.04": ["vm3"]})
+    validator.validate(
+        ProxmoxClusterContext(
+            cluster_vms=cluster_vms,
+            template_refs={"100": ["vm1"], "101": ["vm2"], "ubuntu-22.04": ["vm3"]},
+        )
+    )
 
     passed = {c.kwargs["check_name"]: c.kwargs["passed"] for c in report.add_check.call_args_list}
     assert passed["proxmox_template_vmid_100"] is True
