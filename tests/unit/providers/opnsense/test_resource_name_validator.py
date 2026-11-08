@@ -6,6 +6,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.resource_name_validator import (
     ResourceNameValidator,
 )
@@ -31,7 +32,7 @@ def test_validate_unique_names(validator: ResourceNameValidator, report: MagicMo
         ResourceConfig(name="vlan1", type="interfaces.vlans", provider="opnsense", config={}),
     ]
 
-    validator.validate(resources)
+    validator.validate(OPNsenseValidationContext(resources=resources))
 
     report.add_check.assert_not_called()
 
@@ -46,7 +47,7 @@ def test_validate_duplicate_names_same_type(
         ResourceConfig(name="web_servers", type="firewall.aliases", provider="opnsense", config={}),
     ]
 
-    validator.validate(resources)
+    validator.validate(OPNsenseValidationContext(resources=resources))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -66,7 +67,7 @@ def test_validate_same_name_different_types(
         ResourceConfig(name="web", type="firewall.rules", provider="opnsense", config={}),
     ]
 
-    validator.validate(resources)
+    validator.validate(OPNsenseValidationContext(resources=resources))
 
     # Same names across types are allowed
     report.add_check.assert_not_called()
@@ -82,7 +83,7 @@ def test_validate_multiple_duplicates_same_type(
         ResourceConfig(name="alias1", type="firewall.aliases", provider="opnsense", config={}),
     ]
 
-    validator.validate(resources)
+    validator.validate(OPNsenseValidationContext(resources=resources))
 
     # Should report duplicate twice (second and third occurrences)
     assert report.add_check.call_count == 2
@@ -99,14 +100,14 @@ def test_validate_duplicates_in_multiple_types(
         ResourceConfig(name="dup2", type="interfaces.vlans", provider="opnsense", config={}),
     ]
 
-    validator.validate(resources)
+    validator.validate(OPNsenseValidationContext(resources=resources))
 
     assert report.add_check.call_count == 2
 
 
 def test_validate_empty_resources(validator: ResourceNameValidator, report: MagicMock) -> None:
     """Test validation with no resources."""
-    validator.validate([])
+    validator.validate(OPNsenseValidationContext(resources=[]))
 
     report.add_check.assert_not_called()
 
@@ -117,7 +118,7 @@ def test_validate_single_resource(validator: ResourceNameValidator, report: Magi
         ResourceConfig(name="alias1", type="firewall.aliases", provider="opnsense", config={}),
     ]
 
-    validator.validate(resources)
+    validator.validate(OPNsenseValidationContext(resources=resources))
 
     report.add_check.assert_not_called()
 
@@ -131,7 +132,7 @@ def test_validate_many_unique_resources(
         for i in range(100)
     ]
 
-    validator.validate(resources)
+    validator.validate(OPNsenseValidationContext(resources=resources))
 
     report.add_check.assert_not_called()
 
@@ -143,7 +144,7 @@ def test_validate_check_name_format(validator: ResourceNameValidator, report: Ma
         ResourceConfig(name="duplicate", type="firewall.aliases", provider="opnsense", config={}),
     ]
 
-    validator.validate(resources)
+    validator.validate(OPNsenseValidationContext(resources=resources))
 
     call_args = report.add_check.call_args[1]
     assert "firewall.aliases" in call_args["check_name"]
@@ -158,7 +159,7 @@ def test_validate_case_sensitive_names(validator: ResourceNameValidator, report:
         ResourceConfig(name="WEBSERVERS", type="firewall.aliases", provider="opnsense", config={}),
     ]
 
-    validator.validate(resources)
+    validator.validate(OPNsenseValidationContext(resources=resources))
 
     # Names are case-sensitive, so no duplicates
     report.add_check.assert_not_called()

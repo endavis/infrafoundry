@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import override
 
-from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.oci.validators.context import OCIApiContext
 
 
-class ImageValidator:
+class ImageValidator(SpecializedValidator[OCIApiContext]):
     """Validates that image OCIDs referenced by instances exist in OCI.
 
     This is a report-only validator that works with pre-fetched image data.
@@ -23,17 +24,15 @@ class ImageValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        resources: list[ResourceConfig],
-        existing_images: list[dict[str, Any]] | None,
-    ) -> None:
+    @override
+    def validate(self, context: OCIApiContext) -> None:
         """Validate that image OCIDs referenced by instances exist.
 
         Args:
-            resources: List of resources from the configuration
-            existing_images: Pre-fetched image list from OCI API, or None if unavailable
+            context: The resources and the pre-fetched images (None if unavailable).
         """
+        resources = context.resources
+        existing_images = context.existing_images
         if existing_images is None:
             return
 

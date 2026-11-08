@@ -19,6 +19,7 @@ from infrafoundry.providers.kubernetes.validators import (
     KubeconfigValidator,
     NamespaceValidator,
 )
+from infrafoundry.providers.kubernetes.validators.context import KubeconfigContext
 from tests.helpers.env import make_env_config
 
 
@@ -150,7 +151,9 @@ class TestKubernetesValidatorConnectivity:
         validator = KubernetesValidator(mock_env_config, validation_report)
         validator.kubeconfig_validator.validate = MagicMock()  # type: ignore[method-assign]
         validator.validate_connectivity()
-        validator.kubeconfig_validator.validate.assert_called_once_with("/path/to/kubeconfig", None)
+        validator.kubeconfig_validator.validate.assert_called_once_with(
+            KubeconfigContext(kubeconfig_path="/path/to/kubeconfig", context_override=None)
+        )
 
     def test_validate_connectivity_passes_context_override(
         self, validation_report: ValidationReport
@@ -169,7 +172,7 @@ class TestKubernetesValidatorConnectivity:
         validator.kubeconfig_validator.validate = MagicMock()  # type: ignore[method-assign]
         validator.validate_connectivity()
         validator.kubeconfig_validator.validate.assert_called_once_with(
-            "/path/to/kubeconfig", "my-context"
+            KubeconfigContext(kubeconfig_path="/path/to/kubeconfig", context_override="my-context")
         )
 
 

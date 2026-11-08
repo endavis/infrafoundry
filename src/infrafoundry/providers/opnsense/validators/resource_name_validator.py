@@ -1,10 +1,13 @@
 """Resource name uniqueness validation for OPNsense."""
 
-from infrafoundry.core.provider import ResourceConfig
+from typing import override
+
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 
-class ResourceNameValidator:
+class ResourceNameValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense resource name uniqueness."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -15,12 +18,14 @@ class ResourceNameValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Check for duplicate resource names within each type.
 
         Args:
-            resources: List of resources to check
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        resources = context.resources
         # Group by type
         by_type: dict[str, list[str]] = {}
         for resource in resources:

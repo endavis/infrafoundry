@@ -6,6 +6,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.kubernetes.validators.context import KubernetesHelmContext
 from infrafoundry.providers.kubernetes.validators.helm_validator import HelmValidator
 
 
@@ -40,7 +41,7 @@ class TestHelmValidator:
                 },
             ),
         ]
-        validator.validate(releases)
+        validator.validate(KubernetesHelmContext(helm_releases=releases))
         assert any(r.passed and "nginx" in r.message for r in validation_report.results)
         assert not validation_report.has_errors()
 
@@ -56,7 +57,7 @@ class TestHelmValidator:
                 config={"repository": "https://charts.example.com"},
             ),
         ]
-        validator.validate(releases)
+        validator.validate(KubernetesHelmContext(helm_releases=releases))
         assert any(
             not r.passed and r.level == ValidationLevel.ERROR and "chart" in r.message
             for r in validation_report.results
@@ -74,7 +75,7 @@ class TestHelmValidator:
                 config={"chart": "my-chart"},
             ),
         ]
-        validator.validate(releases)
+        validator.validate(KubernetesHelmContext(helm_releases=releases))
         assert any(
             not r.passed and r.level == ValidationLevel.ERROR and "repository" in r.message
             for r in validation_report.results
@@ -92,7 +93,7 @@ class TestHelmValidator:
                 config={},
             ),
         ]
-        validator.validate(releases)
+        validator.validate(KubernetesHelmContext(helm_releases=releases))
         errors = [r for r in validation_report.results if not r.passed]
         assert len(errors) == 2
 
@@ -100,5 +101,5 @@ class TestHelmValidator:
         self, validator: HelmValidator, validation_report: ValidationReport
     ) -> None:
         """Test that empty releases list produces no checks."""
-        validator.validate([])
+        validator.validate(KubernetesHelmContext(helm_releases=[]))
         assert len(validation_report.results) == 0

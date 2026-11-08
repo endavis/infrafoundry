@@ -17,6 +17,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.interface_assignment_validator import (
     InterfaceAssignmentValidator,
 )
@@ -72,9 +73,11 @@ class TestDeviceResolution:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", device="vtnet1")],
-            vlan_names=set(),
-            existing_interfaces={"vtnet0": {}, "vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", device="vtnet1")],
+                vlan_names=set(),
+                existing_interfaces={"vtnet0": {}, "vtnet1": {}},
+            )
         )
         assert all(c.passed for c in report.results)
 
@@ -84,9 +87,11 @@ class TestDeviceResolution:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("storage", device="vlan-storage")],
-            vlan_names={"vlan-storage"},
-            existing_interfaces={"vtnet0": {}, "vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("storage", device="vlan-storage")],
+                vlan_names={"vlan-storage"},
+                existing_interfaces={"vtnet0": {}, "vtnet1": {}},
+            )
         )
         assert all(c.passed for c in report.results)
 
@@ -97,9 +102,11 @@ class TestDeviceResolution:
     ) -> None:
         # The OPNsense convention: <nic>_vlan<tag>
         validator.validate(
-            [_resource("wan-vlan", device="vtnet0_vlan100")],
-            vlan_names=set(),
-            existing_interfaces={"vtnet0": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("wan-vlan", device="vtnet0_vlan100")],
+                vlan_names=set(),
+                existing_interfaces={"vtnet0": {}},
+            )
         )
         assert all(c.passed for c in report.results)
 
@@ -110,9 +117,11 @@ class TestDeviceResolution:
     ) -> None:
         # NIC names sometimes contain underscores (less common but possible).
         validator.validate(
-            [_resource("foo", device="igb_0_vlan100")],
-            vlan_names=set(),
-            existing_interfaces={"igb_0": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("foo", device="igb_0_vlan100")],
+                vlan_names=set(),
+                existing_interfaces={"igb_0": {}},
+            )
         )
         assert all(c.passed for c in report.results)
 
@@ -129,9 +138,11 @@ class TestDeviceErrors:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", device="em0")],
-            vlan_names=set(),
-            existing_interfaces={"vtnet0": {}, "vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", device="em0")],
+                vlan_names=set(),
+                existing_interfaces={"vtnet0": {}, "vtnet1": {}},
+            )
         )
         device_checks = [
             c for c in report.results if c.check_name == "interface_assignment_lan_device"
@@ -145,9 +156,11 @@ class TestDeviceErrors:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("wan-vlan", device="em0_vlan100")],
-            vlan_names=set(),
-            existing_interfaces={"vtnet0": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("wan-vlan", device="em0_vlan100")],
+                vlan_names=set(),
+                existing_interfaces={"vtnet0": {}},
+            )
         )
         device_checks = [
             c for c in report.results if c.check_name == "interface_assignment_wan-vlan_device"
@@ -160,9 +173,11 @@ class TestDeviceErrors:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("bad", device="vtnet0_vlan5000")],
-            vlan_names=set(),
-            existing_interfaces={"vtnet0": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("bad", device="vtnet0_vlan5000")],
+                vlan_names=set(),
+                existing_interfaces={"vtnet0": {}},
+            )
         )
         device_checks = [
             c for c in report.results if c.check_name == "interface_assignment_bad_device"
@@ -175,9 +190,11 @@ class TestDeviceErrors:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", device="")],
-            vlan_names=set(),
-            existing_interfaces={"vtnet0": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", device="")],
+                vlan_names=set(),
+                existing_interfaces={"vtnet0": {}},
+            )
         )
         assert any(
             not c.passed and c.check_name == "interface_assignment_lan_device"
@@ -190,9 +207,11 @@ class TestDeviceErrors:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", device=123)],
-            vlan_names=set(),
-            existing_interfaces={"vtnet0": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", device=123)],
+                vlan_names=set(),
+                existing_interfaces={"vtnet0": {}},
+            )
         )
         assert any(
             not c.passed and c.check_name == "interface_assignment_lan_device"
@@ -207,9 +226,11 @@ class TestDeviceErrors:
         # Missing device is the load-time required-field check's job —
         # this validator should not error here.
         validator.validate(
-            [_resource("lan", device=None)],
-            vlan_names=set(),
-            existing_interfaces={"vtnet0": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", device=None)],
+                vlan_names=set(),
+                existing_interfaces={"vtnet0": {}},
+            )
         )
         device_checks = [
             c for c in report.results if c.check_name == "interface_assignment_lan_device"
@@ -229,9 +250,11 @@ class TestFieldTypes:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", description=123)],
-            vlan_names=set(),
-            existing_interfaces={"vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", description=123)],
+                vlan_names=set(),
+                existing_interfaces={"vtnet1": {}},
+            )
         )
         assert any(
             not c.passed and c.check_name == "interface_assignment_lan_description"
@@ -244,9 +267,11 @@ class TestFieldTypes:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", enabled="yes")],
-            vlan_names=set(),
-            existing_interfaces={"vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", enabled="yes")],
+                vlan_names=set(),
+                existing_interfaces={"vtnet1": {}},
+            )
         )
         assert any(
             not c.passed and c.check_name == "interface_assignment_lan_enabled"
@@ -259,9 +284,11 @@ class TestFieldTypes:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", lock="yes")],
-            vlan_names=set(),
-            existing_interfaces={"vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", lock="yes")],
+                vlan_names=set(),
+                existing_interfaces={"vtnet1": {}},
+            )
         )
         assert any(
             not c.passed and c.check_name == "interface_assignment_lan_lock" for c in report.results
@@ -273,9 +300,11 @@ class TestFieldTypes:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", ipv4="static")],
-            vlan_names=set(),
-            existing_interfaces={"vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", ipv4="static")],
+                vlan_names=set(),
+                existing_interfaces={"vtnet1": {}},
+            )
         )
         assert any(
             not c.passed and c.check_name == "interface_assignment_lan_ipv4" for c in report.results
@@ -287,9 +316,11 @@ class TestFieldTypes:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", ipv6=["track6"])],
-            vlan_names=set(),
-            existing_interfaces={"vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", ipv6=["track6"])],
+                vlan_names=set(),
+                existing_interfaces={"vtnet1": {}},
+            )
         )
         assert any(
             not c.passed and c.check_name == "interface_assignment_lan_ipv6" for c in report.results
@@ -301,9 +332,11 @@ class TestFieldTypes:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", ipv4={"mode": "static", "address": "172.21.0.1/24"})],
-            vlan_names=set(),
-            existing_interfaces={"vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", ipv4={"mode": "static", "address": "172.21.0.1/24"})],
+                vlan_names=set(),
+                existing_interfaces={"vtnet1": {}},
+            )
         )
         # No ipv4 check failure — the only check should be the device pass.
         ipv4_failures = [
@@ -320,9 +353,11 @@ class TestFieldTypes:
     ) -> None:
         # YAML "ipv4:" with no value parses to None — validator must not error.
         validator.validate(
-            [_resource("lan", ipv4=None)],
-            vlan_names=set(),
-            existing_interfaces={"vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", ipv4=None)],
+                vlan_names=set(),
+                existing_interfaces={"vtnet1": {}},
+            )
         )
         ipv4_failures = [
             c
@@ -337,9 +372,11 @@ class TestFieldTypes:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", description="The LAN interface")],
-            vlan_names=set(),
-            existing_interfaces={"vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", description="The LAN interface")],
+                vlan_names=set(),
+                existing_interfaces={"vtnet1": {}},
+            )
         )
         # Only the device-pass check should be present; no description failure.
         description_failures = [
@@ -355,9 +392,11 @@ class TestFieldTypes:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [_resource("lan", enabled=False)],
-            vlan_names=set(),
-            existing_interfaces={"vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[_resource("lan", enabled=False)],
+                vlan_names=set(),
+                existing_interfaces={"vtnet1": {}},
+            )
         )
         enabled_failures = [
             c
@@ -378,7 +417,9 @@ class TestEdgeCases:
         validator: InterfaceAssignmentValidator,
         report: ValidationReport,
     ) -> None:
-        validator.validate([], vlan_names=set(), existing_interfaces={})
+        validator.validate(
+            OPNsenseValidationContext(assignments=[], vlan_names=set(), existing_interfaces={})
+        )
         assert report.results == []
 
     def test_multiple_assignments_all_validated(
@@ -387,13 +428,15 @@ class TestEdgeCases:
         report: ValidationReport,
     ) -> None:
         validator.validate(
-            [
-                _resource("lan", device="vtnet1"),
-                _resource("wan", device="vtnet0"),
-                _resource("opt1", device="vtnet0_vlan100"),
-            ],
-            vlan_names=set(),
-            existing_interfaces={"vtnet0": {}, "vtnet1": {}},
+            OPNsenseValidationContext(
+                assignments=[
+                    _resource("lan", device="vtnet1"),
+                    _resource("wan", device="vtnet0"),
+                    _resource("opt1", device="vtnet0_vlan100"),
+                ],
+                vlan_names=set(),
+                existing_interfaces={"vtnet0": {}, "vtnet1": {}},
+            )
         )
         # Each assignment yields a device check; all should pass.
         device_checks = [c for c in report.results if c.check_name.endswith("_device")]

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import yaml
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.kubernetes.validators.context import KubeconfigContext
 
 
 @dataclass
@@ -22,7 +24,7 @@ class KubeConnectionInfo:
     connected: bool = False
 
 
-class KubeconfigValidator:
+class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
     """Validates kubeconfig file and establishes connection info.
 
     Parses the kubeconfig to extract server URL, bearer token,
@@ -52,17 +54,15 @@ class KubeconfigValidator:
         """Connection info extracted from kubeconfig."""
         return self._connection_info
 
-    def validate(
-        self,
-        kubeconfig_path: str | None,
-        context_override: str | None = None,
-    ) -> None:
+    @override
+    def validate(self, context: KubeconfigContext) -> None:
         """Validate kubeconfig and test API connectivity.
 
         Args:
-            kubeconfig_path: Path to kubeconfig file, or None for default
-            context_override: Optional context name to use instead of current-context
+            context: Kubeconfig path and optional context override.
         """
+        kubeconfig_path = context.kubeconfig_path
+        context_override = context.context_override
         resolved_path = self._resolve_kubeconfig_path(kubeconfig_path)
         if resolved_path is None:
             return

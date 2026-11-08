@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from infrafoundry.core.config.models import EnvironmentConfig
+    from infrafoundry.core.protocols import SpecializedValidator
     from infrafoundry.core.provider import ResourceConfig
 
 
@@ -123,12 +126,44 @@ class ValidationReport:
         return "\n".join(lines)
 
 
+@dataclass(frozen=True, kw_only=True)
+class ValidationContext:
+    """Input handed to a provider sub-validator's ``validate`` method.
+
+    The base context carries the resources to check. A provider subclasses it
+    to add the API-derived data its validators need (an API client, cluster VM
+    lists, cross-reference indexes). Inputs always available at call time are
+    required fields, so validators need no ``None`` checks for them.
+
+    Attributes:
+        resources: Resources the validator checks.
+    """
+
+    resources: list[ResourceConfig] = field(default_factory=list)
+
+
+def run_validators(
+    validators: Iterable[SpecializedValidator[Any]],
+    context: ValidationContext,
+) -> None:
+    """Run each sub-validator against one context, in order.
+
+    Args:
+        validators: Validators to run; each adds results to its own report.
+        context: The context passed unchanged to every validator.
+    """
+    for validator in validators:
+        validator.validate(context)
+
+
 @runtime_checkable
 class ProviderValidator(Protocol):
     """Protocol defining the standard interface for provider validators.
 
     All provider validators should implement this protocol to ensure
-    consistent validation behavior across providers.
+    consistent validation behavior across providers. The sub-validators a
+    provider validator delegates to follow the separate ``validate(context)``
+    contract, ``SpecializedValidator`` in ``infrafoundry.core.protocols``.
 
     Attributes:
         env_config: Environment configuration including provider_settings

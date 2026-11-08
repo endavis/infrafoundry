@@ -210,7 +210,7 @@ class TestValidateReferences:
         with patch.object(ProxmoxClient, "from_provider_settings", return_value=mock_client):
             validator.validate_references(resources)
 
-        declared = validator.network_validator.validate.call_args.args[2]
+        declared = validator.network_validator.validate.call_args.args[0].declared_vnets
         assert declared == frozenset({"demolan", "tlan"})
 
     def test_exception_caught_gracefully(self, validator: ProxmoxValidator) -> None:

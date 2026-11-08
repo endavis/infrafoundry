@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.oci.validators.context import OCIApiContext
 
 
-class NetworkValidator:
+class NetworkValidator(SpecializedValidator[OCIApiContext]):
     """Validates OCI network resources against live API state.
 
     This is a report-only validator that works with pre-fetched VCN and
@@ -24,19 +26,17 @@ class NetworkValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        resources: list[ResourceConfig],
-        existing_vcns: list[dict[str, Any]] | None,
-        existing_subnets: list[dict[str, Any]] | None,
-    ) -> None:
+    @override
+    def validate(self, context: OCIApiContext) -> None:
         """Validate network resources against pre-fetched API data.
 
         Args:
-            resources: List of resources from the configuration
-            existing_vcns: Pre-fetched VCN list from OCI API, or None if unavailable
-            existing_subnets: Pre-fetched subnet list from OCI API, or None if unavailable
+            context: The resources and the pre-fetched VCNs and subnets
+                (None if unavailable).
         """
+        resources = context.resources
+        existing_vcns = context.existing_vcns
+        existing_subnets = context.existing_subnets
         config_vcns = [r for r in resources if r.type == "vcn"]
         config_subnets = [r for r in resources if r.type == "subnet"]
 

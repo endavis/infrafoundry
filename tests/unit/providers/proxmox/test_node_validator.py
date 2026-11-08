@@ -7,6 +7,7 @@ import pytest
 from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.proxmox.api_client import ProxmoxClient
+from infrafoundry.providers.proxmox.validators.context import ProxmoxLiveContext
 from infrafoundry.providers.proxmox.validators.node_validator import NodeValidator
 
 
@@ -34,7 +35,7 @@ def test_validate_node_online(
     """Test validation of online node."""
     client.get_json.return_value = {"data": {"uptime": 3600}}
 
-    validator.validate(client, {"node1"})
+    validator.validate(ProxmoxLiveContext(client=client, nodes={"node1"}))
 
     client.get_json.assert_called_once_with("nodes/node1/status")
     report.add_check.assert_called_once()
@@ -50,7 +51,7 @@ def test_validate_node_not_accessible(
     """Test validation when node is not accessible."""
     client.get_json.side_effect = APIError("not accessible", provider="proxmox")
 
-    validator.validate(client, {"node1"})
+    validator.validate(ProxmoxLiveContext(client=client, nodes={"node1"}))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -67,7 +68,7 @@ def test_validate_multiple_nodes(
         {"data": {"uptime": 7200}},
     ]
 
-    validator.validate(client, {"node1", "node2"})
+    validator.validate(ProxmoxLiveContext(client=client, nodes={"node1", "node2"}))
 
     assert client.get_json.call_count == 2
     assert report.add_check.call_count == 2
@@ -99,7 +100,7 @@ def test_validate_empty_nodes(
     validator: NodeValidator, client: MagicMock, report: MagicMock
 ) -> None:
     """Test validation with empty node set."""
-    validator.validate(client, set())
+    validator.validate(ProxmoxLiveContext(client=client, nodes=set()))
 
     client.get_json.assert_not_called()
     report.add_check.assert_not_called()

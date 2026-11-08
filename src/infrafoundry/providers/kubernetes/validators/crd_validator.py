@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from typing import override
+
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.kubernetes.validators.context import KubernetesApiContext
 
 # Standard Kubernetes API groups that don't require CRDs
 _STANDARD_API_GROUPS: frozenset[str] = frozenset(
@@ -30,7 +34,7 @@ _STANDARD_API_GROUPS: frozenset[str] = frozenset(
 )
 
 
-class CRDValidator:
+class CRDValidator(SpecializedValidator[KubernetesApiContext]):
     """Validates that CRDs required by manifest resources exist.
 
     Queries the Kubernetes API for installed CRDs and checks that
@@ -48,21 +52,17 @@ class CRDValidator:
         self.api_validator = api_validator
         self.report = report
 
-    def validate(
-        self,
-        server_url: str,
-        headers: dict[str, str],
-        verify_ssl: bool,
-        manifests: list[ResourceConfig],
-    ) -> None:
+    @override
+    def validate(self, context: KubernetesApiContext) -> None:
         """Validate that CRDs required by manifests are installed.
 
         Args:
-            server_url: Kubernetes API server URL
-            headers: HTTP headers with authorization
-            verify_ssl: Whether to verify SSL certificates
-            manifests: Manifest resources to check for CRD requirements
+            context: API connection details and the manifests to check.
         """
+        server_url = context.server_url
+        headers = context.headers
+        verify_ssl = context.verify_ssl
+        manifests = context.manifests
         if not manifests:
             return
 

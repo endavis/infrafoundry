@@ -10,10 +10,12 @@ all OPNsense validators. No secrets, no cross-references.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # Accepted scalar types for a sysctl item field (str / int / bool /
 # float). The wire form is ultimately a string but YAML may yield other
@@ -21,7 +23,7 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 _SCALAR_TYPES: tuple[type, ...] = (str, int, bool, float)
 
 
-class SystemTuningValidator:
+class SystemTuningValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates ``system.tuning`` singleton resources."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -32,8 +34,14 @@ class SystemTuningValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
-        """Validate ``system.tuning`` resources."""
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
+        """Validate ``system.tuning`` resources.
+
+        Args:
+            context: Validation context carrying the resources and lookups this validator checks.
+        """
+        resources = context.resources
         for resource in resources:
             self._validate_one(resource)
 

@@ -29,10 +29,12 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from typing import Any
+from typing import Any, override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # Valid mode values per the live OPNsense schema (probe-788.md, 2026-05-10).
 _VALID_MODES: frozenset[str] = frozenset({"router", "unmanaged", "managed", "assist", "stateless"})
@@ -50,7 +52,7 @@ _HOSTNAME_RE = re.compile(
 )
 
 
-class RadvdValidator:
+class RadvdValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense radvd singleton + per-interface inner fields."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -61,21 +63,16 @@ class RadvdValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        resources: list[ResourceConfig],
-        interface_assignment_names: set[str],
-        existing_interfaces: dict[str, Any],
-    ) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate the radvd singleton.
 
         Args:
-            resources: ``radvd`` ``ResourceConfig`` entries (zero or one).
-            interface_assignment_names: Set of managed
-                ``interfaces.assignments[].name`` values from YAML.
-            existing_interfaces: Live interface map from
-                ``OPNsenseValidator._get_existing_interfaces``.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        resources = context.resources
+        interface_assignment_names = context.interface_assignment_names
+        existing_interfaces = context.existing_interfaces
         if not resources:
             return
         # The loader's structural discrimination guarantees exactly one

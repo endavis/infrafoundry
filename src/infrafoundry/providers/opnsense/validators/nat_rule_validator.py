@@ -35,11 +35,13 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from typing import Any
+from typing import Any, override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # Dotted types referenced by NAT-rule cross-reference fields. Pulled
 # out as constants so the bare-name fallback and the resolver call
@@ -67,7 +69,7 @@ _NET_KEYWORDS: frozenset[str] = frozenset(
 _IDENTITY_PROBE = re.compile(r"\[infrafoundry:[^\]]*\]")
 
 
-class NATRuleValidator:
+class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense NAT-rule resources against managed + live state."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -78,31 +80,19 @@ class NATRuleValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        nat_rules: list[ResourceConfig],
-        alias_names: set[str],
-        interface_assignment_names: set[str],
-        existing_interfaces: dict[str, Any],
-        existing_aliases: dict[str, Any],
-        index: XRefIndex | None = None,
-    ) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate NAT-rule resources.
 
         Args:
-            nat_rules: ``nat_rules`` ``ResourceConfig`` entries.
-            alias_names: Set of managed alias names declared in YAML.
-            interface_assignment_names: Set of managed interface-assignment
-                names declared in YAML.
-            existing_interfaces: Live interface map from
-                ``OPNsenseValidator._get_existing_interfaces``.
-            existing_aliases: Live alias map from
-                ``OPNsenseValidator._get_existing_aliases``.
-            index: Optional dotted-type cross-reference index (#793).
-                When provided, alias / interface fields accept dotted-
-                path forms in addition to bare names. ``None`` falls
-                back to bare-name lookup only.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        nat_rules = context.nat_rules
+        alias_names = context.alias_names
+        interface_assignment_names = context.interface_assignment_names
+        existing_interfaces = context.existing_interfaces
+        existing_aliases = context.existing_aliases
+        index = context.index
         for rule in nat_rules:
             self._validate_one(
                 rule,

@@ -14,7 +14,7 @@ from infrafoundry.core.provider_mixins import (
     TerraformGeneratorMixin,
     sanitize_secret_ref_to_tf_var,
 )
-from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
 
 from .validator import ProxmoxValidator
 from .validators import (
@@ -24,6 +24,7 @@ from .validators import (
     TemplateConfigValidator,
     VMConfigValidator,
 )
+from .validators.context import ProxmoxConfigContext
 from .validators.sdn_config_validator import sdn_id
 
 if TYPE_CHECKING:
@@ -197,12 +198,23 @@ class ProxmoxProvider(
                 name and description.
         """
         report = ValidationReport()
-        StorageConfigValidator(report).validate(resources_by_type.get("storage", []))
-        VMConfigValidator(report).validate(resources_by_type.get("vm", []))
-        ContainerConfigValidator(report).validate(resources_by_type.get("container", []))
-        TemplateConfigValidator(report).validate(resources_by_type.get("template", []))
-        SDNConfigValidator(report).validate(
-            resources_by_type.get("sdn_zone", []), resources_by_type.get("sdn_vnet", [])
+        context = ProxmoxConfigContext(
+            storage=resources_by_type.get("storage", []),
+            vms=resources_by_type.get("vm", []),
+            containers=resources_by_type.get("container", []),
+            templates=resources_by_type.get("template", []),
+            sdn_zones=resources_by_type.get("sdn_zone", []),
+            sdn_vnets=resources_by_type.get("sdn_vnet", []),
+        )
+        run_validators(
+            (
+                StorageConfigValidator(report),
+                VMConfigValidator(report),
+                ContainerConfigValidator(report),
+                TemplateConfigValidator(report),
+                SDNConfigValidator(report),
+            ),
+            context,
         )
 
         if report.has_errors():

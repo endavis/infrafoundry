@@ -46,10 +46,13 @@ entry per category, keyed by check name):
 from __future__ import annotations
 
 import ipaddress
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # Dotted target types for the v4/v6 subnet xref lookups. Pulled out as
 # constants so the resolver call and the wrong-version detection logic
@@ -58,7 +61,7 @@ _MANAGED_DHCP4_SUBNET_TYPE = "kea.dhcp4.subnets"
 _MANAGED_DHCP6_SUBNET_TYPE = "kea.dhcp6.subnets"
 
 
-class KeaReservationValidator:
+class KeaReservationValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense Kea reservation ``subnet_ref`` / ``subnet`` fields.
 
     Covers both ``kea.dhcp4.reservations`` and ``kea.dhcp6.reservations``
@@ -75,26 +78,18 @@ class KeaReservationValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        dhcp4_reservations: list[ResourceConfig],
-        dhcp6_reservations: list[ResourceConfig],
-        dhcp4_subnet_names: set[str],
-        dhcp6_subnet_names: set[str],
-        index: XRefIndex | None = None,
-    ) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate Kea reservation resources for both v4 and v6.
 
         Args:
-            dhcp4_reservations: ``kea.dhcp4.reservations`` ``ResourceConfig`` entries.
-            dhcp6_reservations: ``kea.dhcp6.reservations`` ``ResourceConfig`` entries.
-            dhcp4_subnet_names: Set of managed v4 subnet names declared in YAML.
-            dhcp6_subnet_names: Set of managed v6 subnet names declared in YAML.
-            index: Dotted-type cross-reference index (#793). Required for
-                ``subnet_ref`` resolution; ``None`` causes ``subnet_ref``
-                lookups to fall back to bare-name set lookups against
-                ``dhcp4_subnet_names`` / ``dhcp6_subnet_names``.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        dhcp4_reservations = context.dhcp4_reservations
+        dhcp6_reservations = context.dhcp6_reservations
+        dhcp4_subnet_names = context.dhcp4_subnet_names
+        dhcp6_subnet_names = context.dhcp6_subnet_names
+        index = context.index
         for reservation in dhcp4_reservations:
             self._validate_one(
                 reservation,

@@ -2,15 +2,17 @@
 
 import re
 from pathlib import Path
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.core.validation import ValidationContext, ValidationLevel, ValidationReport
 
 MAC_ADDRESS_PATTERN = re.compile(r"^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
 ETHERNET_NAME_PATTERN = re.compile(r"^ethernet\d+$")
 
 
-class OvfDeploymentValidator:
+class OvfDeploymentValidator(SpecializedValidator[ValidationContext]):
     """Validates OVF deployment resource configurations.
 
     Checks that OVF deployment resources have all required fields
@@ -25,12 +27,14 @@ class OvfDeploymentValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: ValidationContext) -> None:
         """Validate OVF deployment resources.
 
         Args:
-            resources: List of all resources to validate
+            context: Context whose resources are validated.
         """
+        resources = context.resources
         for resource in resources:
             if resource.type != "ovf_deployment":
                 continue

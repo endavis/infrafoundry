@@ -7,13 +7,18 @@ from typing import cast
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import KubernetesProviderSettings
-from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.kubernetes.validators import (
     CRDValidator,
     HelmValidator,
     KubeconfigValidator,
     NamespaceValidator,
+)
+from infrafoundry.providers.kubernetes.validators.context import (
+    KubeconfigContext,
+    KubernetesApiContext,
+    KubernetesHelmContext,
 )
 
 
@@ -53,7 +58,9 @@ class KubernetesValidator:
         """
         kubeconfig_path = self.provider_settings.get("kubeconfig_path")
         context_override = self.provider_settings.get("context")
-        self.kubeconfig_validator.validate(kubeconfig_path, context_override)
+        self.kubeconfig_validator.validate(
+            KubeconfigContext(kubeconfig_path=kubeconfig_path, context_override=context_override)
+        )
 
     def validate_references(self, resources: list[ResourceConfig]) -> None:
         """Validate Kubernetes resource references.
@@ -74,7 +81,7 @@ class KubernetesValidator:
 
         # Helm validation always runs (no API needed)
         helm_releases = [r for r in resources if r.type == "helm_releases"]
-        self.helm_validator.validate(helm_releases)
+        self.helm_validator.validate(KubernetesHelmContext(helm_releases=helm_releases))
 
         # API-based checks only when connected
         if self.kubeconfig_validator.is_connected:
@@ -116,21 +123,18 @@ class KubernetesValidator:
             if ns:
                 referenced_namespaces.add(ns)
 
-        self.namespace_validator.validate(
-            server_url=info.server_url,
-            headers=info.headers,
-            verify_ssl=info.verify_ssl,
-            referenced_namespaces=referenced_namespaces,
-            config_namespaces=config_namespaces,
-        )
-
-        # CRD validation for manifest resources
+        # Namespace checks run before CRD checks (manifests only feed the CRD check)
         manifests = [r for r in resources if r.type == "manifests"]
-        self.crd_validator.validate(
-            server_url=info.server_url,
-            headers=info.headers,
-            verify_ssl=info.verify_ssl,
-            manifests=manifests,
+        run_validators(
+            (self.namespace_validator, self.crd_validator),
+            KubernetesApiContext(
+                server_url=info.server_url,
+                headers=info.headers,
+                verify_ssl=info.verify_ssl,
+                referenced_namespaces=referenced_namespaces,
+                config_namespaces=config_namespaces,
+                manifests=manifests,
+            ),
         )
 
     def _validate_local_references(self, resources: list[ResourceConfig]) -> None:

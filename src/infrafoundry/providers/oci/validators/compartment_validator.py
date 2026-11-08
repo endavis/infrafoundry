@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.oci.validators.context import OCIApiContext
 
 
-class CompartmentValidator:
+class CompartmentValidator(SpecializedValidator[OCIApiContext]):
     """Validates that the configured compartment OCID exists in OCI.
 
     This is a report-only validator that works with pre-fetched compartment
@@ -22,18 +24,16 @@ class CompartmentValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        compartment_ocid: str,
-        compartments: list[dict[str, Any]] | None,
-    ) -> None:
+    @override
+    def validate(self, context: OCIApiContext) -> None:
         """Validate that compartment_ocid exists in the pre-fetched compartments list.
 
         Args:
-            compartment_ocid: The compartment OCID from provider settings
-            compartments: Pre-fetched list of compartment dicts from OCI API,
-                or None if the API call failed
+            context: The compartment OCID and the pre-fetched compartments
+                (None if the API call failed).
         """
+        compartment_ocid = context.compartment_ocid
+        compartments = context.compartments
         if compartments is None:
             return
 

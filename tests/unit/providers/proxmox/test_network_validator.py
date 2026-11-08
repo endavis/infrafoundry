@@ -7,6 +7,7 @@ import pytest
 from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.proxmox.api_client import ProxmoxClient
+from infrafoundry.providers.proxmox.validators.context import ProxmoxLiveContext
 from infrafoundry.providers.proxmox.validators.network_validator import NetworkValidator
 
 
@@ -38,7 +39,7 @@ def test_validate_bridge_exists(
         ]
     }
 
-    validator.validate(client, {("node1", "vmbr0")})
+    validator.validate(ProxmoxLiveContext(client=client, bridges={("node1", "vmbr0")}))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -57,7 +58,7 @@ def test_validate_bridge_not_found(
         ]
     }
 
-    validator.validate(client, {("node1", "vmbr1")})
+    validator.validate(ProxmoxLiveContext(client=client, bridges={("node1", "vmbr1")}))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -77,7 +78,7 @@ def test_validate_non_bridge_interfaces_ignored(
         ]
     }
 
-    validator.validate(client, {("node1", "vmbr0")})
+    validator.validate(ProxmoxLiveContext(client=client, bridges={("node1", "vmbr0")}))
 
     # Should find vmbr0 (bridge type)
     call_args = report.add_check.call_args[1]
@@ -90,7 +91,7 @@ def test_validate_api_fetch_failure(
     """Test validation when API fetch fails."""
     client.get_json.side_effect = APIError("failed", provider="proxmox")
 
-    validator.validate(client, {("node1", "vmbr0")})
+    validator.validate(ProxmoxLiveContext(client=client, bridges={("node1", "vmbr0")}))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -108,7 +109,9 @@ def test_validate_duplicate_bridges(
         ]
     }
 
-    validator.validate(client, {("node1", "vmbr0"), ("node1", "vmbr0")})
+    validator.validate(
+        ProxmoxLiveContext(client=client, bridges={("node1", "vmbr0"), ("node1", "vmbr0")})
+    )
 
     # Should only check once despite duplicate in set
     client.get_json.assert_called_once()
@@ -124,7 +127,9 @@ def test_validate_multiple_bridges(
         {"data": [{"type": "bridge", "iface": "vmbr1"}]},
     ]
 
-    validator.validate(client, {("node1", "vmbr0"), ("node2", "vmbr1")})
+    validator.validate(
+        ProxmoxLiveContext(client=client, bridges={("node1", "vmbr0"), ("node2", "vmbr1")})
+    )
 
     assert client.get_json.call_count == 2
     assert report.add_check.call_count == 2
@@ -134,7 +139,7 @@ def test_validate_empty_bridges(
     validator: NetworkValidator, client: MagicMock, report: MagicMock
 ) -> None:
     """Test validation with empty bridge set."""
-    validator.validate(client, set())
+    validator.validate(ProxmoxLiveContext(client=client, bridges=set()))
 
     client.get_json.assert_not_called()
     report.add_check.assert_not_called()
@@ -163,7 +168,7 @@ def test_applied_sdn_vnet_passes(
         {"nodes/node3/network": NODE, "cluster/sdn/vnets": {"data": [{"vnet": "demolan"}]}}
     )
 
-    validator.validate(client, {("node3", "demolan")})
+    validator.validate(ProxmoxLiveContext(client=client, bridges={("node3", "demolan")}))
 
     call_args = report.add_check.call_args[1]
     assert call_args["passed"] is True
@@ -178,7 +183,11 @@ def test_declared_but_unapplied_vnet_warns(
         {"nodes/node3/network": NODE, "cluster/sdn/vnets": {"data": []}}
     )
 
-    validator.validate(client, {("node3", "demolan")}, declared_vnets=frozenset({"demolan"}))
+    validator.validate(
+        ProxmoxLiveContext(
+            client=client, bridges={("node3", "demolan")}, declared_vnets=frozenset({"demolan"})
+        )
+    )
 
     call_args = report.add_check.call_args[1]
     assert call_args["passed"] is False
@@ -193,7 +202,11 @@ def test_unknown_bridge_is_still_an_error(
         {"nodes/node3/network": NODE, "cluster/sdn/vnets": {"data": [{"vnet": "other"}]}}
     )
 
-    validator.validate(client, {("node3", "demolan")}, declared_vnets=frozenset({"other"}))
+    validator.validate(
+        ProxmoxLiveContext(
+            client=client, bridges={("node3", "demolan")}, declared_vnets=frozenset({"other"})
+        )
+    )
 
     call_args = report.add_check.call_args[1]
     assert call_args["passed"] is False
@@ -208,7 +221,7 @@ def test_unreadable_sdn_endpoint_falls_back_to_the_error(
         {"nodes/node3/network": NODE, "cluster/sdn/vnets": APIError("no sdn")}
     )
 
-    validator.validate(client, {("node3", "demolan")})
+    validator.validate(ProxmoxLiveContext(client=client, bridges={("node3", "demolan")}))
 
     assert report.add_check.call_args[1]["level"] == ValidationLevel.ERROR
 
@@ -225,7 +238,11 @@ def test_vnets_are_fetched_once_and_only_when_needed(
         }
     )
 
-    validator.validate(client, {("node1", "vmbr0"), ("node2", "demolan"), ("node3", "demolan")})
+    validator.validate(
+        ProxmoxLiveContext(
+            client=client, bridges={("node1", "vmbr0"), ("node2", "demolan"), ("node3", "demolan")}
+        )
+    )
 
     endpoints = [c.args[0] for c in client.get_json.call_args_list]
     assert endpoints.count("cluster/sdn/vnets") == 1

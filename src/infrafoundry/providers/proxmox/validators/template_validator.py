@@ -1,20 +1,13 @@
 """Template validation for Proxmox."""
 
-from typing import TypedDict
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxClusterContext
 
 
-class ClusterVM(TypedDict, total=False):
-    """Typed representation of a VM entry in the Proxmox cluster listing."""
-
-    vmid: int
-    name: str
-    template: int
-    type: str
-
-
-class TemplateValidator:
+class TemplateValidator(SpecializedValidator[ProxmoxClusterContext]):
     """Validates Proxmox VM template availability."""
 
     def __init__(self, report: ValidationReport) -> None:
@@ -25,17 +18,15 @@ class TemplateValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        cluster_vms: list[ClusterVM] | None,
-        template_refs: dict[str, list[str]],
-    ) -> None:
+    @override
+    def validate(self, context: ProxmoxClusterContext) -> None:
         """Validate that templates exist (by VMID or name).
 
         Args:
-            cluster_vms: List of cluster VM data (None if fetch failed)
-            template_refs: Dict of {vmid_or_name: [resource_names]}
+            context: Validation context carrying the inputs this validator checks.
         """
+        cluster_vms = context.cluster_vms
+        template_refs = context.template_refs
         if not template_refs:
             return
 

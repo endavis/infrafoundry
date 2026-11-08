@@ -1,11 +1,14 @@
 """SSH connectivity validation for ESXi hosts."""
 
 import socket
+from typing import override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.esxi.validators.context import EsxiHostContext
 
 
-class HostConnectivityValidator:
+class HostConnectivityValidator(SpecializedValidator[EsxiHostContext]):
     """Validates SSH connectivity to ESXi hosts.
 
     Uses socket.create_connection to check if port 22 is reachable
@@ -22,13 +25,15 @@ class HostConnectivityValidator:
         self.report = report
         self.timeout = timeout
 
-    def validate(self, hostname: str, port: int = 22) -> None:
+    @override
+    def validate(self, context: EsxiHostContext) -> None:
         """Validate that an ESXi host is reachable via SSH.
 
         Args:
-            hostname: Host name or IP address to check
-            port: Port to check (default: 22 for SSH)
+            context: Host name or IP address and port to check.
         """
+        hostname = context.hostname
+        port = context.port
         check_name = f"esxi_host_connectivity_{hostname}"
         try:
             conn = socket.create_connection((hostname, port), timeout=self.timeout)

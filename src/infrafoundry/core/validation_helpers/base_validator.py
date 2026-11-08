@@ -14,7 +14,6 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers.connectivity_validator import ConnectivityValidator
 from infrafoundry.core.validation_helpers.credential_validator import CredentialValidator
 from infrafoundry.core.validation_helpers.report_helper import ValidationReportHelper
-from infrafoundry.core.validation_helpers.resource_validator import ResourceValidator
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,6 @@ class BaseProviderValidator:
     Composes specialized validators to provide a complete validation toolkit:
     - Credential validation (settings + environment variables)
     - API connectivity testing
-    - Resource reference validation
     - Standardized report helpers
 
     Example:
@@ -47,14 +45,6 @@ class BaseProviderValidator:
                 headers={"Authorization": f"PVEAPIToken={credentials['api_token']}"},
                 verify_ssl=False
             )
-
-        # Validate resource references
-        validator.validate_resource_exists(
-            resource_type="template",
-            resource_name="ubuntu-22.04",
-            existing_resources=template_names,
-            parent_resource="web-server-01"
-        )
     """
 
     def __init__(
@@ -77,7 +67,6 @@ class BaseProviderValidator:
         # Initialize specialized validators
         self._credential_validator = CredentialValidator(provider_name, env_config, report)
         self._connectivity_validator = ConnectivityValidator(provider_name, report)
-        self._resource_validator = ResourceValidator(provider_name, report)
         self._report_helper = ValidationReportHelper(report)
 
     @property
@@ -144,34 +133,6 @@ class BaseProviderValidator:
             verify_ssl=verify_ssl,
             timeout=timeout,
             success_message=success_message,
-        )
-
-    # Delegate to ResourceValidator
-    def validate_resource_exists(
-        self,
-        resource_type: str,
-        resource_name: str,
-        existing_resources: set[str],
-        parent_resource: str | None = None,
-    ) -> bool:
-        """Validate that a referenced resource exists.
-
-        Delegates to ResourceValidator.
-
-        Args:
-            resource_type: Type of resource (e.g., "template", "vlan", "alias")
-            resource_name: Name of the resource being checked
-            existing_resources: Set of existing resource names
-            parent_resource: Optional parent resource name for context
-
-        Returns:
-            True if resource exists, False otherwise
-        """
-        return self._resource_validator.validate_resource_exists(
-            resource_type=resource_type,
-            resource_name=resource_name,
-            existing_resources=existing_resources,
-            parent_resource=parent_resource,
         )
 
     # Delegate to ValidationReportHelper

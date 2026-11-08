@@ -7,6 +7,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 from infrafoundry.providers.proxmox.validators.storage_config_validator import (
     StorageConfigValidator,
 )
@@ -39,7 +40,11 @@ class TestBackendValidation:
 
     def test_valid_nfs_backend(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid NFS backend should not trigger an error."""
-        validator.validate([_storage(backend="nfs", server="192.168.1.1", export="/export/vol2")])
+        validator.validate(
+            ProxmoxConfigContext(
+                storage=[_storage(backend="nfs", server="192.168.1.1", export="/export/vol2")]
+            )
+        )
         # Only the CIFS username warning should NOT be present; no errors
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
@@ -47,27 +52,31 @@ class TestBackendValidation:
     def test_valid_cifs_backend(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid CIFS backend with username should not trigger errors."""
         validator.validate(
-            [
-                _storage(
-                    backend="cifs",
-                    server="192.168.1.1",
-                    share="backups",
-                    username="admin",
-                )
-            ]
+            ProxmoxConfigContext(
+                storage=[
+                    _storage(
+                        backend="cifs",
+                        server="192.168.1.1",
+                        share="backups",
+                        username="admin",
+                    )
+                ]
+            )
         )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
 
     def test_valid_dir_backend(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid dir backend should not trigger an error."""
-        validator.validate([_storage(backend="dir", path="/mnt/data")])
+        validator.validate(
+            ProxmoxConfigContext(storage=[_storage(backend="dir", path="/mnt/data")])
+        )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
 
     def test_missing_backend(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Missing backend should trigger an error."""
-        validator.validate([_storage()])
+        validator.validate(ProxmoxConfigContext(storage=[_storage()]))
         report.add_check.assert_called()
         call_args = report.add_check.call_args_list[0][1]
         assert call_args["passed"] is False
@@ -76,7 +85,7 @@ class TestBackendValidation:
 
     def test_invalid_backend(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Invalid backend value should trigger an error."""
-        validator.validate([_storage(backend="iscsi")])
+        validator.validate(ProxmoxConfigContext(storage=[_storage(backend="iscsi")]))
         calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(calls) == 1
         assert "iscsi" in calls[0]["message"]
@@ -88,19 +97,27 @@ class TestNFSValidation:
 
     def test_missing_server(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """NFS without server should trigger an error."""
-        validator.validate([_storage(backend="nfs", export="/export/vol2")])
+        validator.validate(
+            ProxmoxConfigContext(storage=[_storage(backend="nfs", export="/export/vol2")])
+        )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("server" in c["message"] for c in error_calls)
 
     def test_missing_export(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """NFS without export should trigger an error."""
-        validator.validate([_storage(backend="nfs", server="192.168.1.1")])
+        validator.validate(
+            ProxmoxConfigContext(storage=[_storage(backend="nfs", server="192.168.1.1")])
+        )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("export" in c["message"] for c in error_calls)
 
     def test_valid_nfs(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid NFS config should not trigger errors."""
-        validator.validate([_storage(backend="nfs", server="192.168.1.1", export="/export/vol2")])
+        validator.validate(
+            ProxmoxConfigContext(
+                storage=[_storage(backend="nfs", server="192.168.1.1", export="/export/vol2")]
+            )
+        )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
 
@@ -110,13 +127,17 @@ class TestCIFSValidation:
 
     def test_missing_server(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """CIFS without server should trigger an error."""
-        validator.validate([_storage(backend="cifs", share="backups")])
+        validator.validate(
+            ProxmoxConfigContext(storage=[_storage(backend="cifs", share="backups")])
+        )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("server" in c["message"] for c in error_calls)
 
     def test_missing_share(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """CIFS without share should trigger an error."""
-        validator.validate([_storage(backend="cifs", server="192.168.1.1")])
+        validator.validate(
+            ProxmoxConfigContext(storage=[_storage(backend="cifs", server="192.168.1.1")])
+        )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("share" in c["message"] for c in error_calls)
 
@@ -124,7 +145,11 @@ class TestCIFSValidation:
         self, validator: StorageConfigValidator, report: MagicMock
     ) -> None:
         """CIFS without username should trigger a warning."""
-        validator.validate([_storage(backend="cifs", server="192.168.1.1", share="backups")])
+        validator.validate(
+            ProxmoxConfigContext(
+                storage=[_storage(backend="cifs", server="192.168.1.1", share="backups")]
+            )
+        )
         warning_calls = [
             c[1]
             for c in report.add_check.call_args_list
@@ -138,14 +163,16 @@ class TestCIFSValidation:
     ) -> None:
         """CIFS with username should not trigger the username warning."""
         validator.validate(
-            [
-                _storage(
-                    backend="cifs",
-                    server="192.168.1.1",
-                    share="backups",
-                    username="admin",
-                )
-            ]
+            ProxmoxConfigContext(
+                storage=[
+                    _storage(
+                        backend="cifs",
+                        server="192.168.1.1",
+                        share="backups",
+                        username="admin",
+                    )
+                ]
+            )
         )
         warning_calls = [
             c[1]
@@ -157,14 +184,16 @@ class TestCIFSValidation:
     def test_valid_cifs(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid CIFS config should not trigger errors."""
         validator.validate(
-            [
-                _storage(
-                    backend="cifs",
-                    server="192.168.1.1",
-                    share="backups",
-                    username="admin",
-                )
-            ]
+            ProxmoxConfigContext(
+                storage=[
+                    _storage(
+                        backend="cifs",
+                        server="192.168.1.1",
+                        share="backups",
+                        username="admin",
+                    )
+                ]
+            )
         )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
@@ -175,13 +204,15 @@ class TestDirValidation:
 
     def test_missing_path(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Dir without path should trigger an error."""
-        validator.validate([_storage(backend="dir")])
+        validator.validate(ProxmoxConfigContext(storage=[_storage(backend="dir")]))
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("path" in c["message"] for c in error_calls)
 
     def test_valid_dir(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Valid dir config should not trigger errors."""
-        validator.validate([_storage(backend="dir", path="/mnt/data")])
+        validator.validate(
+            ProxmoxConfigContext(storage=[_storage(backend="dir", path="/mnt/data")])
+        )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
 
@@ -194,13 +225,15 @@ class TestContentTypesValidation:
     ) -> None:
         """Valid content types should not trigger errors."""
         validator.validate(
-            [
-                _storage(
-                    backend="dir",
-                    path="/mnt/data",
-                    content_types=["snippets", "iso", "vztmpl"],
-                )
-            ]
+            ProxmoxConfigContext(
+                storage=[
+                    _storage(
+                        backend="dir",
+                        path="/mnt/data",
+                        content_types=["snippets", "iso", "vztmpl"],
+                    )
+                ]
+            )
         )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
@@ -210,7 +243,9 @@ class TestContentTypesValidation:
     ) -> None:
         """Invalid content type should trigger an error."""
         validator.validate(
-            [_storage(backend="dir", path="/mnt/data", content_types=["invalid_type"])]
+            ProxmoxConfigContext(
+                storage=[_storage(backend="dir", path="/mnt/data", content_types=["invalid_type"])]
+            )
         )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("invalid_type" in c["message"] for c in error_calls)
@@ -219,14 +254,20 @@ class TestContentTypesValidation:
         self, validator: StorageConfigValidator, report: MagicMock
     ) -> None:
         """Non-list content_types should trigger an error."""
-        validator.validate([_storage(backend="dir", path="/mnt/data", content_types="snippets")])
+        validator.validate(
+            ProxmoxConfigContext(
+                storage=[_storage(backend="dir", path="/mnt/data", content_types="snippets")]
+            )
+        )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 1
         assert "list" in error_calls[0]["message"]
 
     def test_no_content_types(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """Missing content_types should not trigger an error."""
-        validator.validate([_storage(backend="dir", path="/mnt/data")])
+        validator.validate(
+            ProxmoxConfigContext(storage=[_storage(backend="dir", path="/mnt/data")])
+        )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert len(error_calls) == 0
 
@@ -244,5 +285,5 @@ class TestNonStorageResources:
             provider="proxmox",
             config={"name": "test-vm"},
         )
-        validator.validate([resource])
+        validator.validate(ProxmoxConfigContext(storage=[resource]))
         report.add_check.assert_not_called()

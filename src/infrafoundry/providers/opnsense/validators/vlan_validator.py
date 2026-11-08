@@ -1,12 +1,14 @@
 """VLAN validation for OPNsense (ADR-0014 plan-time validation)."""
 
-from typing import Any
+from typing import Any, override
 
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 
-class VLANValidator:
+class VLANValidator(SpecializedValidator[OPNsenseValidationContext]):
     """Validates OPNsense VLAN configurations against the live API.
 
     Checks:
@@ -24,18 +26,15 @@ class VLANValidator:
         """
         self.report = report
 
-    def validate(
-        self,
-        vlans: list[ResourceConfig],
-        existing_interfaces: dict[str, Any],
-    ) -> None:
+    @override
+    def validate(self, context: OPNsenseValidationContext) -> None:
         """Validate VLANs configuration against live state.
 
         Args:
-            vlans: List of VLAN ``ResourceConfig`` entries.
-            existing_interfaces: Map of NIC name -> interface metadata
-                returned by ``OPNsenseValidator._get_existing_interfaces``.
+            context: Validation context carrying the resources and lookups this validator checks.
         """
+        vlans = context.vlans
+        existing_interfaces = context.existing_interfaces
         for vlan in vlans:
             self._validate_one(vlan, existing_interfaces)
 

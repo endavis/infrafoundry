@@ -38,6 +38,7 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.components.radvd import RadvdManager
 from infrafoundry.providers.opnsense.services.radvd import RadvdService
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.radvd_validator import RadvdValidator
 
 SERVICE_PATH = "infrafoundry.providers.opnsense.components.radvd.RadvdService"
@@ -388,9 +389,11 @@ class TestValidator:
         report = ValidationReport()
         validator = RadvdValidator(report)
         validator.validate(
-            [_resource({"opt1": {"mode": "bogus"}})],
-            interface_assignment_names={"opt1"},
-            existing_interfaces={},
+            OPNsenseValidationContext(
+                resources=[_resource({"opt1": {"mode": "bogus"}})],
+                interface_assignment_names={"opt1"},
+                existing_interfaces={},
+            )
         )
         assert _failures(report, "radvd_opt1_mode")
 
@@ -398,9 +401,11 @@ class TestValidator:
         report = ValidationReport()
         validator = RadvdValidator(report)
         validator.validate(
-            [_resource({"opt1": {"min_interval": 600, "max_interval": 200}})],
-            interface_assignment_names={"opt1"},
-            existing_interfaces={},
+            OPNsenseValidationContext(
+                resources=[_resource({"opt1": {"min_interval": 600, "max_interval": 200}})],
+                interface_assignment_names={"opt1"},
+                existing_interfaces={},
+            )
         )
         assert _failures(report, "radvd_opt1_interval_order")
 
@@ -408,9 +413,11 @@ class TestValidator:
         report = ValidationReport()
         validator = RadvdValidator(report)
         validator.validate(
-            [_resource({"optZZ": {"mode": "assist"}})],
-            interface_assignment_names=set(),
-            existing_interfaces={},
+            OPNsenseValidationContext(
+                resources=[_resource({"optZZ": {"mode": "assist"}})],
+                interface_assignment_names=set(),
+                existing_interfaces={},
+            )
         )
         assert _failures(report, "radvd_optZZ_interface")
 
@@ -418,9 +425,11 @@ class TestValidator:
         report = ValidationReport()
         validator = RadvdValidator(report)
         validator.validate(
-            [_resource({"opt1": {"mode": "assist"}})],
-            interface_assignment_names={"opt1"},
-            existing_interfaces={},
+            OPNsenseValidationContext(
+                resources=[_resource({"opt1": {"mode": "assist"}})],
+                interface_assignment_names={"opt1"},
+                existing_interfaces={},
+            )
         )
         assert not _failures(report, "radvd_opt1_interface")
         # Managed assignment should produce a passing INFO check.
@@ -431,9 +440,11 @@ class TestValidator:
         report = ValidationReport()
         validator = RadvdValidator(report)
         validator.validate(
-            [_resource({"opt99": {"mode": "assist"}})],
-            interface_assignment_names=set(),
-            existing_interfaces={"opt99": {"if_type": "vlan"}},
+            OPNsenseValidationContext(
+                resources=[_resource({"opt99": {"mode": "assist"}})],
+                interface_assignment_names=set(),
+                existing_interfaces={"opt99": {"if_type": "vlan"}},
+            )
         )
         assert not _failures(report, "radvd_opt99_interface")
         assert _passes(report, "radvd_opt99_interface")

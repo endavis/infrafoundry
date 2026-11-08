@@ -6,6 +6,7 @@ import pytest
 
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.oci.validators.compartment_validator import CompartmentValidator
+from infrafoundry.providers.oci.validators.context import OCIApiContext
 
 
 @pytest.fixture
@@ -32,7 +33,9 @@ class TestCompartmentValidator:
             {"id": "ocid1.compartment.oc1..bbb", "name": "other-compartment"},
         ]
 
-        validator.validate("ocid1.compartment.oc1..aaa", compartments)
+        validator.validate(
+            OCIApiContext(compartment_ocid="ocid1.compartment.oc1..aaa", compartments=compartments)
+        )
 
         assert len(report.results) == 1
         result = report.results[0]
@@ -49,7 +52,11 @@ class TestCompartmentValidator:
             {"id": "ocid1.compartment.oc1..bbb", "name": "other-compartment"},
         ]
 
-        validator.validate("ocid1.compartment.oc1..missing", compartments)
+        validator.validate(
+            OCIApiContext(
+                compartment_ocid="ocid1.compartment.oc1..missing", compartments=compartments
+            )
+        )
 
         assert len(report.results) == 1
         result = report.results[0]
@@ -63,7 +70,9 @@ class TestCompartmentValidator:
         self, validator: CompartmentValidator, report: ValidationReport
     ) -> None:
         """None compartments (API failure) produces no checks."""
-        validator.validate("ocid1.compartment.oc1..aaa", None)
+        validator.validate(
+            OCIApiContext(compartment_ocid="ocid1.compartment.oc1..aaa", compartments=None)
+        )
 
         assert len(report.results) == 0
 
@@ -71,7 +80,9 @@ class TestCompartmentValidator:
         self, validator: CompartmentValidator, report: ValidationReport
     ) -> None:
         """Empty compartment list produces ERROR."""
-        validator.validate("ocid1.compartment.oc1..aaa", [])
+        validator.validate(
+            OCIApiContext(compartment_ocid="ocid1.compartment.oc1..aaa", compartments=[])
+        )
 
         assert len(report.results) == 1
         result = report.results[0]

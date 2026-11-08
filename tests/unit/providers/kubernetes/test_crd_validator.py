@@ -10,6 +10,7 @@ import pytest
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.kubernetes.validators.context import KubernetesApiContext
 from infrafoundry.providers.kubernetes.validators.crd_validator import CRDValidator
 from tests.helpers.env import make_env_config
 
@@ -66,10 +67,12 @@ class TestCRDValidator:
             ),
         ]
         validator.validate(
-            server_url="https://k8s:6443",
-            headers={"Authorization": "Bearer tok"},
-            verify_ssl=False,
-            manifests=manifests,
+            KubernetesApiContext(
+                server_url="https://k8s:6443",
+                headers={"Authorization": "Bearer tok"},
+                verify_ssl=False,
+                manifests=manifests,
+            )
         )
         assert any(r.passed and "cert-manager.io" in r.message for r in validation_report.results)
 
@@ -90,10 +93,12 @@ class TestCRDValidator:
             ),
         ]
         validator.validate(
-            server_url="https://k8s:6443",
-            headers={"Authorization": "Bearer tok"},
-            verify_ssl=False,
-            manifests=manifests,
+            KubernetesApiContext(
+                server_url="https://k8s:6443",
+                headers={"Authorization": "Bearer tok"},
+                verify_ssl=False,
+                manifests=manifests,
+            )
         )
         assert any(
             not r.passed and r.level == ValidationLevel.ERROR and "cert-manager.io" in r.message
@@ -117,10 +122,12 @@ class TestCRDValidator:
             ),
         ]
         validator.validate(
-            server_url="https://k8s:6443",
-            headers={"Authorization": "Bearer tok"},
-            verify_ssl=False,
-            manifests=manifests,
+            KubernetesApiContext(
+                server_url="https://k8s:6443",
+                headers={"Authorization": "Bearer tok"},
+                verify_ssl=False,
+                manifests=manifests,
+            )
         )
         # No CRD checks should be emitted for standard groups
         api_validator.fetch_json.assert_not_called()
@@ -134,10 +141,12 @@ class TestCRDValidator:
         """Test that empty manifests list makes no API calls."""
         api_validator.fetch_json = MagicMock()  # type: ignore[method-assign]
         validator.validate(
-            server_url="https://k8s:6443",
-            headers={"Authorization": "Bearer tok"},
-            verify_ssl=False,
-            manifests=[],
+            KubernetesApiContext(
+                server_url="https://k8s:6443",
+                headers={"Authorization": "Bearer tok"},
+                verify_ssl=False,
+                manifests=[],
+            )
         )
         api_validator.fetch_json.assert_not_called()
 
@@ -158,10 +167,12 @@ class TestCRDValidator:
             ),
         ]
         validator.validate(
-            server_url="https://k8s:6443",
-            headers={"Authorization": "Bearer tok"},
-            verify_ssl=False,
-            manifests=manifests,
+            KubernetesApiContext(
+                server_url="https://k8s:6443",
+                headers={"Authorization": "Bearer tok"},
+                verify_ssl=False,
+                manifests=manifests,
+            )
         )
         # No CRD-specific error/success checks since API failed
         crd_checks = [

@@ -19,6 +19,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.unbound_host_alias_validator import (
     UnboundHostAliasValidator,
 )
@@ -64,9 +65,11 @@ class TestHostCrossRef:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("ok", host="db-primary")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok", host="db-primary")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert not _failures(report, "unbound_host_alias_ok_host")
 
@@ -74,9 +77,11 @@ class TestHostCrossRef:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("ok", host="db-primary")],
-            managed_host_override_names=set(),
-            existing_host_override_names={"db-primary", "db-primary.internal"},
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok", host="db-primary")],
+                managed_host_override_names=set(),
+                existing_host_override_names={"db-primary", "db-primary.internal"},
+            )
         )
         assert not _failures(report, "unbound_host_alias_ok_host")
 
@@ -84,9 +89,11 @@ class TestHostCrossRef:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("ok", host="db-primary.internal")],
-            managed_host_override_names=set(),
-            existing_host_override_names={"db-primary", "db-primary.internal"},
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok", host="db-primary.internal")],
+                managed_host_override_names=set(),
+                existing_host_override_names={"db-primary", "db-primary.internal"},
+            )
         )
         assert not _failures(report, "unbound_host_alias_ok_host")
 
@@ -94,9 +101,11 @@ class TestHostCrossRef:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("bad", host="bogus")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names={"db-primary"},
+            OPNsenseValidationContext(
+                host_aliases=[_alias("bad", host="bogus")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names={"db-primary"},
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_host")
 
@@ -110,9 +119,11 @@ class TestHostCrossRef:
             config={"hostname": "db", "domain": "internal"},
         )
         validator.validate(
-            [r],
-            managed_host_override_names=set(),
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[r],
+                managed_host_override_names=set(),
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_host")
 
@@ -120,9 +131,11 @@ class TestHostCrossRef:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("bad", host="")],
-            managed_host_override_names=set(),
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("bad", host="")],
+                managed_host_override_names=set(),
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_host")
 
@@ -130,9 +143,11 @@ class TestHostCrossRef:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("bad", host=12345)],
-            managed_host_override_names=set(),
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("bad", host=12345)],
+                managed_host_override_names=set(),
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_host")
 
@@ -147,9 +162,11 @@ class TestHostname:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("ok", hostname="db")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok", hostname="db")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert not _failures(report, "unbound_host_alias_ok_hostname")
 
@@ -163,9 +180,11 @@ class TestHostname:
             config={"host": "db-primary", "domain": "internal"},
         )
         validator.validate(
-            [r],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[r],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_hostname")
 
@@ -173,9 +192,11 @@ class TestHostname:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("bad", hostname="")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("bad", hostname="")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_hostname")
 
@@ -183,9 +204,11 @@ class TestHostname:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("bad", hostname=12345)],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("bad", hostname=12345)],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_hostname")
 
@@ -200,9 +223,11 @@ class TestDomain:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("ok", domain="internal")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok", domain="internal")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert not _failures(report, "unbound_host_alias_ok_domain")
 
@@ -216,9 +241,11 @@ class TestDomain:
             config={"host": "db-primary", "hostname": "db"},
         )
         validator.validate(
-            [r],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[r],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_domain")
 
@@ -226,9 +253,11 @@ class TestDomain:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("bad", domain="")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("bad", domain="")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_domain")
 
@@ -236,9 +265,11 @@ class TestDomain:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("bad", domain=12345)],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("bad", domain=12345)],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_domain")
 
@@ -253,9 +284,11 @@ class TestBoolFields:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("bad", enabled="yes")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("bad", enabled="yes")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_enabled")
 
@@ -263,9 +296,11 @@ class TestBoolFields:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("bad", lock="yes")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("bad", lock="yes")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_lock")
 
@@ -273,9 +308,11 @@ class TestBoolFields:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("ok", enabled=True)],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok", enabled=True)],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert not _failures(report, "unbound_host_alias_ok_enabled")
 
@@ -283,9 +320,11 @@ class TestBoolFields:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("ok", lock=True)],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok", lock=True)],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert not _failures(report, "unbound_host_alias_ok_lock")
 
@@ -300,9 +339,11 @@ class TestDescription:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("ok", description="my description")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok", description="my description")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert not _failures(report, "unbound_host_alias_ok_description")
 
@@ -310,9 +351,11 @@ class TestDescription:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("bad", description=12345)],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("bad", description=12345)],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_bad_description")
 
@@ -327,12 +370,14 @@ class TestUniqueness:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [
-                _alias("a", hostname="db1"),
-                _alias("b", hostname="db2"),
-            ],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[
+                    _alias("a", hostname="db1"),
+                    _alias("b", hostname="db2"),
+                ],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert not _failures(report, "unbound_host_alias_a_uniqueness")
         assert not _failures(report, "unbound_host_alias_b_uniqueness")
@@ -341,12 +386,14 @@ class TestUniqueness:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [
-                _alias("first", hostname="db"),
-                _alias("dup", hostname="db"),
-            ],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[
+                    _alias("first", hostname="db"),
+                    _alias("dup", hostname="db"),
+                ],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         assert _failures(report, "unbound_host_alias_dup_uniqueness")
 
@@ -355,12 +402,14 @@ class TestUniqueness:
     ) -> None:
         # ``hostname`` matches but ``host`` differs — distinct tuple.
         validator.validate(
-            [
-                _alias("a", host="db-primary", hostname="db"),
-                _alias("b", host="db-secondary", hostname="db"),
-            ],
-            managed_host_override_names={"db-primary", "db-secondary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[
+                    _alias("a", host="db-primary", hostname="db"),
+                    _alias("b", host="db-secondary", hostname="db"),
+                ],
+                managed_host_override_names={"db-primary", "db-secondary"},
+                existing_host_override_names=set(),
+            )
         )
         assert not _failures(report, "unbound_host_alias_b_uniqueness")
 
@@ -375,9 +424,11 @@ class TestEdgeCases:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [],
-            managed_host_override_names=set(),
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[],
+                managed_host_override_names=set(),
+                existing_host_override_names=set(),
+            )
         )
         assert report.results == []
 
@@ -385,13 +436,15 @@ class TestEdgeCases:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [
-                _alias("a", hostname="db1"),
-                _alias("b", hostname="db2"),
-                _alias("c", hostname="db3"),
-            ],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[
+                    _alias("a", hostname="db1"),
+                    _alias("b", hostname="db2"),
+                    _alias("c", hostname="db3"),
+                ],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         names = {c.check_name for c in report.results if c.check_name.endswith("_host")}
         assert "unbound_host_alias_a_host" in names
@@ -424,10 +477,12 @@ class TestDottedPathXRefs:
         # ``unbound.host_overrides.db-primary`` is a 3-part path → cross-
         # plugin absolute. Resolver matches the (type, name) tuple.
         validator.validate(
-            [_alias("ok", host="unbound.host_overrides.db-primary")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok", host="unbound.host_overrides.db-primary")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+                index=index,
+            )
         )
         passed = [
             c for c in report.results if c.check_name == "unbound_host_alias_ok_host" and c.passed
@@ -450,10 +505,12 @@ class TestDottedPathXRefs:
         # → ``host_overrides.db-primary`` resolves to
         # ``unbound.host_overrides.db-primary``.
         validator.validate(
-            [_alias("ok", host="host_overrides.db-primary")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
-            index=index,
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok", host="host_overrides.db-primary")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+                index=index,
+            )
         )
         passed = [
             c for c in report.results if c.check_name == "unbound_host_alias_ok_host" and c.passed
@@ -470,10 +527,12 @@ class TestDottedPathXRefs:
 
         index = build_xref_index([])
         validator.validate(
-            [_alias("ok", host="db.internal")],
-            managed_host_override_names=set(),
-            existing_host_override_names={"db.internal"},
-            index=index,
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok", host="db.internal")],
+                managed_host_override_names=set(),
+                existing_host_override_names={"db.internal"},
+                index=index,
+            )
         )
         passed = [
             c for c in report.results if c.check_name == "unbound_host_alias_ok_host" and c.passed
@@ -484,9 +543,11 @@ class TestDottedPathXRefs:
         self, validator: UnboundHostAliasValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            [_alias("ok")],
-            managed_host_override_names={"db-primary"},
-            existing_host_override_names=set(),
+            OPNsenseValidationContext(
+                host_aliases=[_alias("ok")],
+                managed_host_override_names={"db-primary"},
+                existing_host_override_names=set(),
+            )
         )
         passed = [
             c for c in report.results if c.check_name == "unbound_host_alias_ok_host" and c.passed

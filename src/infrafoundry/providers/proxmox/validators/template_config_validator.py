@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 from pathlib import PurePosixPath
-from typing import Any
+from typing import Any, override
 
-from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 
 # Extensions Proxmox VE accepts for ``import`` content (PVE::Storage ``$IMPORT_EXT_RE_1``),
 # which is what ``download_image`` downloads into (#1188).
 IMPORT_EXTENSIONS = (".ova", ".ovf", ".qcow2", ".raw", ".vmdk")
 
 
-class TemplateConfigValidator:
+class TemplateConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
     """Validates template configuration fields before Terraform generation.
 
     Performs field-level validation:
@@ -28,12 +29,14 @@ class TemplateConfigValidator:
         """
         self.report = report
 
-    def validate(self, templates: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: ProxmoxConfigContext) -> None:
         """Validate template-specific configuration fields.
 
         Args:
-            templates: List of template resources to validate.
+            context: Validation context carrying the inputs this validator checks.
         """
+        templates = context.templates
         for resource in templates:
             if resource.type != "template":
                 continue

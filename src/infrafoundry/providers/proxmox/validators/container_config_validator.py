@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, override
 
-from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 
 # Known valid OS types for LXC containers
 KNOWN_OS_TYPES = frozenset(
@@ -35,7 +36,7 @@ KNOWN_CPU_ARCHITECTURES = frozenset({"amd64", "arm64", "armhf", "i386"})
 OSTEMPLATE_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+:vztmpl/.+\.tar\..+$")
 
 
-class ContainerConfigValidator:
+class ContainerConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
     """Validates LXC container configuration fields before Terraform generation.
 
     Performs field-level validation with appropriate severity levels:
@@ -51,12 +52,14 @@ class ContainerConfigValidator:
         """
         self.report = report
 
-    def validate(self, resources: list[ResourceConfig]) -> None:
+    @override
+    def validate(self, context: ProxmoxConfigContext) -> None:
         """Validate container-specific configuration fields.
 
         Args:
-            resources: List of resources to validate.
+            context: Validation context carrying the inputs this validator checks.
         """
+        resources = context.containers
         for resource in resources:
             if resource.type != "container":
                 continue

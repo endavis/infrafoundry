@@ -149,3 +149,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0016](0016-direct-opnsense-nested-yaml-schema.md) | Direct-OPNsense nested YAML schema convention | Accepted |
 | [0017](0017-blueprint-declared-requirements-with-a-preflight-check.md) | Blueprint-declared requirements with a preflight check | Accepted |
 | [0018](0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md) | OPNsense direct-API deletes are limited to the managed set | Accepted |
+| [0019](0019-provider-sub-validators-share-one-validatecontext-contract.md) | Provider sub-validators share one validate(context) contract | Accepted |

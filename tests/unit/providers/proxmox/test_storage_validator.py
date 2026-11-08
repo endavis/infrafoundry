@@ -7,6 +7,7 @@ import pytest
 from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.proxmox.api_client import ProxmoxClient
+from infrafoundry.providers.proxmox.validators.context import ProxmoxLiveContext
 from infrafoundry.providers.proxmox.validators.storage_validator import StorageValidator
 
 
@@ -38,7 +39,7 @@ def test_validate_active_storage(
         ]
     }
 
-    validator.validate(client, {("node1", "local")})
+    validator.validate(ProxmoxLiveContext(client=client, storage_pools={("node1", "local")}))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -57,7 +58,7 @@ def test_validate_inactive_storage(
         ]
     }
 
-    validator.validate(client, {("node1", "local")})
+    validator.validate(ProxmoxLiveContext(client=client, storage_pools={("node1", "local")}))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -75,7 +76,9 @@ def test_validate_missing_storage(
         ]
     }
 
-    validator.validate(client, {("node1", "missing-storage")})
+    validator.validate(
+        ProxmoxLiveContext(client=client, storage_pools={("node1", "missing-storage")})
+    )
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -89,7 +92,7 @@ def test_validate_api_fetch_failure(
     """Test validation when API fetch fails."""
     client.get_json.side_effect = APIError("failed", provider="proxmox")
 
-    validator.validate(client, {("node1", "local")})
+    validator.validate(ProxmoxLiveContext(client=client, storage_pools={("node1", "local")}))
 
     report.add_check.assert_called_once()
     call_args = report.add_check.call_args[1]
@@ -107,7 +110,9 @@ def test_validate_duplicate_storage_pools(
         ]
     }
 
-    validator.validate(client, {("node1", "local"), ("node1", "local")})
+    validator.validate(
+        ProxmoxLiveContext(client=client, storage_pools={("node1", "local"), ("node1", "local")})
+    )
 
     # Should only check once despite duplicate in set
     client.get_json.assert_called_once()
@@ -123,7 +128,9 @@ def test_validate_multiple_storage_pools(
         {"data": [{"storage": "shared", "active": 1, "type": "nfs"}]},
     ]
 
-    validator.validate(client, {("node1", "local"), ("node2", "shared")})
+    validator.validate(
+        ProxmoxLiveContext(client=client, storage_pools={("node1", "local"), ("node2", "shared")})
+    )
 
     assert client.get_json.call_count == 2
     assert report.add_check.call_count == 2
@@ -133,7 +140,7 @@ def test_validate_empty_storage_pools(
     validator: StorageValidator, client: MagicMock, report: MagicMock
 ) -> None:
     """Test validation with empty storage pool set."""
-    validator.validate(client, set())
+    validator.validate(ProxmoxLiveContext(client=client, storage_pools=set()))
 
     client.get_json.assert_not_called()
     report.add_check.assert_not_called()
