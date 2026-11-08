@@ -4,7 +4,7 @@ Manages the OPNsense ``<system><firmware>`` block via the
 ``firmware/info`` (read) + ``firmware/install/<name>`` (write) endpoints.
 This is the **keystone** surface for #806 — without ``firmware.plugins``
 automating the install of contrib plugins, the modern controllers for
-follow-up issues (#790 AcmeClient, #808 OpenVPN-legacy) don't exist on
+follow-up issues (#790 AcmeClient) don't exist on
 the cutover target and ``infra apply`` for those issues silently
 no-ops with 404s.
 

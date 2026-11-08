@@ -50,7 +50,8 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<system>/user` | `system.users` | Supported (direct-API; #805). List-shape, identity is the wire `name`; deletes are limited to the managed set and a uid-0 account (by live uid) is never deleted. Only the fields set in YAML are written and compared (`set` keeps omitted fields). `uid` is assigned by the box and is not configurable. `password` is a `secret://` reference holding the plaintext (the box hashes it); it is write-only, so it is sent on add only, and on update only with `update_password: true`. `authorizedkeys`, `otp_seed` and `apikeys` must be `secret://` references. See [ADR-0014 system.users and system.groups](../decisions/0014-opnsense-direct-api-apply-mechanism.md#systemusers-and-systemgroups-805). |
 | `<system>/group` | `system.groups` | Supported (direct-API; #805). `gid` is assigned by the box and is not configurable. Groups own membership: `member_refs` name `system.users` resources and are written as uids. Applied after `system.users`; group deletes run before user deletes. See [ADR-0014 system.users and system.groups](../decisions/0014-opnsense-direct-api-apply-mechanism.md#systemusers-and-systemgroups-805). |
 | `<ca>`, `<cert>`, `<OPNsense>/trust` (MVC `trust/ca/*`, `trust/cert/*`) | `trust.cas`, `trust.certs` | Supported (direct-API; #807). Identity is the live `descr` against the YAML `description` (default: the resource name). `prv` should be a `secret://` URI. Deletes use the managed set; objects the box reports in use, and CAs that look AcmeClient-issued, are never deleted. No `config migrate` extractor. Several behaviours are not verified yet, see [Trust CAs and certificates (#807)](#trust-cas-and-certificates-807). |
-| `<openvpn>`, `<OPNsense>/OpenVPN` | `openvpn_legacy.clients` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#808](https://github.com/endavis/infrafoundry/issues/808) ships. In scope since ADR-0013's 2026-10-27 amendment; needs `os-openvpn-legacy` from `system.firmware`. |
+| `<OPNsense>/OpenVPN` (MVC `openvpn/instances/*`) | `openvpn.instances` | Supported (direct-API; #808). Client instances only; server instances are not managed and are never touched. Identity is the live `description` (default: the resource name). `username` and `password` are `secret://` URIs. `ca_ref` names a `trust.cas` resource. Deletes use the managed set. No `config migrate` extractor. Write behaviour is not verified yet, see [OpenVPN client instances (#808)](#openvpn-client-instances-808). |
+| `<openvpn>` (legacy `os-openvpn-legacy` plugin) | none | Unmanaged. A cutover recreates the client as a modern `openvpn.instances` entry; import any legacy server or other legacy configuration by hand. |
 | `<OPNsense>/AcmeClient` | `acmeclient_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#790](https://github.com/endavis/infrafoundry/issues/790) ships. In scope since ADR-0013's 2026-10-27 amendment; needs `os-acme-client` from `system.firmware`. |
 | `<OPNsense>/tailscale` | `tailscale_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#787](https://github.com/endavis/infrafoundry/issues/787) ships. |
 | `<OPNsense>/Syslog` | `syslog_settings` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#804](https://github.com/endavis/infrafoundry/issues/804) ships. |
@@ -121,6 +122,62 @@ opnsense:
 
 **Not verified.** Whether the box refuses to delete an in-use object (the guard above does not rely on it), and the CA row shape beyond the fields read here.
 
+## OpenVPN client instances (#808)
+
+`openvpn.instances` manages OpenVPN **client** instances on the modern MVC API (`openvpn/instances/*`, stock OPNsense, no plugin). It is a list-shape, managed-set type ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)) and the child of `trust.cas`. Every write sends `role: client`; a live server instance is never matched, updated or deleted. The legacy `os-openvpn-legacy` plugin is not managed: a cutover recreates the client as a modern instance.
+
+```yaml
+opnsense:
+  openvpn:
+    instances:
+      - name: office-vpn
+        config:
+          description: Office VPN
+          enabled: true
+          proto: udp
+          port: 1194
+          remote:
+            - vpn.example.com
+          ca_ref: vpn-ca
+          username: secret://env_secrets/openvpn/office/username
+          password: secret://env_secrets/openvpn/office/password
+          data_ciphers:
+            - AES-256-GCM
+          remote_cert_tls: true
+          route:
+            - 192.0.2.0/24
+```
+
+| Field | Meaning |
+| --- | --- |
+| `description` | Wire `description` and the identity. Defaults to the resource `name`. |
+| `enabled` | Boolean. |
+| `dev_type` | `tun`, `tap` or `ovpn`. |
+| `proto` | `udp`, `udp4`, `udp6`, `tcp`, `tcp4` or `tcp6`. |
+| `remote` | Required list of remote hosts, sent comma-joined; compared in order. |
+| `port` | Integer 1-65535. |
+| `topology` | `net30`, `p2p` or `subnet`. |
+| `ca_ref` | Required. Name of the `trust.cas` resource; resolved to the live CA `refid` (sent as wire `ca`). |
+| `username`, `password` | `secret://env_secrets/<path>` URIs; a literal is a validation error. `password` is write-only: never compared, sent on add and on update only with `update_password: true`. |
+| `update_password` | Boolean; send `password` on update too. |
+| `auth` | Auth digest name. |
+| `data_ciphers` | List; wire `data-ciphers`; compared as a set. |
+| `data_ciphers_fallback` | String; wire `data-ciphers-fallback`. |
+| `remote_cert_tls` | Boolean. |
+| `verify_x509_name` | String; wire `verify-x509-name`. |
+| `various_flags`, `route`, `redirect_gateway` | Lists, compared as sets. |
+| `keepalive_interval`, `keepalive_timeout`, `reneg_sec`, `tun_mtu`, `fragment`, `mssfix` | Non-negative integers (`reneg_sec` is wire `reneg-sec`). |
+| `verb` | Log verbosity, integer 0-11. |
+| `lock` | Never add, update or delete. |
+
+Fields are sparse: only the ones you set are written and compared. `uuid` and `vpnid` are assigned by the box and rejected, as are `role`, `ca`, `cert`, `tls_key` and the hyphenated wire spellings.
+
+**Not managed (follow-ups).** `tls_key` (a reference to a static key, which needs its own `openvpn.static_keys` type), `cert` (a client certificate, a future `cert_ref` to `trust.certs`) and server instances. Messages and logs name the resource and field and never include `username` or `password`.
+
+**Order and pending CAs.** CAs are applied before instances, and instances are deleted before CAs. A plan for an instance whose `ca_ref` CA is not on the box yet shows an add plus a warning; at apply an unresolved `ca_ref` raises an error before any write. Changes are applied with one `openvpn/service/reconfigure` call after the instance writes.
+
+**What is verified.** Read-only on a test firewall: the empty model template of `GET openvpn/instances/get` (field names and option shapes), and that the endpoints exist in the bundled specs. **Not verified:** write behaviour, the meaning of `remote` and `port` together, whether `set` keeps omitted fields, whether the password reads back, and whether `mssfix` takes an integer.
+
 ## Unbound advanced settings (#1254)
 
 `opnsense.unbound.advanced` is a singleton dict with three list fields:
@@ -182,13 +239,13 @@ opnsense:
 
 **Two kinds of type.**
 
-- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas` and `trust.certs`.
+- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs` and `openvpn.instances`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
 - **Singletons** (`system.*`, `unbound.advanced`, `interfaces.settings`, `radvd`) are unaffected.
 
 **Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
 
-**Parent and child types.** Unbound host overrides are applied before host aliases, and kea subnets before kea reservations. Kea deletes run in reverse order first (reservations, then subnets), so a managed reservation is deleted while its subnet is still live (#1264). OPNsense does not cascade a kea subnet delete to its reservations and does not refuse it, so without this order they would be left pointing at a subnet that no longer exists. Gateways and static routes are applied before firewall rules, so a rule's `gateway:` names a gateway that already exists (#1269). The same reverse-order delete phase covers firewall rules, NAT, static routes, gateways and virtual IPs, so a child is deleted while its parent is still live. Interface assignments use it too: OPNsense refuses to delete an assigned VLAN (HTTP 500), so the assignment is deleted first (#1271). An assignment's apply installs the controller (an SSH step) only when it has something to write, so the delete phase and the forward pass do not repeat it. Radvd uses it too, so a radvd record is deleted before its interface assignment (#1272). Trust CAs are applied before trust certificates, and certificates are deleted first (#807). Deleting an Unbound host override does remove its aliases. If a managed child still cannot be matched to its parent, it is matched through live orphans (same MAC/DUID, or for an alias the same hostname and domain; an alias only when exactly one live orphan fits), and with no match it is skipped with a warning and retried on the next run.
+**Parent and child types.** Unbound host overrides are applied before host aliases, and kea subnets before kea reservations. Kea deletes run in reverse order first (reservations, then subnets), so a managed reservation is deleted while its subnet is still live (#1264). OPNsense does not cascade a kea subnet delete to its reservations and does not refuse it, so without this order they would be left pointing at a subnet that no longer exists. Gateways and static routes are applied before firewall rules, so a rule's `gateway:` names a gateway that already exists (#1269). The same reverse-order delete phase covers firewall rules, NAT, static routes, gateways and virtual IPs, so a child is deleted while its parent is still live. Interface assignments use it too: OPNsense refuses to delete an assigned VLAN (HTTP 500), so the assignment is deleted first (#1271). An assignment's apply installs the controller (an SSH step) only when it has something to write, so the delete phase and the forward pass do not repeat it. Radvd uses it too, so a radvd record is deleted before its interface assignment (#1272). Trust CAs are applied before trust certificates, and certificates are deleted first (#807). OpenVPN client instances are applied after the CAs they reference and deleted before them (#808). Deleting an Unbound host override does remove its aliases. If a managed child still cannot be matched to its parent, it is matched through live orphans (same MAC/DUID, or for an alias the same hostname and domain; an alias only when exactly one live orphan fits), and with no match it is skipped with a warning and retried on the next run.
 
 **A subnet with reservations you did not create.** InfraFoundry does not delete a kea subnet while a reservation it does not manage, such as one made by hand, still uses it. `infra plan` shows `N blocked (kept)` and a warning naming the subnet and each reservation's MAC or DUID and IP. `infra apply` leaves the subnet in place with the same warning, does not fail, and retries on the next run. To finish the removal, delete or move the reservation on the box, then re-run apply. `infra destroy` skips such a subnet the same way.
 

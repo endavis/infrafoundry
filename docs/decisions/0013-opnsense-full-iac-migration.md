@@ -42,7 +42,7 @@ We will close the IaC gap so OPNsense box-to-box migration is achievable through
 | `static_routes` | Needed when downstream networks aren't reachable via the default route. |
 | `virtual_ips` | Required for CARP, NAT outbound source addresses, and IP aliases. |
 | Unbound `domain_override`, `host_alias`, `forward` | Existing `unbound_host_override` is incomplete — host aliases and conditional forwarders are common in real deployments. |
-| `openvpn_legacy.clients` ([#808](https://github.com/endavis/infrafoundry/issues/808)) | Added 2026-10-27 (#1093). The VPN client must work on the replacement box without a hand import. |
+| `openvpn.instances` ([#808](https://github.com/endavis/infrafoundry/issues/808)) | Added 2026-10-27 (#1093); renamed from `openvpn_legacy.clients` 2026-11-08 (#808). The VPN client must work on the replacement box without a hand import. It is managed as a modern client instance; the legacy `os-openvpn-legacy` plugin is not managed, and a cutover recreates the client as a modern instance. |
 | `trust.cas`, `trust.certs` ([#807](https://github.com/endavis/infrafoundry/issues/807)) | Added 2026-10-27 (#1093). `system.webgui` and the OpenVPN client refer to certificates by reference, so the references must resolve after a rebuild. |
 | `acmeclient_*` ([#790](https://github.com/endavis/infrafoundry/issues/790)) | Added 2026-10-27 (#1093). Certificates issued by the ACME client stop renewing if its accounts, validations and actions are not carried over. |
 
@@ -117,7 +117,7 @@ Each step above is a separate feature issue. Issue numbers will be added to this
 - Issue [#725](https://github.com/endavis/infrafoundry/issues/725): feat: add OPNsense `port_forward` kind on `nat_rules` (direct-API at `firewall/d_nat`; closes implementation-order item #2; the 2026-05-04 re-probe corrected the original deferral premise).
 - Issue [#788](https://github.com/endavis/infrafoundry/issues/788): feat: add OPNsense `radvd` direct-API resource (IPv6 Router Advertisements; hybrid YAML-singleton/wire-list pattern; cutover hard blocker for hands-free IPv6).
 - Issue [#1093](https://github.com/endavis/infrafoundry/issues/1093): docs: reconcile the out-of-scope list with open issues (amended 2026-10-27).
-- Issue [#808](https://github.com/endavis/infrafoundry/issues/808): feat: add `openvpn_legacy.clients` direct-API resource (moved in scope by #1093).
+- Issue [#808](https://github.com/endavis/infrafoundry/issues/808): feat: add `openvpn.instances` direct-API resource for OpenVPN client instances (moved in scope by #1093; scope changed from the legacy plugin to modern instances).
 - Issue [#807](https://github.com/endavis/infrafoundry/issues/807): feat: add `trust.cas` and `trust.certs` direct-API resources (moved in scope by #1093).
 - Issue [#790](https://github.com/endavis/infrafoundry/issues/790): feat: add the `acmeclient_*` resource types (moved in scope by #1093).
 

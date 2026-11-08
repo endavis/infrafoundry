@@ -323,6 +323,18 @@ TRUST_CERT = _crud(
     delete="del",
 )
 
+# --- openvpn client instances (#808) ------------------------------------------------
+OPENVPN_INSTANCE = _crud(
+    "openvpn/instances",
+    search="search",
+    get="get",
+    add="add",
+    update="set",
+    delete="del",
+    search_method="GET",
+)
+OPENVPN_RECONFIGURE = Endpoint("POST", "openvpn/service/reconfigure")
+
 # --- kea ----------------------------------------------------------------------------
 KEA_CRUD: dict[tuple[str, str], CrudEndpoints] = {
     (api_version, noun): _crud(
@@ -466,6 +478,7 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     "system.groups": (*AUTH_GROUP.all(), AUTH_USER.search),
     "trust.cas": TRUST_CA.all(),
     "trust.certs": (*TRUST_CERT.all(), TRUST_CA.search),
+    "openvpn.instances": (*OPENVPN_INSTANCE.all(), OPENVPN_RECONFIGURE, TRUST_CA.search),
 }
 
 #: Endpoints used outside a single resource type (ISC to Kea migration).

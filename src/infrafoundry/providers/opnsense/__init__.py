@@ -262,6 +262,7 @@ class OPNsenseProvider(
         from .components.kea_dhcp6_reservation import KeaDHCPv6ReservationManager
         from .components.kea_dhcp6_subnet import KeaDHCPv6SubnetManager
         from .components.nat_rule import NATRuleManager
+        from .components.openvpn_instances import OpenVpnInstanceManager
         from .components.radvd import RadvdManager
         from .components.static_route import StaticRouteManager
         from .components.system_firmware import SystemFirmwareManager
@@ -281,8 +282,9 @@ class OPNsenseProvider(
         # ``OPNsenseDirectRunner``). ``system.*`` singletons run first so
         # that ``system.firmware`` (#806's keystone) installs contrib
         # plugins before any subsequent component depends on the
-        # plugin-installed controllers (e.g., ``os-acme-client`` for #790,
-        # ``os-openvpn-legacy`` for #808). DHCPv4/DHCPv6 subnets must be
+        # plugin-installed controllers (e.g., ``os-acme-client`` for #790; the
+        # modern OpenVPN instances of #808 are stock and need no plugin).
+        # DHCPv4/DHCPv6 subnets must be
         # applied before reservations because reservations resolve their
         # subnet UUID via ``search_dhcpv4_subnets`` / ``search_dhcpv6_subnets``
         # at apply time — a brand-new subnet must exist on the box before its
@@ -329,6 +331,8 @@ class OPNsenseProvider(
             "cron.jobs": CronJobsManager,
             "trust.cas": TrustCaManager,
             "trust.certs": TrustCertManager,
+            # #808: client instances resolve ``ca_ref`` against trust.cas.
+            "openvpn.instances": OpenVpnInstanceManager,
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
@@ -356,6 +360,9 @@ class OPNsenseProvider(
         - ``interfaces_settings_reconfigure`` (#1092) — fired by
           :class:`InterfacesSettingsManager` when the interface settings changed.
 
+        - ``openvpn_reconfigure`` (#808) — fired by :class:`OpenVpnInstanceManager`
+          so a single ``openvpn/service/reconfigure`` call fires per apply.
+
         The mechanism is generic — future components with shared post-apply
         work register their own key here.
 
@@ -368,6 +375,7 @@ class OPNsenseProvider(
             "unbound_reconfigure": self._reconfigure_unbound,
             "radvd_reconfigure": self._reconfigure_radvd,
             "cron_reconfigure": self._reconfigure_cron,
+            "openvpn_reconfigure": self._reconfigure_openvpn,
             "tunables_reconfigure": self._reconfigure_tunables,
             "interfaces_settings_reconfigure": self._reconfigure_interfaces_settings,
         }
@@ -474,6 +482,22 @@ class OPNsenseProvider(
         from .services.cron_jobs import CronJobsService
 
         service = CronJobsService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
+    def _reconfigure_openvpn(self, env_name: str) -> None:
+        """Reconfigure OpenVPN after any client-instance mutation (#808).
+
+        Used by :meth:`get_finalization_hooks` so the direct-API runner fires a
+        single ``openvpn/service/reconfigure`` call after the instance adds,
+        updates and deletes. Hook errors propagate, failing the apply.
+
+        Args:
+            env_name: Active environment name (matches the runner's hook
+                contract — ``hook(env_name) -> None``).
+        """
+        from .services.openvpn_instances import OpenVpnInstanceService
+
+        service = OpenVpnInstanceService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
     def _reconfigure_tunables(self, env_name: str) -> None:
@@ -599,6 +623,7 @@ class OPNsenseProvider(
             "cron.jobs": [],
             "trust.cas": [],
             "trust.certs": ["trust.cas"],
+            "openvpn.instances": ["trust.cas"],
             "system.firmware": [],
             "system.tuning": [],
             # #805

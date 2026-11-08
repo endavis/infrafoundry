@@ -227,6 +227,28 @@ class TestValidateReferences:
         assert validator.system_user_validator.validate.call_args.args[0].resources == [user]
         assert validator.system_group_validator.validate.call_args.args[0].resources == [group]
 
+    def test_dispatches_openvpn_instances(self, validator: OPNsenseValidator) -> None:
+        """The OpenVPN validator receives only its own resource slice (#808)."""
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "api_url": "https://opnsense.example.com",
+                "api_key": "key",
+                "api_secret": "secret",
+            }
+        )
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
+        validator.openvpn_instance_validator = MagicMock()
+        instance = ResourceConfig(
+            name="v", type="openvpn.instances", provider="opnsense", config={}
+        )
+        other = ResourceConfig(name="g", type="system.groups", provider="opnsense", config={})
+
+        validator.validate_references([instance, other])
+
+        assert validator.openvpn_instance_validator.validate.call_args.args[0].resources == [
+            instance
+        ]
+
     def test_exception_caught_gracefully(self, validator: OPNsenseValidator) -> None:
         """Exceptions during validation are caught and reported."""
         validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]

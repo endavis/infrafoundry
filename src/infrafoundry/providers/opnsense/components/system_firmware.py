@@ -3,7 +3,7 @@
 Singleton component manager for the ``system.firmware`` dotted resource
 type — the **keystone** surface of #806. Without ``firmware.plugins``
 automating the install of contrib plugins, the modern controllers for
-follow-up issues (#790 AcmeClient, #808 OpenVPN-legacy) don't exist on
+follow-up issues (#790 AcmeClient) don't exist on
 the cutover target and ``infra apply`` for those issues silently no-ops
 with 404s.
 
