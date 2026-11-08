@@ -1025,6 +1025,8 @@ class TestDottedTypeRegistrySanity:
         "kea.dhcp6.subnets",
         "kea.dhcp6.reservations",
         "cron.jobs",
+        "trust.cas",
+        "trust.certs",
     )
 
     def test_each_phase_1_dotted_type_registered_as_list(self) -> None:

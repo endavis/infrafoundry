@@ -305,6 +305,24 @@ AUTH_GROUP = _crud(
     search_method="GET",
 )
 
+# --- trust (CAs and certificates, #807)---------------------------------------------
+TRUST_CA = _crud(
+    "trust/ca",
+    search="search",
+    get="get",
+    add="add",
+    update="set",
+    delete="del",
+)
+TRUST_CERT = _crud(
+    "trust/cert",
+    search="search",
+    get="get",
+    add="add",
+    update="set",
+    delete="del",
+)
+
 # --- kea ----------------------------------------------------------------------------
 KEA_CRUD: dict[tuple[str, str], CrudEndpoints] = {
     (api_version, noun): _crud(
@@ -446,6 +464,8 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     "cron.jobs": (*CRON.all(), CRON_RECONFIGURE),
     "system.users": AUTH_USER.all(),
     "system.groups": (*AUTH_GROUP.all(), AUTH_USER.search),
+    "trust.cas": TRUST_CA.all(),
+    "trust.certs": (*TRUST_CERT.all(), TRUST_CA.search),
 }
 
 #: Endpoints used outside a single resource type (ISC to Kea migration).

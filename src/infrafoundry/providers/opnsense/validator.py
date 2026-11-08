@@ -33,6 +33,7 @@ from infrafoundry.providers.opnsense.validators import (
     SystemGroupValidator,
     SystemTuningValidator,
     SystemUserValidator,
+    TrustValidator,
     UnboundAdvancedValidator,
     UnboundForwardValidator,
     UnboundHostAliasValidator,
@@ -108,6 +109,7 @@ class OPNsenseValidator:
         self.kea_reservation_validator = KeaReservationValidator(report)
         self.radvd_validator = RadvdValidator(report)
         self.cron_jobs_validator = CronJobsValidator(report)
+        self.trust_validator = TrustValidator(report)
         self.system_firmware_validator = SystemFirmwareValidator(report)
         self.system_tuning_validator = SystemTuningValidator(report)
         self.system_user_validator = SystemUserValidator(report)
@@ -352,6 +354,7 @@ class OPNsenseValidator:
             self.cron_jobs_validator.validate(
                 replace(context, resources=resource_refs["cron_jobs"])
             )
+            self.trust_validator.validate(replace(context, resources=resource_refs["trust"]))
             self.system_firmware_validator.validate(
                 replace(context, resources=resource_refs["system_firmware"])
             )
@@ -404,6 +407,7 @@ class OPNsenseValidator:
         kea_dhcp6_subnets = [r for r in resources if r.type == "kea.dhcp6.subnets"]
         radvd = [r for r in resources if r.type == "radvd"]
         cron_jobs = [r for r in resources if r.type == "cron.jobs"]
+        trust = [r for r in resources if r.type in {"trust.cas", "trust.certs"}]
         system_firmware = [r for r in resources if r.type == "system.firmware"]
         system_tuning = [r for r in resources if r.type == "system.tuning"]
         system_users = [r for r in resources if r.type == "system.users"]
@@ -453,6 +457,7 @@ class OPNsenseValidator:
             "kea_dhcp6_subnet_names": kea_dhcp6_subnet_names,
             "radvd": radvd,
             "cron_jobs": cron_jobs,
+            "trust": trust,
             "system_firmware": system_firmware,
             "system_tuning": system_tuning,
             "system_users": system_users,
