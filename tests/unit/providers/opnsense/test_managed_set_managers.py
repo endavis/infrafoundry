@@ -26,6 +26,7 @@ from infrafoundry.providers.opnsense.components import (
 from infrafoundry.providers.opnsense.components.interface_assignment import (
     InterfaceAssignmentManager,
 )
+from infrafoundry.providers.opnsense.components.openvpn_instances import OpenVpnInstanceManager
 from infrafoundry.providers.opnsense.components.unbound_forward import UnboundForwardManager
 from infrafoundry.providers.opnsense.components.unbound_host_alias import (
     UnboundHostAliasManager,
@@ -66,6 +67,7 @@ class TestConfigKeyedManagers:
             kea_dhcp6_subnet.KeaDHCPv6SubnetManager,
             kea_dhcp4_reservation.KeaDHCPv4ReservationManager,
             kea_dhcp6_reservation.KeaDHCPv6ReservationManager,
+            OpenVpnInstanceManager,
         ):
             assert manager.DELETE_SCOPE == "managed_set"
 

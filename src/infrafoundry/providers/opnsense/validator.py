@@ -26,6 +26,7 @@ from infrafoundry.providers.opnsense.validators import (
     InterfacesSettingsValidator,
     KeaReservationValidator,
     NATRuleValidator,
+    OpenVpnInstanceValidator,
     RadvdValidator,
     ResourceNameValidator,
     StaticRouteValidator,
@@ -110,6 +111,7 @@ class OPNsenseValidator:
         self.radvd_validator = RadvdValidator(report)
         self.cron_jobs_validator = CronJobsValidator(report)
         self.trust_validator = TrustValidator(report)
+        self.openvpn_instance_validator = OpenVpnInstanceValidator(report)
         self.system_firmware_validator = SystemFirmwareValidator(report)
         self.system_tuning_validator = SystemTuningValidator(report)
         self.system_user_validator = SystemUserValidator(report)
@@ -355,6 +357,9 @@ class OPNsenseValidator:
                 replace(context, resources=resource_refs["cron_jobs"])
             )
             self.trust_validator.validate(replace(context, resources=resource_refs["trust"]))
+            self.openvpn_instance_validator.validate(
+                replace(context, resources=resource_refs["openvpn_instances"])
+            )
             self.system_firmware_validator.validate(
                 replace(context, resources=resource_refs["system_firmware"])
             )
@@ -408,6 +413,7 @@ class OPNsenseValidator:
         radvd = [r for r in resources if r.type == "radvd"]
         cron_jobs = [r for r in resources if r.type == "cron.jobs"]
         trust = [r for r in resources if r.type in {"trust.cas", "trust.certs"}]
+        openvpn_instances = [r for r in resources if r.type == "openvpn.instances"]
         system_firmware = [r for r in resources if r.type == "system.firmware"]
         system_tuning = [r for r in resources if r.type == "system.tuning"]
         system_users = [r for r in resources if r.type == "system.users"]
@@ -458,6 +464,7 @@ class OPNsenseValidator:
             "radvd": radvd,
             "cron_jobs": cron_jobs,
             "trust": trust,
+            "openvpn_instances": openvpn_instances,
             "system_firmware": system_firmware,
             "system_tuning": system_tuning,
             "system_users": system_users,

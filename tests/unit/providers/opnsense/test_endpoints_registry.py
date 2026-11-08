@@ -108,3 +108,17 @@ def test_trust_types_register_their_endpoints() -> None:
         "trust/cert/set/{uuid}",
         "trust/cert/del/{uuid}",
     }
+
+
+def test_openvpn_instances_register_their_endpoints() -> None:
+    registered = endpoints.RESOURCE_TYPE_ENDPOINTS["openvpn.instances"]
+    assert {e.template for e in registered} == {
+        "openvpn/instances/search",
+        "openvpn/instances/get/{uuid}",
+        "openvpn/instances/add",
+        "openvpn/instances/set/{uuid}",
+        "openvpn/instances/del/{uuid}",
+        "openvpn/service/reconfigure",
+        "trust/ca/search",
+    }
+    assert endpoints.OPENVPN_INSTANCE.search.method == "GET"

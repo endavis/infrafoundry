@@ -1027,6 +1027,7 @@ class TestDottedTypeRegistrySanity:
         "cron.jobs",
         "trust.cas",
         "trust.certs",
+        "openvpn.instances",
     )
 
     def test_each_phase_1_dotted_type_registered_as_list(self) -> None:

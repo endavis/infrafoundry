@@ -45,6 +45,7 @@ class TestNestedFormatConstants:
         assert DOTTED_RESOURCE_SHAPES["kea.dhcp6.reservations"] == "list"
         assert DOTTED_RESOURCE_SHAPES["trust.cas"] == "list"
         assert DOTTED_RESOURCE_SHAPES["trust.certs"] == "list"
+        assert DOTTED_RESOURCE_SHAPES["openvpn.instances"] == "list"
 
     def test_dotted_shapes_includes_documented_singletons(self) -> None:
         """ADR-0016 future singletons are registered as dict-shape."""
