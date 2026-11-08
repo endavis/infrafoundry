@@ -460,7 +460,7 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Validator:** `TrustValidator`: unknown keys, `crt` required, literal `prv` is an ERROR, literal `crt`/`csr` a WARNING, PEM markers on literals, duplicate descriptions, ACME-looking CA description, `ca_ref` through `resolve_xref`, `type` in server/client/combined.
 - **Migrate:** no `config migrate` extractor, because it would write key material into plaintext YAML. A secret-aware extractor is a follow-up. `ca_ref` on `trust.cas` (chained CAs) is not implemented.
 - **Rollback strategy:** a rejected write raises on the API layer and fails the apply; writes that landed stay applied. Removing an entry from YAML deletes the managed object on the next full apply unless it is guarded above.
-- **Not verified on a box:** the `action` values (`existing`, `import`), `set` re-import semantics, `caref` derivation, the `cert_type` wire values and in-use delete refusal. See [Trust CAs and certificates](../development/opnsense-resource-coverage.md#trust-cas-and-certificates-807).
+- **Verified on a test box:** the `action` values (`existing`, `import`), `caref` linking, idempotent re-plan, `set` re-importing a changed `crt` in place (same `uuid` and `refid`), and cert-before-CA deletes. The box does not honour `cert_type` on import; the stored type follows the certificate. **Not verified:** in-use delete refusal. See [Trust CAs and certificates](../development/opnsense-resource-coverage.md#trust-cas-and-certificates-807).
 
 ### `dhcp_static_maps` — retired (#782, 2026-05-08)
 

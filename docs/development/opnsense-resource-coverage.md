@@ -74,16 +74,18 @@ opnsense:
   trust:
     cas:
       - name: vpn-ca
-        description: vpn.example.com CA
-        crt: secret://env_secrets/trust/vpn_ca/crt
-        prv: secret://env_secrets/trust/vpn_ca/prv
+        config:
+          description: vpn.example.com CA
+          crt: secret://env_secrets/trust/vpn_ca/crt
+          prv: secret://env_secrets/trust/vpn_ca/prv
     certs:
       - name: vpn-server
-        description: vpn.example.com
-        type: server
-        ca_ref: vpn-ca
-        crt: secret://env_secrets/trust/vpn_server/crt
-        prv: secret://env_secrets/trust/vpn_server/prv
+        config:
+          description: vpn.example.com
+          type: server
+          ca_ref: vpn-ca
+          crt: secret://env_secrets/trust/vpn_server/crt
+          prv: secret://env_secrets/trust/vpn_server/prv
 ```
 
 | Field | Types | Meaning |
@@ -93,7 +95,7 @@ opnsense:
 | `prv` | both | PEM private key. Use a `secret://env_secrets/<path>` URI; a literal key is a validation error. |
 | `csr` | certs | PEM signing request. Optional. |
 | `ca_ref` | certs | Name of the `trust.cas` resource that signed it. Resolved to the live CA `refid`; see `ca_refids_by_name` in `services/trust.py`, which the OpenVPN work (#808) reuses. |
-| `type` | certs | `server`, `client` or `combined`. Sent as `cert_type` on add and update; not compared. |
+| `type` | certs | `server`, `client` or `combined`. Sent as `cert_type` on add and update; not compared. On import the box keeps the type it derives from the certificate (see below). |
 | `lock` | both | Never add, update or delete. |
 
 `refid` and `serial` are assigned by the box and are not YAML fields. A literal `crt` or `csr` is a validation warning (public material, but keep it with its key). Messages and logs name the resource and field and never include a value derived from `crt`, `prv` or `csr`.
@@ -106,11 +108,18 @@ opnsense:
 
 **Not migrated.** There is no `config migrate` extractor: it would write key material into plaintext YAML. A secret-aware extractor is a follow-up.
 
-**Not yet verified on a box.** Read-only probing confirmed the cert row shape (`uuid`, `refid`, `descr`, `caref`, `crt`, `csr`, `prv`, the `*_payload` raw PEM twins, `cert_type`, `in_use`). The CA search returned no rows, so the CA row is assumed to be the cert row minus the cert-only fields. The write endpoints exist in every bundled 26.1 spec, but they were not exercised:
+**Verified on a test box.** A live plan and apply with a throwaway CA and certificate (removed afterwards) confirmed:
 
-- there is no `import` endpoint; an import is an `add` whose body carries `action` and the `*_payload` fields. The `action` values (`existing` for a CA, `import` for a certificate) are assumed;
-- the semantics of `set` re-importing a changed `crt`, how `caref` is derived on import, and the `cert_type` wire values (`server_cert`, `usr_cert`, `combined_server_client`);
-- whether the box refuses to delete an in-use object, which the guard above does not rely on.
+- there is no `import` endpoint; an import is an `add` whose body carries `action` (`existing` for a CA, `import` for a certificate) and the `*_payload` fields. Both imports stored the supplied certificate and key;
+- the certificate's `caref` points at the CA resolved from `ca_ref`;
+- a second plan is idempotent;
+- `set` with a changed `crt` re-imports it in place: same `uuid` and `refid`, the key is kept;
+- changing `description` is a delete plus an add, since `descr` is the identity;
+- deletes run certificates first, then CAs.
+
+**`type` is not honoured on import.** The box stored `cert_type` as `usr_cert` for a certificate sent with `type: server` (`server_cert`); the stored type appears to follow the imported certificate, not the request. `type` is not compared, so it causes no drift.
+
+**Not verified.** Whether the box refuses to delete an in-use object (the guard above does not rely on it), and the CA row shape beyond the fields read here.
 
 ## Unbound advanced settings (#1254)
 

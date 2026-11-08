@@ -14,13 +14,13 @@ What is verified and what is not:
 - Verified read-only against a test firewall: ``GET trust/cert/search`` rows
   carry ``uuid, refid, descr, caref, crt, csr, prv`` (base64), the raw PEM
   twins ``crt_payload, csr_payload, prv_payload``, ``cert_type`` and ``in_use``.
-- The CA row shape is assumed to be the cert row minus the cert-only fields.
-- The write endpoints exist in every bundled 26.1 spec, but there is no
-  ``import`` endpoint: an import is an ``add`` whose body carries an ``action``
-  plus the ``*_payload`` fields. The ``action`` values (``existing`` for a CA,
-  ``import`` for a certificate), the semantics of re-importing on ``set``, the
-  derivation of ``caref`` and the refusal to delete an in-use object are NOT
-  verified; the coverage doc lists them.
+- Verified by a live apply on a test firewall: there is no ``import``
+  endpoint; an import is an ``add`` whose body carries an ``action``
+  (``existing`` for a CA, ``import`` for a certificate) plus the ``*_payload``
+  fields. ``caref`` links to the resolved CA, ``set`` re-imports a changed
+  ``crt`` in place (same ``uuid`` and ``refid``), and the box ignores
+  ``cert_type`` on import (the stored type follows the certificate).
+- Not verified: whether the box refuses to delete an in-use object.
 
 Secrets: ``prv`` should be a ``secret://`` URI. The manager resolves it; this
 module only ever sees plaintext and never logs, formats or raises anything
@@ -51,7 +51,8 @@ TrustKind = Literal["ca", "cert"]
 ACME_ISSUED_CA_DESCR = r"^(?:R|E)\d+$"
 _ACME_ISSUED_CA_RE = re.compile(ACME_ISSUED_CA_DESCR)
 
-#: YAML ``type`` value to the wire ``cert_type`` value (UNVERIFIED, see module docstring).
+#: YAML ``type`` value to the wire ``cert_type`` value. The box ignores it on
+#: import (the stored type follows the certificate); see the module docstring.
 CERT_TYPE_WIRE: dict[str, str] = {
     "server": "server_cert",
     "client": "usr_cert",
