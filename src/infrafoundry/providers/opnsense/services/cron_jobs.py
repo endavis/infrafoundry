@@ -47,84 +47,20 @@ the manager itself MUST NOT call reconfigure directly.
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.provider import ResourceConfig
 
 from ..api_client import CronClient, OPNsenseClient
+from ._identity import OpnsenseDriftError as OpnsenseDriftError
+from ._identity import encode_identity as encode_identity
+from ._identity import has_identity_marker
+from ._identity import parse_identity as parse_identity
 from ._nested_emit import emit_nested_list_yaml
 from .base import BaseService
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Identity helpers (duplicated from firewall_rule.py — do NOT refactor)
-# ---------------------------------------------------------------------------
-
-# Regex for parsing the description-suffix identity tag. Operator-supplied
-# free-form text leads, followed by whitespace, followed by
-# ``\[infrafoundry:<name>\]`` at the end of the string.
-_IDENTITY_PATTERN = re.compile(r"^(?:(.+?)\s+)?\[infrafoundry:([a-z0-9-]+)\]\s*$")
-_IDENTITY_PROBE = re.compile(r"\[infrafoundry:[^\]]*\]")
-
-
-class OpnsenseDriftError(InfraFoundryError):
-    """A managed cron job's identity tag is malformed on the live box.
-
-    Raised by the diff engine when a live job's ``description`` looks
-    like it carries an InfraFoundry tag but does not match the strict
-    identity regex. The operator must repair the description in the GUI
-    (or via API) before the next plan/apply.
-    """
-
-
-def encode_identity(resource_name: str, user_description: str) -> str:
-    """Encode the description with the InfraFoundry identity suffix.
-
-    Args:
-        resource_name: Operator-facing YAML name; becomes the diff key.
-        user_description: Free-form description from YAML (may be empty).
-
-    Returns:
-        ``"<user_description> [infrafoundry:<name>]"`` when the user
-        description is non-empty; ``"[infrafoundry:<name>]"`` otherwise.
-    """
-    if user_description:
-        return f"{user_description} [infrafoundry:{resource_name}]"
-    return f"[infrafoundry:{resource_name}]"
-
-
-def parse_identity(description: str) -> tuple[str | None, str]:
-    """Parse the description-suffix identity tag.
-
-    Args:
-        description: ``description`` field from a live job row.
-
-    Returns:
-        ``(resource_name, user_description)``. ``resource_name`` is
-        ``None`` when the description has no tag (unmanaged job).
-
-    Raises:
-        OpnsenseDriftError: If the description contains the
-            ``[infrafoundry:...]`` marker but does not match the strict
-            suffix-only regex.
-    """
-    match = _IDENTITY_PATTERN.match(description)
-    if match is not None:
-        user_desc = match.group(1) or ""
-        return match.group(2), user_desc
-    if _IDENTITY_PROBE.search(description):
-        raise OpnsenseDriftError(
-            f"Cron job description contains an InfraFoundry identity tag but is malformed: "
-            f"{description!r}. Expected '<user description> [infrafoundry:<name>]' (or just "
-            f"'[infrafoundry:<name>]') where <name> matches [a-z0-9-]+ (non-empty) and the "
-            f"tag is the LAST token in the description."
-        )
-    return None, description
-
 
 # ---------------------------------------------------------------------------
 # Domain model
@@ -434,7 +370,7 @@ def _build_config(name: str, config: dict[str, Any]) -> CronJobConfig:
     description = config.get("description", "")
     if not isinstance(description, str):
         raise ValueError(f"cron_job '{name}' description must be a string")
-    if _IDENTITY_PROBE.search(description):
+    if has_identity_marker(description):
         raise ValueError(
             f"cron_job '{name}' description must not contain "
             f"'[infrafoundry:<name>]' — that tag is reserved for InfraFoundry's "
@@ -659,7 +595,7 @@ def _row_to_live(row: dict[str, Any]) -> LiveCronJob:
     uuid = str(row.get("uuid", ""))
     description = str(row.get("description", "") or "")
     origin = str(row.get("origin", "") or "")
-    managed_name, user_description = parse_identity(description)
+    managed_name, user_description = parse_identity(description, record_label="Cron job")
     return LiveCronJob(
         uuid=uuid,
         managed_name=managed_name,

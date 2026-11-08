@@ -22,6 +22,7 @@ from typing import Any, override
 from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.services._identity import has_identity_marker
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 # ---------------------------------------------------------------------------
@@ -40,9 +41,6 @@ _SCHEDULE_RANGES: dict[str, tuple[int, int]] = {
 # Single token regex: ``*``, a plain integer, or a ``*/N`` step expression.
 # We validate range in a second pass rather than inline in the regex.
 _TOKEN_RE = re.compile(r"^\*(?:/(\d+))?$|^(\d+)$|^(\d+)-(\d+)(?:/(\d+))?$")
-
-# Reserved identity prefix — must NOT appear in the operator-supplied description.
-_IDENTITY_PROBE = re.compile(r"\[infrafoundry:[^\]]*\]")
 
 
 class CronJobsValidator(SpecializedValidator[OPNsenseValidationContext]):
@@ -115,7 +113,7 @@ class CronJobsValidator(SpecializedValidator[OPNsenseValidationContext]):
                 level=ValidationLevel.ERROR,
             )
             return
-        if _IDENTITY_PROBE.search(description):
+        if has_identity_marker(description):
             self.report.add_check(
                 check_name=f"cron_job_{name}_description_reserved",
                 passed=False,
