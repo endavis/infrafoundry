@@ -370,7 +370,7 @@ class YourValidator:
 
         # Compose specialized validators
         self.network_validator = NetworkValidator(report)
-        self.resource_validator = ResourceValidator(report)
+        self.template_validator = TemplateValidator(report)
 ```
 
 ### validate_connectivity() Pattern
@@ -408,9 +408,11 @@ def validate_connectivity(self):
 
 ### validate_references() Pattern
 
-Collect references from resources, fetch live state, delegate to specialized validators:
+Collect references from resources, fetch live state, build a validation context and run the specialized validators through `run_validators`:
 
 ```python
+from infrafoundry.core.validation import run_validators
+
 def validate_references(self, resources):
     client = YourClient.from_provider_settings(self.provider_settings)
     if not client:
@@ -420,8 +422,14 @@ def validate_references(self, resources):
         refs = self._collect_resource_references(resources)
         live_data = client.get_json("resources")
 
-        self.network_validator.validate(client, refs.networks)
-        self.resource_validator.validate(live_data, refs.resource_refs)
+        run_validators(
+            (self.network_validator,),
+            YourLiveContext(client=client, networks=refs.networks),
+        )
+        run_validators(
+            (self.template_validator,),
+            YourDataContext(existing_templates=live_data, template_refs=refs.template_refs),
+        )
 
     except Exception as exc:
         self.api_validator.handle_validation_exception(
@@ -431,18 +439,44 @@ def validate_references(self, resources):
         )
 ```
 
+### The validate(context) Contract
+
+Every specialized validator implements one signature, `validate(self, context) -> None`
+([ADR-0019](../decisions/0019-provider-sub-validators-share-one-validatecontext-contract.md)):
+
+- `ValidationContext` (`infrafoundry.core.validation`) is a frozen, keyword-only dataclass that
+  carries `resources`. Subclass it per provider in a `context.py` module in your provider's `validators` package
+  to add the API-derived data your validators need. Make inputs that are always available at call
+  time required fields, so validators need no `None` checks for them.
+- `SpecializedValidator[YourContext]` (`infrafoundry.core.protocols`) is the contract. Subclass it
+  explicitly and mark `validate` with `@override`, so mypy rejects a drifting signature.
+- `run_validators(validators, context)` calls each validator in order with the same context. When
+  API fetches are interleaved with validator calls, build the context step by step with
+  `dataclasses.replace`.
+- `tests/unit/providers/test_specialized_validator_contract.py` discovers every class under
+  `providers/*/validators/` automatically, so a new validator needs no registration.
+
 ### Specialized Validator Types
 
-1. **API-calling validators** take a client instance and make requests:
+1. **API-calling validators** take a client in their context and make requests:
    ```python
-   class NetworkValidator:
+   # context.py in your provider's validators package
+   @dataclass(frozen=True, kw_only=True)
+   class YourLiveContext(ValidationContext):
+       client: YourClient
+       networks: set[str] = field(default_factory=set)
+
+
+   # network_validator.py in the same package
+   class NetworkValidator(SpecializedValidator[YourLiveContext]):
        def __init__(self, report):
            self.report = report
 
-       def validate(self, client, networks):
-           for network in networks:
+       @override
+       def validate(self, context: YourLiveContext) -> None:
+           for network in context.networks:
                try:
-                   data = client.get_json(f"networks/{network}")
+                   data = context.client.get_json(f"networks/{network}")
                    self.report.add_check(
                        check_name=f"network_{network}",
                        passed=True,
@@ -457,17 +491,24 @@ def validate_references(self, resources):
                    )
    ```
 
-2. **Report-only validators** receive pre-fetched data (no client needed):
+2. **Report-only validators** receive pre-fetched data in their context (no client needed):
    ```python
-   class TemplateValidator:
+   @dataclass(frozen=True, kw_only=True)
+   class YourDataContext(ValidationContext):
+       existing_templates: set[str] | None = None
+       template_refs: dict[str, list[str]] = field(default_factory=dict)
+
+
+   class TemplateValidator(SpecializedValidator[YourDataContext]):
        def __init__(self, report):
            self.report = report
 
-       def validate(self, existing_templates, template_refs):
-           if existing_templates is None:
+       @override
+       def validate(self, context: YourDataContext) -> None:
+           if context.existing_templates is None:
                return  # API fetch failed, skip gracefully
-           for ref, users in template_refs.items():
-               if ref in existing_templates:
+           for ref, users in context.template_refs.items():
+               if ref in context.existing_templates:
                    self.report.add_check(...)
    ```
 
