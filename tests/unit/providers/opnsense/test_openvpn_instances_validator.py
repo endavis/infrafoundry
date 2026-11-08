@@ -73,11 +73,22 @@ def test_update_password_without_password() -> None:
 
 
 def test_box_assigned_refused_and_unknown_keys() -> None:
-    report = _run(
-        [_ca(), _inst(uuid="x", vpnid="1", role="server", cert="c", tls_key="k", ca="r", bogus=1)]
-    )
-    for key in ("uuid", "vpnid", "role", "cert", "tls_key", "ca", "bogus"):
+    report = _run([_ca(), _inst(uuid="x", role="server", cert="c", tls_key="k", ca="r", bogus=1)])
+    for key in ("uuid", "role", "cert", "tls_key", "ca", "bogus"):
         assert _fails(report, f"openvpn_instance_vpn-a_unknown_key_{key}"), key
+
+
+def test_vpnid_valid_and_invalid() -> None:
+    assert _failed(_run([_ca(), _inst(vpnid=3)])) == []
+    for bad in ("1", 0, -1, True):
+        report = _run([_ca(), _inst(vpnid=bad)])
+        assert _fails(report, "openvpn_instance_vpn-a_vpnid"), bad
+
+
+def test_duplicate_vpnid_errors() -> None:
+    report = _run([_ca(), _inst("a", vpnid=2), _inst("b", vpnid=2)])
+    assert _fails(report, "openvpn_instances_unique_vpnids")
+    assert _failed(_run([_ca(), _inst("a", vpnid=2), _inst("b", vpnid=3), _inst("c")])) == []
 
 
 def test_hyphenated_wire_spelling_hint() -> None:

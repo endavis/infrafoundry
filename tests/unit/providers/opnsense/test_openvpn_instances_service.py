@@ -149,7 +149,8 @@ class TestParser:
 
     def test_allowed_keys_include_fields(self) -> None:
         assert {"remote", "ca_ref", "username", "password", "reneg_sec"} <= ALLOWED_KEYS
-        assert not {"role", "cert", "tls_key", "uuid", "vpnid", "ca"} & ALLOWED_KEYS
+        assert not {"role", "cert", "tls_key", "uuid", "ca"} & ALLOWED_KEYS
+        assert "vpnid" in ALLOWED_KEYS
 
 
 class TestPayload:
@@ -367,3 +368,110 @@ class TestService:
         client.request.return_value = {"status": "ok"}
         OpenVpnInstanceService(client).reconfigure()
         assert client.request.call_args.args[:2] == ("POST", "openvpn/service/reconfigure")
+
+
+class TestVpnid:
+    @staticmethod
+    def _sent(client: MagicMock) -> dict[str, dict[str, Any]]:
+        return {c.args[1]: c.kwargs.get("data") for c in client.request.call_args_list}
+
+    @staticmethod
+    def _svc() -> tuple[OpenVpnInstanceService, MagicMock]:
+        client = MagicMock()
+        client.request.return_value = {"result": "saved"}
+        return OpenVpnInstanceService(client), client
+
+    def test_explicit_vpnid_sent_on_add(self) -> None:
+        svc, client = self._svc()
+        svc.apply_diff(compute_diff([_cfg("new", vpnid=7)], []), {"vpn-ca": "r1"})
+        assert self._sent(client)["openvpn/instances/add"]["instance"]["vpnid"] == "7"
+
+    def test_omitted_allocates_max_plus_one_across_roles(self) -> None:
+        svc, client = self._svc()
+        live = [_live("c", vpnid="2"), _live("s", role="server", vpnid="5")]
+        svc.apply_diff(compute_diff([_cfg("new")], live), {"vpn-ca": "r1"})
+        assert self._sent(client)["openvpn/instances/add"]["instance"]["vpnid"] == "6"
+
+    def test_allocation_starts_at_one(self) -> None:
+        svc, client = self._svc()
+        svc.apply_diff(compute_diff([_cfg("new")], []), {"vpn-ca": "r1"})
+        assert self._sent(client)["openvpn/instances/add"]["instance"]["vpnid"] == "1"
+
+    def test_multiple_omitted_get_distinct_ids(self) -> None:
+        svc, client = self._svc()
+        diff = compute_diff([_cfg("a"), _cfg("b"), _cfg("c")], [_live("x", vpnid="3")])
+        svc.apply_diff(diff, {"vpn-ca": "r1"})
+        ids = [
+            c.kwargs["data"]["instance"]["vpnid"]
+            for c in client.request.call_args_list
+            if c.args[1] == "openvpn/instances/add"
+        ]
+        assert sorted(ids) == ["4", "5", "6"]
+
+    def test_explicit_ids_skipped_by_allocation(self) -> None:
+        svc, client = self._svc()
+        diff = compute_diff([_cfg("auto"), _cfg("pinned", vpnid=9)], [_live("x", vpnid="1")])
+        svc.apply_diff(diff, {"vpn-ca": "r1"})
+        by_desc = {
+            c.kwargs["data"]["instance"]["description"]: c.kwargs["data"]["instance"]["vpnid"]
+            for c in client.request.call_args_list
+            if c.args[1] == "openvpn/instances/add"
+        }
+        assert by_desc == {"pinned": "9", "auto": "10"}
+
+    def test_explicit_mismatch_is_update(self) -> None:
+        live = _live("x", remote=_opt("vpn.example.com"), vpnid="1")
+        diff = compute_diff([_cfg("x", vpnid=2)], [live])
+        assert [w.name for _, w in diff.updates] == ["x"]
+        assert changed_fields(live, _cfg("x", vpnid=2)) == ["vpnid"]
+        assert changed_fields(live, _cfg("x", vpnid=1)) == []
+
+    def test_omitted_never_causes_update(self) -> None:
+        live = _live("x", remote=_opt("vpn.example.com"), vpnid="4")
+        assert changed_fields(live, _cfg("x")) == []
+        assert compute_diff([_cfg("x")], [live]).updates == []
+
+    def test_update_payload_carries_live_vpnid(self) -> None:
+        svc, client = self._svc()
+        live = _live("upd", remote=_opt("old.example.com"), vpnid="4")
+        svc.apply_diff(compute_diff([_cfg("upd")], [live]), {"vpn-ca": "r1"})
+        assert self._sent(client)["openvpn/instances/set/u-upd"]["instance"]["vpnid"] == "4"
+
+    def test_update_payload_prefers_explicit_vpnid(self) -> None:
+        svc, client = self._svc()
+        live = _live("upd", remote=_opt("vpn.example.com"), vpnid="4")
+        svc.apply_diff(compute_diff([_cfg("upd", vpnid=8)], [live]), {"vpn-ca": "r1"})
+        assert self._sent(client)["openvpn/instances/set/u-upd"]["instance"]["vpnid"] == "8"
+
+    @pytest.mark.parametrize("bad", ["1", 0, -2, True, 1.5])
+    def test_parser_rejects_bad_vpnid(self, bad: Any) -> None:
+        with pytest.raises(ValueError):
+            _cfg(vpnid=bad)
+
+
+class TestLoaderRoundTrip:
+    """Configs parsed by the real nested loader are accepted (live-test regression)."""
+
+    def test_loader_injected_name_is_accepted(self, tmp_path: Any) -> None:
+        from infrafoundry.core.config.package_loader import PackageLoader
+
+        data = {
+            "opnsense": {
+                "openvpn": {
+                    "instances": [
+                        {
+                            "name": "vpn-a",
+                            "config": {
+                                "description": "Example VPN",
+                                "remote": ["192.0.2.10"],
+                                "ca_ref": "vpn-ca",
+                            },
+                        }
+                    ]
+                }
+            }
+        }
+        resources = PackageLoader(tmp_path)._parse_resources_from_data(data, "fw.yaml", "opnsense")
+        assert resources[0].config["name"] == "vpn-a"
+        configs = openvpn_instance_configs_from_resources(resources)
+        assert [c.description for c in configs] == ["Example VPN"]

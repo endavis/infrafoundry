@@ -8,7 +8,18 @@ matched, updated or deleted.
 
 Identity is the live ``description`` against the YAML ``description`` (falling back
 to the resource name). A change of description is a delete plus an add. The box
-assigns ``uuid`` and ``vpnid``; neither is a YAML field.
+assigns ``uuid``; it is not a YAML field.
+
+vpnid
+-----
+
+``add`` is rejected without ``vpnid`` (verified on a test firewall), and the id names
+the tunnel device (``ovpncN`` for clients). ``vpnid`` is an optional YAML field.
+Set, it is written and compared. Omitted, an add allocates the next free id
+(max over every live instance of any role, every explicit YAML id in the apply and
+ids already allocated, plus one; starting at 1) and it is never compared. An update
+always sends a ``vpnid`` (the explicit one, else the live row's) so the ``set``
+payload never lacks a required field.
 
 Sparse comparison
 -----------------
@@ -39,8 +50,10 @@ What is verified and what is not
 - Verified read-only on a test firewall: the empty model template of
   ``GET openvpn/instances/get`` (field names, option shapes, ``ca`` and ``cert`` as
   reference options, ``tls_key`` as a reference to a static key).
-- Not verified: write behaviour, the meaning of ``remote`` and ``port`` together,
-  whether ``set`` keeps omitted fields, and whether a password reads back.
+- Verified by a live apply on a test firewall: ``add`` requires ``vpnid`` (the
+  template leaves it empty); ``set`` changes only the sent fields and keeps the
+  rest; the password reads back but is deliberately not compared.
+- Not verified: whether ``mssfix`` takes an integer, and tunnel behaviour.
 """
 
 from __future__ import annotations
@@ -102,6 +115,7 @@ FIELD_SPECS: dict[str, FieldSpec] = {
     "enabled": FieldSpec("enabled", _BOOL),
     "dev_type": FieldSpec("dev_type", _ENUM, _DEV_TYPES),
     "proto": FieldSpec("proto", _ENUM, _PROTOS),
+    "vpnid": FieldSpec("vpnid", _INT, low=1),
     "remote": FieldSpec("remote", _LIST),
     "port": FieldSpec("port", _INT, low=1, high=65535),
     "topology": FieldSpec("topology", _ENUM, _TOPOLOGIES),
@@ -131,6 +145,8 @@ SECRET_FIELDS: tuple[str, ...] = ("username", "password")
 #: parser and the validator).
 ALLOWED_KEYS: frozenset[str] = frozenset(
     {
+        # The nested loader copies the entry name into config (package_loader).
+        "name",
         "description",
         "ca_ref",
         "update_password",
@@ -140,7 +156,7 @@ ALLOWED_KEYS: frozenset[str] = frozenset(
     }
 )
 #: Keys the box assigns itself.
-BOX_ASSIGNED_KEYS: frozenset[str] = frozenset({"uuid", "vpnid"})
+BOX_ASSIGNED_KEYS: frozenset[str] = frozenset({"uuid"})
 #: Keys this type refuses, with the hint the validator shows.
 REJECTED_KEY_HINTS: dict[str, str] = {
     "role": "only client instances are managed; the role is always client",
@@ -240,19 +256,25 @@ class OpenVpnInstanceConfig:
         """Identity of this instance: its description."""
         return self.description
 
-    def to_payload(self, ca_refid: str = "", *, include_password: bool = False) -> dict[str, Any]:
+    def to_payload(
+        self, ca_refid: str = "", *, include_password: bool = False, default_vpnid: str = ""
+    ) -> dict[str, Any]:
         """Serialize to the ``add``/``set`` envelope.
 
         Args:
             ca_refid: Resolved CA refid; omitted when empty.
             include_password: Add ``password`` (when set). True on add; on update
                 only with ``update_password``.
+            default_vpnid: ``vpnid`` to send when the config sets none (allocated on
+                add, the live value on update); omitted when empty.
 
         Returns:
             ``{"instance": {...}}`` with ``role: client`` and the set fields only.
         """
         body: dict[str, Any] = {"role": ROLE_CLIENT, "description": self.description}
         body.update(self.fields)
+        if default_vpnid and "vpnid" not in body:
+            body["vpnid"] = default_vpnid
         if ca_refid:
             body["ca"] = ca_refid
         if self.username:
@@ -284,6 +306,11 @@ class LiveOpenVpnInstance:
         return self.description
 
     @property
+    def vpnid(self) -> str:
+        """Return the live ``vpnid`` as a string, or ``""`` when absent."""
+        return flatten_option(self.raw.get("vpnid")).strip()
+
+    @property
     def is_client(self) -> bool:
         """Return True for a client instance, the only role managed here."""
         return self.role == ROLE_CLIENT
@@ -301,6 +328,7 @@ class Diff:
         default_factory=list
     )
     warnings: list[str] = field(default_factory=list)
+    live_vpnids: list[int] = field(default_factory=list)
 
     @property
     def is_empty(self) -> bool:
@@ -406,7 +434,7 @@ def compute_diff(
         )
     locked_keys = {c.diff_key for c in desired if c.lock}
 
-    diff = Diff()
+    diff = Diff(live_vpnids=[int(v) for v in (x.vpnid for x in current) if v.isdigit()])
     for key, want in desired_by_key.items():
         have = clients.get(key)
         if want.lock:
@@ -589,24 +617,43 @@ class OpenVpnInstanceService(BaseService):
             )
         return live
 
-    def add(self, config: OpenVpnInstanceConfig, ca_refid: str = "") -> dict[str, Any]:
-        """Create a client instance; raises when OPNsense rejects it."""
+    def add(
+        self, config: OpenVpnInstanceConfig, ca_refid: str = "", vpnid: str = ""
+    ) -> dict[str, Any]:
+        """Create a client instance; raises when OPNsense rejects it.
+
+        Args:
+            config: Desired instance.
+            ca_refid: Resolved CA refid.
+            vpnid: Allocated ``vpnid``, used when the config sets none.
+        """
         ep = endpoints.OPENVPN_INSTANCE.add
         response = self.client.request(
-            ep.method, ep.path(), data=config.to_payload(ca_refid, include_password=True)
+            ep.method,
+            ep.path(),
+            data=config.to_payload(ca_refid, include_password=True, default_vpnid=vpnid),
         )
         raise_on_failed_write(response, f"add openvpn instance {config.name!r}")
         return response
 
     def update(
-        self, uuid: str, config: OpenVpnInstanceConfig, ca_refid: str = ""
+        self, uuid: str, config: OpenVpnInstanceConfig, ca_refid: str = "", vpnid: str = ""
     ) -> dict[str, Any]:
-        """Update a client instance by UUID; raises when OPNsense rejects it."""
+        """Update a client instance by UUID; raises when OPNsense rejects it.
+
+        Args:
+            uuid: Row UUID.
+            config: Desired instance.
+            ca_refid: Resolved CA refid.
+            vpnid: Live ``vpnid``, sent when the config sets none.
+        """
         ep = endpoints.OPENVPN_INSTANCE.update
         response = self.client.request(
             ep.method,
             ep.path(uuid=uuid),
-            data=config.to_payload(ca_refid, include_password=config.update_password),
+            data=config.to_payload(
+                ca_refid, include_password=config.update_password, default_vpnid=vpnid
+            ),
         )
         raise_on_failed_write(response, f"update openvpn instance {config.name!r}")
         return response
@@ -673,9 +720,21 @@ class OpenVpnInstanceService(BaseService):
                 )
             resolved[config.name] = refids[config.ca_ref]
 
+        taken = [*diff.live_vpnids]
+        desired = [*diff.adds, *(want for _, want in diff.updates), *(w for w, _ in diff.locked)]
+        for config in desired:
+            explicit = dict(config.fields).get("vpnid", "")
+            if explicit.isdigit():
+                taken.append(int(explicit))
+        next_vpnid = max(taken, default=0) + 1
+
         created = updated = deleted = 0
         for config in diff.adds:
-            self.add(config, resolved[config.name])
+            allocated = ""
+            if "vpnid" not in dict(config.fields):
+                allocated = str(next_vpnid)
+                next_vpnid += 1
+            self.add(config, resolved[config.name], allocated)
             created += 1
         for live, want in diff.updates:
             logger.info(
@@ -683,7 +742,7 @@ class OpenVpnInstanceService(BaseService):
                 want.name,
                 changed_fields(live, want, resolved[want.name]),
             )
-            self.update(live.uuid, want, resolved[want.name])
+            self.update(live.uuid, want, resolved[want.name], live.vpnid)
             updated += 1
         for live in diff.deletes:
             self.delete(live)

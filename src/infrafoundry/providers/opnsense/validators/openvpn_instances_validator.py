@@ -3,12 +3,12 @@
 Plan-time checks for ``openvpn.instances`` (no live-box access). Messages name the
 resource and the field, never a value: ``username`` and ``password`` are secrets.
 
-- Unknown keys are ERRORs; box-assigned (``uuid``, ``vpnid``) and refused keys
+- Unknown keys are ERRORs; box-assigned (``uuid``) and refused keys
   (``role``, ``ca``, ``cert``, ``tls_key``, hyphenated wire spellings) carry a hint.
 - ``remote`` and ``ca_ref`` are required; ``ca_ref`` must name a ``trust.cas`` resource.
 - ``username`` and ``password`` must be ``secret://`` URIs; a literal is an ERROR.
 - Enums, integer ranges and list shapes are checked with the parser's own rules.
-- Duplicate descriptions within the type.
+- Duplicate descriptions and duplicate explicit ``vpnid`` values within the type.
 """
 
 from __future__ import annotations
@@ -49,6 +49,7 @@ class OpenVpnInstanceValidator(SpecializedValidator[OPNsenseValidationContext]):
         if not resources:
             return
         self._check_duplicates(resources)
+        self._check_duplicate_vpnids(resources)
         for resource in resources:
             self._validate_one(resource, context)
 
@@ -68,6 +69,20 @@ class OpenVpnInstanceValidator(SpecializedValidator[OPNsenseValidationContext]):
                 "openvpn_instances_unique_descriptions",
                 f"openvpn.instances resources share descriptions: {sorted(dupes)!r}. "
                 f"The description is the identity on the box; make each unique.",
+            )
+
+    def _check_duplicate_vpnids(self, resources: list[ResourceConfig]) -> None:
+        seen: set[int] = set()
+        dupes: set[int] = set()
+        for r in resources:
+            value = r.config.get("vpnid")
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 1:
+                (dupes if value in seen else seen).add(value)
+        if dupes:
+            self._error(
+                "openvpn_instances_unique_vpnids",
+                f"openvpn.instances resources share vpnid values: {sorted(dupes)!r}. "
+                f"The vpnid names the tunnel device; make each unique.",
             )
 
     def _validate_one(self, resource: ResourceConfig, context: OPNsenseValidationContext) -> None:

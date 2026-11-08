@@ -167,16 +167,25 @@ opnsense:
 | `verify_x509_name` | String; wire `verify-x509-name`. |
 | `various_flags`, `route`, `redirect_gateway` | Lists, compared as sets. |
 | `keepalive_interval`, `keepalive_timeout`, `reneg_sec`, `tun_mtu`, `fragment`, `mssfix` | Non-negative integers (`reneg_sec` is wire `reneg-sec`). |
+| `vpnid` | Optional positive integer; unique across instances. The API requires it on add (verified on a test firewall). It names the tunnel device (`ovpncN` for clients), so pin it when an interface assignment or firewall rule references the device. Omitted: an add allocates the next free id (max of every live instance of any role, every explicit `vpnid` in the apply and ids already allocated, plus one; starting at 1), and the live value is never compared, so it never causes drift. |
 | `verb` | Log verbosity, integer 0-11. |
 | `lock` | Never add, update or delete. |
 
-Fields are sparse: only the ones you set are written and compared. `uuid` and `vpnid` are assigned by the box and rejected, as are `role`, `ca`, `cert`, `tls_key` and the hyphenated wire spellings.
+Fields are sparse: only the ones you set are written and compared. `uuid` is assigned by the box and rejected, as are `role`, `ca`, `cert`, `tls_key` and the hyphenated wire spellings.
 
 **Not managed (follow-ups).** `tls_key` (a reference to a static key, which needs its own `openvpn.static_keys` type), `cert` (a client certificate, a future `cert_ref` to `trust.certs`) and server instances. Messages and logs name the resource and field and never include `username` or `password`.
 
 **Order and pending CAs.** CAs are applied before instances, and instances are deleted before CAs. A plan for an instance whose `ca_ref` CA is not on the box yet shows an add plus a warning; at apply an unresolved `ca_ref` raises an error before any write. Changes are applied with one `openvpn/service/reconfigure` call after the instance writes.
 
-**What is verified.** Read-only on a test firewall: the empty model template of `GET openvpn/instances/get` (field names and option shapes), and that the endpoints exist in the bundled specs. **Not verified:** write behaviour, the meaning of `remote` and `port` together, whether `set` keeps omitted fields, whether the password reads back, and whether `mssfix` takes an integer.
+**What is verified.** A live plan and apply on a test firewall, with a throwaway disabled client and CA that were removed afterwards:
+
+- `add` requires `vpnid`; the template leaves it empty, so an omitted `vpnid` is allocated (the first client got `1`);
+- the stored client has role `client` and the `remote`, `port`, CA reference and username from YAML;
+- a re-plan is idempotent;
+- `set` with a changed `port` changes only that field and keeps the omitted ones, `vpnid` and credentials included;
+- removing the config deletes the instance, then certificates, then CAs.
+
+The password reads back from the API, but it is not compared; use `update_password` to rotate it. **Not verified:** whether `mssfix` takes an integer, and tunnel behaviour, since the test client stayed disabled.
 
 ## Unbound advanced settings (#1254)
 
