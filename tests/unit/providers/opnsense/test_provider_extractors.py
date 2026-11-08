@@ -29,6 +29,7 @@ EXPECTED_RESOURCE_TYPES = [
     "unbound.host_aliases",
     "unbound.host_overrides",
     "interfaces.settings",
+    "syslog.settings",
     "interfaces.virtual_ips",
     "interfaces.vlans",
 ]

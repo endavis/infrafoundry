@@ -30,6 +30,7 @@ from infrafoundry.providers.opnsense.validators import (
     RadvdValidator,
     ResourceNameValidator,
     StaticRouteValidator,
+    SyslogSettingsValidator,  # #804
     SystemFirmwareValidator,
     SystemGroupValidator,
     SystemTuningValidator,
@@ -118,6 +119,7 @@ class OPNsenseValidator:
         self.system_group_validator = SystemGroupValidator(report)
         self.unbound_advanced_validator = UnboundAdvancedValidator(report)
         self.interfaces_settings_validator = InterfacesSettingsValidator(report)
+        self.syslog_settings_validator = SyslogSettingsValidator(report)  # #804
 
     def validate_endpoint_support(self, resources: list[ResourceConfig]) -> None:
         """Check the in-scope resource types' endpoints against the box's version (#1239).
@@ -351,6 +353,10 @@ class OPNsenseValidator:
             self.interfaces_settings_validator.validate(
                 replace(context, resources=resource_refs["interfaces_settings"])
             )
+            # #804
+            self.syslog_settings_validator.validate(
+                replace(context, resources=resource_refs["syslog_settings"])
+            )
             self.kea_reservation_validator.validate(context)
             self.radvd_validator.validate(replace(context, resources=resource_refs["radvd"]))
             self.cron_jobs_validator.validate(
@@ -401,6 +407,7 @@ class OPNsenseValidator:
         unbound_forwards = [r for r in resources if r.type == "unbound.forwards"]
         unbound_advanced = [r for r in resources if r.type == "unbound.advanced"]
         interfaces_settings = [r for r in resources if r.type == "interfaces.settings"]
+        syslog_settings = [r for r in resources if r.type == "syslog.settings"]  # #804
         interface_assignments = [r for r in resources if r.type == "interfaces.assignments"]
         nat_rules = [r for r in resources if r.type == "firewall.nat"]
         gateways = [r for r in resources if r.type == "routing.gateways"]
@@ -445,6 +452,7 @@ class OPNsenseValidator:
             "unbound_forwards": unbound_forwards,
             "unbound_advanced": unbound_advanced,
             "interfaces_settings": interfaces_settings,
+            "syslog_settings": syslog_settings,  # #804
             "interface_assignments": interface_assignments,
             "interface_assignment_names": interface_assignment_names,
             "nat_rules": nat_rules,

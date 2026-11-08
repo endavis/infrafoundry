@@ -54,7 +54,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<openvpn>` (legacy `os-openvpn-legacy` plugin) | none | Unmanaged. A cutover recreates the client as a modern `openvpn.instances` entry; import any legacy server or other legacy configuration by hand. |
 | `<OPNsense>/AcmeClient` | `acmeclient_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#790](https://github.com/endavis/infrafoundry/issues/790) ships. In scope since ADR-0013's 2026-10-27 amendment; needs `os-acme-client` from `system.firmware`. |
 | `<OPNsense>/tailscale` | `tailscale_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#787](https://github.com/endavis/infrafoundry/issues/787) ships. |
-| `<OPNsense>/Syslog` | `syslog_settings` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#804](https://github.com/endavis/infrafoundry/issues/804) ships. |
+| `<OPNsense>/Syslog` | `syslog.settings` | Supported (direct-API; #804). A singleton over the `general` section of the syslog model (local logging switch and log rotation); only declared fields are compared, the whole live `general` object is echoed back on write; destroy is a no-op; the `syslog_reconfigure` hook fires one reconfigure per apply. Remote `destinations` are not managed. The `set` and `reconfigure` calls are verified live. See [Syslog settings](#syslog-settings-804). |
 | `<OPNsense>/monit` | `monit_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#791](https://github.com/endavis/infrafoundry/issues/791) ships. |
 | `<OPNsense>/Hostwatch` | `hostwatch` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#792](https://github.com/endavis/infrafoundry/issues/792) ships. |
 | `<OPNsense>/unboundplus/advanced` (`privatedomain`, `insecuredomain`, `privateaddress`) | `unbound.advanced` | Supported (direct-API; #1254). Only declared fields are compared; the whole `advanced` section is echoed back on write; destroy is a no-op; shares the `unbound_reconfigure` hook. The `set` envelope key is unverified live. |
@@ -238,6 +238,31 @@ opnsense:
 
 **Link reset.** Reconfigure re-applies the hardware flags to every interface, which on some NICs can briefly reset the link. Apply during a maintenance window.
 
+## Syslog settings (#804)
+
+`opnsense.syslog.settings` is a singleton dict over the `general` section of the `OPNsense\Syslog` model. Every key is optional. The model's `destinations` list is not managed.
+
+| YAML | wire field | type |
+|---|---|---|
+| `enabled` | `enabled` | bool |
+| `log_local` | `loglocal` | bool |
+| `max_preserve` | `maxpreserve` | integer >= 0 |
+| `max_file_size` | `maxfilesize` | integer >= 0 |
+
+An omitted key is not managed. The write sends `{"syslog": {"general": {...}}}`: the whole flattened live `general` object with the declared fields overwritten.
+
+```yaml
+opnsense:
+  syslog:
+    settings:
+      enabled: true
+      log_local: true
+      max_preserve: 31
+      max_file_size: 10
+```
+
+**Verified live** on a test firewall: `syslog/settings/set` with the `syslog` envelope changed `max_preserve` and left the other `general` fields and the `destinations` list unchanged; `syslog/service/reconfigure` ran and the service stayed running; a re-plan after apply showed no update.
+
 ## How deletes work: the managed set (#1256)
 
 `opnsense_direct` deletes only objects InfraFoundry manages ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). A live object InfraFoundry never applied is kept, whether or not its type has YAML entries. `infra plan` shows those as `N unmanaged (kept)` on the type's summary line.
@@ -250,7 +275,7 @@ opnsense:
 
 - **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs` and `openvpn.instances`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
-- **Singletons** (`system.*`, `unbound.advanced`, `interfaces.settings`, `radvd`) are unaffected.
+- **Singletons** (`system.*`, `unbound.advanced`, `interfaces.settings`, `syslog.settings`, `radvd`) are unaffected.
 
 **Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
 

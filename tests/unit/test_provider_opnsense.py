@@ -260,6 +260,24 @@ class TestOPNsenseResourceTypes:
             provider.get_finalization_hooks()["interfaces_settings_reconfigure"]("env")
         factory.return_value.reconfigure.assert_called_once_with()
 
+    def test_syslog_settings_is_supported_with_its_own_hook(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        types = provider.get_direct_api_resource_types()
+        assert "syslog.settings" in provider.get_resource_types()
+        assert provider.get_dependencies()["syslog.settings"] == []
+        hook = types["syslog.settings"].FINALIZATION_HOOK
+        assert hook == "syslog_reconfigure"
+        assert hook in provider.get_finalization_hooks()
+
+    def test_syslog_hook_calls_the_service(self, provider: OPNsenseProvider) -> None:
+        with patch(
+            "infrafoundry.providers.opnsense.services.syslog_settings"
+            ".SyslogSettingsService.from_environment"
+        ) as factory:
+            provider.get_finalization_hooks()["syslog_reconfigure"]("env")
+        factory.return_value.reconfigure.assert_called_once_with()
+
     @pytest.mark.parametrize(
         "resource_type",
         [

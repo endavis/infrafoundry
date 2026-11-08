@@ -122,3 +122,10 @@ def test_openvpn_instances_register_their_endpoints() -> None:
         "trust/ca/search",
     }
     assert endpoints.OPENVPN_INSTANCE.search.method == "GET"
+
+
+def test_syslog_settings_registers_the_settings_endpoints() -> None:
+    registered = endpoints.RESOURCE_TYPE_ENDPOINTS["syslog.settings"]
+    assert endpoints.SYSLOG_SETTINGS_GET in registered
+    assert endpoints.SYSLOG_SETTINGS_SET in registered
+    assert endpoints.SYSLOG_RECONFIGURE in registered

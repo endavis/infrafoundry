@@ -73,7 +73,7 @@ A type with no YAML entries is dispatched only when the run has a managed set, i
 
 Removing the environment's last `provider: opnsense` resource used to leave its objects on the box, because the provider was never dispatched when it had no resources. #1260 closes this. The orchestrator asks managed-set runners (the `DispatchesManagedSet` protocol) whether a provider absent from YAML needs dispatching, and adds it with an empty resource list, for full non-dry-run runs only.
 
-Singleton types (`system.*`, `unbound.advanced`, `interfaces.settings`, `radvd`) are unaffected. `radvd` reconciles fully inside its own component.
+Singleton types (`system.*`, `unbound.advanced`, `interfaces.settings`, `syslog.settings`, `radvd`) are unaffected. `radvd` reconciles fully inside its own component.
 
 ## Documentation
 
