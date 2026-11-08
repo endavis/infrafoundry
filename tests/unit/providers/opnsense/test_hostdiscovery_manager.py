@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -11,6 +12,7 @@ import yaml
 
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.providers.opnsense import OPNsenseProvider
 from infrafoundry.providers.opnsense.components.hostdiscovery import HostDiscoveryManager
 from infrafoundry.providers.opnsense.services.hostdiscovery import HostDiscoveryService
 
@@ -128,3 +130,50 @@ def test_migrate_exports_live_fields(tmp_path: Path) -> None:
 
 def test_split_delete_phase_declared() -> None:
     assert HostDiscoveryManager.SPLIT_DELETE_PHASE is True
+
+
+def test_apply_deletes_only_touches_nothing(tmp_path: Path) -> None:
+    """The runner's delete phase passes ``deletes_only=True``; there is nothing to delete."""
+    service = _service()
+    set_mock = MagicMock()
+    service.set_settings = set_mock  # type: ignore[method-assign]
+    with patch(SERVICE_PATH) as cls:
+        cls.from_environment.return_value = service
+        result = HostDiscoveryManager(tmp_path).apply(
+            "env", [_resource({"verbose": True})], deletes_only=True
+        )
+    set_mock.assert_not_called()
+    cls.from_environment.assert_not_called()
+    assert result["success"] is True
+    assert result["resources_updated"] == 0
+    assert result["resources_deleted"] == 0
+    assert result["resource_outcomes"] == []
+
+
+def test_apply_runner_split_delete_call_shape(tmp_path: Path) -> None:
+    """Both runner phases call ``apply`` with the kwargs the runner passes."""
+    service = _service()
+    set_mock = MagicMock(return_value={"result": "saved"})
+    service.set_settings = set_mock  # type: ignore[method-assign]
+    resources = [_resource({"verbose": True})]
+    with patch(SERVICE_PATH) as cls:
+        cls.from_environment.return_value = service
+        manager = HostDiscoveryManager(tmp_path)
+        manager.apply("env", resources, auto_approve=True, add_only=False, deletes_only=True)
+        set_mock.assert_not_called()
+        result = manager.apply("env", resources, auto_approve=True, add_only=False)
+    set_mock.assert_called_once()
+    assert result["resources_updated"] == 1
+
+
+def test_every_split_delete_manager_accepts_deletes_only() -> None:
+    """The runner passes ``deletes_only`` to each ``SPLIT_DELETE_PHASE`` manager."""
+    registry = OPNsenseProvider.get_direct_api_resource_types(MagicMock())
+    split = {n: c for n, c in registry.items() if getattr(c, "SPLIT_DELETE_PHASE", None) is True}
+    assert "hostdiscovery" in split
+    missing = [
+        name
+        for name, cls in split.items()
+        if "deletes_only" not in inspect.signature(cls.apply).parameters
+    ]
+    assert missing == []

@@ -61,14 +61,35 @@ class HostDiscoveryManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         add_only: bool = False,
+        deletes_only: bool = False,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
         """Write the host-discovery settings when a declared field drifted.
 
         Reconfigure is not called here; the ``hostdiscovery_reconfigure``
         hook fires.
+
+        Args:
+            env_name: Active environment name.
+            resources: Should contain exactly one ``hostdiscovery`` resource.
+            auto_approve: No-op.
+            add_only: No-op (the singleton is never deleted).
+            deletes_only: If True, do nothing: the runner's delete phase. There
+                is nothing to delete, so the box is neither read nor written.
+            provider_name: Provider identifier (defaults to ``opnsense``).
+
+        Returns:
+            Dict with counts and ``resource_outcomes``.
         """
         del auto_approve, add_only
+        if deletes_only:
+            return {
+                "success": True,
+                "resources_created": 0,
+                "resources_updated": 0,
+                "resources_deleted": 0,
+                "resource_outcomes": [],
+            }
         service, settings, diff = self._drift(env_name, resources, provider_name)
         outcomes: list[ResourceOutcome] = []
         if diff is not None:
