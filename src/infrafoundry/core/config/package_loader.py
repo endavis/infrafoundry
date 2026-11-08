@@ -106,6 +106,9 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     "system.firmware": "dict",
     "system.remotebackup": "dict",
     "system.tuning": "dict",
+    # #805 system users and groups (list shape, natural key ``name``).
+    "system.users": "list",
+    "system.groups": "list",
 }
 
 # Set of dotted resource-type paths recognised under the nested ``opnsense:``

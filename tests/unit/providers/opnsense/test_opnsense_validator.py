@@ -207,6 +207,26 @@ class TestValidateReferences:
         validator.resource_name_validator.validate.assert_called_once()
         validator.interface_assignment_validator.validate.assert_called_once()
 
+    def test_dispatches_system_users_and_groups(self, validator: OPNsenseValidator) -> None:
+        """System user and group validators receive only their own resource slices (#805)."""
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "api_url": "https://opnsense.example.com",
+                "api_key": "key",
+                "api_secret": "secret",
+            }
+        )
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
+        validator.system_user_validator = MagicMock()
+        validator.system_group_validator = MagicMock()
+        user = ResourceConfig(name="u", type="system.users", provider="opnsense", config={})
+        group = ResourceConfig(name="g", type="system.groups", provider="opnsense", config={})
+
+        validator.validate_references([user, group])
+
+        assert validator.system_user_validator.validate.call_args.args[0].resources == [user]
+        assert validator.system_group_validator.validate.call_args.args[0].resources == [group]
+
     def test_exception_caught_gracefully(self, validator: OPNsenseValidator) -> None:
         """Exceptions during validation are caught and reported."""
         validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]

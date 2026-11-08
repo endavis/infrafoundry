@@ -28,6 +28,10 @@ from infrafoundry.providers.opnsense.validators.resource_name_validator import (
 from infrafoundry.providers.opnsense.validators.static_route_validator import (
     StaticRouteValidator,
 )
+from infrafoundry.providers.opnsense.validators.system_auth_validator import (
+    SystemGroupValidator,
+    SystemUserValidator,
+)
 from infrafoundry.providers.opnsense.validators.system_firmware_validator import (
     SystemFirmwareValidator,
 )
@@ -63,7 +67,9 @@ __all__ = [
     "ResourceNameValidator",
     "StaticRouteValidator",
     "SystemFirmwareValidator",
+    "SystemGroupValidator",
     "SystemTuningValidator",
+    "SystemUserValidator",
     "UnboundAdvancedValidator",
     "UnboundForwardValidator",
     "UnboundHostAliasValidator",

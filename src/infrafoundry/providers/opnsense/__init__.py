@@ -265,7 +265,9 @@ class OPNsenseProvider(
         from .components.radvd import RadvdManager
         from .components.static_route import StaticRouteManager
         from .components.system_firmware import SystemFirmwareManager
+        from .components.system_groups import GroupManager
         from .components.system_tuning import SystemTuningManager
+        from .components.system_users import UserManager
         from .components.unbound_advanced import UnboundAdvancedManager
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
@@ -301,6 +303,9 @@ class OPNsenseProvider(
         return {
             "system.firmware": SystemFirmwareManager,
             "system.tuning": SystemTuningManager,
+            # #805: users before groups; groups resolve member_refs to live uids.
+            "system.users": UserManager,
+            "system.groups": GroupManager,
             "interfaces.settings": InterfacesSettingsManager,
             "interfaces.vlans": VlanManager,
             "interfaces.assignments": InterfaceAssignmentManager,
@@ -590,6 +595,9 @@ class OPNsenseProvider(
             "cron.jobs": [],
             "system.firmware": [],
             "system.tuning": [],
+            # #805
+            "system.users": [],
+            "system.groups": ["system.users"],
             "interfaces.settings": [],
         }
 
