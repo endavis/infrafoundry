@@ -14,6 +14,7 @@ It does NOT depend on the private infra-config/ config repo.
 
 import textwrap
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 
@@ -51,7 +52,7 @@ def test_rocky9_example_package_loads_blueprint(loader: PackageLoader) -> None:
     assert variables["bridge"] == "vmbr0"
     assert variables["ciuser"] == "rocky"
     assert variables["image_filename"] == "Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
-    assert "rockylinux.org" in variables["image_url"]
+    assert urlparse(variables["image_url"]).hostname == "dl.rockylinux.org"
 
 
 def test_rocky9_example_renders_single_template_resource(loader: PackageLoader) -> None:
@@ -94,7 +95,7 @@ def test_rocky9_example_resource_config_merges_defaults_and_overrides(
     assert config["cloud_init"] is True
     assert config["tags"] == ["template", "rocky9"]
     assert config["download_image"]["filename"] == "Rocky-9-GenericCloud-Base.latest.x86_64.qcow2"
-    assert "rockylinux.org" in config["download_image"]["url"]
+    assert urlparse(config["download_image"]["url"]).hostname == "dl.rockylinux.org"
 
 
 def test_rocky9_blueprint_supports_multiple_instances(tmp_path: Path) -> None:

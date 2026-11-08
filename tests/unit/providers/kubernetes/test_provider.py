@@ -193,7 +193,7 @@ def test_generate_terraform_ingress(provider: KubernetesProvider, tmp_dirs: Any)
     content = (terraform_dir / "ingress.tf").read_text()
     assert "kubernetes_ingress_v1" in content
     assert "nginx" in content
-    assert "example.com" in content
+    assert 'host = "example.com"' in content
 
 
 def test_generate_terraform_pvc(provider: KubernetesProvider, tmp_dirs: Any) -> None:

@@ -74,7 +74,10 @@ class TestCRDValidator:
                 manifests=manifests,
             )
         )
-        assert any(r.passed and "cert-manager.io" in r.message for r in validation_report.results)
+        assert any(
+            r.passed and r.check_name == "kubernetes_crd_cert-manager.io"
+            for r in validation_report.results
+        )
 
     def test_missing_crd_error(
         self,
@@ -101,7 +104,9 @@ class TestCRDValidator:
             )
         )
         assert any(
-            not r.passed and r.level == ValidationLevel.ERROR and "cert-manager.io" in r.message
+            not r.passed
+            and r.level == ValidationLevel.ERROR
+            and r.check_name == "kubernetes_crd_cert-manager.io"
             for r in validation_report.results
         )
 
