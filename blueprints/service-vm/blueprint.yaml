@@ -62,6 +62,9 @@ inputs:
   - name: cloud_init_snippets
     description: "List of cloud-init snippet names to attach to the VM"
     default: []
+  - name: cloud_init_snippets_storage
+    description: "Proxmox storage for the cloud-init snippet file; empty: provider default"
+    default: ""
   - name: extra_cloud_init_vars
     description: "Additional cloud-init variables merged on top of HOSTNAME"
     default: {}

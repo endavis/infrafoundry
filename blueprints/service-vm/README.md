@@ -77,6 +77,7 @@ foundry infra apply --env <env> --package my-service
 | `onboot`                 | `true`                         | Start the VM automatically when the host boots         |
 | `cloud_init_snippets`    | `[]`                           | List of cloud-init snippet names to attach             |
 | `extra_cloud_init_vars`  | `{}`                           | Extra cloud-init vars merged with the `HOSTNAME` entry |
+| `cloud_init_snippets_storage` | `""` | Proxmox storage for the cloud-init snippet file; empty: provider default |
 | `tags`                   | `[]`                           | Proxmox tags applied to the VM                         |
 | `dhcp_description`       | `""` (falls back to `vm_name`) | Description written on the DHCP reservation            |
 

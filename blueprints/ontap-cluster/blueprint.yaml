@@ -172,7 +172,12 @@ inputs:
     description: "Domain for the published host overrides; falls back to dns_domain when empty. One of the two is required when publish_dns is true"
     default: ""
 
-  # Extra Proxmox tags appended to the blueprint's default tags
+  # Base Proxmox tags; extra_tags are appended to them. Changing base_tags on an
+  # existing VM changes its tags, which replaces an OVA-imported VM
+  - name: base_tags
+    description: "Base Proxmox tags for the VM; extra_tags are appended"
+    default: [ontap, ontap-sim]
+  # Extra Proxmox tags appended to base_tags
   - name: extra_tags
     default: []
 

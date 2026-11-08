@@ -78,6 +78,7 @@ infra apply --env <env> --package console-connector
 | `console_account_id` | `""` | Console organization ID; empty: the only account the service account sees |
 | `console_company` | `""` | Company name sent at registration; empty: `vm_name` |
 | `console_site` | `default` | Site name sent at registration |
+| `cloud_init_snippets_storage` | `""` | Proxmox storage for the cloud-init snippet file; empty: provider default |
 | `extra_tags` | `[]` | Additional Proxmox tags |
 
 `docker_version` is the upstream version only (`27.5.1`). The install script
