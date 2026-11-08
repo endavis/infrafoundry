@@ -410,7 +410,7 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 
 **Mechanism:** Direct-REST singleton over the `general` section of the `OPNsense\Syslog` model. Only declared YAML keys are compared and written; an omitted key is unmanaged. Destroy is a no-op. Applies ADR-0014 and ADR-0016 unchanged.
 
-- **Endpoints:** `GET syslog/settings/get` (response `{"syslog": {"general": {...}, "destinations": ...}}`), `POST syslog/settings/set` and `POST syslog/service/reconfigure`. The GET shape was probed live; the **`set` and `reconfigure` calls are unverified live**.
+- **Endpoints:** `GET syslog/settings/get` (response `{"syslog": {"general": {...}, "destinations": ...}}`), `POST syslog/settings/set` and `POST syslog/service/reconfigure`. The GET shape, the `set` call with the `syslog` envelope and the `reconfigure` call were verified live on a test firewall (value changed, re-plan stable, value restored).
 - **Identity:** singleton named `syslog.settings`. `get_resource_ids()` returns `{"syslog.settings": "global"}`.
 - **Wire schema:** four fields (see [the coverage doc](../development/opnsense-resource-coverage.md#syslog-settings-804)). The write sends the whole flattened live `general` object with the declared fields overwritten; `destinations` is never sent.
 - **Reconfigure:** the manager declares `FINALIZATION_HOOK = "syslog_reconfigure"`, so one `syslog/service/reconfigure` call fires per apply, only when the settings changed.

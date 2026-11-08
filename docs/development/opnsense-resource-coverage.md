@@ -54,7 +54,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<openvpn>` (legacy `os-openvpn-legacy` plugin) | none | Unmanaged. A cutover recreates the client as a modern `openvpn.instances` entry; import any legacy server or other legacy configuration by hand. |
 | `<OPNsense>/AcmeClient` | `acmeclient_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#790](https://github.com/endavis/infrafoundry/issues/790) ships. In scope since ADR-0013's 2026-10-27 amendment; needs `os-acme-client` from `system.firmware`. |
 | `<OPNsense>/tailscale` | `tailscale_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#787](https://github.com/endavis/infrafoundry/issues/787) ships. |
-| `<OPNsense>/Syslog` | `syslog.settings` | Supported (direct-API; #804). A singleton over the `general` section of the syslog model (local logging switch and log rotation); only declared fields are compared, the whole live `general` object is echoed back on write; destroy is a no-op; the `syslog_reconfigure` hook fires one reconfigure per apply. Remote `destinations` are not managed. **The `set` and `reconfigure` calls are not yet verified against a live box.** See [Syslog settings](#syslog-settings-804). |
+| `<OPNsense>/Syslog` | `syslog.settings` | Supported (direct-API; #804). A singleton over the `general` section of the syslog model (local logging switch and log rotation); only declared fields are compared, the whole live `general` object is echoed back on write; destroy is a no-op; the `syslog_reconfigure` hook fires one reconfigure per apply. Remote `destinations` are not managed. The `set` and `reconfigure` calls are verified live. See [Syslog settings](#syslog-settings-804). |
 | `<OPNsense>/monit` | `monit_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#791](https://github.com/endavis/infrafoundry/issues/791) ships. |
 | `<OPNsense>/Hostwatch` | `hostwatch` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#792](https://github.com/endavis/infrafoundry/issues/792) ships. |
 | `<OPNsense>/unboundplus/advanced` (`privatedomain`, `insecuredomain`, `privateaddress`) | `unbound.advanced` | Supported (direct-API; #1254). Only declared fields are compared; the whole `advanced` section is echoed back on write; destroy is a no-op; shares the `unbound_reconfigure` hook. The `set` envelope key is unverified live. |
@@ -261,7 +261,7 @@ opnsense:
       max_file_size: 10
 ```
 
-**Not yet verified live.** The `get` shape was probed on a test firewall, but the `set` call and the `syslog/service/reconfigure` call have not been run against a box. After the first apply, re-run `infra plan` and expect no update.
+**Verified live** on a test firewall: `syslog/settings/set` with the `syslog` envelope changed `max_preserve` and left the other `general` fields and the `destinations` list unchanged; `syslog/service/reconfigure` ran and the service stayed running; a re-plan after apply showed no update.
 
 ## How deletes work: the managed set (#1256)
 
