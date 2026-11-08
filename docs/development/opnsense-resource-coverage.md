@@ -57,8 +57,8 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<OPNsense>/Syslog` | `syslog.settings` | Supported (direct-API; #804). A singleton over the `general` section of the syslog model (local logging switch and log rotation); only declared fields are compared, the whole live `general` object is echoed back on write; destroy is a no-op; the `syslog_reconfigure` hook fires one reconfigure per apply. Remote `destinations` are not managed. The `set` and `reconfigure` calls are verified live. See [Syslog settings](#syslog-settings-804). |
 | `<OPNsense>/monit` | `monit_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#791](https://github.com/endavis/infrafoundry/issues/791) ships. |
 | `<OPNsense>/Hostwatch` | `hostwatch` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#792](https://github.com/endavis/infrafoundry/issues/792) ships. |
-| `<OPNsense>/unboundplus/advanced` (`privatedomain`, `insecuredomain`, `privateaddress`) | `unbound.advanced` | Supported (direct-API; #1254). Only declared fields are compared; the whole `advanced` section is echoed back on write; destroy is a no-op; shares the `unbound_reconfigure` hook. The `set` envelope key is unverified live. |
-| `<OPNsense>/unboundplus/general`, the rest of `<OPNsense>/unboundplus/advanced` | `unbound.settings` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#1091](https://github.com/endavis/infrafoundry/issues/1091) ships. |
+| `<OPNsense>/unboundplus/advanced` (`privatedomain`, `insecuredomain`, `privateaddress`) | `unbound.advanced` | Supported (direct-API; #1254). Only declared fields are compared; the whole `advanced` section is echoed back on write; destroy is a no-op; shares the `unbound_reconfigure` hook. The `set` envelope key `unbound` is verified live through `unbound.settings` (#1091). |
+| `<OPNsense>/unboundplus/general`, the rest of `<OPNsense>/unboundplus/advanced` | `unbound.settings` | Supported (direct-API; #1091). Singleton with optional `general:` and `advanced:` mappings keyed by wire field name; only declared fields are compared, each declared live section is echoed back whole on write; destroy is a no-op; shares the `unbound_reconfigure` hook. See [Unbound general and advanced settings](#unbound-general-and-advanced-settings-1091). |
 | `<OPNsense>/Interfaces/settings` | `interfaces.settings` | Supported (direct-API; #1092). A singleton over the whole settings model; only declared fields are compared, the whole live object is echoed back on write; destroy is a no-op; the `interfaces_settings_reconfigure` hook fires one reconfigure per apply. **The `set` and `reconfigure` calls are not yet verified against a live box.** See [Interface settings](#interface-settings-1092). |
 | `<system>/lb_use_sticky`, `<system>/pf_share_forward`, `<system>/disablenatreflection`, `<system>/pfdebug` (firewall advanced) | none | **Out of scope.** Exist only on a legacy PHP page (`system_advanced_firewall.php`) with no MVC API, and the usual setup leaves them at the defaults. |
 | `<system>/timeservers` (NTP) | none | **Out of scope.** Same reason: legacy PHP page only (`services_ntpd.php`), usually left at the defaults. |
@@ -197,7 +197,7 @@ The password reads back from the API, but it is not compared; use `update_passwo
 | `insecure_domains` | `insecuredomain` |
 | `private_addresses` | `privateaddress` |
 
-An omitted key is not managed. An empty list (`[]`) is managed and clears the list. Lists are compared as sets. `insecure_domains` is for internal zones under a DNSSEC-signed parent. The `set` envelope key has not been verified live; after the first apply, re-run `infra plan` and expect no update.
+An omitted key is not managed. An empty list (`[]`) is managed and clears the list. Lists are compared as sets. `insecure_domains` is for internal zones under a DNSSEC-signed parent. The `set` envelope key `unbound` was verified live through `unbound.settings` (#1091), which writes the same section through the same call.
 
 ```yaml
 opnsense:
@@ -207,6 +207,41 @@ opnsense:
         - test.example.net
       insecure_domains:
         - test.example.net
+```
+
+## Unbound general and advanced settings (#1091)
+
+`opnsense.unbound.settings` is a singleton dict with optional `general:` and `advanced:` mappings. Keys are the OPNsense wire field names, as in `unbound.forwards`. An omitted key, or an omitted section, is not managed. Comparison is sparse: only declared fields are compared and written; the whole live section is echoed back on write, so undeclared settings stay unchanged.
+
+| Kind | Fields | YAML value |
+|---|---|---|
+| general booleans | `enabled`, `stats`, `dnssec`, `dns64`, `noarecords`, `regdhcp`, `regdhcpstatic`, `noreglladdr6`, `noregrecords`, `txtsupport`, `cacheflush`, `safesearch`, `enable_wpad` | `true` / `false` |
+| `port` | `port` | integer 1-65535 |
+| `local_zone_type` | `local_zone_type` | one of `transparent`, `always_nxdomain`, `always_refuse`, `always_transparent`, `deny`, `inform`, `inform_deny`, `nodefault`, `refuse`, `static`, `typetransparent` |
+| interface lists | `active_interface`, `outgoing_interface` | list of interface keys, compared as sets |
+| text | `dns64prefix` (empty or a network prefix), `regdhcpdomain` (no whitespace) | string |
+| advanced booleans | `hideidentity`, `hideversion`, `prefetch`, `prefetchkey`, `dnssecstripped`, `belownxdomain`, `aggressivensec`, `serveexpired`, `serveexpiredttlreset`, `qnameminstrict`, `extendedstatistics`, `logqueries`, `logreplies`, `logtagqueryreply`, `logservfail`, `loglocalactions`, `infrakeepprobing` | `true` / `false` |
+| levels | `logverbosity` (0-5), `valloglevel` (0-2) | integer |
+| tuning | `serveexpiredreplyttl`, `serveexpiredttl`, `serveexpiredclienttimeout`, `msgcachesize`, `rrsetcachesize`, `outgoingnumtcp`, `incomingnumtcp`, `numqueriesperthread`, `outgoingrange`, `jostletimeout`, `discardtimeout`, `cachemaxttl`, `cachemaxnegativettl`, `cacheminttl`, `infrahostttl`, `infracachenumhosts`, `unwantedreplythreshold` | non-negative integer, or a string without whitespace or commas |
+
+Unknown keys are validation errors. `privatedomain`, `insecuredomain` and `privateaddress` stay owned by `unbound.advanced`: declaring one here (by wire name or by its `unbound.advanced` key) is an error that names the `unbound.advanced` key to use. Both resources can be declared together, in either order. A declared field that the live section does not carry fails at plan time.
+
+**Verified live** on a test firewall: an `advanced` field changed through `unbound/settings/set`, `unbound/service/reconfigure` ran with the service still running, a re-plan after apply showed no update, and restoring the value worked the same way.
+
+`config migrate` exports every supported field present on the box, skipping empty text and empty lists; digit-only text is exported as an integer. The owned fields are never exported. `unbound.advanced` has no migrate extractor yet; that is a known follow-up gap.
+
+```yaml
+opnsense:
+  unbound:
+    settings:
+      general:
+        enabled: true
+        regdhcp: true
+        regdhcpstatic: true
+        local_zone_type: transparent
+      advanced:
+        hideidentity: true
+        prefetch: true
 ```
 
 ## Interface settings (#1092)
@@ -275,7 +310,7 @@ opnsense:
 
 - **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs` and `openvpn.instances`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
-- **Singletons** (`system.*`, `unbound.advanced`, `interfaces.settings`, `syslog.settings`, `radvd`) are unaffected.
+- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `radvd`) are unaffected.
 
 **Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
 

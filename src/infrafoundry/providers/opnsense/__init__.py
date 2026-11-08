@@ -156,6 +156,7 @@ class OPNsenseProvider(
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
         from .components.unbound_host_override import UnboundHostOverrideManager
+        from .components.unbound_settings import UnboundSettingsManager
         from .components.virtual_ip import VirtualIPManager
         from .components.vlan import VlanManager
 
@@ -173,6 +174,7 @@ class OPNsenseProvider(
             ("unbound.host_overrides", UnboundHostOverrideManager),
             ("unbound.host_aliases", UnboundHostAliasManager),
             ("unbound.forwards", UnboundForwardManager),
+            ("unbound.settings", UnboundSettingsManager),
             ("kea_dhcp", KeaDHCPManager),
             ("isc_to_kea", ISCToKeaMigrationManager),
             ("cron.jobs", CronJobsManager),
@@ -278,6 +280,7 @@ class OPNsenseProvider(
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
         from .components.unbound_host_override import UnboundHostOverrideManager
+        from .components.unbound_settings import UnboundSettingsManager
         from .components.virtual_ip import VirtualIPManager
         from .components.vlan import VlanManager
 
@@ -327,6 +330,7 @@ class OPNsenseProvider(
             "unbound.host_aliases": UnboundHostAliasManager,
             "unbound.forwards": UnboundForwardManager,
             "unbound.advanced": UnboundAdvancedManager,
+            "unbound.settings": UnboundSettingsManager,
             "kea.dhcp4.subnets": KeaDHCPv4SubnetManager,
             "kea.dhcp4.reservations": KeaDHCPv4ReservationManager,
             "kea.dhcp6.subnets": KeaDHCPv6SubnetManager,
@@ -358,9 +362,10 @@ class OPNsenseProvider(
           when DHCPv4 was migrated to direct-API (#777, #778).
         - ``unbound_reconfigure`` (#776) — shared by
           :class:`UnboundHostOverrideManager`, :class:`UnboundHostAliasManager`,
-          :class:`UnboundForwardManager` and :class:`UnboundAdvancedManager`
-          (#1254) so a single ``unbound/service/reconfigure`` call fires per
-          apply when any of the four unbound components changed state.
+          :class:`UnboundForwardManager`, :class:`UnboundAdvancedManager` (#1254)
+          and :class:`UnboundSettingsManager` (#1091) so a single
+          ``unbound/service/reconfigure`` call fires per apply when any of the
+          five unbound components changed state.
         - ``interfaces_settings_reconfigure`` (#1092) — fired by
           :class:`InterfacesSettingsManager` when the interface settings changed.
 
@@ -641,6 +646,7 @@ class OPNsenseProvider(
             "unbound.host_aliases": ["unbound.host_overrides"],
             "unbound.forwards": [],
             "unbound.advanced": [],
+            "unbound.settings": [],
             "radvd": ["interfaces.assignments"],
             "cron.jobs": [],
             "trust.cas": [],

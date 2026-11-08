@@ -39,6 +39,7 @@ from infrafoundry.providers.opnsense.validators import (
     UnboundAdvancedValidator,
     UnboundForwardValidator,
     UnboundHostAliasValidator,
+    UnboundSettingsValidator,
     UnboundValidator,
     VirtualIPValidator,
     VLANValidator,
@@ -118,6 +119,7 @@ class OPNsenseValidator:
         self.system_user_validator = SystemUserValidator(report)
         self.system_group_validator = SystemGroupValidator(report)
         self.unbound_advanced_validator = UnboundAdvancedValidator(report)
+        self.unbound_settings_validator = UnboundSettingsValidator(report)
         self.interfaces_settings_validator = InterfacesSettingsValidator(report)
         self.syslog_settings_validator = SyslogSettingsValidator(report)  # #804
 
@@ -350,6 +352,9 @@ class OPNsenseValidator:
             self.unbound_advanced_validator.validate(
                 replace(context, resources=resource_refs["unbound_advanced"])
             )
+            self.unbound_settings_validator.validate(
+                replace(context, resources=resource_refs["unbound_settings"])
+            )
             self.interfaces_settings_validator.validate(
                 replace(context, resources=resource_refs["interfaces_settings"])
             )
@@ -406,6 +411,7 @@ class OPNsenseValidator:
         unbound_host_aliases = [r for r in resources if r.type == "unbound.host_aliases"]
         unbound_forwards = [r for r in resources if r.type == "unbound.forwards"]
         unbound_advanced = [r for r in resources if r.type == "unbound.advanced"]
+        unbound_settings = [r for r in resources if r.type == "unbound.settings"]
         interfaces_settings = [r for r in resources if r.type == "interfaces.settings"]
         syslog_settings = [r for r in resources if r.type == "syslog.settings"]  # #804
         interface_assignments = [r for r in resources if r.type == "interfaces.assignments"]
@@ -451,6 +457,7 @@ class OPNsenseValidator:
             "unbound_host_aliases": unbound_host_aliases,
             "unbound_forwards": unbound_forwards,
             "unbound_advanced": unbound_advanced,
+            "unbound_settings": unbound_settings,
             "interfaces_settings": interfaces_settings,
             "syslog_settings": syslog_settings,  # #804
             "interface_assignments": interface_assignments,
