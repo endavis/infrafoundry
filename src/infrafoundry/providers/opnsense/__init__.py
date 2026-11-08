@@ -572,7 +572,7 @@ class OPNsenseProvider(
 
         Used by :meth:`get_finalization_hooks` so one
         ``hostdiscovery/service/reconfigure`` call fires per apply, only when the
-        settings changed. Unverified against a live box. Hook errors propagate,
+        settings changed. Verified against a live box. Hook errors propagate,
         failing the apply.
 
         Args:
