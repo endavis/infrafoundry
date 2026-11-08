@@ -190,6 +190,25 @@ class TestParseNestedSingleton:
 class TestParseNestedList:
     """List (sequence-leaf) shape — emits one ResourceConfig per entry."""
 
+    def test_system_users_and_groups_lists(self, temp_dir: Path) -> None:
+        """``opnsense.system.{users,groups}`` list leaves round-trip, secret URIs intact (#805)."""
+        loader = PackageLoader(temp_dir)
+        uri = "secret://env_secrets/users/example-user/password"
+        data = {
+            "opnsense": {
+                "system": {
+                    "users": [{"name": "example-user", "config": {"uid": 2000, "password": uri}}],
+                    "groups": [{"name": "admins", "config": {"member_refs": ["example-user"]}}],
+                }
+            }
+        }
+        resources = loader._parse_resources_from_data(data, "fw.yaml", "opnsense")
+        by_type = {r.type: r for r in resources}
+        assert set(by_type) == {"system.users", "system.groups"}
+        assert by_type["system.users"].name == "example-user"
+        assert by_type["system.users"].config["password"] == uri
+        assert by_type["system.groups"].config["member_refs"] == ["example-user"]
+
     def test_firewall_aliases_list(self, temp_dir: Path) -> None:
         """``opnsense.firewall.aliases`` list leaf emits one config per entry."""
         loader = PackageLoader(temp_dir)

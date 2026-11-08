@@ -30,7 +30,9 @@ from infrafoundry.providers.opnsense.validators import (
     ResourceNameValidator,
     StaticRouteValidator,
     SystemFirmwareValidator,
+    SystemGroupValidator,
     SystemTuningValidator,
+    SystemUserValidator,
     UnboundAdvancedValidator,
     UnboundForwardValidator,
     UnboundHostAliasValidator,
@@ -108,6 +110,8 @@ class OPNsenseValidator:
         self.cron_jobs_validator = CronJobsValidator(report)
         self.system_firmware_validator = SystemFirmwareValidator(report)
         self.system_tuning_validator = SystemTuningValidator(report)
+        self.system_user_validator = SystemUserValidator(report)
+        self.system_group_validator = SystemGroupValidator(report)
         self.unbound_advanced_validator = UnboundAdvancedValidator(report)
         self.interfaces_settings_validator = InterfacesSettingsValidator(report)
 
@@ -354,6 +358,12 @@ class OPNsenseValidator:
             self.system_tuning_validator.validate(
                 replace(context, resources=resource_refs["system_tuning"])
             )
+            self.system_user_validator.validate(
+                replace(context, resources=resource_refs["system_users"])
+            )
+            self.system_group_validator.validate(
+                replace(context, resources=resource_refs["system_groups"])
+            )
             self.resource_name_validator.validate(context)
 
         except Exception as exc:
@@ -396,6 +406,8 @@ class OPNsenseValidator:
         cron_jobs = [r for r in resources if r.type == "cron.jobs"]
         system_firmware = [r for r in resources if r.type == "system.firmware"]
         system_tuning = [r for r in resources if r.type == "system.tuning"]
+        system_users = [r for r in resources if r.type == "system.users"]
+        system_groups = [r for r in resources if r.type == "system.groups"]
 
         alias_names = {a.name for a in aliases}
         vlan_names = {v.name for v in vlans}
@@ -443,6 +455,8 @@ class OPNsenseValidator:
             "cron_jobs": cron_jobs,
             "system_firmware": system_firmware,
             "system_tuning": system_tuning,
+            "system_users": system_users,
+            "system_groups": system_groups,
         }
 
     def _get_existing_aliases(

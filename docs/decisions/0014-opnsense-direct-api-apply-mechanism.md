@@ -431,6 +431,21 @@ The spike empirically established that `/api/core/backup/{backups,download}` ret
 - **Rollback strategy:** Per-job write failures surface in the OPNsense response and raise on the API layer, failing the apply loud. No transactional rollback — successful per-job writes that landed before a later failure stay applied. `cron/service/reconfigure` runs once per apply via the finalization hook.
 - **Cross-reference notes:** None. Self-contained list resource; no cross-references to other resource types.
 
+### `system.users` and `system.groups` (#805)
+
+**Mechanism:** Direct REST against the `auth/user` and `auth/group` controllers. Two list-shape types under `opnsense.system`, keyed by the wire `name`, with `DELETE_SCOPE = "managed_set"` ([ADR-0018](0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). There is no reconfigure step: the 26.1 specs expose no reconfigure endpoint for the auth controllers (not tested live).
+
+- **Endpoints:** `GET auth/{user,group}/search` (verified by a read-only probe on a 26.1 box; rows are flat string maps, groups carry `member` as comma-joined uids), `POST auth/{user,group}/add`, `POST .../set/<uuid>`, `POST .../del/<uuid>`. `add`, `set` and the `{"user": {...}}` / `{"group": {...}}` envelopes were verified against a 26.1 test firewall.
+- **Two-form schema:** YAML keys are `scope`, `disabled`, `expires`, `shell`, `description` (wire `descr`), `email`, `comment`, `language`, `priv`, `password`, `update_password`, `authorizedkeys`, `otp_seed`, `apikeys` for users; `scope`, `description`, `priv` for groups. `priv` is an opaque string list, compared as a set. Groups add `member_refs`. `group_memberships` and `source_networks` are not modeled. Unknown keys are a validator ERROR (the allowed-key sets in the services are the single source) with a plan-time `ValueError` as backstop.
+- **`uid` and `gid` are box-assigned.** The API ignores a supplied value (the box takes its next free number on add and keeps it on set), so neither key is accepted: the validator reports an ERROR. They are never written or compared.
+- **Sparse comparison:** only the fields the operator set (plus `name`) are written and compared, so a live user such as `root` can be declared with just its `name`. `set` leaves omitted fields untouched (verified).
+- **Membership is owned by groups.** A user's `group_memberships` is never written or compared. A group with `member_refs` writes `member` as sorted comma-joined uids and compares it as a set; a group without `member_refs` leaves membership alone.
+- **Sibling pattern:** `GroupManager` declares `SIBLING_RESOURCE_TYPE = "system.users"` and resolves each ref (bare, `users.<n>`, `system.users.<n>`) to the sibling resource, its wire name, then its live uid from `auth/user/search`. Resolution of group member uids against live users is verified. At plan time a user that is in YAML but not live marks the group as changed (the box assigns the uid on add). At apply time a ref with no live user raises `ReferenceValidationError`. Users dispatch before groups (`get_dependencies`: `system.groups` depends on `system.users`), and `SPLIT_DELETE_PHASE` runs group deletes before user deletes.
+- **uid 0 protection:** no code path deletes a live user whose live `uid` is `"0"`: not `compute_diff` (also with no managed set; it logs a WARNING only when it would otherwise have planned the delete), not `apply_diff`, not `destroy` (counted under `protected_skipped`, with a WARNING).
+- **Secrets:** `password`, `authorizedkeys`, `otp_seed` and `apikeys` must be `secret://` URIs; a literal is a validator ERROR (stricter than `virtual_ips`), and messages never echo values. The repo has no `!secret` YAML tag, so the `secret://env_secrets/...` form is the reference syntax. `password` holds the PLAINTEXT password and the box hashes it, like the GUI. `auth/user/get` and `search` never return it (write-only), so it is never compared: it is sent on `add` only. A value that resolves to a bcrypt-looking hash (`$2[aby]$NN$...`) is rejected at plan time, without echoing it. To rotate deliberately, set `update_password: true` (the password is then sent on update and counts as a change), apply, then remove the flag.
+- **Not verified:** whether `apikeys` is writable through `set`.
+- **Not in scope:** a `config migrate` extractor, and moving `virtual_ips` onto the shared secret helper `components/_secrets.py` (follow-up: its tests patch `virtual_ip.ConfigManager`).
+
 ### `dhcp_static_maps` — retired (#782, 2026-05-08)
 
 **Mechanism: deletion, not migration.** `dhcp_static_maps` was the legacy ISC DHCP static-mapping resource type, intended to be backed by the terraform resource `opnsense_dhcpv4_static_map`. Live audit during the cutover-unblock series (#766) confirmed that resource never existed in the `browningluke/opnsense` provider; the surface had no working apply path under any provider version the project pinned.
@@ -486,6 +501,8 @@ Direct-API resources can declare secret-bearing fields as `secret://env_secrets/
 The validator (plan-time) accepts `secret://...` URIs as a valid placeholder without resolving — resolution is strictly an apply-time concern. Plaintext values in secret-bearing fields are accepted but produce a soft warning so operators don't silently commit secrets to YAML.
 
 **First consumer:** `virtual_ips` (CARP `password`, #723).
+
+**Second consumer:** `system.users` (#805) resolves through the shared `components/_secrets.py::resolve_resource_secrets`. Follow-up: move `virtual_ips` onto the same helper.
 
 **Future-proofing:** if a follow-up direct-API resource needs secrets, that issue is the place to consolidate this pattern (e.g., generalize to runner-level pre-resolution rather than per-component manager). The current component-manager-level resolution is the smallest viable path.
 
@@ -566,6 +583,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#778](https://github.com/endavis/infrafoundry/issues/778): feat: migrate `kea_reservation` (DHCPv4) write path from terraform to direct-API (paired with #777; identity tuple `(hw_address, subnet_uuid)`; reservation→subnet UUID resolution raises `ReferenceValidationError` on missing live subnet). Recorded under "Per-component decisions" / `kea_dhcp4` above.
 - Issue [#782](https://github.com/endavis/infrafoundry/issues/782): refactor: retire `dhcp_static_maps` (deletion, not migration — superseded by `kea_reservation` direct-API; the legacy `opnsense_dhcpv4_static_map` terraform resource never existed in `browningluke/opnsense`). End-of-series milestone: OPNsense now has no terraform write paths. Recorded under "Per-component decisions" / `dhcp_static_maps` above.
 - Issue [#802](https://github.com/endavis/infrafoundry/issues/802): bug — Kea reservation `subnet_ref` → subnet name resolution missing after the #781 direct-API migration. Adds a `KeaReservationValidator` (plan-time pure check via the `_xref` resolver) plus component-time `subnet_ref` → CIDR translation in both `KeaDHCPv{4,6}ReservationManager`; runner gains a generic opt-in `SIBLING_RESOURCE_TYPE` ClassVar marker that threads the matching sibling resource slice as a `sibling_resources` kwarg without changing signatures of managers that don't opt in. Recorded in the 2026-05-09 amendment line above.
+- Issue [#805](https://github.com/endavis/infrafoundry/issues/805): feat — `system.users` and `system.groups` direct-API list types (`auth/user`, `auth/group`; groups own membership via `member_refs`; uid 0 never deleted; secret fields `secret://`-only). Recorded under "Per-component decisions" / `system.users` and `system.groups` above.
 
 ## Related Documentation
 

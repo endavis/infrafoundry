@@ -284,6 +284,27 @@ CRON = _crud(
 )
 CRON_RECONFIGURE = Endpoint("POST", "cron/service/reconfigure")
 
+# --- auth (system users and groups, #805) ---------------------------------------------
+# No reconfigure: the 26.1 specs expose none for the auth controllers.
+AUTH_USER = _crud(
+    "auth/user",
+    search="search",
+    get=None,
+    add="add",
+    update="set",
+    delete="del",
+    search_method="GET",
+)
+AUTH_GROUP = _crud(
+    "auth/group",
+    search="search",
+    get=None,
+    add="add",
+    update="set",
+    delete="del",
+    search_method="GET",
+)
+
 # --- kea ----------------------------------------------------------------------------
 KEA_CRUD: dict[tuple[str, str], CrudEndpoints] = {
     (api_version, noun): _crud(
@@ -423,6 +444,8 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     ),
     "radvd": (*RADVD.all(), RADVD_RECONFIGURE),
     "cron.jobs": (*CRON.all(), CRON_RECONFIGURE),
+    "system.users": AUTH_USER.all(),
+    "system.groups": (*AUTH_GROUP.all(), AUTH_USER.search),
 }
 
 #: Endpoints used outside a single resource type (ISC to Kea migration).
