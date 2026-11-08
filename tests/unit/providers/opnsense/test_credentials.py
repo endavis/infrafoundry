@@ -488,9 +488,7 @@ class TestResolveSshSettings:
         assert ssh == SshSettings(host="172.20.99.1", user="root", port="22", key="")
 
     def test_ssh_host_beats_api_url_host(self) -> None:
-        ssh = resolve_ssh_settings(
-            {"api_url": "https://172.20.99.1", "ssh_host": "172.20.10.250"}
-        )
+        ssh = resolve_ssh_settings({"api_url": "https://172.20.99.1", "ssh_host": "172.20.10.250"})
         assert ssh.host == "172.20.10.250"
 
     def test_user_port_key_from_settings(self) -> None:

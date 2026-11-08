@@ -795,7 +795,11 @@ class TestMigrateKeaDHCPEmitsNested:
         service = KeaDHCPService(MagicMock())
         service.search_dhcpv4_subnets = MagicMock(  # type: ignore[method-assign]
             return_value=[
-                {"description": "lan", "subnet": "172.21.0.0/24", "pools": "172.21.0.10-172.21.0.99"},
+                {
+                    "description": "lan",
+                    "subnet": "172.21.0.0/24",
+                    "pools": "172.21.0.10-172.21.0.99",
+                },
             ]
         )
         service.search_dhcpv4_reservations = MagicMock(  # type: ignore[method-assign]

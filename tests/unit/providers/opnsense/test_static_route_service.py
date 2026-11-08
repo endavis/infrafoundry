@@ -824,7 +824,9 @@ class TestApplyDiffRejectedWrite:
         }
         svc = StaticRouteService(client)
 
-        with pytest.raises(APIError, match=r"add static route 172\.21\.0\.0/24.*Option not in list"):
+        with pytest.raises(
+            APIError, match=r"add static route 172\.21\.0\.0/24.*Option not in list"
+        ):
             svc.apply_diff(Diff(adds=[_route("foo")]))
 
         endpoints = [c.args[1] for c in client.request.call_args_list]

@@ -206,7 +206,8 @@ class TestApply:
         assert outcomes[0].action == "delete"
         assert outcomes[0].resource_name == "forward-forward-x-example-172-21-0-99-53"
         assert (
-            outcomes[0].address == "opnsense_unbound_forward.forward-forward-x-example-172-21-0-99-53"
+            outcomes[0].address
+            == "opnsense_unbound_forward.forward-forward-x-example-172-21-0-99-53"
         )
 
     def test_apply_threads_add_only(self, tmp_path: Path) -> None:
