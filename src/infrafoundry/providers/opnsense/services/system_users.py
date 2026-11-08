@@ -11,9 +11,10 @@ Sparse comparison
 -----------------
 
 Only the fields the operator set (plus ``name``) are written and compared, so an
-existing user such as ``root`` can be declared with just ``uid: 0`` without
-clobbering the fields the YAML leaves out. Group membership is owned by
-``system.groups``: ``group_memberships`` is never written or compared here.
+existing user such as ``root`` can be declared with just a ``name`` without
+clobbering the fields the YAML leaves out (``set`` keeps omitted fields). Group
+membership is owned by ``system.groups``: ``group_memberships`` is never written
+or compared here. ``uid`` is assigned by the box and is not configurable.
 
 Secrets
 -------
@@ -21,13 +22,17 @@ Secrets
 ``password``, ``authorizedkeys``, ``otp_seed`` and ``apikeys`` must be written as
 ``secret://`` URIs in YAML (the validator rejects literals). The manager resolves
 them before the diff runs, so this module sees plaintext values only through
-``UserConfig.fields`` and never logs them: log lines name changed fields only.
+``UserConfig`` and never logs them: log lines name changed fields only.
+
+``password`` holds the PLAINTEXT password; the box hashes it. The API never returns
+it (write-only), so it is never compared: it is sent on add, and on update only
+when ``update_password`` is true (which also counts as a change).
 
 Root protection
 ---------------
 
-A live user with ``uid == "0"`` is never deleted by the diff, ``apply_diff`` or
-the manager's ``destroy``.
+A live user with ``uid == "0"`` (the live uid) is never deleted by the diff,
+``apply_diff`` or the manager's ``destroy``.
 """
 
 from __future__ import annotations
@@ -47,21 +52,29 @@ logger = logging.getLogger(__name__)
 #: Wire fields whose values must come from ``secret://`` URIs.
 SECRET_FIELDS: tuple[str, ...] = ("password", "authorizedkeys", "otp_seed", "apikeys")
 
-#: Plain string wire fields an operator may set (``uid``, ``disabled`` and ``priv`` are typed).
+#: Secret fields compared like ordinary fields; ``password`` is write-only and handled apart.
+_COMPARED_SECRET_FIELDS: tuple[str, ...] = tuple(f for f in SECRET_FIELDS if f != "password")
+
+#: Plain string config keys an operator may set (``disabled`` and ``priv`` are typed).
 _STRING_FIELDS: tuple[str, ...] = (
     "scope",
     "expires",
     "shell",
-    "descr",
+    "description",
     "email",
     "comment",
     "language",
-    *SECRET_FIELDS,
+    *_COMPARED_SECRET_FIELDS,
 )
+#: Config key -> wire key, where they differ.
+_WIRE_KEYS: dict[str, str] = {"description": "descr"}
 _VALID_SCOPES: frozenset[str] = frozenset({"system", "user"})
-_ALLOWED_KEYS: frozenset[str] = frozenset(
-    {"name", "lock", "uid", "disabled", "priv", *_STRING_FIELDS}
+#: Every config key a ``system.users`` resource accepts (single source for plan and validator).
+ALLOWED_KEYS: frozenset[str] = frozenset(
+    {"name", "lock", "disabled", "priv", "password", "update_password", *_STRING_FIELDS}
 )
+#: Keys the box assigns itself; the validator rejects them with an explanation.
+BOX_ASSIGNED_KEYS: frozenset[str] = frozenset({"uid"})
 _BCRYPT_RE = re.compile(r"^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$")
 ROOT_UID = "0"
 
@@ -72,13 +85,18 @@ class UserConfig:
 
     Attributes:
         name: Wire user name (diff key).
-        fields: Sorted ``(wire_key, serialized_value)`` pairs the operator set.
+        fields: Sorted ``(wire_key, serialized_value)`` pairs the operator set,
+            without ``password``.
         lock: Per-resource safety annotation (ADR-0014 section 6).
+        password: Plaintext password (never compared, logged or shown in ``repr``).
+        update_password: Send ``password`` on update too.
     """
 
     name: str
     fields: tuple[tuple[str, str], ...] = ()
     lock: bool = False
+    password: str = field(default="", repr=False)
+    update_password: bool = False
 
     @property
     def diff_key(self) -> str:
@@ -92,9 +110,17 @@ class UserConfig:
                 return v
         return None
 
-    def to_payload(self) -> dict[str, Any]:
-        """Serialize to the ``add``/``set`` envelope: ``name`` plus the set fields only."""
-        return {"user": {"name": self.name, **dict(self.fields)}}
+    def to_payload(self, *, include_password: bool = False) -> dict[str, Any]:
+        """Serialize to the ``add``/``set`` envelope: ``name`` plus the set fields only.
+
+        Args:
+            include_password: Add ``password`` (when set). True on add; on update only
+                with ``update_password``.
+        """
+        body: dict[str, Any] = {"name": self.name, **dict(self.fields)}
+        if include_password and self.password:
+            body["password"] = self.password
+        return {"user": body}
 
 
 @dataclass(frozen=True)
@@ -148,7 +174,9 @@ def changed_fields(have: LiveUser, want: UserConfig) -> list[str]:
         want: Desired user.
 
     Returns:
-        Field names only, never values (some are secrets).
+        Field names only, never values (some are secrets). ``password`` appears only
+        when ``update_password`` is set and a password was supplied: the live value
+        is write-only, so it is never compared.
     """
     changed: list[str] = []
     for key, value in want.fields:
@@ -158,6 +186,8 @@ def changed_fields(have: LiveUser, want: UserConfig) -> list[str]:
                 changed.append(key)
         elif value != live_value:
             changed.append(key)
+    if want.update_password and want.password:
+        changed.append("password")
     return changed
 
 
@@ -206,10 +236,10 @@ def compute_diff(
     for key, have in current_by_key.items():
         if key in locked_keys or key in desired_by_key:
             continue
-        if have.is_root:
-            logger.warning("opnsense system.users: refusing to delete the uid 0 account")
+        if managed_keys is not None and key not in managed_keys:
             diff.unmanaged.append(have)
-        elif managed_keys is not None and key not in managed_keys:
+        elif have.is_root:
+            logger.warning("opnsense system.users: refusing to delete the uid 0 account")
             diff.unmanaged.append(have)
         else:
             diff.deletes.append(have)
@@ -242,7 +272,7 @@ def user_configs_from_resources(resources: list[ResourceConfig]) -> list[UserCon
 
 def _build_config(resource_name: str, config: dict[str, Any]) -> UserConfig:
     """Build one :class:`UserConfig`; error messages never include values."""
-    unknown = sorted(set(config) - _ALLOWED_KEYS)
+    unknown = sorted(set(config) - ALLOWED_KEYS)
     if unknown:
         raise ValueError(f"system user '{resource_name}' has unknown keys: {unknown}")
     name = config.get("name", resource_name)
@@ -252,12 +282,15 @@ def _build_config(resource_name: str, config: dict[str, Any]) -> UserConfig:
     if not isinstance(lock, bool):
         raise ValueError(f"system user '{resource_name}' lock must be a boolean")
 
+    update_password = config.get("update_password", False)
+    if not isinstance(update_password, bool):
+        raise ValueError(f"system user '{resource_name}' update_password must be a boolean")
+    raw_password = config.get("password")
+    password = "" if raw_password is None else raw_password
+    if not isinstance(password, str):
+        raise ValueError(f"system user '{resource_name}' password must be a string")
+
     values: dict[str, str] = {}
-    if "uid" in config:
-        uid = config["uid"]
-        if isinstance(uid, bool) or not isinstance(uid, (int, str)) or not str(uid).isdigit():
-            raise ValueError(f"system user '{resource_name}' uid must be a non-negative integer")
-        values["uid"] = str(int(uid))
     if "disabled" in config:
         disabled = config["disabled"]
         if not isinstance(disabled, bool):
@@ -276,30 +309,38 @@ def _build_config(resource_name: str, config: dict[str, Any]) -> UserConfig:
             value = ""
         if not isinstance(value, str):
             raise ValueError(f"system user '{resource_name}' {key} must be a string")
-        values[key] = value
+        values[_WIRE_KEYS.get(key, key)] = value
     scope = values.get("scope")
     if scope is not None and scope not in _VALID_SCOPES:
         raise ValueError(
             f"system user '{resource_name}' scope must be one of {sorted(_VALID_SCOPES)}"
         )
-    return UserConfig(name=name, fields=tuple(sorted(values.items())), lock=lock)
+    return UserConfig(
+        name=name,
+        fields=tuple(sorted(values.items())),
+        lock=lock,
+        password=password,
+        update_password=update_password,
+    )
 
 
-def check_password_hashes(configs: list[UserConfig]) -> None:
-    """Require every resolved ``password`` to be a bcrypt hash.
+def reject_hashed_passwords(configs: list[UserConfig]) -> None:
+    """Reject a resolved ``password`` that looks like a bcrypt hash.
+
+    The box hashes the password itself, so a pre-hashed value would become the
+    literal password.
 
     Args:
         configs: Users after secret resolution.
 
     Raises:
-        ValueError: Naming the user, never the value, when a password is not bcrypt.
+        ValueError: Naming the user, never the value.
     """
     for config in configs:
-        password = config.field("password")
-        if password and not _BCRYPT_RE.match(password):
+        if config.password and _BCRYPT_RE.match(config.password):
             raise ValueError(
-                f"system user '{config.name}' password must resolve to a bcrypt hash "
-                f'("$2y$NN$..."); plaintext passwords are not accepted'
+                f"system user '{config.name}' password resolves to a bcrypt-looking hash; "
+                f"supply the plaintext password (the box hashes it)"
             )
 
 
@@ -350,13 +391,19 @@ class UserService(BaseService):
     def add(self, user: UserConfig) -> dict[str, Any]:
         """Create a user; raises when OPNsense rejects it."""
         ep = endpoints.AUTH_USER.add
-        response = self.client.request(ep.method, ep.path(), data=user.to_payload())
+        response = self.client.request(
+            ep.method, ep.path(), data=user.to_payload(include_password=True)
+        )
         return raise_on_failed_write(response, f"add user {user.name}")  # type: ignore[no-any-return]
 
     def update(self, uuid: str, user: UserConfig) -> dict[str, Any]:
         """Update a user by UUID; raises when OPNsense rejects it."""
         ep = endpoints.AUTH_USER.update
-        response = self.client.request(ep.method, ep.path(uuid=uuid), data=user.to_payload())
+        response = self.client.request(
+            ep.method,
+            ep.path(uuid=uuid),
+            data=user.to_payload(include_password=user.update_password),
+        )
         return raise_on_failed_write(response, f"update user {user.name}")  # type: ignore[no-any-return]
 
     def delete(self, live: LiveUser) -> dict[str, Any] | None:

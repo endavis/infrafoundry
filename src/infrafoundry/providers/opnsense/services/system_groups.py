@@ -26,9 +26,10 @@ logger = logging.getLogger(__name__)
 
 _STRING_FIELDS: tuple[str, ...] = ("scope", "description")
 _VALID_SCOPES: frozenset[str] = frozenset({"system", "user"})
-_ALLOWED_KEYS: frozenset[str] = frozenset(
-    {"name", "lock", "gid", "priv", "member_refs", *_STRING_FIELDS}
-)
+#: Every config key a ``system.groups`` resource accepts (single source for plan and validator).
+ALLOWED_KEYS: frozenset[str] = frozenset({"name", "lock", "priv", "member_refs", *_STRING_FIELDS})
+#: Keys the box assigns itself; the validator rejects them with an explanation.
+BOX_ASSIGNED_KEYS: frozenset[str] = frozenset({"gid"})
 
 
 @dataclass(frozen=True)
@@ -205,7 +206,7 @@ def group_configs_from_resources(resources: list[ResourceConfig]) -> list[GroupC
 
 def _build_config(resource_name: str, config: dict[str, Any]) -> GroupConfig:
     """Build one :class:`GroupConfig`."""
-    unknown = sorted(set(config) - _ALLOWED_KEYS)
+    unknown = sorted(set(config) - ALLOWED_KEYS)
     if unknown:
         raise ValueError(f"system group '{resource_name}' has unknown keys: {unknown}")
     name = config.get("name", resource_name)
@@ -215,11 +216,6 @@ def _build_config(resource_name: str, config: dict[str, Any]) -> GroupConfig:
     if not isinstance(lock, bool):
         raise ValueError(f"system group '{resource_name}' lock must be a boolean")
     values: dict[str, str] = {}
-    if "gid" in config:
-        gid = config["gid"]
-        if isinstance(gid, bool) or not isinstance(gid, (int, str)) or not str(gid).isdigit():
-            raise ValueError(f"system group '{resource_name}' gid must be a non-negative integer")
-        values["gid"] = str(int(gid))
     if "priv" in config:
         priv = config["priv"]
         if not isinstance(priv, list) or not all(isinstance(p, str) for p in priv):

@@ -1,7 +1,7 @@
 """System-users component manager for OPNsense (ADR-0014, #805).
 
 Thin orchestration over :class:`UserService`: resolves ``secret://`` URIs, checks
-the password hash format, then plans, applies or destroys. Identity is the wire
+that no password is a pre-hashed value, then plans, applies or destroys. Identity is the wire
 ``name``. The uid-0 account is never deleted.
 """
 
@@ -17,7 +17,7 @@ from ..services.system_users import (
     Diff,
     UserConfig,
     UserService,
-    check_password_hashes,
+    reject_hashed_passwords,
     user_configs_from_resources,
 )
 from ._managed import managed_keys as derive_managed_keys
@@ -36,10 +36,10 @@ class UserManager(BaseComponentManager):
     DELETE_SCOPE: ClassVar[str] = "managed_set"
 
     def _desired(self, env_name: str, resources: list[ResourceConfig]) -> list[UserConfig]:
-        """Resolve secrets, parse and validate the password hashes."""
+        """Resolve secrets, parse, reject hashed passwords."""
         resolved = resolve_resource_secrets(self.config_dir, env_name, resources, _TYPE)
         configs = user_configs_from_resources(resolved)
-        check_password_hashes(configs)
+        reject_hashed_passwords(configs)
         return configs
 
     def plan(

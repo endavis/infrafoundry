@@ -3,7 +3,8 @@
 Static plan-time checks for the ``system.users`` and ``system.groups`` list
 types. Secret-bearing user fields (``password``, ``authorizedkeys``, ``otp_seed``,
 ``apikeys``) must be empty or a ``secret://`` URI; a literal is an ERROR and the
-message never echoes the value. Group ``member_refs`` must resolve to a
+message never echoes the value. ``uid`` / ``gid`` are assigned by the box and are
+an ERROR, as is any unknown config key. Group ``member_refs`` must resolve to a
 ``system.users`` resource.
 """
 
@@ -15,6 +16,7 @@ from typing import Any, override
 from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.services import system_groups, system_users
 from infrafoundry.providers.opnsense.services.system_users import SECRET_FIELDS
 from infrafoundry.providers.opnsense.validators._xref import resolve_xref
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
@@ -41,10 +43,9 @@ class _AuthBase:
             check_name=check, passed=False, message=message, level=ValidationLevel.ERROR
         )
 
-    def _check_unique(self, resources: list[ResourceConfig], key: str, label: str) -> None:
-        """Flag duplicate wire names, and duplicate ``key`` values (uid or gid)."""
+    def _check_unique(self, resources: list[ResourceConfig]) -> None:
+        """Flag duplicate wire names."""
         names: set[str] = set()
-        values: set[str] = set()
         for r in resources:
             name = str(r.config.get("name", r.name))
             if name in names:
@@ -53,24 +54,26 @@ class _AuthBase:
                     f"Duplicate system {self.kind} name {name!r}.",
                 )
             names.add(name)
-            if key in r.config:
-                value = str(r.config[key])
-                if value in values:
-                    self._error(
-                        f"system_{self.kind}_unique_{key}s",
-                        f"Duplicate {label} {value} (system {self.kind} '{r.name}').",
-                    )
-                values.add(value)
 
-    def _check_common(self, r: ResourceConfig, id_key: str) -> None:
+    def _check_common(
+        self,
+        r: ResourceConfig,
+        allowed: frozenset[str],
+        box_assigned: frozenset[str],
+    ) -> None:
         config = r.config
-        if id_key in config:
-            raw = config[id_key]
-            if isinstance(raw, bool) or not isinstance(raw, (int, str)) or not str(raw).isdigit():
-                self._error(
-                    f"system_{self.kind}_{r.name}_{id_key}",
-                    f"system {self.kind} '{r.name}' {id_key} must be a non-negative integer",
-                )
+        for key in sorted(box_assigned & set(config)):
+            self._error(
+                f"system_{self.kind}_{r.name}_{key}",
+                f"system {self.kind} '{r.name}' must not set {key}: the box assigns it "
+                f"and the API ignores a supplied value",
+            )
+        unknown = sorted(set(config) - allowed - box_assigned)
+        if unknown:
+            self._error(
+                f"system_{self.kind}_{r.name}_unknown_keys",
+                f"system {self.kind} '{r.name}' has unknown keys: {unknown}",
+            )
         scope = config.get("scope")
         if scope is not None and scope not in _SCOPES:
             self._error(
@@ -102,10 +105,24 @@ class SystemUserValidator(_AuthBase, SpecializedValidator[OPNsenseValidationCont
         resources = context.resources
         if not resources:
             return
-        self._check_unique(resources, "uid", "uid")
+        self._check_unique(resources)
         for r in resources:
-            self._check_common(r, "uid")
+            self._check_common(r, system_users.ALLOWED_KEYS, system_users.BOX_ASSIGNED_KEYS)
             self._check_secrets(r.name, r.config)
+            self._check_password_flags(r.name, r.config)
+
+    def _check_password_flags(self, name: str, config: dict[str, Any]) -> None:
+        flag = config.get("update_password")
+        if flag is not None and not isinstance(flag, bool):
+            self._error(
+                f"system_user_{name}_update_password",
+                f"system user '{name}' update_password must be a boolean",
+            )
+        elif flag and not config.get("password"):
+            self._error(
+                f"system_user_{name}_update_password",
+                f"system user '{name}' sets update_password but no password",
+            )
 
     def _check_secrets(self, name: str, config: dict[str, Any]) -> None:
         for field in SECRET_FIELDS:
@@ -135,9 +152,9 @@ class SystemGroupValidator(_AuthBase, SpecializedValidator[OPNsenseValidationCon
         resources = context.resources
         if not resources:
             return
-        self._check_unique(resources, "gid", "gid")
+        self._check_unique(resources)
         for r in resources:
-            self._check_common(r, "gid")
+            self._check_common(r, system_groups.ALLOWED_KEYS, system_groups.BOX_ASSIGNED_KEYS)
             if "member_refs" in r.config:
                 self._check_refs(r, context)
 

@@ -55,8 +55,8 @@ class GroupManager(BaseComponentManager):
             service: Group service, used to read live users.
             desired: Parsed groups.
             sibling_resources: ``system.users`` resources from YAML.
-            allow_pending: Plan only. A user in YAML but not live yet resolves to its
-                YAML ``uid`` if set, else marks the group pending.
+            allow_pending: Plan only. A user in YAML but not live yet marks the group
+                pending (the box assigns the uid on add).
 
         Returns:
             ``(members, pending)``: uids per group name, and groups with an unknown member.
@@ -83,8 +83,6 @@ class GroupManager(BaseComponentManager):
                     )
                 wire = user.config.get("name", user.name)
                 uid = live_uid.get(str(wire))
-                if uid is None and allow_pending and user.config.get("uid") is not None:
-                    uid = str(user.config["uid"])
                 if uid is None:
                     if not allow_pending:
                         raise ReferenceValidationError(

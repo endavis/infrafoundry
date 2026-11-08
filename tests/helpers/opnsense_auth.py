@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 BCRYPT = "$2y$10$" + "a" * 53
+PLAIN = "example-plaintext-pw"
 PUBKEY = "ssh-ed25519 AAAAFAKE example-user@example.com"
 
 

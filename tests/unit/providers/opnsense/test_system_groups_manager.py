@@ -58,17 +58,6 @@ def test_plan_pending_user_without_uid_marks_update(tmp_path: Path) -> None:
     assert len(diff.updates) == 1
 
 
-def test_plan_pending_user_uses_yaml_uid(tmp_path: Path) -> None:
-    client = FakeClient(groups=[group_row("admins", "1999", "2005")])
-    with _patch(client):
-        diff = GroupManager(tmp_path).plan(
-            "env",
-            [_grp("admins", member_refs=["new"])],
-            sibling_resources=[_usr("new", uid=2005)],
-        )
-    assert diff.is_empty
-
-
 def test_unknown_ref_raises(tmp_path: Path) -> None:
     with _patch(FakeClient()), pytest.raises(ReferenceValidationError):
         GroupManager(tmp_path).plan(

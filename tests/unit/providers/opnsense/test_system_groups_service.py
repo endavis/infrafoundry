@@ -28,10 +28,12 @@ def _live(name: str, gid: str, member: str = "", **extra: str) -> Any:
 
 class TestParse:
     def test_payload_without_refs_has_no_member(self) -> None:
-        cfg = _cfg("admins", gid=1999, description="d")
-        assert cfg.to_payload(["5"]) == {
-            "group": {"name": "admins", "description": "d", "gid": "1999"}
-        }
+        cfg = _cfg("admins", description="d")
+        assert cfg.to_payload(["5"]) == {"group": {"name": "admins", "description": "d"}}
+
+    def test_gid_not_accepted(self) -> None:
+        with pytest.raises(ValueError, match="unknown keys"):
+            _cfg("g", gid=1999)
 
     def test_payload_with_refs_sorted_numeric(self) -> None:
         cfg = _cfg("admins", member_refs=["a", "b"])
