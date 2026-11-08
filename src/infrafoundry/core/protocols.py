@@ -16,7 +16,7 @@ Example:
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 from jinja2 import Template
 
@@ -26,7 +26,9 @@ if TYPE_CHECKING:
     from infrafoundry.core.config.models import EnvironmentConfig
     from infrafoundry.core.managed_set import ManagedResources
     from infrafoundry.core.provider import ProviderBase, ResourceConfig
-    from infrafoundry.core.validation import ValidationReport
+    from infrafoundry.core.validation import ValidationContext, ValidationReport
+
+ContextT_contra = TypeVar("ContextT_contra", bound="ValidationContext", contravariant=True)
 
 
 @runtime_checkable
@@ -271,6 +273,22 @@ class HasSnippetStrictness(Protocol):
     """
 
     fail_on_missing_snippets: bool
+
+
+@runtime_checkable
+class SpecializedValidator(Protocol[ContextT_contra]):
+    """Contract for a provider sub-validator: ``validate(context) -> None``.
+
+    Each validator names the context type it needs (a ``ValidationContext``
+    subclass) and adds its findings to ``report``. Subclass it explicitly and
+    mark ``validate`` with ``@override`` so mypy rejects a drifting signature.
+    """
+
+    report: "ValidationReport"
+
+    def validate(self, context: ContextT_contra, /) -> None:
+        """Validate ``context`` and add results to ``report``."""
+        ...
 
 
 @runtime_checkable
