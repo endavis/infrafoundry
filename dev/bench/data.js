@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794230616341,
+  "lastUpdate": 1794233778421,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -558,6 +558,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001843843192026428",
             "extra": "mean: 130.02834634722765 usec\nrounds: 8350"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d55ab32fc4bd24e690dbe059c9c94a771ad2cff3",
+          "message": "fix: read hidden opnsense outbound nat rules and manage the snat mode (merges PR #1336, addresses #1333)\n\nOn OPNsense 26.1, firewall/source_nat/searchRule omits manual outbound rules\nwhile the outbound NAT mode is automatic or disabled. InfraFoundry saw every\ndeclared outbound rule as absent and added it again on each apply.\n\nThe outbound read now checks the mode first and, when the search would hide\nmanual rules, reads them from the model (firewall/source_nat/get). Hybrid,\nadvanced and pre-26.1 boxes keep the search, which carries raw port ranges.\n\nAdd a firewall.source_nat singleton with snat_mode, applied before\nfirewall.nat through a source_nat_apply finalization hook, with a validator\nand a config migrate extractor. It fails clearly on boxes without the 26.1\nmodel field. Plan warns when enabled outbound rules are declared and the\neffective mode leaves them inert. NAT rule add and update now raise on a\nfailed write.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T14:15:38Z",
+          "tree_id": "654c911f6dcbe5f750d4e01edb4f5fd6f2f61c04",
+          "url": "https://github.com/endavis/infrafoundry/commit/d55ab32fc4bd24e690dbe059c9c94a771ad2cff3"
+        },
+        "date": 1794233777471,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15730.331779186672,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001536188187967614",
+            "extra": "mean: 63.571449988304344 usec\nrounds: 16876"
           }
         ]
       }
