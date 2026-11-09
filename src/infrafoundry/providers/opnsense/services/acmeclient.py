@@ -64,7 +64,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
@@ -422,6 +422,24 @@ def slug_handle(text: str) -> str:
     return re.sub(r"[^a-z0-9_-]+", "-", text.lower()).strip("-")
 
 
+def next_free_handle(base: str, taken: set[str]) -> str:
+    """Return ``base``, or ``base-2``, ``base-3`` ..., the first not in ``taken``.
+
+    Args:
+        base: The wanted handle.
+        taken: Handles already in use; the result is added to it.
+
+    Returns:
+        The free handle.
+    """
+    handle, n = base, 1
+    while handle in taken:
+        n += 1
+        handle = f"{base}-{n}"
+    taken.add(handle)
+    return handle
+
+
 def assign_handles(sub: str, items: Sequence[LiveAcmeItem]) -> dict[str, str]:
     """Give each live row a stable, collision-free handle.
 
@@ -435,13 +453,53 @@ def assign_handles(sub: str, items: Sequence[LiveAcmeItem]) -> dict[str, str]:
     taken: set[str] = set()
     result: dict[str, str] = {}
     for index, item in enumerate(items, start=1):
-        base = slug_handle(item.name) or f"{sub}-{index}"
-        handle, n = base, 1
-        while handle in taken:
-            n += 1
-            handle = f"{base}-{n}"
-        taken.add(handle)
-        result[item.uuid] = handle
+        result[item.uuid] = next_free_handle(slug_handle(item.name) or f"{sub}-{index}", taken)
+    return result
+
+
+#: Migrate order of the list types: dependencies first.
+MIGRATE_ORDER: tuple[str, ...] = ("accounts", "validations", "actions", "certs")
+
+
+def assign_migrate_handles(
+    live: Mapping[str, Sequence[LiveAcmeItem]],
+    existing: Mapping[str, Mapping[str, str]] | None = None,
+    reserved: Collection[str] = (),
+) -> dict[str, dict[str, str]]:
+    """Assign handles to the live rows of all four list types at once.
+
+    Pass 1 pins a live row whose wire name already has a row of its own type in the
+    environment to that row's handle (only the first live row per wire name). Pass 2
+    gives every other row a slug of its name, suffixed ``-2``, ``-3`` ... until it is
+    free of every reserved and already assigned handle. The result depends only on the
+    inputs, so every list type's migration computes the same handles.
+
+    Args:
+        live: ``sub`` -> live rows in search order.
+        existing: ``sub`` -> ``{wire_name: handle}`` of rows already in the environment.
+        reserved: Every opnsense resource name already in the environment.
+
+    Returns:
+        ``sub`` -> ``{uuid: handle}``.
+    """
+    known = existing or {}
+    taken: set[str] = set(reserved)
+    result: dict[str, dict[str, str]] = {sub: {} for sub in MIGRATE_ORDER}
+    for sub in MIGRATE_ORDER:
+        pinned = known.get(sub, {})
+        seen: set[str] = set()
+        for item in live.get(sub, ()):
+            if item.name in pinned and item.name not in seen:
+                seen.add(item.name)
+                result[sub][item.uuid] = pinned[item.name]
+                taken.add(pinned[item.name])
+    for sub in MIGRATE_ORDER:
+        for index, item in enumerate(live.get(sub, ()), start=1):
+            if item.uuid in result[sub]:
+                continue
+            result[sub][item.uuid] = next_free_handle(
+                slug_handle(item.name) or f"{sub}-{index}", taken
+            )
     return result
 
 
@@ -931,12 +989,14 @@ class AcmeListService(BaseService):
         self,
         items: list[LiveAcmeItem],
         ref_handles: Mapping[str, Mapping[str, str]] | None = None,
+        handles: Mapping[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         """Build the nested-YAML entries for live rows.
 
         Args:
             items: Live rows (from :meth:`search`).
             ref_handles: ``sub`` -> ``{uuid: handle}`` for reference fields.
+            handles: ``{uuid: handle}`` for ``items``; computed per type when omitted.
 
         Returns:
             One ``{"name": handle, "config": {...}}`` per row. Secrets become
@@ -944,7 +1004,7 @@ class AcmeListService(BaseService):
             booleans.
         """
         spec = self.SPEC
-        handles = assign_handles(spec.sub, items)
+        handles = handles if handles is not None else assign_handles(spec.sub, items)
         known = ref_handles or {}
         rows: list[dict[str, Any]] = []
         for item in items:
@@ -1015,10 +1075,26 @@ class AcmeListService(BaseService):
         else:
             config[key] = flat
 
-    def export_to_yaml(self, ref_handles: Mapping[str, Mapping[str, str]] | None = None) -> str:
-        """Export every live row as nested YAML for ``config migrate``."""
+    def export_to_yaml(
+        self,
+        ref_handles: Mapping[str, Mapping[str, str]] | None = None,
+        *,
+        items: list[LiveAcmeItem] | None = None,
+        handles: Mapping[str, str] | None = None,
+    ) -> str:
+        """Export every live row as nested YAML for ``config migrate``.
+
+        Args:
+            ref_handles: ``sub`` -> ``{uuid: handle}`` for reference fields.
+            items: Live rows already fetched; searched when omitted.
+            handles: ``{uuid: handle}`` for the rows; computed per type when omitted.
+
+        Returns:
+            The nested YAML text.
+        """
+        rows = items if items is not None else self.search()
         return emit_nested_list_yaml(
-            self.SPEC.type_name, self.export_rows(self.search(), ref_handles)
+            self.SPEC.type_name, self.export_rows(rows, ref_handles, handles)
         )
 
 
@@ -1052,3 +1128,6 @@ REF_SERVICES: dict[str, type[AcmeListService]] = {
     "validations": AcmeValidationsService,
     "actions": AcmeActionsService,
 }
+
+#: Every list type's service, in migrate order.
+LIST_SERVICES: dict[str, type[AcmeListService]] = {**REF_SERVICES, "certs": AcmeCertsService}

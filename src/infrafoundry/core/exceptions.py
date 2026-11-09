@@ -50,6 +50,14 @@ class InvalidConfigurationError(ConfigurationError):
     """Configuration file is invalid or malformed."""
 
 
+class DuplicateResourceNameError(InvalidConfigurationError, ValueError):
+    """Two resources of one provider share a name within an environment.
+
+    Subclasses ``ValueError`` so callers that caught the earlier plain
+    ``ValueError`` keep working.
+    """
+
+
 class MissingConfigurationError(ConfigurationError):
     """Required configuration is missing."""
 
@@ -429,6 +437,7 @@ __all__ = [
     # Deployment
     "DeploymentError",
     "DeploymentNotFoundError",
+    "DuplicateResourceNameError",
     "EnvironmentNotFoundError",
     "FilteredDestroyRefusedError",
     "InfraFoundryError",

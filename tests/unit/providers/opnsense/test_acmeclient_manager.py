@@ -498,3 +498,98 @@ def test_runner_tuple_siblings_helper_is_used() -> None:
     assert rows is not None
     assert {r.type for r in rows} == {A, V, X}
     assert svc.REF_SUBS == ("accounts", "validations", "actions")
+
+
+# -- migrate handles vs the environment (#1337) ---------------------------------------
+
+
+def _write_env(tmp_path: Path, leaf: str, type_name: str, rows: list[dict[str, Any]]) -> None:
+    from infrafoundry.providers.opnsense.services._nested_emit import emit_nested_list_yaml
+
+    target = tmp_path / "env" / "resources"
+    target.mkdir(parents=True, exist_ok=True)
+    (target / f"{leaf}.yaml").write_text(emit_nested_list_yaml(type_name, rows), encoding="utf-8")
+
+
+def _load_env(tmp_path: Path) -> list[ResourceConfig]:
+    import warnings
+
+    from infrafoundry.core.config import ConfigManager
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        return ConfigManager(tmp_path).get_all_resources_all_providers("env")
+
+
+def _cert_names(text: str) -> list[str]:
+    return [r["name"] for r in yaml.safe_load(text)["opnsense"]["acmeclient"]["certs"]]
+
+
+def test_cert_migrate_avoids_name_of_other_resource(
+    make: Any, box: FakeBox, tmp_path: Path
+) -> None:
+    _write_env(
+        tmp_path,
+        "dns",
+        "unbound.host_overrides",
+        [
+            {
+                "name": "fw-prod-example-com",
+                "config": {"hostname": "fw-prod", "domain": "example.com"},
+            }
+        ],
+    )
+    box.rows["certificates"] = {"c1": {"name": "fw-prod.example.com"}}
+    text = make(comp.AcmeClientCertsManager).migrate("env")
+    assert _cert_names(text) == ["fw-prod-example-com-2"]
+    (tmp_path / "env" / "resources" / "certs.yaml").write_text(text, encoding="utf-8")
+    assert len(_load_env(tmp_path)) == 2
+
+
+def test_migrate_is_idempotent_over_its_own_output(make: Any, box: FakeBox, tmp_path: Path) -> None:
+    box.rows["accounts"] = {"ua": {"name": "web", "email": "a@example.com"}}
+    box.rows["certificates"] = {
+        "c1": {"name": "web", "account": {"ua": {"selected": 1}}},
+        "c2": {"name": "fw-test.example.com"},
+    }
+    first_certs = make(comp.AcmeClientCertsManager).migrate("env")
+    first_accts = make(comp.AcmeClientAccountsManager).migrate("env")
+    resources = tmp_path / "env" / "resources"
+    resources.mkdir(parents=True)
+    (resources / "certs.yaml").write_text(first_certs, encoding="utf-8")
+    (resources / "accounts.yaml").write_text(first_accts, encoding="utf-8")
+    assert make(comp.AcmeClientCertsManager).migrate("env") == first_certs
+    assert make(comp.AcmeClientAccountsManager).migrate("env") == first_accts
+
+
+def test_migrate_refs_follow_hand_renamed_env_handles(
+    make: Any, box: FakeBox, tmp_path: Path
+) -> None:
+    _write_env(
+        tmp_path,
+        "accounts",
+        A,
+        [{"name": "my-acct", "config": {"display_name": "Main Account", "email": "a@example.com"}}],
+    )
+    box.rows["accounts"] = {"ua": {"name": "Main Account", "email": "a@example.com"}}
+    box.rows["certificates"] = {
+        "c1": {"name": "fw-test.example.com", "account": {"ua": {"selected": 1}}}
+    }
+    (cert,) = yaml.safe_load(make(comp.AcmeClientCertsManager).migrate("env"))["opnsense"][
+        "acmeclient"
+    ]["certs"]
+    assert cert["config"]["account"] == "my-acct"
+    acct_yaml = yaml.safe_load(make(comp.AcmeClientAccountsManager).migrate("env"))
+    assert acct_yaml["opnsense"]["acmeclient"]["accounts"][0]["name"] == "my-acct"
+
+
+def test_migrate_cross_type_names_are_consistent(make: Any, box: FakeBox) -> None:
+    box.rows["accounts"] = {"ua": {"name": "web", "email": "a@example.com"}}
+    box.rows["certificates"] = {"c1": {"name": "web", "account": {"ua": {"selected": 1}}}}
+    acct = yaml.safe_load(make(comp.AcmeClientAccountsManager).migrate("env"))
+    cert = yaml.safe_load(make(comp.AcmeClientCertsManager).migrate("env"))
+    (acct_row,) = acct["opnsense"]["acmeclient"]["accounts"]
+    (cert_row,) = cert["opnsense"]["acmeclient"]["certs"]
+    assert acct_row["name"] == "web"
+    assert cert_row["name"] == "web-2"
+    assert cert_row["config"]["account"] == acct_row["name"]

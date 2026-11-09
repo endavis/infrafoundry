@@ -72,6 +72,7 @@ Identity contract (#776):
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -605,15 +606,20 @@ class UnboundHostOverrideService(BaseService):
     # Migration / export
     # ------------------------------------------------------------------
 
-    def export_to_yaml(self) -> str:
+    def export_to_yaml(self, reserved: Collection[str] = ()) -> str:
         """Export the current host overrides to InfraFoundry YAML.
 
         For each live host override the ``searchHostOverride`` row already
         carries every field we need (no extra ``getHostOverride`` round-trip
         required). Operator-facing ``name`` is synthesized from
         ``hostname.domain`` (with ``-<rr>`` suffix when ``rr`` is non-default)
-        for stable, human-readable resource keys. The operator can rename
+        for stable, human-readable resource keys. A name already in
+        ``reserved`` or used by an earlier row gets ``-2``, ``-3`` ... so it
+        cannot collide with another resource (#1337). The operator can rename
         after import — identity is the natural-key tuple, not the name.
+
+        Args:
+            reserved: Resource names already in use in the environment.
 
         Output is the nested ``opnsense:`` schema defined by ADR-0016
         (#793 Phase 4); host overrides land at
@@ -623,14 +629,16 @@ class UnboundHostOverrideService(BaseService):
             YAML string with the nested ``opnsense:`` namespace and an
             ``unbound.host_overrides`` list leaf.
         """
-        live = self.search()
-        entries = [
-            {
-                "name": _synthesize_name(override),
-                "config": _live_to_export_config(override),
-            }
-            for override in live
-        ]
+        taken: set[str] = set(reserved)
+        entries: list[dict[str, Any]] = []
+        for override in self.search():
+            base = _synthesize_name(override)
+            name, n = base, 1
+            while name in taken:
+                n += 1
+                name = f"{base}-{n}"
+            taken.add(name)
+            entries.append({"name": name, "config": _live_to_export_config(override)})
         return emit_nested_list_yaml("unbound.host_overrides", entries)
 
 

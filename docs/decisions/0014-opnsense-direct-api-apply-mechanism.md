@@ -542,7 +542,7 @@ Certificates reference accounts, validations and actions by handle (`name`, `acc
 
 The dispatch order is settings, accounts, validations, actions, certs. Certs set `SPLIT_DELETE_PHASE` and delete first; the other three do not split. No `system.firmware` dependency is declared, since it would force the settings singleton to split deletes; the dispatch order already puts firmware first. **Known limitation:** moving a cert from account A to account B and removing A in the same apply deletes A before the cert is updated, as for every parent/child pair; do it in two applies.
 
-**Migrate:** extractors exist for all five. Handles come from `assign_handles` (a slug of the wire name, collisions suffixed), shared by the cert migration so the emitted references match the other types' output. Secrets become `secret://` placeholders, never values.
+**Migrate:** extractors exist for all five. Handles come from one `assign_migrate_handles` call over all four types (a slug of the wire name, collisions suffixed, every opnsense name already in the environment reserved, #1337), shared by the cert migration so the emitted references match the other types' output. Secrets become `secret://` placeholders, never values.
 
 **Verified live** on a test firewall: the list `search` method (GET), the item template, that `update/{uuid}` keeps omitted fields, secret read-back with a clean re-plan, one reconfigure per apply, certificate-first deletes, and a clean plan of `config migrate` output. **Not verified:** `fetchCronIntegration`. The live check is config-only and never calls `register`, `sign` or `signallcerts`, so a valid account and an issued certificate are not live-verified. See [ACME client](../development/opnsense-resource-coverage.md#acme-client-790).
 

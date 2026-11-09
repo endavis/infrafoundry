@@ -477,3 +477,44 @@ class TestFinalizationHook:
             svc_cls.from_environment.return_value = service_mock
             manager.apply("test-env", resources)
         service_mock.reconfigure.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# migrate reserves names already in the environment (#1337)
+# ---------------------------------------------------------------------------
+
+
+def _migrate_with_env(tmp_path: Path, env_yaml: str) -> str:
+    target = tmp_path / "env" / "resources" / "existing.yaml"
+    target.parent.mkdir(parents=True)
+    target.write_text(env_yaml, encoding="utf-8")
+    client = MagicMock()
+    client.request.return_value = {
+        "rows": [{"uuid": "u1", "hostname": "web", "domain": "example.com", "rr": "A"}]
+    }
+    from infrafoundry.providers.opnsense.services.unbound_host_override import (
+        UnboundHostOverrideService,
+    )
+
+    with patch.object(
+        UnboundHostOverrideService,
+        "from_environment",
+        return_value=UnboundHostOverrideService(client),
+    ):
+        return UnboundHostOverrideManager(tmp_path).migrate("env")
+
+
+def test_migrate_suffixes_name_used_by_another_type(tmp_path: Path) -> None:
+    env_yaml = (
+        "opnsense:\n  acmeclient:\n    certs:\n      - name: web-example-com\n"
+        "        config:\n          common_name: web.example.com\n"
+    )
+    assert "name: web-example-com-2" in _migrate_with_env(tmp_path, env_yaml)
+
+
+def test_migrate_keeps_name_of_its_own_type(tmp_path: Path) -> None:
+    env_yaml = (
+        "opnsense:\n  unbound:\n    host_overrides:\n      - name: web-example-com\n"
+        "        config:\n          hostname: web\n          domain: example.com\n"
+    )
+    assert "name: web-example-com\n" in _migrate_with_env(tmp_path, env_yaml)

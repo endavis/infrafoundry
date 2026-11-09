@@ -15,6 +15,7 @@ from infrafoundry.core.config.provider_centric_loader import ProviderCentricLoad
 from infrafoundry.core.config.resource_centric_loader import ResourceCentricLoader
 from infrafoundry.core.config.sops import load_yaml_with_sops
 from infrafoundry.core.exceptions import (
+    DuplicateResourceNameError,
     InvalidConfigurationError,
     PackageNotFoundError,
     ResourceFilterError,
@@ -233,7 +234,8 @@ class ConfigManager(PathBasedManager):
             List of all ResourceConfig objects from all providers
 
         Raises:
-            ValueError: If duplicate resource names are found
+            DuplicateResourceNameError: If duplicate resource names are found; the
+                message names each location with its resource type
         """
         all_resources = []
         resource_locations: dict[str, list[str]] = {}  # Track where each resource is defined
@@ -258,7 +260,7 @@ class ConfigManager(PathBasedManager):
                     key = f"{resource.provider}:{resource.name}"
                     if key not in resource_locations:
                         resource_locations[key] = []
-                    resource_locations[key].append(str(config_file))
+                    resource_locations[key].append(f"{resource.type} ({config_file})")
 
                 if resources:
                     loose_resource_files.append(str(config_file))
@@ -286,7 +288,9 @@ class ConfigManager(PathBasedManager):
                     key = f"{resource.provider}:{resource.name}"
                     if key not in resource_locations:
                         resource_locations[key] = []
-                    resource_locations[key].append(str(package_dir / "infrafoundry.yml"))
+                    resource_locations[key].append(
+                        f"{resource.type} ({package_dir / 'infrafoundry.yml'})"
+                    )
 
                 all_resources.extend(pkg_resources)
                 for event_type, handlers in pkg_events.items():
@@ -315,7 +319,9 @@ class ConfigManager(PathBasedManager):
                 key = f"{resource.provider}:{resource.name}"
                 if key not in resource_locations:
                     resource_locations[key] = []
-                resource_locations[key].append(str(package_dir / "infrafoundry.yml"))
+                resource_locations[key].append(
+                    f"{resource.type} ({package_dir / 'infrafoundry.yml'})"
+                )
 
             all_resources.extend(pkg_resources)
             for event_type, handlers in pkg_events.items():
@@ -334,7 +340,7 @@ class ConfigManager(PathBasedManager):
                     key = f"{resource.provider}:{resource.name}"
                     if key not in resource_locations:
                         resource_locations[key] = []
-                    resource_locations[key].append(str(config_file))
+                    resource_locations[key].append(f"{resource.type} ({config_file})")
 
                 if resources:
                     loose_resource_files.append(str(config_file))
@@ -360,7 +366,7 @@ class ConfigManager(PathBasedManager):
         ]
 
         if duplicates:
-            raise ValueError(
+            raise DuplicateResourceNameError(
                 f"Duplicate resource names found in environment '{env_name}':\n  "
                 + "\n  ".join(duplicates)
                 + "\n\nEach resource name must be unique within its provider."
