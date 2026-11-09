@@ -1925,3 +1925,80 @@ class TestWriteFailureChecks:
         client.request.return_value = {"result": "saved", "uuid": "u-1"}
         assert svc.add(_outbound("o")) == {"result": "saved", "uuid": "u-1"}
         assert svc.update("u-1", _outbound("o")) == {"result": "saved", "uuid": "u-1"}
+
+
+def _matching_live(uuid: str, want: NATRuleConfig) -> LiveNATRule:
+    """A live row whose fields already equal ``want``'s payload."""
+    overrides = {k: str(v) for k, v in want.to_payload()["rule"].items()}
+    return _live(uuid, want.name, want.kind, raw_overrides=overrides)
+
+
+class TestComputeDiffDuplicateManagedRules:
+    """Several live rows with one managed name (#1339)."""
+
+    def test_two_matching_copies_delete_second(self) -> None:
+        want = _outbound("lan-out")
+        diff = compute_diff([want], [_matching_live("u1", want), _matching_live("u2", want)])
+        assert [d.uuid for d in diff.deletes] == ["u2"]
+        assert diff.updates == []
+        assert diff.adds == []
+        assert len(diff.warnings) == 1
+        assert "lan-out" in diff.warnings[0]
+
+    def test_keeps_the_copy_that_matches(self) -> None:
+        want = _outbound("lan-out")
+        stale = _live("u1", "lan-out", "outbound")
+        diff = compute_diff([want], [stale, _matching_live("u2", want)])
+        assert [d.uuid for d in diff.deletes] == ["u1"]
+        assert diff.updates == []
+
+    def test_no_match_updates_first_and_deletes_second(self) -> None:
+        want = _outbound("lan-out")
+        diff = compute_diff(
+            [want], [_live("u1", "lan-out", "outbound"), _live("u2", "lan-out", "outbound")]
+        )
+        assert [have.uuid for have, _ in diff.updates] == ["u1"]
+        assert [d.uuid for d in diff.deletes] == ["u2"]
+
+    def test_three_copies_delete_two_in_search_order(self) -> None:
+        want = _outbound("lan-out")
+        live = [_matching_live(f"u{i}", want) for i in (1, 2, 3)]
+        diff = compute_diff([want], live)
+        assert [d.uuid for d in diff.deletes] == ["u2", "u3"]
+
+    def test_undesired_name_deletes_every_copy(self) -> None:
+        live = [_live("u1", "gone", "outbound"), _live("u2", "gone", "outbound")]
+        diff = compute_diff([], live)
+        assert [d.uuid for d in diff.deletes] == ["u1", "u2"]
+
+    def test_add_only_plans_no_deletes_but_warns(self) -> None:
+        want = _outbound("lan-out")
+        live = [_matching_live("u1", want), _matching_live("u2", want)]
+        diff = compute_diff([want], live, add_only=True)
+        assert diff.deletes == []
+        assert len(diff.warnings) == 1
+        assert "add-only" in diff.warnings[0]
+
+    def test_locked_leaves_copies_and_warns(self) -> None:
+        want = _outbound("lan-out", lock=True)
+        live = [_live("u1", "lan-out", "outbound"), _live("u2", "lan-out", "outbound")]
+        diff = compute_diff([want], live)
+        assert diff.deletes == []
+        assert diff.updates == []
+        assert diff.locked[0][1] is not None
+        assert diff.locked[0][1].uuid == "u1"
+        assert len(diff.warnings) == 1
+        assert "locked" in diff.warnings[0]
+
+    def test_same_name_in_different_kinds_is_not_a_duplicate(self) -> None:
+        out = _outbound("shared")
+        oto = _one_to_one("shared")
+        diff = compute_diff([out, oto], [_matching_live("u1", out), _matching_live("u2", oto)])
+        assert diff.deletes == []
+        assert diff.warnings == []
+
+    def test_port_forward_duplicates(self) -> None:
+        want = _port_forward("web")
+        diff = compute_diff([want], [_matching_live("u1", want), _matching_live("u2", want)])
+        assert [d.uuid for d in diff.deletes] == ["u2"]
+        assert len(diff.warnings) == 1

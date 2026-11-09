@@ -450,7 +450,22 @@ def compute_diff(
         diff.updates.extend(per_kind.updates)
         diff.deletes.extend(per_kind.deletes)
         diff.locked.extend(per_kind.locked)
+        diff.warnings.extend(per_kind.warnings)
     return diff
+
+
+def _pick_keeper(copies: list[LiveNATRule], want: NATRuleConfig | None) -> LiveNATRule:
+    """Pick the live copy to keep when several rows share one managed name (#1339).
+
+    The first copy in search order whose fields already match ``want`` wins; if none
+    matches (or nothing is desired), the first copy. The choice is deterministic: the
+    runner computes the diff twice (delete phase, then forward pass).
+    """
+    if want is not None:
+        for copy in copies:
+            if not _needs_update(copy, want):
+                return copy
+    return copies[0]
 
 
 def _compute_diff_for_kind(
@@ -459,21 +474,32 @@ def _compute_diff_for_kind(
     *,
     add_only: bool,
 ) -> Diff:
-    """Single-kind diff. Matches by ``managed_name`` against ``NATRuleConfig.name``."""
+    """Single-kind diff. Matches by ``managed_name`` against ``NATRuleConfig.name``.
+
+    Several live rows can carry one managed name (left by #1333, or made by hand).
+    One copy is kept (see ``_pick_keeper``) and compared with the desired rule; the
+    others are planned as deletes, in search order. With ``add_only`` or a locked
+    desired rule the extra copies are left alone and a warning says so.
+    """
     desired_by_name: dict[str, NATRuleConfig] = {d.name: d for d in desired}
-    # ``managed_name`` is non-None for every entry in ``current_managed``.
-    current_by_name: dict[str, LiveNATRule] = {
-        live.managed_name: live for live in current_managed if live.managed_name is not None
-    }
+    copies_by_name: dict[str, list[LiveNATRule]] = {}
+    for live in current_managed:
+        if live.managed_name is not None:
+            copies_by_name.setdefault(live.managed_name, []).append(live)
     locked_names: set[str] = {d.name for d in desired if d.lock}
 
     adds: list[NATRuleConfig] = []
     updates: list[tuple[LiveNATRule, NATRuleConfig]] = []
     deletes: list[LiveNATRule] = []
     locked: list[tuple[NATRuleConfig, LiveNATRule | None]] = []
+    warnings: list[str] = []
+    keepers: dict[str, LiveNATRule] = {
+        name: _pick_keeper(copies, desired_by_name.get(name))
+        for name, copies in copies_by_name.items()
+    }
 
     for name, want in desired_by_name.items():
-        have = current_by_name.get(name)
+        have = keepers.get(name)
         if want.lock:
             locked.append((want, have))
             continue
@@ -482,14 +508,35 @@ def _compute_diff_for_kind(
         elif _needs_update(have, want):
             updates.append((have, want))
 
-    if not add_only:
-        for name, have in current_by_name.items():
-            if name in locked_names:
-                continue
-            if name not in desired_by_name:
-                deletes.append(have)
+    for name, copies in copies_by_name.items():
+        if name not in desired_by_name:
+            continue  # every copy of an undesired name is handled below
+        extras = [c for c in copies if c is not keepers[name]]
+        if not extras:
+            continue
+        kind = copies[0].kind
+        if name in locked_names:
+            reason = "the rule is locked, so they were left alone"
+        elif add_only:
+            reason = "add-only mode, so they were left alone"
+        else:
+            deletes.extend(extras)
+            warnings.append(
+                f"firewall.nat: {len(extras)} extra {kind} copy(ies) of '{name}' on the box "
+                "will be deleted; one copy is kept."
+            )
+            continue
+        warnings.append(
+            f"firewall.nat: {len(extras)} extra {kind} copy(ies) of '{name}' on the box; {reason}."
+        )
 
-    return Diff(adds=adds, updates=updates, deletes=deletes, locked=locked)
+    if not add_only:
+        for name, copies in copies_by_name.items():
+            if name in locked_names or name in desired_by_name:
+                continue
+            deletes.extend(copies)
+
+    return Diff(adds=adds, updates=updates, deletes=deletes, locked=locked, warnings=warnings)
 
 
 def _needs_update(have: LiveNATRule, want: NATRuleConfig) -> bool:

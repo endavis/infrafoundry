@@ -108,7 +108,7 @@ class NATRuleManager(BaseComponentManager):
         desired = nat_rule_configs_from_resources(resources)
         live = service.search_all()
         diff = service.compute_diff(desired, live, add_only=add_only)
-        diff.warnings = _snat_mode_warnings(service, desired, sibling_resources)
+        diff.warnings.extend(_snat_mode_warnings(service, desired, sibling_resources))
         return diff
 
     def apply(
@@ -150,6 +150,7 @@ class NATRuleManager(BaseComponentManager):
             diff.updates = []
 
         outcomes: list[ResourceOutcome] = []
+        desired_keys = {(rule.kind, rule.name) for rule in desired}
         for rule in diff.adds:
             outcomes.append(
                 ResourceOutcome(
@@ -171,7 +172,14 @@ class NATRuleManager(BaseComponentManager):
         for live_rule in diff.deletes:
             # Synthesize a stable name for deletes; managed_name is non-None
             # because the diff engine filters out unmanaged rows entirely.
-            synthetic_name = live_rule.managed_name or f"nat-rule-{live_rule.uuid}"
+            # A duplicate copy of a still-desired rule is named by uuid so the kept
+            # resource's on_destroy handlers do not fire (#1339).
+            is_duplicate = (live_rule.kind, live_rule.managed_name) in desired_keys
+            synthetic_name = (
+                f"nat-rule-{live_rule.uuid}"
+                if is_duplicate or live_rule.managed_name is None
+                else live_rule.managed_name
+            )
             outcomes.append(
                 ResourceOutcome(
                     address=f"opnsense_nat_rule.{synthetic_name}",
@@ -224,11 +232,10 @@ class NATRuleManager(BaseComponentManager):
 
         # Index by per-kind name so destroy honors the same isolation as
         # the diff engine.
-        live_by_key: dict[tuple[NATRuleKind, str], LiveNATRule] = {
-            (entry.kind, entry.managed_name): entry
-            for entry in live
-            if entry.managed_name is not None
-        }
+        copies_by_key: dict[tuple[NATRuleKind, str], list[LiveNATRule]] = {}
+        for entry in live:
+            if entry.managed_name is not None:
+                copies_by_key.setdefault((entry.kind, entry.managed_name), []).append(entry)
 
         deleted = 0
         locked_skipped = 0
@@ -237,12 +244,11 @@ class NATRuleManager(BaseComponentManager):
             if rule.lock:
                 locked_skipped += 1
                 continue
-            existing = live_by_key.get((rule.kind, rule.name))
-            if existing is None:
-                continue
-            service.delete(existing.uuid, existing.kind)
-            kinds_touched.add(existing.kind)
-            deleted += 1
+            # Every copy goes, not just one (#1339).
+            for existing in copies_by_key.get((rule.kind, rule.name), []):
+                service.delete(existing.uuid, existing.kind)
+                kinds_touched.add(existing.kind)
+                deleted += 1
 
         for kind in kinds_touched:
             service.apply_changes(kind)
