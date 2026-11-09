@@ -34,6 +34,11 @@ EXPECTED_RESOURCE_TYPES = [
     "interfaces.virtual_ips",
     "interfaces.vlans",
     "hostdiscovery",
+    "acmeclient.settings",
+    "acmeclient.accounts",
+    "acmeclient.validations",
+    "acmeclient.actions",
+    "acmeclient.certs",
 ]
 
 

@@ -142,6 +142,13 @@ class OPNsenseProvider(
         """
         from infrafoundry.core.extractors import register_extractor
 
+        from .components.acmeclient import (
+            AcmeClientAccountsManager,
+            AcmeClientActionsManager,
+            AcmeClientCertsManager,
+            AcmeClientValidationsManager,
+        )
+        from .components.acmeclient_settings import AcmeClientSettingsManager
         from .components.alias import AliasManager
         from .components.cron_jobs import CronJobsManager
         from .components.firewall_rule import FirewallRuleManager
@@ -180,6 +187,12 @@ class OPNsenseProvider(
             ("isc_to_kea", ISCToKeaMigrationManager),
             ("cron.jobs", CronJobsManager),
             ("hostdiscovery", HostDiscoveryManager),
+            # #790
+            ("acmeclient.settings", AcmeClientSettingsManager),
+            ("acmeclient.accounts", AcmeClientAccountsManager),
+            ("acmeclient.validations", AcmeClientValidationsManager),
+            ("acmeclient.actions", AcmeClientActionsManager),
+            ("acmeclient.certs", AcmeClientCertsManager),
         ]
         for resource_type, manager_class in components:
             register_extractor(
@@ -257,6 +270,13 @@ class OPNsenseProvider(
             knows the duck-typed surface (``plan``, ``apply``, ``destroy``,
             ``get_resource_ids``) each manager must expose.
         """
+        from .components.acmeclient import (
+            AcmeClientAccountsManager,
+            AcmeClientActionsManager,
+            AcmeClientCertsManager,
+            AcmeClientValidationsManager,
+        )
+        from .components.acmeclient_settings import AcmeClientSettingsManager
         from .components.alias import AliasManager
         from .components.cron_jobs import CronJobsManager
         from .components.firewall_rule import FirewallRuleManager
@@ -291,7 +311,7 @@ class OPNsenseProvider(
         # ``OPNsenseDirectRunner``). ``system.*`` singletons run first so
         # that ``system.firmware`` (#806's keystone) installs contrib
         # plugins before any subsequent component depends on the
-        # plugin-installed controllers (e.g., ``os-acme-client`` for #790; the
+        # plugin-installed controllers (e.g., ``os-acme-client`` for #790, whose types run last; the
         # modern OpenVPN instances of #808 are stock and need no plugin).
         # DHCPv4/DHCPv6 subnets must be
         # applied before reservations because reservations resolve their
@@ -346,6 +366,15 @@ class OPNsenseProvider(
             "openvpn.instances": OpenVpnInstanceManager,
             # #792: depends on interfaces.assignments for its interface list.
             "hostdiscovery": HostDiscoveryManager,
+            # #790 (os-acme-client, installed by ``system.firmware``): settings first,
+            # then the three types a certificate references, then the certificates.
+            # Certificates resolve ``account``, ``validation`` and ``restart_actions``
+            # by handle, and delete before the types they use.
+            "acmeclient.settings": AcmeClientSettingsManager,
+            "acmeclient.accounts": AcmeClientAccountsManager,
+            "acmeclient.validations": AcmeClientValidationsManager,
+            "acmeclient.actions": AcmeClientActionsManager,
+            "acmeclient.certs": AcmeClientCertsManager,
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
@@ -381,6 +410,9 @@ class OPNsenseProvider(
         - ``openvpn_reconfigure`` (#808) — fired by :class:`OpenVpnInstanceManager`
           so a single ``openvpn/service/reconfigure`` call fires per apply.
 
+        - ``acmeclient_reconfigure`` (#790) — shared by the five ``acmeclient.*``
+          managers so a single ``acmeclient/service/reconfigure`` call fires per apply.
+
         The mechanism is generic — future components with shared post-apply
         work register their own key here.
 
@@ -398,6 +430,7 @@ class OPNsenseProvider(
             "interfaces_settings_reconfigure": self._reconfigure_interfaces_settings,
             "syslog_reconfigure": self._reconfigure_syslog,  # #804
             "hostdiscovery_reconfigure": self._reconfigure_hostdiscovery,
+            "acmeclient_reconfigure": self._reconfigure_acmeclient,  # #790
         }
 
     def check_endpoint_support(
@@ -567,6 +600,21 @@ class OPNsenseProvider(
         service = SyslogSettingsService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
+    def _reconfigure_acmeclient(self, env_name: str) -> None:
+        """Reconfigure the ACME client after any settings or list change (#790).
+
+        Used by :meth:`get_finalization_hooks` so one ``acmeclient/service/reconfigure``
+        call fires per apply, shared by the five ``acmeclient.*`` managers. Unverified
+        against a live box. Hook errors propagate, failing the apply.
+
+        Args:
+            env_name: Active environment name.
+        """
+        from .services.acmeclient_settings import AcmeClientSettingsService
+
+        service = AcmeClientSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
     def _reconfigure_hostdiscovery(self, env_name: str) -> None:
         """Reconfigure host discovery after a settings change (#792).
 
@@ -684,6 +732,16 @@ class OPNsenseProvider(
             "interfaces.settings": [],
             "syslog.settings": [],  # #804
             "hostdiscovery": ["interfaces.assignments"],
+            # #790
+            "acmeclient.settings": [],
+            "acmeclient.accounts": [],
+            "acmeclient.validations": [],
+            "acmeclient.actions": [],
+            "acmeclient.certs": [
+                "acmeclient.accounts",
+                "acmeclient.validations",
+                "acmeclient.actions",
+            ],
         }
 
     @override

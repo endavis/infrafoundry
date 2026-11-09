@@ -17,6 +17,13 @@ it is absent from the specs. Those entries carry :attr:`EndpointKind.EXTENSION` 
 are skipped by the checks; a test asserts they stay absent so the exemption is
 dropped if upstream ever ships them.
 
+Plugin exemption (#790): the ``acmeclient/*`` controllers belong to the contrib plugin
+``os-acme-client``. The bundled specs cover core only, so those entries carry
+:attr:`EndpointKind.PLUGIN` and are skipped by the checks; a test asserts they are
+absent from the specs and that no endpoint that contacts a CA or a remote host
+(register, sign, revoke, removekey, automation, import, signallcerts, toggle) is ever
+registered.
+
 Strict mode of ``opnsense-openapi`` (``validate_endpoints=True``) stays off. It
 needs a known box version, but the wrapper builds the client with
 ``auto_detect_version=False``, and it cannot exempt the extension above.
@@ -41,6 +48,7 @@ class EndpointKind(StrEnum):
 
     STOCK = "stock"
     EXTENSION = "extension"
+    PLUGIN = "plugin"  # served by an installed contrib plugin, absent from the core specs
 
 
 @dataclass(frozen=True)
@@ -50,7 +58,8 @@ class Endpoint:
     Attributes:
         method: HTTP method the provider sends.
         template: Path relative to ``/api/`` with ``{name}`` placeholders.
-        kind: :attr:`EndpointKind.EXTENSION` for endpoints stock OPNsense lacks.
+        kind: :attr:`EndpointKind.EXTENSION` for endpoints stock OPNsense lacks,
+            :attr:`EndpointKind.PLUGIN` for those a contrib plugin serves.
     """
 
     method: Method
@@ -392,6 +401,44 @@ HOSTDISCOVERY_SETTINGS_GET = Endpoint("GET", "hostdiscovery/settings/get")
 HOSTDISCOVERY_SETTINGS_SET = Endpoint("POST", "hostdiscovery/settings/set")
 HOSTDISCOVERY_RECONFIGURE = Endpoint("POST", "hostdiscovery/service/reconfigure")
 
+# --- acmeclient (#790, os-acme-client plugin) -------------------------------------------
+# Never registered on purpose: register, sign, revoke, removekey, automation, import,
+# signallcerts and toggle. They contact a CA or a remote host; issuance stays with the
+# plugin's own cron job or the GUI.
+ACMECLIENT_SETTINGS_GET = Endpoint("GET", "acmeclient/settings/get", EndpointKind.PLUGIN)
+ACMECLIENT_SETTINGS_SET = Endpoint("POST", "acmeclient/settings/set", EndpointKind.PLUGIN)
+ACMECLIENT_FETCH_CRON = Endpoint(
+    "POST", "acmeclient/settings/fetchCronIntegration", EndpointKind.PLUGIN
+)
+ACMECLIENT_RECONFIGURE = Endpoint("POST", "acmeclient/service/reconfigure", EndpointKind.PLUGIN)
+
+
+def _acme_crud(sub: str) -> CrudEndpoints:
+    """CRUD for one ``acmeclient/<sub>`` list controller (update action is ``update``)."""
+    return _crud(
+        f"acmeclient/{sub}",
+        search="search",
+        get="get",
+        add="add",
+        update="update",
+        delete="del",
+        search_method="GET",
+        kind=EndpointKind.PLUGIN,
+    )
+
+
+ACMECLIENT_ACCOUNT = _acme_crud("accounts")
+ACMECLIENT_VALIDATION = _acme_crud("validations")
+ACMECLIENT_CERTIFICATE = _acme_crud("certificates")
+ACMECLIENT_ACTION = _acme_crud("actions")
+# Item template: ``get`` without a UUID returns the empty model, i.e. every field name.
+ACMECLIENT_ACCOUNT_TEMPLATE = Endpoint("GET", "acmeclient/accounts/get", EndpointKind.PLUGIN)
+ACMECLIENT_VALIDATION_TEMPLATE = Endpoint("GET", "acmeclient/validations/get", EndpointKind.PLUGIN)
+ACMECLIENT_CERTIFICATE_TEMPLATE = Endpoint(
+    "GET", "acmeclient/certificates/get", EndpointKind.PLUGIN
+)
+ACMECLIENT_ACTION_TEMPLATE = Endpoint("GET", "acmeclient/actions/get", EndpointKind.PLUGIN)
+
 # --- core -----------------------------------------------------------------------------
 CORE_MENU_SEARCH = Endpoint("GET", "core/menu/search")
 CORE_SYSTEM_STATUS = Endpoint("GET", "core/system/status")
@@ -496,6 +543,39 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
         HOSTDISCOVERY_SETTINGS_GET,
         HOSTDISCOVERY_SETTINGS_SET,
         HOSTDISCOVERY_RECONFIGURE,
+    ),
+    # #790 (os-acme-client). The templates are the item ``get`` without a UUID.
+    "acmeclient.settings": (
+        ACMECLIENT_SETTINGS_GET,
+        ACMECLIENT_SETTINGS_SET,
+        ACMECLIENT_FETCH_CRON,
+        ACMECLIENT_RECONFIGURE,
+    ),
+    "acmeclient.accounts": (
+        *ACMECLIENT_ACCOUNT.all(),
+        ACMECLIENT_ACCOUNT_TEMPLATE,
+        ACMECLIENT_RECONFIGURE,
+    ),
+    "acmeclient.validations": (
+        *ACMECLIENT_VALIDATION.all(),
+        ACMECLIENT_VALIDATION_TEMPLATE,
+        ACMECLIENT_RECONFIGURE,
+    ),
+    "acmeclient.actions": (
+        *ACMECLIENT_ACTION.all(),
+        ACMECLIENT_ACTION_TEMPLATE,
+        ACMECLIENT_RECONFIGURE,
+    ),
+    "acmeclient.certs": (
+        *ACMECLIENT_CERTIFICATE.all(),
+        ACMECLIENT_CERTIFICATE_TEMPLATE,
+        ACMECLIENT_ACCOUNT.search,
+        ACMECLIENT_ACCOUNT.read,
+        ACMECLIENT_VALIDATION.search,
+        ACMECLIENT_VALIDATION.read,
+        ACMECLIENT_ACTION.search,
+        ACMECLIENT_ACTION.read,
+        ACMECLIENT_RECONFIGURE,
     ),
 }
 

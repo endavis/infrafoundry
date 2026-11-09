@@ -82,3 +82,10 @@ def test_check_box_uses_detected_version() -> None:
     result = check_box(client, ["system.hostname"])
     assert result.version == "26.1.6_2"
     assert result.errors
+
+
+def test_plugin_endpoints_are_skipped() -> None:
+    types = ["acmeclient.settings", "acmeclient.accounts", "acmeclient.certs"]
+    result = check_resource_types("26.1.6", types)
+    assert result.errors == []
+    assert result.warnings == []

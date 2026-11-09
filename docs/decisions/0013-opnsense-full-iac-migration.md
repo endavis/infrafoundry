@@ -44,7 +44,7 @@ We will close the IaC gap so OPNsense box-to-box migration is achievable through
 | Unbound `domain_override`, `host_alias`, `forward` | Existing `unbound_host_override` is incomplete — host aliases and conditional forwarders are common in real deployments. |
 | `openvpn.instances` ([#808](https://github.com/endavis/infrafoundry/issues/808)) | Added 2026-10-27 (#1093); renamed from `openvpn_legacy.clients` 2026-11-08 (#808). The VPN client must work on the replacement box without a hand import. It is managed as a modern client instance; the legacy `os-openvpn-legacy` plugin is not managed, and a cutover recreates the client as a modern instance. |
 | `trust.cas`, `trust.certs` ([#807](https://github.com/endavis/infrafoundry/issues/807)) | Added 2026-10-27 (#1093). `system.webgui` and the OpenVPN client refer to certificates by reference, so the references must resolve after a rebuild. |
-| `acmeclient_*` ([#790](https://github.com/endavis/infrafoundry/issues/790)) | Added 2026-10-27 (#1093). Certificates issued by the ACME client stop renewing if its accounts, validations and actions are not carried over. |
+| `acmeclient_*` ([#790](https://github.com/endavis/infrafoundry/issues/790)) | Added 2026-10-27 (#1093). Certificates issued by the ACME client stop renewing if its accounts, validations and actions are not carried over. Implemented by #790 as `acmeclient.settings`, `.accounts`, `.validations`, `.actions` and `.certs`; the renewal cron job is plugin-managed, see [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md). |
 
 **Tooling work:**
 
@@ -119,7 +119,7 @@ Each step above is a separate feature issue. Issue numbers will be added to this
 - Issue [#1093](https://github.com/endavis/infrafoundry/issues/1093): docs: reconcile the out-of-scope list with open issues (amended 2026-10-27).
 - Issue [#808](https://github.com/endavis/infrafoundry/issues/808): feat: add `openvpn.instances` direct-API resource for OpenVPN client instances (moved in scope by #1093; scope changed from the legacy plugin to modern instances).
 - Issue [#807](https://github.com/endavis/infrafoundry/issues/807): feat: add `trust.cas` and `trust.certs` direct-API resources (moved in scope by #1093).
-- Issue [#790](https://github.com/endavis/infrafoundry/issues/790): feat: add the `acmeclient_*` resource types (moved in scope by #1093).
+- Issue [#790](https://github.com/endavis/infrafoundry/issues/790): feat: add the `acmeclient_*` resource types (moved in scope by #1093). Implemented as the `acmeclient.*` types; the renewal cron job is plugin-managed rather than a `cron.jobs` reference.
 
 ## Related Documentation
 

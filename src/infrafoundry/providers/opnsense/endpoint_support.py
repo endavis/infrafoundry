@@ -2,7 +2,9 @@
 
 The check reads the specs bundled with ``opnsense-openapi``; it never calls the box
 except to read its version in :func:`check_box`. ``interfaces/assign_settings/*``
-(``EndpointKind.EXTENSION``) is skipped because stock OPNsense does not serve it.
+(``EndpointKind.EXTENSION``) is skipped because stock OPNsense does not serve it, and so
+is every ``acmeclient/*`` endpoint (``EndpointKind.PLUGIN``, #790): the specs cover core
+only and the ``os-acme-client`` plugin is installed by ``system.firmware``.
 """
 
 from __future__ import annotations
@@ -65,7 +67,7 @@ def check_resource_types(version: str, resource_types: Iterable[str]) -> Endpoin
     try:
         for resource_type in types:
             for endpoint in endpoints.RESOURCE_TYPE_ENDPOINTS[resource_type]:
-                if endpoint.kind is endpoints.EndpointKind.EXTENSION:
+                if endpoint.kind is not endpoints.EndpointKind.STOCK:
                     continue
                 if not endpoint_exists(endpoint.sample_path(), endpoint.method, version=version):
                     result.errors.append(

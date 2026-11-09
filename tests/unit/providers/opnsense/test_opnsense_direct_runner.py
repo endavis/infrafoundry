@@ -2016,3 +2016,65 @@ class TestDeletePhase:
             result = OPNsenseDirectRunner().destroy(provider_with_env)
         assert result["success"] is True
         assert log == ["res.destroy", "sub.destroy", "plain.destroy"]
+
+
+class TestTupleSiblingTypes:
+    """``SIBLING_RESOURCE_TYPE`` may be a tuple of types (#790)."""
+
+    class _Multi:
+        SIBLING_RESOURCE_TYPE = ("kea.dhcp4.subnets", "interfaces.vlans")
+        DELETE_SCOPE = "managed_set"
+
+    def test_tuple_slices_every_listed_type(self) -> None:
+        all_resources = [
+            _kea_subnet("lan-dhcp"),
+            _vlan_resource("v1", "igb0", 10),
+            _kea_reservation("server1"),
+        ]
+        sibling = OPNsenseDirectRunner._sibling_resources_for(self._Multi, all_resources)
+        assert sibling is not None
+        assert {r.name for r in sibling} == {"lan-dhcp", "v1"}
+
+    def test_managed_siblings_concatenate_across_types(self) -> None:
+        managed = _managed(("kea.dhcp4.subnets", "a"), ("interfaces.vlans", "b"), ("other", "c"))
+        kwargs = OPNsenseDirectRunner()._managed_kwargs("x", self._Multi, managed)
+        assert {r.name for r in kwargs["managed_sibling_resources"]} == {"a", "b"}
+
+    def test_str_none_and_malformed_values_are_unchanged(self) -> None:
+        class _Str:
+            SIBLING_RESOURCE_TYPE = "kea.dhcp4.subnets"
+
+        class _Empty:
+            SIBLING_RESOURCE_TYPE = ()
+
+        class _Bad:
+            SIBLING_RESOURCE_TYPE = ("kea.dhcp4.subnets", 3)
+
+        resources = [_kea_subnet("lan-dhcp")]
+        assert OPNsenseDirectRunner._sibling_types(_Str) == ("kea.dhcp4.subnets",)
+        assert OPNsenseDirectRunner._sibling_resources_for(_Empty, resources) is None
+        assert OPNsenseDirectRunner._sibling_resources_for(_Bad, resources) is None
+        assert OPNsenseDirectRunner._sibling_resources_for(object, resources) is None
+
+
+class TestAcmeclientHookCoalescing:
+    """Two ACME managers that change state fire ``acmeclient_reconfigure`` once (#790)."""
+
+    def test_multi_type_apply_fires_the_shared_hook_once(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        resources = [
+            ResourceConfig(name=n, type=t, provider="opnsense", config={})
+            for n, t in (("a", "acmeclient.accounts"), ("c", "acmeclient.certs"))
+        ]
+        accounts, _ = _hook_manager(hook_key="acmeclient_reconfigure", created=1)
+        certs, _ = _hook_manager(hook_key="acmeclient_reconfigure", updated=1)
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "acmeclient.accounts": accounts,
+            "acmeclient.certs": certs,
+        }
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"acmeclient_reconfigure": hook}
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().apply(provider_with_env)
+        hook.assert_called_once_with("test-env")

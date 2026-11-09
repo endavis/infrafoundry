@@ -1028,6 +1028,10 @@ class TestDottedTypeRegistrySanity:
         "trust.cas",
         "trust.certs",
         "openvpn.instances",
+        "acmeclient.accounts",
+        "acmeclient.validations",
+        "acmeclient.actions",
+        "acmeclient.certs",
     )
 
     def test_each_phase_1_dotted_type_registered_as_list(self) -> None:

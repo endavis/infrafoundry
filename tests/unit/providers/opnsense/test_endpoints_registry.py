@@ -144,3 +144,61 @@ def test_syslog_settings_registers_the_settings_endpoints() -> None:
     assert endpoints.SYSLOG_SETTINGS_GET in registered
     assert endpoints.SYSLOG_SETTINGS_SET in registered
     assert endpoints.SYSLOG_RECONFIGURE in registered
+
+
+_ACME_FORBIDDEN = (
+    "register",
+    "sign",
+    "revoke",
+    "removekey",
+    "automation",
+    "import",
+    "signallcerts",
+    "toggle",
+)
+
+
+def test_plugin_entries_are_exactly_the_acmeclient_endpoints() -> None:
+    registered = endpoints.registered_endpoints()
+    plugin = {e.template for e in registered if e.kind is EndpointKind.PLUGIN}
+    assert plugin
+    assert all(t.startswith("acmeclient/") for t in plugin)
+    stock = [e for e in registered if e.kind is EndpointKind.STOCK]
+    assert not any(e.template.startswith("acmeclient/") for e in stock)
+
+
+def test_acmeclient_lists_register_update_not_set() -> None:
+    for crud in (
+        endpoints.ACMECLIENT_ACCOUNT,
+        endpoints.ACMECLIENT_VALIDATION,
+        endpoints.ACMECLIENT_CERTIFICATE,
+        endpoints.ACMECLIENT_ACTION,
+    ):
+        assert crud.update.template.rsplit("/", 2)[1] == "update"
+        assert crud.update.template.endswith("/update/{uuid}")
+        assert crud.search.method == "GET"
+    assert (
+        endpoints.ACMECLIENT_CERTIFICATE.update.template == "acmeclient/certificates/update/{uuid}"
+    )
+
+
+def test_acmeclient_types_register_their_endpoints() -> None:
+    types = endpoints.RESOURCE_TYPE_ENDPOINTS
+    assert endpoints.ACMECLIENT_SETTINGS_SET in types["acmeclient.settings"]
+    assert endpoints.ACMECLIENT_FETCH_CRON in types["acmeclient.settings"]
+    for name in ("accounts", "validations", "actions", "certs"):
+        assert endpoints.ACMECLIENT_RECONFIGURE in types[f"acmeclient.{name}"]
+    certs = types["acmeclient.certs"]
+    for crud in (
+        endpoints.ACMECLIENT_ACCOUNT,
+        endpoints.ACMECLIENT_VALIDATION,
+        endpoints.ACMECLIENT_ACTION,
+    ):
+        assert crud.search in certs
+
+
+def test_no_registered_template_can_contact_a_ca_or_remote_host() -> None:
+    for e in endpoints.registered_endpoints():
+        if e.template.startswith("acmeclient/"):
+            actions = e.template.split("/")[1:]
+            assert not any(word in part.lower() for part in actions for word in _ACME_FORBIDDEN), e

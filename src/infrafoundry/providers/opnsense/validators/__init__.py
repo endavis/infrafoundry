@@ -5,6 +5,7 @@ from infrafoundry.providers.opnsense.validators._xref import (
     build_xref_index,
     resolve_xref,
 )
+from infrafoundry.providers.opnsense.validators.acmeclient_validator import AcmeClientValidator
 from infrafoundry.providers.opnsense.validators.alias_validator import AliasValidator
 from infrafoundry.providers.opnsense.validators.cron_jobs_validator import CronJobsValidator
 from infrafoundry.providers.opnsense.validators.firewall_rule_validator import (
@@ -68,6 +69,7 @@ from infrafoundry.providers.opnsense.validators.virtual_ip_validator import Virt
 from infrafoundry.providers.opnsense.validators.vlan_validator import VLANValidator
 
 __all__ = [
+    "AcmeClientValidator",
     "AliasValidator",
     "CronJobsValidator",
     "FirewallRuleValidator",

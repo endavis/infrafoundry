@@ -968,3 +968,39 @@ class TestSingletonNamesAreDotted:
         } == SINGLETON_RESOURCE_TYPES
         assert {"system.tuning", "radvd"} <= SINGLETON_RESOURCE_TYPES
         assert "firewall.aliases" not in SINGLETON_RESOURCE_TYPES
+
+
+@pytest.mark.unit
+class TestAcmeclientNested:
+    """The acmeclient settings dict and four lists load to dotted types (#790)."""
+
+    def test_settings_and_lists_load_with_name_injected(self, temp_dir: Path) -> None:
+        data = {
+            "opnsense": {
+                "acmeclient": {
+                    "settings": {"enabled": True},
+                    "accounts": [{"name": "acct", "config": {"email": "admin@example.com"}}],
+                    "validations": [{"name": "dns", "config": {"method": "dns01"}}],
+                    "actions": [{"name": "gui", "config": {"type": "configd_restart_gui"}}],
+                    "certs": [{"name": "web", "config": {"common_name": "a.example.com"}}],
+                }
+            }
+        }
+        resources = PackageLoader(temp_dir)._parse_resources_from_data(data, "t.yaml", "opnsense")
+        by_type = {r.type: r for r in resources}
+        assert set(by_type) == {
+            "acmeclient.settings",
+            "acmeclient.accounts",
+            "acmeclient.validations",
+            "acmeclient.actions",
+            "acmeclient.certs",
+        }
+        assert by_type["acmeclient.settings"].config == {"enabled": True}
+        assert by_type["acmeclient.accounts"].name == "acct"
+        assert by_type["acmeclient.accounts"].config["name"] == "acct"
+        assert by_type["acmeclient.certs"].config["common_name"] == "a.example.com"
+
+    def test_list_given_as_dict_is_rejected(self, temp_dir: Path) -> None:
+        data = {"opnsense": {"acmeclient": {"accounts": {"name": "x", "config": {}}}}}
+        with pytest.raises(InvalidConfigurationError, match=r"acmeclient\.accounts"):
+            PackageLoader(temp_dir)._parse_resources_from_data(data, "bad.yaml", "opnsense")

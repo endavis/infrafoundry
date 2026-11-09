@@ -716,3 +716,32 @@ class TestValidateEndpointSupport:
         validator.validate_endpoint_support([])
         validator.api_validator.add_error.assert_not_called()
         validator.api_validator.add_success.assert_not_called()
+
+
+class TestAcmeclientWiring:
+    """The ACME-client validator gets only the ``acmeclient.*`` slice (#790)."""
+
+    def test_dispatches_acmeclient_slice(self, validator: OPNsenseValidator) -> None:
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "api_url": "https://opnsense.example.com",
+                "api_key": "key",
+                "api_secret": "secret",
+            }
+        )
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
+        validator.acmeclient_validator = MagicMock()
+        account = ResourceConfig(
+            name="a", type="acmeclient.accounts", provider="opnsense", config={}
+        )
+        settings = ResourceConfig(
+            name="acmeclient.settings", type="acmeclient.settings", provider="opnsense", config={}
+        )
+        other = ResourceConfig(name="g", type="system.groups", provider="opnsense", config={})
+
+        validator.validate_references([account, settings, other])
+
+        assert validator.acmeclient_validator.validate.call_args.args[0].resources == [
+            account,
+            settings,
+        ]

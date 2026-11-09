@@ -118,3 +118,18 @@ def test_newer_series_gaps_are_reported_not_failed() -> None:
                 continue
             if not endpoint_exists(e.sample_path(), e.method, version=version):
                 warnings.warn(f"{e} is absent from OPNsense {version}", stacklevel=1)
+
+
+@pytest.mark.parametrize("version", _supported_specs())
+def test_plugin_endpoints_are_absent_from_the_core_specs(version: str) -> None:
+    """The PLUGIN exemption stands: the specs cover core only (#790)."""
+    plugin = [e for e in endpoints.registered_endpoints() if e.kind is EndpointKind.PLUGIN]
+    assert plugin
+    present = [
+        f"{e} in {version}"
+        for e in plugin
+        if endpoint_exists(e.sample_path(), e.method, version=version)
+    ]
+    assert not present, "upstream now ships these; drop the PLUGIN exemption:\n" + "\n".join(
+        present
+    )
