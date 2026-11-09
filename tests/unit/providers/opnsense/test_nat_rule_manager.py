@@ -549,3 +549,43 @@ class TestSnatModeWarning:
             deletes = manager.apply("env", [_outbound_resource("a")], deletes_only=True)
         assert len(result["warnings"]) == 1
         assert "warnings" not in deletes
+
+
+class TestDuplicateManagedRules:
+    """Several live rows with one managed name (#1339)."""
+
+    def test_plan_keeps_diff_and_snat_mode_warnings(self, tmp_path: Path) -> None:
+        service = _make_service_mock(diff=Diff(warnings=["firewall.nat: duplicate"]))
+        service.get_snat_mode.return_value = "automatic"
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = NATRuleManager(tmp_path).plan("env", [_outbound_resource("foo")])
+        assert len(diff.warnings) == 2
+        assert diff.warnings[0] == "firewall.nat: duplicate"
+        assert "automatic" in diff.warnings[1]
+
+    def test_apply_names_duplicate_of_desired_rule_by_uuid(self, tmp_path: Path) -> None:
+        dup = _live_managed("u2", "foo", "outbound")
+        stale = _live_managed("u3", "stale", "outbound")
+        service = _make_service_mock(
+            diff=Diff(deletes=[dup, stale]),
+            apply_counts={"created": 0, "updated": 0, "deleted": 2},
+        )
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            result = NATRuleManager(tmp_path).apply("env", [_outbound_resource("foo")])
+        names = [o.resource_name for o in result["resource_outcomes"]]
+        assert names == ["nat-rule-u2", "stale"]
+
+    def test_destroy_deletes_every_copy(self, tmp_path: Path) -> None:
+        live = [_live_managed("u1", "foo", "outbound"), _live_managed("u2", "foo", "outbound")]
+        service = _make_service_mock(live=live)
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            result = NATRuleManager(tmp_path).destroy("env", [_outbound_resource("foo")])
+        assert [c.args for c in service.delete.call_args_list] == [
+            ("u1", "outbound"),
+            ("u2", "outbound"),
+        ]
+        service.apply_changes.assert_called_once_with("outbound")
+        assert result["resources_destroyed"] == 2
