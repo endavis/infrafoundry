@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794226563705,
+  "lastUpdate": 1794228102901,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -496,6 +496,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002620655708557622",
             "extra": "mean: 78.84240880685404 usec\nrounds: 13762"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d3db672bbd19d060b40f95421bb0c218db4590e8",
+          "message": "fix: let the opnsense-vm bootstrap open the api on the lan address (merges PR #1334, addresses #1332)\n\nA fresh box only passes TCP 443 to its WAN address, so an environment whose\napi_url is the LAN address cannot reach it after a rebuild until the declared\nrules are restored through that same API.\n\nAdd an opt-in api_allow_lan blueprint input (default false). When set, the\nbootstrap adds a second WAN pass rule from api_allow_cidr to the LAN address.\nThe README documents the input and the WAN-address override for boxes built\nwithout it.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T12:41:02Z",
+          "tree_id": "f542d4397f4c7166506c787527016cde411f531b",
+          "url": "https://github.com/endavis/infrafoundry/commit/d3db672bbd19d060b40f95421bb0c218db4590e8"
+        },
+        "date": 1794228102037,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 11194.884813534318,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005565002023639638",
+            "extra": "mean: 89.3265108713782 usec\nrounds: 12326"
           }
         ]
       }
