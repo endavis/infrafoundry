@@ -47,6 +47,22 @@ expect {
   timeout { puts "ERROR: Timed out waiting for the shell"; exit 1 }
 }
 
+{% if opnsense_disk_size | int > 0 %}
+# Grow the root filesystem into a disk that was resized before first boot
+# (disk_size). UNVERIFIED on a live box. Every step tolerates failure and
+# does nothing when there is nothing to grow, so it never fails the bootstrap.
+# The console shell is csh-family, so the script runs under sh -c. Output goes
+# to /tmp/ifb-grow.log on the box, never to this console.
+set grow {sh -c 'exec >/tmp/ifb-grow.log 2>&1; d=ada0; gpart recover $d; i=$(gpart show $d | awk "\$1 ~ /^[0-9]+\$/ && \$3 ~ /^[0-9]+\$/ {n=\$3} END {print n}"); if [ -n "$i" ]; then gpart resize -i $i $d; p=${d}s${i}; if gpart show $p >/dev/null 2>&1; then j=$(gpart show $p | awk "\$1 ~ /^[0-9]+\$/ && \$3 ~ /^[0-9]+\$/ {n=\$3} END {print n}"); [ -n "$j" ] && gpart resize -i $j $p; fi; fi; growfs -y /; true'}
+set timeout 120
+send "$grow\r"
+expect {
+  -re $prompt {}
+  timeout { puts "WARNING: Growing the root filesystem timed out; continuing" }
+}
+set timeout 60
+
+{% endif %}
 # Payload: no logging from here until it has run.
 log_user 0
 log_file

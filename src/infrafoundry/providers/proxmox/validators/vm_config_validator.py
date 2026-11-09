@@ -76,6 +76,7 @@ class VMConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
             self._validate_network_models(name, config)
             self._validate_ovmf_efi_disk(name, config)
             self._validate_disk_image(name, config)
+            self._validate_disk_size(name, config)
 
     def _validate_cpu_type(self, name: str, config: dict[str, Any]) -> None:
         """Warn if cpu_type is not in the known set."""
@@ -227,6 +228,28 @@ class VMConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
             self._error(
                 name, "disk_image_sha256", "disk_image_sha256 must be 64 lowercase hex characters."
             )
+
+    def _validate_disk_size(self, name: str, config: dict[str, Any]) -> None:
+        """Check ``disk_size`` is a positive integer and only used with a disk image.
+
+        Whether it exceeds the image's own size is decided at apply time.
+        """
+        disk_size = config.get("disk_size")
+        if disk_size is None:
+            return
+        if not config.get("disk_image_source"):
+            self.report.add_check(
+                check_name=f"proxmox_vm_{name}_disk_size",
+                passed=True,
+                message=(
+                    f"VM '{name}': disk_size only applies to VMs with disk_image_source; "
+                    "it is ignored."
+                ),
+                level=ValidationLevel.WARNING,
+            )
+            return
+        if isinstance(disk_size, bool) or not isinstance(disk_size, int) or disk_size <= 0:
+            self._error(name, "disk_size", "disk_size must be a positive integer (GiB).")
 
     def _error(self, name: str, field: str, message: str) -> None:
         self.report.add_check(

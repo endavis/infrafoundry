@@ -31,6 +31,10 @@ inputs:
   - name: cores
     type: integer
     default: 2
+  - name: disk_size
+    type: integer
+    default: 0
+    description: "Boot disk size in GiB; 0 keeps the image's own size. Larger values resize the disk before first boot"
 
   # --- Image (OPNsense nano, serial console; bz2 is decompressed on the host) ---
   - name: image_source

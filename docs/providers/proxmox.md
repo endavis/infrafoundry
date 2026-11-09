@@ -106,6 +106,11 @@ that ship as a disk, not as a cloud image. Such VMs skip cloud-init.
   - If `disk_image_sha256` is set, the downloaded or given file is checked
     against it before use.
   - The image is imported as the only disk.
+  - `disk_size` (GiB, positive integer) is for disk-image VMs only. The disk
+    is resized after the import and before first boot, but only when the value
+    exceeds the image's own size; otherwise the step is skipped at apply time.
+    The guest must grow its own filesystem. Changing it rebuilds the VM. On
+    other VMs it is ignored, with a validation warning.
 
 The two are mutually exclusive.
 
@@ -118,6 +123,7 @@ vms:
     disk_image_sha256: "<sha256 of the .img.bz2>"
     disk_bus: ide
     disk_storage: local-lvm
+    disk_size: 16
     serial: true
     network:
       - { bridge: vmbr1, model: e1000 }

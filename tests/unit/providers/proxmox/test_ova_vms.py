@@ -604,3 +604,69 @@ class TestDiskImageVM:
         assert "tar -xf" in content
         assert "disk_image_source" not in content
         assert "OVA VM managed by InfraFoundry" in content
+
+
+def _make_sized_image_vm(**config_overrides: Any) -> ResourceConfig:
+    """Disk-image VM shaped like the opnsense-vm blueprint (#1329)."""
+    return _make_image_vm(
+        "fw-test",
+        disk_image_sha256="ab" * 32,
+        disk_image_cache_dir=CACHE,
+        cores=2,
+        memory=2048,
+        disk_bus="ide",
+        disk_storage="local-lvm",
+        serial=True,
+        boot_order=["ide0"],
+        onboot=False,
+        tags=["opnsense", "fw-test"],
+        network=[
+            {"bridge": "vmbr1", "model": "e1000"},
+            {"bridge": "vmbr0", "model": "e1000", "tag": 10},
+        ],
+        **config_overrides,
+    )
+
+
+class TestDiskImageSize:
+    """``disk_size`` resizes the imported disk at apply time (#1329)."""
+
+    # sha256 of the render without disk_size, measured before the template change.
+    NO_DISK_SIZE_DIGEST = "c5825c741c4896e64e2c72730620f1a59f461011d95a759e671771107b3d3947"
+
+    def test_render_without_disk_size_is_unchanged(self, provider: ProxmoxProvider) -> None:
+        import hashlib
+
+        content = _render_ova_vms(provider, [_make_sized_image_vm(), _make_ova_vm()])
+
+        assert hashlib.sha256(content.encode()).hexdigest() == self.NO_DISK_SIZE_DIGEST
+        assert "qm resize" not in content
+        assert "disk_size" not in content
+
+    def test_disk_size_is_a_trigger(self, provider: ProxmoxProvider) -> None:
+        content = _render_ova_vms(provider, [_make_sized_image_vm(disk_size=16)])
+        start = content.find("triggers_replace")
+        block = content[start : content.find("}", start)]
+
+        assert 'disk_size    = "16"' in block
+
+    def test_disk_size_resizes_after_import_only_when_larger(
+        self, provider: ProxmoxProvider
+    ) -> None:
+        content = _render_ova_vms(provider, [_make_sized_image_vm(disk_size=16)])
+
+        resize = "qm resize ${self.triggers_replace.vmid} ${self.triggers_replace.disk_bus}0 16G"
+        attach = (
+            'qm set ${self.triggers_replace.vmid} --${self.triggers_replace.disk_bus}0 "$DISK_PATH"'
+        )
+        assert resize in content
+        assert f"qemu-img info --output=json {CACHE}/OPNsense-26.1.6-nano-amd64.img" in content
+        assert "$((16 * 1024 * 1024 * 1024))" in content
+        assert '[ "$WANT" -gt "$HAVE" ]' in content
+        assert "disk_size 16G is not larger than the image; keeping the image size" in content
+        assert content.index(attach) < content.index(resize) < content.index("# Phase 4")
+
+    def test_ova_vm_ignores_disk_size(self, provider: ProxmoxProvider) -> None:
+        content = _render_ova_vms(provider, [_make_ova_vm(disk_size=16)])
+
+        assert "qm resize" not in content

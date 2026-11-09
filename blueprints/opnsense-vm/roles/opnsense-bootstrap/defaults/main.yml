@@ -17,3 +17,7 @@ opnsense_wan_if: em1
 # Base64 is sent to the console in pieces this long, keeping each shell
 # line well under the terminal's input limit.
 opnsense_send_chunk: 160
+
+# Boot disk size in GiB the VM was built with (0 = the image's own size).
+# When above 0, the bootstrap runs an idempotent grow step on the console.
+opnsense_disk_size: 0

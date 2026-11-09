@@ -31,6 +31,7 @@
         opnsense_lan_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_lan_ip') }}"
         opnsense_lan_prefix: "{{ lookup('env', 'INFRAFOUNDRY_VAR_lan_prefix') }}"
         opnsense_api_allow_cidr: "{{ lookup('env', 'INFRAFOUNDRY_VAR_api_allow_cidr') }}"
+        opnsense_disk_size: "{{ lookup('env', 'INFRAFOUNDRY_VAR_disk_size') | default('0', true) }}"
         opnsense_boot_timeout: "{{ lookup('env', 'INFRAFOUNDRY_VAR_boot_timeout') }}"
         opnsense_root_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_opnsense_root_password') }}"
         opnsense_api_key: "{{ lookup('env', 'INFRAFOUNDRY_VAR_opnsense_api_key') }}"
