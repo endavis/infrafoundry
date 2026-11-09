@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794228102901,
+  "lastUpdate": 1794230616341,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -527,6 +527,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005565002023639638",
             "extra": "mean: 89.3265108713782 usec\nrounds: 12326"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d808d7d8b68444740aa790af73a58540943deade",
+          "message": "feat: add acmeclient direct-api resources for the opnsense acme client plugin (merges PR #1335, addresses #790)\n\nAdd five direct-API types for os-acme-client: acmeclient.settings (singleton)\nand acmeclient.accounts, .validations, .actions and .certs (lists). The four\nlists share one table-driven engine, delete only managed rows, and have\nconfig migrate extractors. Certs reference accounts, validations and actions\nby handle; the runner now accepts a tuple SIBLING_RESOURCE_TYPE so one manager\ncan resolve several sibling types. One acmeclient_reconfigure hook fires per\napply.\n\nThe renewal cron job is plugin-managed: UpdateCron is never diffed, and a\nsettings apply with the plugin and auto-renewal on calls fetchCronIntegration.\nDNS credential fields pass through verbatim as secret:// URIs; the validator\nrejects another provider's fields and requires dns_cf_token for dns_cf.\nPlugin endpoints are a new EndpointKind.PLUGIN, exempt from the core spec\ncheck. Apply never registers accounts or signs certificates.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T13:22:54Z",
+          "tree_id": "e35236542fc62da6d6088006a535de20994a6742",
+          "url": "https://github.com/endavis/infrafoundry/commit/d808d7d8b68444740aa790af73a58540943deade"
+        },
+        "date": 1794230615728,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7690.6307593084375,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001843843192026428",
+            "extra": "mean: 130.02834634722765 usec\nrounds: 8350"
           }
         ]
       }
