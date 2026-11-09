@@ -2,8 +2,23 @@
 
 from typing import Literal
 
-from ..services.kea_dhcp import KeaDHCPService
+from ..services.kea_dhcp import (
+    KEA_DHCP4_RESERVATIONS,
+    KEA_DHCP4_SUBNETS,
+    KEA_DHCP6_RESERVATIONS,
+    KEA_DHCP6_SUBNETS,
+    KeaDHCPService,
+    kea_identity,
+)
+from ._migrate_names import env_provider_resources, reserved_names
 from .base import BaseComponentManager
+
+_KEA_TYPES = (
+    KEA_DHCP4_SUBNETS,
+    KEA_DHCP4_RESERVATIONS,
+    KEA_DHCP6_SUBNETS,
+    KEA_DHCP6_RESERVATIONS,
+)
 
 
 class KeaDHCPManager(BaseComponentManager):
@@ -78,10 +93,23 @@ class KeaDHCPManager(BaseComponentManager):
             env_name: Environment name
             provider_name: Provider name (defaults to 'opnsense')
 
+        Names avoid every other opnsense resource name in the environment and
+        stay unique across the four Kea types (``-2``, ``-3`` suffixes); an
+        entry already in the environment keeps its name (#1340).
+
         Returns:
             YAML configuration as a string
         """
         service: KeaDHCPService = KeaDHCPService.from_environment(
             env_name, provider_name, self.config_dir
         )
-        return service.export_to_yaml()
+        resources = env_provider_resources(self.config_dir, env_name, provider_name)
+        reserved = reserved_names(resources, exclude_types=_KEA_TYPES)
+        existing: dict[str, dict[str, str]] = {t: {} for t in _KEA_TYPES}
+        for r in resources:
+            if r.type not in _KEA_TYPES:
+                continue
+            identity = kea_identity(r.type, r.config)
+            if identity:
+                existing[r.type].setdefault(identity, r.name)
+        return service.export_to_yaml(existing=existing, reserved=reserved)

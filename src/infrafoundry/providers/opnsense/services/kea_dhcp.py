@@ -20,11 +20,13 @@ the helpers below normalize the live shape so change-detection matches what
 """
 
 import logging
+from collections.abc import Collection, Mapping
 from typing import Any, Final
 
 from .. import endpoints
 from ..api_client import KeaClient, OPNsenseClient
 from ._nested_emit import emit_nested_multi_yaml
+from .acmeclient import next_free_handle, slug_handle
 from .base import BaseService
 
 logger = logging.getLogger(__name__)
@@ -798,7 +800,12 @@ class KeaDHCPService(BaseService):
         self.client.request(endpoints.KEA_RECONFIGURE.method, endpoints.KEA_RECONFIGURE.path())
 
     # Export Operations
-    def export_to_yaml(self) -> str:
+    def export_to_yaml(
+        self,
+        *,
+        existing: Mapping[str, Mapping[str, str]] | None = None,
+        reserved: Collection[str] = (),
+    ) -> str:
         """Export current Kea DHCP configuration to YAML.
 
         Emits all four Kea resource types (DHCPv4 subnets, DHCPv4
@@ -820,13 +827,63 @@ class KeaDHCPService(BaseService):
         Empty branches are still emitted (as ``[]``) so the operator can
         see at a glance which Kea surfaces are unconfigured.
 
+        Names are unique across the four types and avoid ``reserved`` (#1340):
+        a clash gets a ``-2``, ``-3`` ... suffix, an empty name falls back to the
+        subnet CIDR, MAC address, DUID or IP address, then to ``<type>-<index>``.
+        An entry whose identity is in ``existing`` keeps that name.
+
+        Args:
+            existing: Resource type (``kea.dhcp4.subnets`` ...) to
+                ``{identity: name}`` of entries already in the environment.
+            reserved: Names of other opnsense resources already in the
+                environment.
+
         Returns:
             YAML string with the nested ``opnsense:`` namespace and four
             list leaves under ``kea.dhcp4`` / ``kea.dhcp6``.
         """
+        dhcp4_subnets = self.search_dhcpv4_subnets()
+        dhcp4_reservations = self.search_dhcpv4_reservations()
+        dhcp6_subnets = self.search_dhcpv6_subnets()
+        dhcp6_reservations = self.search_dhcpv6_reservations()
+        names = _assign_kea_names(
+            {
+                KEA_DHCP4_SUBNETS: [
+                    (r.get("subnet", ""), _subnet_base(r), _slug_or_empty(r.get("subnet", "")))
+                    for r in dhcp4_subnets
+                ],
+                KEA_DHCP4_RESERVATIONS: [
+                    (
+                        kea_identity(KEA_DHCP4_RESERVATIONS, r),
+                        _host_base(r),
+                        _slug_or_empty(r.get("hw_address", "")),
+                    )
+                    for r in dhcp4_reservations
+                ],
+                KEA_DHCP6_SUBNETS: [
+                    (
+                        r.get("subnet", ""),
+                        _subnet_base(r, "_v6"),
+                        _slug_or_empty(r.get("subnet", "")),
+                    )
+                    for r in dhcp6_subnets
+                ],
+                KEA_DHCP6_RESERVATIONS: [
+                    (
+                        kea_identity(KEA_DHCP6_RESERVATIONS, r),
+                        _host_base(r, "_v6"),
+                        _slug_or_empty(r.get("duid") or r.get("ip_address", "")),
+                    )
+                    for r in dhcp6_reservations
+                ],
+            },
+            existing or {},
+            reserved,
+        )
+
         # DHCPv4 subnets
         dhcp4_subnet_entries: list[dict[str, Any]] = []
-        for subnet in self.search_dhcpv4_subnets():
+        for i, subnet in enumerate(dhcp4_subnets):
             entry_config: dict[str, Any] = {
                 "subnet": subnet.get("subnet", ""),
                 "pools": subnet.get("pools", []),
@@ -845,14 +902,14 @@ class KeaDHCPService(BaseService):
                 entry_config["ntp_servers"] = [n.strip() for n in ntp_servers.split(",")]
             dhcp4_subnet_entries.append(
                 {
-                    "name": subnet.get("description", "").lower().replace(" ", "_"),
+                    "name": names[KEA_DHCP4_SUBNETS][i],
                     "config": entry_config,
                 }
             )
 
         # DHCPv4 reservations
         dhcp4_reservation_entries: list[dict[str, Any]] = []
-        for reservation in self.search_dhcpv4_reservations():
+        for i, reservation in enumerate(dhcp4_reservations):
             hostname = reservation.get("hostname", "")
             res_config: dict[str, Any] = {
                 "subnet": reservation.get("subnet", ""),
@@ -865,14 +922,14 @@ class KeaDHCPService(BaseService):
                 res_config["description"] = description
             dhcp4_reservation_entries.append(
                 {
-                    "name": hostname.lower().replace(" ", "_").replace("-", "_"),
+                    "name": names[KEA_DHCP4_RESERVATIONS][i],
                     "config": res_config,
                 }
             )
 
         # DHCPv6 subnets
         dhcp6_subnet_entries: list[dict[str, Any]] = []
-        for subnet in self.search_dhcpv6_subnets():
+        for i, subnet in enumerate(dhcp6_subnets):
             entry_config = {
                 "subnet": subnet.get("subnet", ""),
                 "description": subnet.get("description", ""),
@@ -885,14 +942,14 @@ class KeaDHCPService(BaseService):
                 entry_config["domain_search"] = [d.strip() for d in domain_search.split(",")]
             dhcp6_subnet_entries.append(
                 {
-                    "name": f"{subnet.get('description', '').lower().replace(' ', '_')}_v6",
+                    "name": names[KEA_DHCP6_SUBNETS][i],
                     "config": entry_config,
                 }
             )
 
         # DHCPv6 reservations
         dhcp6_reservation_entries: list[dict[str, Any]] = []
-        for reservation in self.search_dhcpv6_reservations():
+        for i, reservation in enumerate(dhcp6_reservations):
             hostname = reservation.get("hostname", "")
             res_config = {
                 "subnet": reservation.get("subnet", ""),
@@ -906,7 +963,7 @@ class KeaDHCPService(BaseService):
                 res_config["description"] = description
             dhcp6_reservation_entries.append(
                 {
-                    "name": f"{hostname.lower().replace(' ', '_').replace('-', '_')}_v6",
+                    "name": names[KEA_DHCP6_RESERVATIONS][i],
                     "config": res_config,
                 }
             )
@@ -919,3 +976,128 @@ class KeaDHCPService(BaseService):
                 "kea.dhcp6.reservations": dhcp6_reservation_entries,
             }
         )
+
+
+KEA_DHCP4_SUBNETS: Final = "kea.dhcp4.subnets"
+KEA_DHCP4_RESERVATIONS: Final = "kea.dhcp4.reservations"
+KEA_DHCP6_SUBNETS: Final = "kea.dhcp6.subnets"
+KEA_DHCP6_RESERVATIONS: Final = "kea.dhcp6.reservations"
+_KEA_TYPES: Final = (
+    KEA_DHCP4_SUBNETS,
+    KEA_DHCP4_RESERVATIONS,
+    KEA_DHCP6_SUBNETS,
+    KEA_DHCP6_RESERVATIONS,
+)
+
+
+def _subnet_base(row: Mapping[str, Any], suffix: str = "") -> str:
+    """Return the historical subnet name, or ``""`` when the description is empty.
+
+    Args:
+        row: A live subnet search row.
+        suffix: Appended to a non-empty slug (``_v6`` for DHCPv6).
+
+    Returns:
+        The wanted name before collision handling.
+    """
+    slug = str(row.get("description", "")).lower().replace(" ", "_")
+    return f"{slug}{suffix}" if slug else ""
+
+
+def _host_base(row: Mapping[str, Any], suffix: str = "") -> str:
+    """Return the historical reservation name, or ``""`` when there is no hostname.
+
+    Args:
+        row: A live reservation search row.
+        suffix: Appended to a non-empty slug (``_v6`` for DHCPv6).
+
+    Returns:
+        The wanted name before collision handling.
+    """
+    slug = str(row.get("hostname", "")).lower().replace(" ", "_").replace("-", "_")
+    return f"{slug}{suffix}" if slug else ""
+
+
+def kea_identity(kea_type: str, fields: Mapping[str, Any]) -> str:
+    """Return the re-run identity of a Kea entry, from a live row or an env config.
+
+    Kea reserves one MAC (or DUID) once per subnet, so a reservation is told
+    apart by the (MAC or DUID, IP) pair, joined with ``|``. Either part alone is
+    used when the other is empty. Subnets are identified by their CIDR.
+
+    Args:
+        kea_type: One of the four ``kea.dhcp*`` resource types.
+        fields: A live search row or an environment ``config`` mapping.
+
+    Returns:
+        The identity string, ``""`` when the entry has none.
+    """
+
+    def _get(key: str) -> str:
+        return str(fields.get(key) or "").strip().lower()
+
+    if kea_type in (KEA_DHCP4_SUBNETS, KEA_DHCP6_SUBNETS):
+        return str(fields.get("subnet") or "").strip()
+    owner = _get("hw_address") if kea_type == KEA_DHCP4_RESERVATIONS else _get("duid")
+    ip = _get("ip_address")
+    if owner and ip:
+        return f"{owner}|{ip}"
+    return owner or ip
+
+
+def _identity_candidates(identity: str, pinned: Mapping[str, str]) -> list[str]:
+    """Return the environment keys a live ``identity`` may pin to, best first."""
+    if "|" in identity:
+        return [identity, identity.split("|", 1)[0]]
+    return [identity, *(k for k in pinned if k.startswith(f"{identity}|"))]
+
+
+def _slug_or_empty(identity: str) -> str:
+    """Return ``identity`` as a handle slug (no dots), ``""`` when nothing remains."""
+    return slug_handle(identity)
+
+
+def _assign_kea_names(
+    rows: Mapping[str, list[tuple[str, str, str]]],
+    existing: Mapping[str, Mapping[str, str]],
+    reserved: Collection[str],
+) -> dict[str, list[str]]:
+    """Assign a unique, non-empty name to every live Kea entry.
+
+    Pass 1 pins the first live entry of an identity already present in
+    ``existing`` to its environment name. Pass 2 gives every other entry its
+    base name, else its identity slug, else ``<type>-<index>``, suffixed
+    ``-2``, ``-3`` ... until free of every reserved and assigned name.
+
+    Args:
+        rows: Resource type to ``(identity, base name, identity slug)`` per live
+            entry, in search order.
+        existing: Resource type to ``{identity: name}`` from the environment.
+        reserved: Names of other opnsense resources in the environment.
+
+    Returns:
+        Resource type to the names, aligned with ``rows``.
+    """
+    taken: set[str] = set(reserved)
+    result: dict[str, list[str | None]] = {t: [None] * len(rows.get(t, ())) for t in _KEA_TYPES}
+    for kea_type in _KEA_TYPES:
+        pinned = existing.get(kea_type, {})
+        seen: set[str] = set()
+        for i, (identity, _base, _slug) in enumerate(rows.get(kea_type, ())):
+            if not identity:
+                continue
+            candidates = _identity_candidates(identity, pinned)
+            key = next((c for c in candidates if c in pinned and c not in seen), None)
+            if key is not None:
+                seen.add(key)
+                result[kea_type][i] = pinned[key]
+                taken.add(pinned[key])
+    for kea_type in _KEA_TYPES:
+        suffix = "_v6" if "dhcp6" in kea_type else ""
+        for i, (_identity, base, slug) in enumerate(rows.get(kea_type, ())):
+            if result[kea_type][i] is not None:
+                continue
+            wanted = base or (f"{slug}{suffix}" if slug else "")
+            wanted = wanted or f"{kea_type.replace('.', '-')}-{i + 1}"
+            result[kea_type][i] = next_free_handle(wanted, taken)
+    return {t: [n for n in names if n is not None] for t, names in result.items()}
