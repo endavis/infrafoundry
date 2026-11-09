@@ -159,6 +159,7 @@ class OPNsenseProvider(
         from .components.isc_to_kea_migration import ISCToKeaMigrationManager
         from .components.kea_dhcp import KeaDHCPManager
         from .components.nat_rule import NATRuleManager
+        from .components.source_nat import SourceNatManager  # #1333
         from .components.static_route import StaticRouteManager
         from .components.syslog_settings import SyslogSettingsManager  # #804
         from .components.unbound_forward import UnboundForwardManager
@@ -174,6 +175,7 @@ class OPNsenseProvider(
             ("interfaces.settings", InterfacesSettingsManager),
             ("syslog.settings", SyslogSettingsManager),  # #804
             ("firewall.aliases", AliasManager),
+            ("firewall.source_nat", SourceNatManager),  # #1333
             ("firewall.nat", NATRuleManager),
             ("firewall.rules", FirewallRuleManager),
             ("routing.gateways", GatewayManager),
@@ -291,6 +293,7 @@ class OPNsenseProvider(
         from .components.nat_rule import NATRuleManager
         from .components.openvpn_instances import OpenVpnInstanceManager
         from .components.radvd import RadvdManager
+        from .components.source_nat import SourceNatManager  # #1333
         from .components.static_route import StaticRouteManager
         from .components.syslog_settings import SyslogSettingsManager  # #804
         from .components.system_firmware import SystemFirmwareManager
@@ -344,6 +347,8 @@ class OPNsenseProvider(
             "interfaces.vlans": VlanManager,
             "interfaces.assignments": InterfaceAssignmentManager,
             "firewall.aliases": AliasManager,
+            # #1333: the outbound NAT mode before the rules it governs
+            "firewall.source_nat": SourceNatManager,
             "firewall.nat": NATRuleManager,
             "routing.gateways": GatewayManager,
             "routing.static": StaticRouteManager,
@@ -404,6 +409,7 @@ class OPNsenseProvider(
           :class:`InterfacesSettingsManager` when the interface settings changed.
 
         - ``syslog_reconfigure`` (#804) — fired by :class:`SyslogSettingsManager`.
+        - ``source_nat_apply`` (#1333) — fired by :class:`SourceNatManager`.
         - ``hostdiscovery_reconfigure`` (#792) — fired by :class:`HostDiscoveryManager`
           when the host-discovery settings changed.
 
@@ -429,6 +435,7 @@ class OPNsenseProvider(
             "tunables_reconfigure": self._reconfigure_tunables,
             "interfaces_settings_reconfigure": self._reconfigure_interfaces_settings,
             "syslog_reconfigure": self._reconfigure_syslog,  # #804
+            "source_nat_apply": self._apply_source_nat,  # #1333
             "hostdiscovery_reconfigure": self._reconfigure_hostdiscovery,
             "acmeclient_reconfigure": self._reconfigure_acmeclient,  # #790
         }
@@ -600,6 +607,21 @@ class OPNsenseProvider(
         service = SyslogSettingsService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
+    def _apply_source_nat(self, env_name: str) -> None:
+        """Apply the outbound NAT mode after a change (#1333).
+
+        Used by :meth:`get_finalization_hooks` so one ``firewall/source_nat/apply``
+        call fires per apply, only when the mode changed. Hook errors propagate,
+        failing the apply.
+
+        Args:
+            env_name: Active environment name.
+        """
+        from .services.source_nat import SourceNatService
+
+        service = SourceNatService.from_environment(env_name, "opnsense", self.config_dir)
+        service.apply()
+
     def _reconfigure_acmeclient(self, env_name: str) -> None:
         """Reconfigure the ACME client after any settings or list change (#790).
 
@@ -711,7 +733,12 @@ class OPNsenseProvider(
             "kea.dhcp6.subnets": ["interfaces.vlans"],
             "kea.dhcp6.reservations": ["kea.dhcp6.subnets"],
             "unbound.host_overrides": [],
-            "firewall.nat": ["firewall.aliases", "interfaces.assignments"],
+            "firewall.source_nat": [],  # #1333
+            "firewall.nat": [
+                "firewall.aliases",
+                "interfaces.assignments",
+                "firewall.source_nat",
+            ],
             "routing.gateways": ["interfaces.assignments"],
             "routing.static": ["routing.gateways"],
             "interfaces.virtual_ips": ["interfaces.assignments"],

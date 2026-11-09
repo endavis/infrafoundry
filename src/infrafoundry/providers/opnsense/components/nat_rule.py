@@ -17,13 +17,44 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
 
 from ..services.nat_rule import (
+    SNAT_MODES_INERT,
     Diff,
     LiveNATRule,
+    NATRuleConfig,
     NATRuleKind,
     NATRuleService,
     nat_rule_configs_from_resources,
 )
 from .base import BaseComponentManager
+
+
+def _snat_mode_warnings(
+    service: NATRuleService,
+    desired: list[NATRuleConfig],
+    sibling_resources: list[ResourceConfig] | None,
+) -> list[str]:
+    """Warn when declared outbound rules sit under a mode that ignores them (#1333).
+
+    The effective mode is the declared ``firewall.source_nat.snat_mode`` when there
+    is one, otherwise the live mode. An unreadable live mode (before 26.1) is silent.
+    """
+    outbound = [rule for rule in desired if rule.kind == "outbound" and rule.enabled]
+    if not outbound:
+        return []
+    mode: Any = None
+    if sibling_resources:
+        declared = sibling_resources[0].config.get("snat_mode")
+        if isinstance(declared, str):
+            mode = declared
+    if mode is None:
+        mode = service.get_snat_mode()
+    if not isinstance(mode, str) or mode not in SNAT_MODES_INERT:
+        return []
+    return [
+        f"firewall.nat: {len(outbound)} outbound rule(s) declared but the OPNsense outbound "
+        f"NAT mode is '{mode}'; manual outbound rules only take effect in 'hybrid' or "
+        "'advanced' mode. Declare opnsense.firewall.source_nat.snat_mode: hybrid to manage it."
+    ]
 
 
 class NATRuleManager(BaseComponentManager):
@@ -38,6 +69,10 @@ class NATRuleManager(BaseComponentManager):
     #: The diff engine deletes only objects carrying InfraFoundry's marker, so no
     #: managed set is needed (ADR-0018).
     DELETE_SCOPE: ClassVar[str] = "marker"
+
+    #: Resource type threaded in as ``sibling_resources``: the declared outbound NAT
+    #: mode, so the plan warning uses it instead of the live mode (#1333).
+    SIBLING_RESOURCE_TYPE: ClassVar[str | None] = "firewall.source_nat"
 
     #: The runner deletes in a separate phase before this type's adds and updates,
     #: so a row is deleted while the objects it depends on are still live (#1269).
@@ -54,6 +89,7 @@ class NATRuleManager(BaseComponentManager):
         *,
         add_only: bool = False,
         provider_name: str = "opnsense",
+        sibling_resources: list[ResourceConfig] | None = None,
     ) -> Diff:
         """Compute the add/update/delete diff for the given resources.
 
@@ -63,6 +99,7 @@ class NATRuleManager(BaseComponentManager):
             add_only: If True, suppress deletes for managed live rules
                 not in YAML. Unmanaged live rules are always ignored.
             provider_name: Provider identifier (defaults to ``opnsense``).
+            sibling_resources: ``firewall.source_nat`` resources from YAML.
 
         Returns:
             ``Diff`` describing what apply would do.
@@ -70,7 +107,9 @@ class NATRuleManager(BaseComponentManager):
         service = NATRuleService.from_environment(env_name, provider_name, self.config_dir)
         desired = nat_rule_configs_from_resources(resources)
         live = service.search_all()
-        return service.compute_diff(desired, live, add_only=add_only)
+        diff = service.compute_diff(desired, live, add_only=add_only)
+        diff.warnings = _snat_mode_warnings(service, desired, sibling_resources)
+        return diff
 
     def apply(
         self,
@@ -81,6 +120,7 @@ class NATRuleManager(BaseComponentManager):
         add_only: bool = False,
         deletes_only: bool = False,
         provider_name: str = "opnsense",
+        sibling_resources: list[ResourceConfig] | None = None,
     ) -> dict[str, Any]:
         """Apply the diff: add/update/delete rules and applyChanges.
 
@@ -93,6 +133,7 @@ class NATRuleManager(BaseComponentManager):
             deletes_only: If True, only delete: the runner's delete phase, run
                 before the adds and updates (#1269).
             provider_name: Provider identifier (defaults to ``opnsense``).
+            sibling_resources: ``firewall.source_nat`` resources from YAML.
 
         Returns:
             Dict with ``resources_created``, ``resources_updated``,
@@ -140,13 +181,18 @@ class NATRuleManager(BaseComponentManager):
             )
 
         counts = service.apply_diff(diff)
-        return {
+        result: dict[str, Any] = {
             "success": True,
             "resources_created": counts["created"],
             "resources_updated": counts["updated"],
             "resources_deleted": counts["deleted"],
             "resource_outcomes": outcomes,
         }
+        if not deletes_only:
+            warnings = _snat_mode_warnings(service, desired, sibling_resources)
+            if warnings:
+                result["warnings"] = warnings
+        return result
 
     def destroy(
         self,
@@ -155,6 +201,7 @@ class NATRuleManager(BaseComponentManager):
         *,
         auto_approve: bool = True,
         provider_name: str = "opnsense",
+        sibling_resources: list[ResourceConfig] | None = None,
     ) -> dict[str, Any]:
         """Delete every managed NAT rule named in ``resources``.
 
@@ -170,7 +217,7 @@ class NATRuleManager(BaseComponentManager):
         Returns:
             Dict with ``resources_destroyed`` and ``locked_skipped`` counts.
         """
-        del auto_approve
+        del auto_approve, sibling_resources
         service = NATRuleService.from_environment(env_name, provider_name, self.config_dir)
         desired = nat_rule_configs_from_resources(resources)
         live = service.search_all()
@@ -216,6 +263,7 @@ class NATRuleManager(BaseComponentManager):
         resources: list[ResourceConfig],
         *,
         provider_name: str = "opnsense",
+        sibling_resources: list[ResourceConfig] | None = None,
     ) -> dict[str, str]:
         """Return ``{resource_name: opnsense_uuid}`` for live managed rules.
 
@@ -231,6 +279,7 @@ class NATRuleManager(BaseComponentManager):
             the operator-facing ``name`` as the key — collisions are
             prevented at the YAML level by the resource-name validator.
         """
+        del sibling_resources
         service = NATRuleService.from_environment(env_name, provider_name, self.config_dir)
         desired = nat_rule_configs_from_resources(resources)
         live = service.search_all()

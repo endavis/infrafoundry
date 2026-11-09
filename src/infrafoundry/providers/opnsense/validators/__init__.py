@@ -32,6 +32,7 @@ from infrafoundry.providers.opnsense.validators.radvd_validator import RadvdVali
 from infrafoundry.providers.opnsense.validators.resource_name_validator import (
     ResourceNameValidator,
 )
+from infrafoundry.providers.opnsense.validators.source_nat_validator import SourceNatValidator
 from infrafoundry.providers.opnsense.validators.static_route_validator import (
     StaticRouteValidator,
 )
@@ -82,6 +83,7 @@ __all__ = [
     "OpenVpnInstanceValidator",
     "RadvdValidator",
     "ResourceNameValidator",
+    "SourceNatValidator",  # #1333
     "StaticRouteValidator",
     "SyslogSettingsValidator",  # #804
     "SystemFirmwareValidator",

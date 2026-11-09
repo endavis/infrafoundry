@@ -542,6 +542,39 @@ class TestParseNestedShapeMismatch:
         SyslogSettingsValidator(report).validate(OPNsenseValidationContext(resources=found))
         assert not [r for r in report.results if r.level == ValidationLevel.ERROR]
 
+    def test_source_nat_is_a_singleton_dict(self, temp_dir: Path) -> None:
+        """``firewall.source_nat`` loads as one singleton next to the ``firewall.nat`` list."""
+        from infrafoundry.core.config.package_loader import SINGLETON_RESOURCE_TYPES
+
+        assert "firewall.source_nat" in SINGLETON_RESOURCE_TYPES
+        loader = PackageLoader(temp_dir)
+        data = {
+            "opnsense": {
+                "firewall": {
+                    "nat": [
+                        {
+                            "name": "out",
+                            "kind": "outbound",
+                            "interface": "wan",
+                            "target": "wanip",
+                        }
+                    ],
+                    "source_nat": {"snat_mode": "hybrid"},
+                }
+            }
+        }
+        resources = loader._parse_resources_from_data(data, "t.yaml", "opnsense")
+        found = [r for r in resources if r.type == "firewall.source_nat"]
+        assert len(found) == 1
+        assert found[0].config == {"snat_mode": "hybrid"}
+        assert [r.name for r in resources if r.type == "firewall.nat"] == ["out"]
+
+    def test_source_nat_list_rejected(self, temp_dir: Path) -> None:
+        loader = PackageLoader(temp_dir)
+        data: dict[str, Any] = {"opnsense": {"firewall": {"source_nat": [{"snat_mode": "hybrid"}]}}}
+        with pytest.raises(InvalidConfigurationError, match="declared as a dict"):
+            loader._parse_resources_from_data(data, "bad.yaml", "opnsense")
+
     def test_hostdiscovery_is_a_singleton_dict(self, temp_dir: Path) -> None:
         """``hostdiscovery`` loads as one singleton named and typed ``hostdiscovery``."""
         from infrafoundry.core.config.package_loader import (

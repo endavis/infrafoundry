@@ -289,6 +289,25 @@ class TestOPNsenseResourceTypes:
             provider.get_finalization_hooks()["syslog_reconfigure"]("env")
         factory.return_value.reconfigure.assert_called_once_with()
 
+    def test_source_nat_is_dispatched_before_nat_with_its_own_hook(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        types = provider.get_direct_api_resource_types()
+        assert "firewall.source_nat" in provider.get_resource_types()
+        keys = list(types)
+        assert keys.index("firewall.source_nat") < keys.index("firewall.nat")
+        assert "firewall.source_nat" in provider.get_dependencies()["firewall.nat"]
+        hook = types["firewall.source_nat"].FINALIZATION_HOOK
+        assert hook == "source_nat_apply"
+        assert hook in provider.get_finalization_hooks()
+
+    def test_source_nat_hook_calls_the_service(self, provider: OPNsenseProvider) -> None:
+        with patch(
+            "infrafoundry.providers.opnsense.services.source_nat.SourceNatService.from_environment"
+        ) as factory:
+            provider.get_finalization_hooks()["source_nat_apply"]("env")
+        factory.return_value.apply.assert_called_once_with()
+
     def test_hostdiscovery_is_supported_with_its_own_hook(self, provider: OPNsenseProvider) -> None:
         types = provider.get_direct_api_resource_types()
         assert "hostdiscovery" in provider.get_resource_types()

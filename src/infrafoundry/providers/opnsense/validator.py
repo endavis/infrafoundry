@@ -31,6 +31,7 @@ from infrafoundry.providers.opnsense.validators import (
     OpenVpnInstanceValidator,
     RadvdValidator,
     ResourceNameValidator,
+    SourceNatValidator,  # #1333
     StaticRouteValidator,
     SyslogSettingsValidator,  # #804
     SystemFirmwareValidator,
@@ -126,6 +127,7 @@ class OPNsenseValidator:
         self.interfaces_settings_validator = InterfacesSettingsValidator(report)
         self.syslog_settings_validator = SyslogSettingsValidator(report)  # #804
         self.hostdiscovery_validator = HostDiscoveryValidator(report)
+        self.source_nat_validator = SourceNatValidator(report)  # #1333
 
     def validate_endpoint_support(self, resources: list[ResourceConfig]) -> None:
         """Check the in-scope resource types' endpoints against the box's version (#1239).
@@ -369,6 +371,10 @@ class OPNsenseValidator:
             self.hostdiscovery_validator.validate(
                 replace(context, resources=resource_refs["hostdiscovery"])
             )
+            # #1333
+            self.source_nat_validator.validate(
+                replace(context, resources=resource_refs["source_nat"])
+            )
             self.kea_reservation_validator.validate(context)
             self.radvd_validator.validate(replace(context, resources=resource_refs["radvd"]))
             self.cron_jobs_validator.validate(
@@ -425,6 +431,7 @@ class OPNsenseValidator:
         interfaces_settings = [r for r in resources if r.type == "interfaces.settings"]
         syslog_settings = [r for r in resources if r.type == "syslog.settings"]  # #804
         hostdiscovery = [r for r in resources if r.type == "hostdiscovery"]
+        source_nat = [r for r in resources if r.type == "firewall.source_nat"]  # #1333
         interface_assignments = [r for r in resources if r.type == "interfaces.assignments"]
         nat_rules = [r for r in resources if r.type == "firewall.nat"]
         gateways = [r for r in resources if r.type == "routing.gateways"]
@@ -473,6 +480,7 @@ class OPNsenseValidator:
             "interfaces_settings": interfaces_settings,
             "syslog_settings": syslog_settings,  # #804
             "hostdiscovery": hostdiscovery,
+            "source_nat": source_nat,  # #1333
             "interface_assignments": interface_assignments,
             "interface_assignment_names": interface_assignment_names,
             "nat_rules": nat_rules,

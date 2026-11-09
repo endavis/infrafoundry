@@ -58,6 +58,7 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     "interfaces.virtual_ips": "list",
     "firewall.aliases": "list",
     "firewall.nat": "list",
+    "firewall.source_nat": "dict",  # #1333
     "firewall.rules": "list",
     "routing.gateways": "list",
     "routing.static": "list",

@@ -1127,7 +1127,10 @@ class TestServiceSearch:
         client.request.return_value = {"rows": []}
         svc = NATRuleService(client)
         result = svc.search("outbound")
-        client.request.assert_called_once_with("POST", "firewall/source_nat/searchRule")
+        assert [c.args for c in client.request.call_args_list] == [
+            ("GET", "firewall/source_nat/get"),
+            ("POST", "firewall/source_nat/searchRule"),
+        ]
         assert result == []
 
     def test_one_to_one_search_calls_correct_endpoint(self) -> None:
@@ -1600,6 +1603,7 @@ class TestExportToYaml:
         # ``search_all`` iterates ALLOWED_KINDS in order:
         # outbound → one_to_one → port_forward.
         client.request.side_effect = [
+            {"filter": {"general": {"snat_mode": {"hybrid": {"selected": 1}}}}},
             {
                 "rows": [
                     {
@@ -1760,3 +1764,164 @@ class TestCategoryBootstrap:
         sent_data = call.kwargs.get("data") or (call.args[2] if len(call.args) > 2 else None)
         assert sent_data is not None
         assert sent_data["rule"]["categories"] == "cat-uuid"
+
+
+# ---------------------------------------------------------------------------
+# Outbound read path by outbound NAT mode (#1333)
+# ---------------------------------------------------------------------------
+
+
+def _model_response(mode: str | None, rules: dict[str, dict[str, Any]] | None = None) -> Any:
+    """Build a ``firewall/source_nat/get`` response with an option-dict mode."""
+    general: dict[str, Any] = {}
+    if mode is not None:
+        general["snat_mode"] = {
+            name: {"value": name, "selected": 1 if name == mode else 0}
+            for name in ("automatic", "hybrid", "advanced", "disabled")
+        }
+    return {"filter": {"general": general, "snatrules": {"rule": rules or {}}}}
+
+
+def _model_row(rule: NATRuleConfig) -> dict[str, Any]:
+    """Render a desired rule the way the model ``get`` returns it (option dicts)."""
+    row: dict[str, Any] = dict(rule.to_payload()["rule"])
+    for key in ("interface", "protocol", "ipprotocol"):
+        row[key] = {row[key]: {"value": row[key], "selected": 1}, "other": {"selected": 0}}
+    return row
+
+
+class TestOutboundReadByMode:
+    @pytest.mark.parametrize("mode", ["automatic", "disabled"])
+    def test_inert_mode_reads_the_model_not_search_rule(self, mode: str) -> None:
+        want = _outbound("lan-out", description="x")
+        client = MagicMock()
+        client.request.side_effect = _make_per_kind_request(
+            outbound_response=_model_response(mode, {"u-1": _model_row(want)}),
+            one_to_one_response={"rows": []},
+            port_forward_response={"rows": []},
+        )
+        svc = NATRuleService(client)
+        live = svc.search("outbound")
+        assert [c.args for c in client.request.call_args_list] == [
+            ("GET", "firewall/source_nat/get")
+        ]
+        assert [(r.uuid, r.managed_name) for r in live] == [("u-1", "lan-out")]
+        diff = compute_diff([want], live)
+        assert diff.is_empty
+
+    @pytest.mark.parametrize("mode", ["hybrid", "advanced"])
+    def test_listing_modes_use_search_rule(self, mode: str) -> None:
+        client = MagicMock()
+        client.request.side_effect = [
+            _model_response(mode),
+            {"rows": [{"uuid": "u-9", "description": "o [infrafoundry:o]"}]},
+        ]
+        live = NATRuleService(client).search("outbound")
+        assert [c.args for c in client.request.call_args_list] == [
+            ("GET", "firewall/source_nat/get"),
+            ("POST", "firewall/source_nat/searchRule"),
+        ]
+        assert [r.uuid for r in live] == ["u-9"]
+
+    @pytest.mark.parametrize(
+        "first",
+        [{"filter": {"general": {}, "snatrules": {"rule": {}}}}, {"rows": []}, [], None],
+    )
+    def test_unknown_mode_falls_back_to_search_rule(self, first: Any) -> None:
+        client = MagicMock()
+        client.request.side_effect = [first, {"rows": []}]
+        assert NATRuleService(client).search("outbound") == []
+        assert client.request.call_args_list[-1].args == (
+            "POST",
+            "firewall/source_nat/searchRule",
+        )
+
+    def test_four_copies_are_four_live_entries_and_none_is_added(self) -> None:
+        want = _outbound("lan-out")
+        rules = {f"u-{i}": _model_row(want) for i in range(4)}
+        client = MagicMock()
+        client.request.return_value = _model_response("automatic", rules)
+        live = NATRuleService(client).search("outbound")
+        assert len(live) == 4
+        diff = compute_diff([want], live)
+        assert not diff.adds
+
+    def test_model_flattening_keeps_strings_and_selected_keys(self) -> None:
+        row = {
+            "interface": {"wan": {"selected": 1}, "lan": {"selected": 0}},
+            "source_net": "192.0.2.0/24",
+            "protocol": [],
+            "description": "d [infrafoundry:d]",
+        }
+        client = MagicMock()
+        client.request.return_value = _model_response("automatic", {"u-1": row})
+        (live,) = NATRuleService(client).search("outbound")
+        assert live.raw == {
+            "uuid": "u-1",
+            "interface": "wan",
+            "source_net": "192.0.2.0/24",
+            "protocol": "",
+            "description": "d [infrafoundry:d]",
+        }
+
+    def test_non_dict_rule_entries_are_skipped(self) -> None:
+        client = MagicMock()
+        client.request.return_value = _model_response("automatic", {"u-1": "junk"})  # type: ignore[dict-item]
+        assert NATRuleService(client).search("outbound") == []
+
+    def test_404_on_the_model_get_skips_outbound_in_tolerant_search(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        client = MagicMock()
+        client.request.side_effect = _make_per_kind_request(
+            outbound_response=APIError("404", status_code=404),
+            one_to_one_response={"rows": []},
+            port_forward_response={"rows": []},
+        )
+        with caplog.at_level(logging.WARNING):
+            assert NATRuleService(client).search_all_tolerant() == []
+        assert len([r for r in caplog.records if "outbound" in r.getMessage()]) == 1
+
+    def test_500_on_the_model_get_propagates(self) -> None:
+        client = MagicMock()
+        client.request.side_effect = _make_per_kind_request(
+            outbound_response=APIError("boom", status_code=500),
+            one_to_one_response={"rows": []},
+            port_forward_response={"rows": []},
+        )
+        with pytest.raises(APIError):
+            NATRuleService(client).search_all_tolerant()
+
+
+class TestGetSnatMode:
+    def test_returns_the_selected_key(self) -> None:
+        client = MagicMock()
+        client.request.return_value = _model_response("hybrid")
+        assert NATRuleService(client).get_snat_mode() == "hybrid"
+
+    @pytest.mark.parametrize("response", [_model_response(None), {}, "x"])
+    def test_none_when_absent(self, response: Any) -> None:
+        client = MagicMock()
+        client.request.return_value = response
+        assert NATRuleService(client).get_snat_mode() is None
+
+
+class TestWriteFailureChecks:
+    def test_add_and_update_raise_on_failed(self) -> None:
+        client = MagicMock()
+        svc = NATRuleService(client)
+        svc._category_uuid = "cat-1"
+        failed = {"result": "failed", "validations": {"rule.target": "bad"}}
+        client.request.return_value = failed
+        with pytest.raises(APIError, match="add outbound NAT rule o"):
+            svc.add(_outbound("o"))
+        with pytest.raises(APIError, match="update outbound NAT rule o"):
+            svc.update("u-1", _outbound("o"))
+
+    def test_add_and_update_return_the_response_on_saved(self) -> None:
+        client = MagicMock()
+        svc = NATRuleService(client)
+        svc._category_uuid = "cat-1"
+        client.request.return_value = {"result": "saved", "uuid": "u-1"}
+        assert svc.add(_outbound("o")) == {"result": "saved", "uuid": "u-1"}
+        assert svc.update("u-1", _outbound("o")) == {"result": "saved", "uuid": "u-1"}
