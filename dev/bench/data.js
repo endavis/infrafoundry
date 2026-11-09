@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794219443103,
+  "lastUpdate": 1794226188324,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -434,6 +434,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000022028556335205256",
             "extra": "mean: 77.98236342241806 usec\nrounds: 14446"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7937f3cfa1269ad284d30dbd10c4085995287274",
+          "message": "fix: add migrate for opnsense syslog.settings so config migrate works (merges PR #1330, addresses #1328)\n\nfix: add migrate to opnsense syslog.settings manager\n\nSyslogSettingsManager had no migrate(), so config migrate for\nsyslog.settings crashed with AttributeError. Add it, following\nUnboundSettingsManager, exporting the general settings as\nopnsense.syslog.settings YAML. Add extractor round-trip tests and a\nguard that every registered OPNsense extractor manager has migrate.\n\nAddresses #1328\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T12:09:03Z",
+          "tree_id": "fb8899892d0d848d8e2a082ea06f14cbd0758958",
+          "url": "https://github.com/endavis/infrafoundry/commit/7937f3cfa1269ad284d30dbd10c4085995287274"
+        },
+        "date": 1794226187665,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10582.96644561185,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004691968953184645",
+            "extra": "mean: 94.49146467006354 usec\nrounds: 11152"
           }
         ]
       }
