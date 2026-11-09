@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794237120123,
+  "lastUpdate": 1794237650708,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -651,6 +651,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000015859444974488952",
             "extra": "mean: 100.70813457522326 usec\nrounds: 10522"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "021ba2fe6a6ebfb8d65a09d89091fbe4d21fd470",
+          "message": "fix: keep migrated kea dhcp names unique, non-empty and clear of env names (merges PR #1342, addresses #1340)\n\n* fix: keep migrated kea dhcp names unique, non-empty and clear of env names\n\nKea config migrate synthesized names from description and hostname without\nchecking them, so empty slugs and same-type collisions were emitted as is.\nNames are now assigned across all four kea types with the #1338 helpers:\nnames reserved by other opnsense types are avoided, collisions get -2, -3\nsuffixes, empty slugs fall back to the identity or an indexed name, and\nentries already in the env keep their names on a re-run.\n\nAddresses #1340\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: match kea reservations by mac or duid and ip when migrating names\n\nKea allows one MAC (or DUID) to be reserved in several subnets, one\nreservation per subnet with its own IP. Pinning existing names by MAC alone\nkept only the first live reservation's name and renamed the others on every\nre-run of config migrate. The identity is now the (MAC, IP) pair for DHCPv4\nand the (DUID, IP) pair for DHCPv6, falling back to the MAC or DUID alone when\neither side has no IP.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T15:20:07Z",
+          "tree_id": "0c2875e2777a0d90a1ee246fb7b7bfbf54db0e56",
+          "url": "https://github.com/endavis/infrafoundry/commit/021ba2fe6a6ebfb8d65a09d89091fbe4d21fd470"
+        },
+        "date": 1794237650042,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7546.613790101841,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001915070759718376",
+            "extra": "mean: 132.50976236674555 usec\nrounds: 8349"
           }
         ]
       }
