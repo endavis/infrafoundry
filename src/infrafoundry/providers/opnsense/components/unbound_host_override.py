@@ -36,6 +36,7 @@ from ..services.unbound_host_override import (
     unbound_host_override_configs_from_resources,
 )
 from ._managed import managed_keys as derive_managed_keys
+from ._migrate_names import env_provider_resources, reserved_names
 from .base import BaseComponentManager
 
 
@@ -317,12 +318,17 @@ class UnboundHostOverrideManager(BaseComponentManager):
             YAML string containing the live host overrides in
             resource-centric form. Operator-facing ``name`` is synthesized
             from ``hostname.domain`` (with ``-<rr>`` suffix when ``rr`` is
-            non-default).
+            non-default). A name already used by another opnsense resource in
+            the environment gets a ``-2``, ``-3`` ... suffix (#1337); names of
+            other host overrides are not reserved, so a re-migrate reproduces
+            the same names.
         """
         service = UnboundHostOverrideService.from_environment(
             env_name, provider_name, self.config_dir
         )
-        return service.export_to_yaml()
+        resources = env_provider_resources(self.config_dir, env_name, provider_name)
+        reserved = reserved_names(resources, exclude_types={"unbound.host_overrides"})
+        return service.export_to_yaml(reserved=reserved)
 
 
 def _synthetic_name(override: LiveUnboundHostOverride) -> str:

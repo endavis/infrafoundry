@@ -1116,3 +1116,27 @@ class TestComputeDiffServiceWrapper:
         svc = UnboundHostOverrideService(client)
         diff = svc.compute_diff([], [_live_for_diff("u1")], add_only=True)
         assert diff.deletes == []
+
+
+class TestExportReservedNames:
+    """Synthesized names avoid reserved and repeated names (#1337)."""
+
+    def _service(self, rows: list[dict[str, Any]]) -> UnboundHostOverrideService:
+        client = MagicMock()
+        client.request.return_value = {"rows": rows}
+        return UnboundHostOverrideService(client)
+
+    def test_reserved_name_gets_suffix(self) -> None:
+        service = self._service([_row("web", "example.com", uuid="u1")])
+        text = service.export_to_yaml(reserved={"web-example-com"})
+        assert "name: web-example-com-2" in text
+
+    def test_repeated_name_gets_suffix(self) -> None:
+        rows = [_row("x", "example.com", uuid="u1"), _row("x", "example.com", uuid="u2")]
+        text = self._service(rows).export_to_yaml()
+        assert "name: x-example-com\n" in text
+        assert "name: x-example-com-2" in text
+
+    def test_no_reserved_is_unchanged(self) -> None:
+        text = self._service([_row("web", "example.com")]).export_to_yaml()
+        assert "name: web-example-com\n" in text

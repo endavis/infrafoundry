@@ -445,6 +445,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_deployment_executor.py",
     "tests/unit/test_drift_detector.py",
     "tests/unit/test_drift_remediation.py",
+    "tests/unit/test_duplicate_resource_name.py",
     "tests/unit/test_env_root_packages.py",
     "tests/unit/test_env_vars_for_secrets.py",
     "tests/unit/test_event_double_fire.py",

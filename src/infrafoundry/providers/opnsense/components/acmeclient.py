@@ -32,6 +32,7 @@ from ..services.acmeclient import (
     ACCOUNTS,
     ACTIONS,
     CERTS,
+    LIST_SERVICES,
     REF_SERVICES,
     VALIDATIONS,
     AcmeAccountsService,
@@ -42,7 +43,8 @@ from ..services.acmeclient import (
     AcmeValidationsService,
     Diff,
     ListSpec,
-    assign_handles,
+    LiveAcmeItem,
+    assign_migrate_handles,
     changed_fields,
     compute_diff,
     configs_from_resources,
@@ -50,6 +52,7 @@ from ..services.acmeclient import (
     wire_name_of,
 )
 from ._managed import managed_keys as derive_managed_keys
+from ._migrate_names import env_provider_resources, reserved_names
 from ._secrets import resolve_resource_secrets
 from .acmeclient_settings import PLUGIN_MISSING_WARNING
 from .base import BaseComponentManager
@@ -341,10 +344,42 @@ class _AcmeListManager(BaseComponentManager):
             if r.type == spec.type_name and wire_name_of(spec, r.name, r.config) in live
         }
 
+    def _migrate_handles(
+        self, service: AcmeListService, env_name: str, provider_name: str
+    ) -> tuple[dict[str, list[LiveAcmeItem]], dict[str, dict[str, str]]]:
+        """Return every type's live rows and the handles the migrations assign.
+
+        Every acmeclient migrate runs this on the same inputs, so each emits its own
+        slice of one assignment that avoids every opnsense name in the environment.
+        """
+        live: dict[str, list[LiveAcmeItem]] = {}
+        for sub, service_cls in LIST_SERVICES.items():
+            live[sub] = (
+                service.search() if sub == self.SPEC.sub else service_cls(service.client).search()
+            )
+        resources = env_provider_resources(self.config_dir, env_name, provider_name)
+        existing: dict[str, dict[str, str]] = {sub: {} for sub in LIST_SERVICES}
+        for sub, service_cls in LIST_SERVICES.items():
+            spec = service_cls.SPEC
+            for r in resources:
+                wire = wire_name_of(spec, r.name, r.config) if r.type == spec.type_name else ""
+                if wire:
+                    existing[sub].setdefault(wire, r.name)
+        handles = assign_migrate_handles(
+            live, existing, reserved_names(resources, exclude_types=())
+        )
+        return live, handles
+
     def migrate(self, env_name: str, *, provider_name: str = "opnsense") -> str:
-        """Export the live rows to InfraFoundry YAML."""
+        """Export the live rows to InfraFoundry YAML.
+
+        Handles come from one assignment over all four types that avoids every
+        opnsense name already in the environment (#1337).
+        """
         service = self.SERVICE.from_environment(env_name, provider_name, self.config_dir)
-        return service.export_to_yaml()
+        live, handles = self._migrate_handles(service, env_name, provider_name)
+        sub = self.SPEC.sub
+        return service.export_to_yaml(items=live[sub], handles=handles[sub])
 
 
 class AcmeClientAccountsManager(_AcmeListManager):
@@ -442,12 +477,13 @@ class AcmeClientCertsManager(_AcmeListManager):
     def migrate(self, env_name: str, *, provider_name: str = "opnsense") -> str:
         """Export the live certificates, with references as handles.
 
-        The handles come from the same ``assign_handles`` the accounts, validations and
-        actions migrations use, so the emitted references match their output.
+        The handles come from the same ``assign_migrate_handles`` call the accounts,
+        validations and actions migrations make, so the emitted references match their
+        output and avoid every opnsense name in the environment.
         """
         service = self.SERVICE.from_environment(env_name, provider_name, self.config_dir)
-        ref_handles: dict[str, dict[str, str]] = {}
-        for sub, ref_cls in REF_SERVICES.items():
-            ref_service = ref_cls(service.client)
-            ref_handles[sub] = assign_handles(sub, ref_service.search())
-        return service.export_to_yaml(ref_handles)
+        live, handles = self._migrate_handles(service, env_name, provider_name)
+        ref_handles = {sub: handles[sub] for sub in REF_SERVICES}
+        return service.export_to_yaml(
+            ref_handles, items=live[self.SPEC.sub], handles=handles[self.SPEC.sub]
+        )

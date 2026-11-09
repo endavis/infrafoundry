@@ -477,3 +477,10 @@ class TestErrorCatalogCompleteness:
             assert code != "IF-GENERAL-001" or exc_name == "InfraFoundryError", (
                 f"Exception {exc_name} should have specific code, not IF-GENERAL-001"
             )
+
+
+def test_duplicate_resource_name_error_maps_to_invalid_configuration() -> None:
+    """DuplicateResourceNameError reports as IF-CONFIG-002 (#1337)."""
+    from infrafoundry.core.exceptions import DuplicateResourceNameError
+
+    assert get_error_code(DuplicateResourceNameError("x")) == "IF-CONFIG-002"

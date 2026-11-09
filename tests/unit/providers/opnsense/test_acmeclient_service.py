@@ -545,3 +545,61 @@ def test_exported_yaml_round_trips_through_the_parser() -> None:
     (cfg,) = svc.configs_from_resources(svc.ACCOUNTS, [resource])
     assert cfg.wire_name == "Main"
     assert cfg.secret_wires == {"eab_hmac"}
+
+
+# -- migrate handles (#1337) --------------------------------------------------------
+
+
+def test_assign_migrate_handles_avoids_reserved_names() -> None:
+    live = {"certs": [_live("c1", "fw-prod.example.com")]}
+    handles = svc.assign_migrate_handles(live, reserved={"fw-prod-example-com"})
+    assert handles["certs"] == {"c1": "fw-prod-example-com-2"}
+
+
+def test_assign_migrate_handles_separates_types() -> None:
+    live = {"accounts": [_live("a1", "web")], "certs": [_live("c1", "web")]}
+    handles = svc.assign_migrate_handles(live)
+    assert handles["accounts"] == {"a1": "web"}
+    assert handles["certs"] == {"c1": "web-2"}
+
+
+def test_assign_migrate_handles_pins_existing_handle() -> None:
+    live = {"certs": [_live("c1", "fw-prod.example.com")]}
+    existing = {"certs": {"fw-prod.example.com": "edge-cert"}}
+    handles = svc.assign_migrate_handles(live, existing, reserved={"edge-cert"})
+    assert handles["certs"] == {"c1": "edge-cert"}
+
+
+def test_assign_migrate_handles_fresh_row_never_takes_pinned_handle() -> None:
+    live = {"accounts": [_live("a1", "b"), _live("a2", "other")]}
+    existing = {"accounts": {"other": "b"}}
+    handles = svc.assign_migrate_handles(live, existing)
+    assert handles["accounts"] == {"a2": "b", "a1": "b-2"}
+
+
+def test_assign_migrate_handles_pins_only_first_row_per_wire_name() -> None:
+    live = {"accounts": [_live("a1", "dup"), _live("a2", "dup")]}
+    existing = {"accounts": {"dup": "mine"}}
+    handles = svc.assign_migrate_handles(live, existing)
+    assert handles["accounts"] == {"a1": "mine", "a2": "dup"}
+
+
+def test_assign_migrate_handles_empty_slug_falls_back_to_index() -> None:
+    live = {"actions": [_live("x1", "ok"), _live("x2", "!!!")]}
+    assert svc.assign_migrate_handles(live)["actions"] == {"x1": "ok", "x2": "actions-2"}
+
+
+def test_assign_migrate_handles_is_deterministic() -> None:
+    live = {"accounts": [_live("a1", "web")], "certs": [_live("c1", "web"), _live("c2", "web")]}
+    assert svc.assign_migrate_handles(live) == svc.assign_migrate_handles(live)
+
+
+def test_export_uses_explicit_items_and_handles_without_searching() -> None:
+    client = MagicMock()
+    service = svc.AcmeAccountsService(client)
+    items = [_live("a1", "Main Account", email="a@example.com")]
+    text = service.export_to_yaml(items=items, handles={"a1": "custom"})
+    (row,) = yaml.safe_load(text)["opnsense"]["acmeclient"]["accounts"]
+    assert row["name"] == "custom"
+    client.request.assert_not_called()
+    assert service.export_rows(items, handles={"a1": "other"})[0]["name"] == "other"
