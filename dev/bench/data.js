@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794236081407,
+  "lastUpdate": 1794237120123,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -620,6 +620,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011056042951928009",
             "extra": "mean: 97.45038278926562 usec\nrounds: 11121"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "69024f41746de30f3255bbcc11af15fbb0a5ca93",
+          "message": "fix: keep one live copy of duplicate managed opnsense nat rules and delete the rest (merges PR #1341, addresses #1339)\n\n_compute_diff_for_kind keyed live rows by managed name in a dict, so when\nseveral rows carried the same InfraFoundry tag only the last was compared,\nupdated or deleted. The others stayed on the box unreported.\n\nThe diff now groups live rows per name, keeps the first copy whose fields\nmatch the desired rule (else the first copy) and plans the other copies as\ndeletes. add_only and locked rules leave the extra copies alone and warn.\nDuplicate deletes of a still-desired rule get a uuid-based outcome name so\nthe kept rule's on_destroy handlers do not fire, and destroy now removes\nevery copy.\n\nAddresses #1339\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T15:11:14Z",
+          "tree_id": "6d9823d02febbc4b8686a572f0003329ab501e30",
+          "url": "https://github.com/endavis/infrafoundry/commit/69024f41746de30f3255bbcc11af15fbb0a5ca93"
+        },
+        "date": 1794237119552,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9929.68447104992,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015859444974488952",
+            "extra": "mean: 100.70813457522326 usec\nrounds: 10522"
           }
         ]
       }
