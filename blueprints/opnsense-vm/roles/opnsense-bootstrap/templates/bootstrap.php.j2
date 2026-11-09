@@ -4,7 +4,7 @@
  *
  * Sets the hostname, the root password and an API key for root, static WAN
  * and LAN addresses, and a WAN rule letting api_allow_cidr reach the web
- * GUI/API. Turns off the image's dnsmasq DHCP on LAN. Values arrive as base64 JSON so no quoting can break the script.
+ * GUI/API (plus a second rule for the LAN address when api_allow_lan is set). Turns off the image's dnsmasq DHCP on LAN. Values arrive as base64 JSON so no quoting can break the script.
  * Prints "BOOTSTRAP OK" on success; the expect script waits for it.
  */
 require_once('script/load_phalcon.php');
@@ -62,6 +62,21 @@ $rule->addChild('source')->addChild('address', $v['api_allow_cidr']);
 $destination = $rule->addChild('destination');
 $destination->addChild('network', 'wanip');
 $destination->addChild('port', '443');
+{% if opnsense_bootstrap_values.api_allow_lan == '1' %}
+
+// A controller outside the firewall that uses the LAN address as api_url still
+// arrives through the WAN interface, so pass 443 to the LAN address there too.
+$lan_rule = $cfg->filter->addChild('rule');
+$lan_rule->addChild('type', 'pass');
+$lan_rule->addChild('interface', 'wan');
+$lan_rule->addChild('ipprotocol', 'inet');
+$lan_rule->addChild('protocol', 'tcp');
+$lan_rule->addChild('descr', 'infrafoundry bootstrap: web GUI/API on the LAN address from ' . $v['api_allow_cidr']);
+$lan_rule->addChild('source')->addChild('address', $v['api_allow_cidr']);
+$lan_destination = $lan_rule->addChild('destination');
+$lan_destination->addChild('network', 'lanip');
+$lan_destination->addChild('port', '443');
+{% endif %}
 
 Config::getInstance()->save();
 echo "BOOTSTRAP OK\n";

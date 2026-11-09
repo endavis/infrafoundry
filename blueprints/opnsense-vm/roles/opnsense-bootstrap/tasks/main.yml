@@ -68,6 +68,7 @@
       lan_ip: "{{ opnsense_lan_ip }}"
       lan_prefix: "{{ opnsense_lan_prefix | string }}"
       api_allow_cidr: "{{ opnsense_api_allow_cidr }}"
+      api_allow_lan: "{{ opnsense_api_allow_lan | bool | ternary('1', '0') }}"
   register: wrapper_bg
   changed_when: true
   no_log: true
