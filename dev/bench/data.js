@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794237650708,
+  "lastUpdate": 1794238376661,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -682,6 +682,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001915070759718376",
             "extra": "mean: 132.50976236674555 usec\nrounds: 8349"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4a9d3defd413ae315be9c2a383c2c2787708d139",
+          "message": "refactor: resolve virtual ip secrets through the shared opnsense helper (merges PR #1343, addresses #1321)\n\nVirtualIPManager._resolve_and_parse now calls\n_secrets.resolve_resource_secrets instead of carrying its own copy of the\nenv-secrets loading and SecretResolver setup. The virtual IP tests patch\nthe ConfigManager the helper uses; no assertion changed.\n\nNo other direct-API manager had an inline copy.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T15:32:04Z",
+          "tree_id": "d3b4ef11777f774c5201708f58c46aa22e35b172",
+          "url": "https://github.com/endavis/infrafoundry/commit/4a9d3defd413ae315be9c2a383c2c2787708d139"
+        },
+        "date": 1794238375612,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15855.221087877495,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001971532874353035",
+            "extra": "mean: 63.07070676955586 usec\nrounds: 17106"
           }
         ]
       }
