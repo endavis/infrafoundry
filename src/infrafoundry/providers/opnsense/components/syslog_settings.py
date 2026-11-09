@@ -106,3 +106,13 @@ class SyslogSettingsManager(BaseComponentManager):
         """Return the singleton's stable id."""
         del env_name, provider_name
         return {resource.name: "global" for resource in resources}
+
+    def migrate(
+        self,
+        env_name: str,
+        *,
+        provider_name: str = "opnsense",
+    ) -> str:
+        """Export the live syslog ``general`` settings to YAML."""
+        service = SyslogSettingsService.from_environment(env_name, provider_name, self.config_dir)
+        return service.export_to_yaml()

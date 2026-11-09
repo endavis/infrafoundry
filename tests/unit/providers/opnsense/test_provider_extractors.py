@@ -228,3 +228,22 @@ def test_isolated_registry_does_not_see_singleton_entries() -> None:
     isolated = ExtractorRegistry()
 
     assert isolated.list_providers() == []
+
+
+#: Registered types whose manager still lacks ``migrate``; filled in when the guard finds any.
+MIGRATE_MISSING_FOLLOW_UP: dict[str, str] = {}
+
+
+@pytest.mark.parametrize("resource_type", EXPECTED_RESOURCE_TYPES)
+def test_every_registered_extractor_manager_has_migrate(
+    provider: OPNsenseProvider, resource_type: str
+) -> None:
+    """The adapter calls ``manager.migrate``; a registration without it crashes (#1328)."""
+    del provider
+    if resource_type in MIGRATE_MISSING_FOLLOW_UP:
+        pytest.xfail(MIGRATE_MISSING_FOLLOW_UP[resource_type])
+    adapter = get_extractor("opnsense", resource_type)
+    assert isinstance(adapter, _ExtractorAdapter)
+    assert callable(getattr(adapter.manager_class, "migrate", None)), (
+        f"{adapter.manager_class.__name__} registered for {resource_type!r} has no migrate()"
+    )

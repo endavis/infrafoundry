@@ -284,7 +284,7 @@ opnsense:
 | `max_preserve` | `maxpreserve` | integer >= 0 |
 | `max_file_size` | `maxfilesize` | integer >= 0 |
 
-An omitted key is not managed. The write sends `{"syslog": {"general": {...}}}`: the whole flattened live `general` object with the declared fields overwritten.
+An omitted key is not managed. `config migrate` exports every `general` field present on the box. The write sends `{"syslog": {"general": {...}}}`: the whole flattened live `general` object with the declared fields overwritten.
 
 ```yaml
 opnsense:

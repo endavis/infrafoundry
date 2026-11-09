@@ -24,6 +24,7 @@ box. The GET shape was probed on 26.1.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from typing import Any
 
@@ -31,7 +32,10 @@ from infrafoundry.core.exceptions import APIError, InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 
 from .. import endpoints
+from ._nested_emit import emit_nested_singleton_yaml
 from .base import BaseService, raise_on_failed_write
+
+logger = logging.getLogger(__name__)
 
 #: YAML key -> wire key under ``syslog.general``.
 FIELD_MAP: dict[str, str] = {
@@ -182,3 +186,22 @@ class SyslogSettingsService(BaseService):
         for key, value in desired.items():
             flat[FIELD_MAP[key]] = value
         return {"syslog": {"general": flat}}
+
+    def export_to_yaml(self) -> str:
+        """Export every ``general`` field present on the box as nested YAML.
+
+        A live integer that is not a non-negative digit string is logged and omitted.
+        """
+        general = self.live_general(self.get_settings())
+        present = [key for key, wire in FIELD_MAP.items() if wire in general]
+        live = self.extract_live(general, present)
+        clean: dict[str, Any] = {}
+        for key in present:
+            text = live[key]
+            if key in BOOL_FIELDS:
+                clean[key] = text == "1"
+            elif text.isascii() and text.isdigit():
+                clean[key] = int(text)
+            else:
+                logger.warning("syslog.settings: non-integer %s %r; omitted", key, text)
+        return emit_nested_singleton_yaml("syslog.settings", clean)
