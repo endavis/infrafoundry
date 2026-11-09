@@ -113,7 +113,7 @@ def _vip(name: str, **overrides: Any) -> VirtualIPConfig:
 
 
 SERVICE_PATH = "infrafoundry.providers.opnsense.components.virtual_ip.VirtualIPService"
-CONFIG_MANAGER_PATH = "infrafoundry.providers.opnsense.components.virtual_ip.ConfigManager"
+CONFIG_MANAGER_PATH = "infrafoundry.providers.opnsense.components._secrets.ConfigManager"
 
 
 def _make_service_mock(

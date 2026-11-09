@@ -2,39 +2,33 @@
 
 Mirrors the layout of ``components/static_route.py`` and the rest of the
 direct-API component family. The unique aspect of this manager is that
-it is the first direct-API component to carry secrets: CARP passwords
-flow via ``secret://env_secrets/<dotted/path>`` URIs which are resolved
-by ``SecretResolver`` against an ``EnvSecretsBackend`` configured with
-``EnvironmentConfig.secrets`` (populated by
-``SecretManager.populate_environment_config`` after SOPS decryption).
+it carries secrets: CARP passwords flow via
+``secret://env_secrets/<dotted/path>`` URIs.
 
-Resolution flow (per the issue plan):
+Resolution flow:
 
-1. The manager loads the ``EnvironmentConfig`` for the active env.
-2. It instantiates a ``SecretResolver`` and configures the
-   ``env_secrets`` backend with ``{"secrets": env_config.secrets}``.
-3. For each ``ResourceConfig``, ``resolver.resolve_config()`` is called
-   on ``resource.config`` to produce a plaintext-resolved dict.
-4. The resolved dicts are passed into the existing parser
+1. The manager passes its resources to the shared
+   ``_secrets.resolve_resource_secrets`` helper, which loads the
+   environment's decrypted secrets and resolves every URI in each
+   resource's config (it returns early, loading nothing, when there are
+   no resources).
+2. The resolved resources are passed into the existing parser
    (``virtual_ip_configs_from_resources``); the service layer never
    sees the original secret URIs.
 
 Failure modes:
 
-- If ``env_config.secrets`` is empty (or missing the path the URI
-  references), ``SecretResolver.resolve_config`` raises
+- If a referenced secret path is missing, the helper raises
   ``SecretResolutionError``; the manager surfaces that to the runner
-  so plan/apply outcome carries ``error``.
+  so the plan/apply outcome carries ``error``.
 """
 
 from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
-from infrafoundry.secrets.resolver import SecretResolver
 
 from ..services.virtual_ip import (
     Diff,
@@ -44,7 +38,10 @@ from ..services.virtual_ip import (
     virtual_ip_configs_from_resources,
 )
 from ._managed import managed_keys as derive_managed_keys
+from ._secrets import resolve_resource_secrets
 from .base import BaseComponentManager
+
+_TYPE = "interfaces.virtual_ips"
 
 
 class VirtualIPManager(BaseComponentManager):
@@ -306,12 +303,9 @@ class VirtualIPManager(BaseComponentManager):
     ) -> list[VirtualIPConfig]:
         """Resolve ``secret://`` URIs in each resource and parse to ``VirtualIPConfig``.
 
-        Loads ``EnvironmentConfig.secrets`` once via ``ConfigManager``
-        and runs every ``virtual_ips`` resource's ``config`` dict
-        through ``SecretResolver.resolve_config``. The resolver is
-        configured with the ``env_secrets`` backend so URIs of the
-        form ``secret://env_secrets/<path>`` are resolved against the
-        env's secret tree.
+        Delegates to the shared ``_secrets.resolve_resource_secrets``
+        helper, which resolves ``secret://env_secrets/<path>`` URIs in
+        every resource's ``config`` against the env's secret tree.
 
         Args:
             env_name: Active environment name.
@@ -335,37 +329,7 @@ class VirtualIPManager(BaseComponentManager):
             only direct-API component with a private helper after
             ``list()``, hence the ordering quirk.
         """
-        # Load env secrets once.
-        config_manager = ConfigManager(self.config_dir)
-        env_config = config_manager.load_environment(env_name)
-        env_secrets = env_config.secrets if env_config.secrets is not None else {}
-
-        # Build a resolver and resolve every resource's config dict.
-        resolver = SecretResolver()
-        resolver.configure_backend("env_secrets", {"secrets": env_secrets})
-
-        try:
-            resolved_resources: list[ResourceConfig] = []
-            for resource in resources:
-                if resource.type != "interfaces.virtual_ips":
-                    # Forward non-virtual_ips resources unchanged so the
-                    # parser sees them and skips them as expected.
-                    resolved_resources.append(resource)
-                    continue
-                # ``ResourceConfig.config`` is typed ``dict[str, Any]``;
-                # the parser handles per-field type errors downstream.
-                resolved_config = resolver.resolve_config(resource.config)
-                resolved_resources.append(
-                    ResourceConfig(
-                        name=resource.name,
-                        type=resource.type,
-                        provider=resource.provider,
-                        config=resolved_config,
-                    )
-                )
-        finally:
-            resolver.close()
-
+        resolved_resources = resolve_resource_secrets(self.config_dir, env_name, resources, _TYPE)
         return virtual_ip_configs_from_resources(resolved_resources)
 
     # ------------------------------------------------------------------
