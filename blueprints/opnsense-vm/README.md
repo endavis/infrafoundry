@@ -34,7 +34,8 @@ reach the API. The OPNsense provider can then manage it with no manual steps.
    - the LAN as `lan_ip`/`lan_prefix`;
    - dnsmasq off, with its DHCP ranges removed, so the image's default LAN
      DHCP does not run and Kea can serve the LAN instead;
-   - a WAN pass rule for TCP 443 from `api_allow_cidr`.
+   - a WAN pass rule for TCP 443 from `api_allow_cidr` to the WAN address and,
+     with `api_allow_lan: true`, a second one to the LAN address.
 
    When `disk_size` is above 0, the script first runs a best-effort grow step
    in the shell (`gpart recover`, `gpart resize`, `growfs -y /`). It logs to
@@ -45,7 +46,9 @@ reach the API. The OPNsense provider can then manage it with no manual steps.
    unauthenticated request (302 to the login page). The probe sends no
    credentials, since the certificate is self-signed and not verified.
 3. **Manage it.** Point the environment's `opnsense` provider settings at
-   `https://<wan_ip>` with the same key and secret.
+   `https://<wan_ip>` with the same key and secret. If `api_url` is the LAN
+   address, the controller reaches it through the WAN, so the box needs
+   `api_allow_lan: true`.
 
 The bootstrap does not set a default gateway, DNS or LAN DHCP. Manage the
 gateway and LAN DHCP with the provider (`routing.gateways`,
@@ -118,6 +121,7 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 | `lan_ip` / `lan_prefix` | `172.20.99.1` / `24` | LAN address |
 | `domain` | `lab.local` | Domain |
 | `api_allow_cidr` | `172.20.10.0/24` | Source allowed to reach the web GUI/API on the WAN |
+| `api_allow_lan` | `false` | Also let `api_allow_cidr` reach the web GUI/API on the LAN address through the WAN; set it when the provider's `api_url` is the LAN address |
 | `boot_timeout` | `600` | Seconds to wait for the first login prompt, and for the API afterwards |
 | `base_tags` | `[opnsense, fw-test]` | Base Proxmox tags; changing it on an existing VM changes its tags and replaces the VM |
 | `extra_tags` | `[]` | Extra Proxmox tags, appended to `base_tags` |
@@ -144,3 +148,17 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 - Nothing secret is written to the Proxmox host. The rendered PHP reaches the
   expect process only through its environment, and the expect log is paused
   while it is sent.
+
+### Rebuilding
+
+After `foundry infra apply --env <env> -P proxmox` rebuilds the box, the next
+`-P opnsense` apply restores its configuration. If `api_url` is the LAN address
+and the box was built without `api_allow_lan`, the LAN address is unreachable
+until the declared rules are back. Aim the first apply at the WAN address:
+
+```bash
+INFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1 OPNSENSE_API_URL=https://<wan_ip> \
+  foundry infra apply --env <env> -P opnsense
+```
+
+Once the declared rules are applied, the LAN `api_url` works again.

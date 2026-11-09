@@ -71,6 +71,10 @@ inputs:
   - name: api_allow_cidr
     description: "Source allowed to reach the web GUI/API (TCP 443) on the WAN address"
     default: "172.20.10.0/24"
+  - name: api_allow_lan
+    description: "Also allow api_allow_cidr to reach the web GUI/API (TCP 443) on the LAN address through the WAN. Set it when the opnsense provider's api_url is the LAN address"
+    type: boolean
+    default: false
   - name: boot_timeout
     description: "Seconds to wait for the first login prompt on the serial console"
     type: integer

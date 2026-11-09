@@ -42,6 +42,7 @@ VALUES = {
     "lan_ip": "172.20.99.1",
     "lan_prefix": "24",
     "api_allow_cidr": "172.20.10.0/24",
+    "api_allow_lan": "0",
 }
 
 
@@ -155,14 +156,41 @@ def test_bootstrap_php_removes_every_dhcp_range_before_saving() -> None:
     assert php.index("dhcp_ranges") < php.index("Config::getInstance()->save();")
 
 
-@pytest.mark.skipif(shutil.which("php") is None, reason="php is not installed")
-def test_bootstrap_php_is_valid_php(tmp_path: Path) -> None:
-    script = tmp_path / "bootstrap.php"
-    script.write_text(
+def _bootstrap_php(**overrides: str) -> str:
+    return (
         _ansible_like_env()
         .get_template("bootstrap.php.j2")
-        .render(opnsense_bootstrap_values=VALUES)
+        .render(opnsense_bootstrap_values=VALUES | overrides)
     )
+
+
+def test_bootstrap_php_allows_only_the_wan_address_by_default() -> None:
+    php = _bootstrap_php()
+
+    assert "lanip" not in php
+    assert php.count("addChild('rule')") == 1
+
+
+def test_bootstrap_php_adds_a_lan_address_rule_when_asked() -> None:
+    php = _bootstrap_php(api_allow_lan="1")
+
+    assert php.count("addChild('rule')") == 2
+    for line in [
+        "$lan_rule->addChild('interface', 'wan');",
+        "$lan_destination->addChild('network', 'lanip');",
+        "$lan_destination->addChild('port', '443');",
+        "$lan_rule->addChild('source')->addChild('address', $v['api_allow_cidr']);",
+        "$destination->addChild('network', 'wanip');",
+    ]:
+        assert line in php
+    assert php.index("$lan_rule") < php.index("Config::getInstance()->save();")
+
+
+@pytest.mark.skipif(shutil.which("php") is None, reason="php is not installed")
+@pytest.mark.parametrize("api_allow_lan", ["0", "1"])
+def test_bootstrap_php_is_valid_php(tmp_path: Path, api_allow_lan: str) -> None:
+    script = tmp_path / "bootstrap.php"
+    script.write_text(_bootstrap_php(api_allow_lan=api_allow_lan))
 
     subprocess.run(["php", "-l", str(script)], check=True, capture_output=True)
 
@@ -293,3 +321,40 @@ def test_grow_step_is_valid_sh() -> None:
     assert body is not None
 
     subprocess.run(["sh", "-n", "-c", body.group(1)], check=True, capture_output=True)
+
+
+def test_default_package_does_not_open_the_lan_address(loaded: Any) -> None:
+    _resources, _events, variables = loaded
+
+    assert variables["api_allow_lan"] is False
+
+
+def test_api_allow_lan_input_reaches_the_package(tmp_path: Path) -> None:
+    package = tmp_path / "dev" / "proxmox" / "fw-test"
+    package.mkdir(parents=True)
+    source = (PACKAGE_DIR / "infrafoundry.yml").read_text()
+    (package / "infrafoundry.yml").write_text(source.rstrip("\n") + "\n  api_allow_lan: true\n")
+    resolver = BlueprintResolver(EXAMPLE_ENVS)
+    loader = PackageLoader(EXAMPLE_ENVS, blueprint_resolver=resolver)
+
+    _resources, _events, variables = loader.load_package(
+        package, provider="proxmox", env_name="dev"
+    )
+
+    assert variables["api_allow_lan"] is True
+
+
+def test_playbook_and_role_pass_api_allow_lan_to_the_php() -> None:
+    import yaml
+
+    role = BLUEPRINT_DIR / "roles" / "opnsense-bootstrap"
+    playbook = yaml.safe_load((BLUEPRINT_DIR / "opnsense-bootstrap.yml").read_text())
+    tasks = yaml.safe_load((role / "tasks" / "main.yml").read_text())
+    defaults = yaml.safe_load((role / "defaults" / "main.yml").read_text())
+
+    role_vars = playbook[0]["roles"][0]["vars"]
+    assert "INFRAFOUNDRY_VAR_api_allow_lan" in role_vars["opnsense_api_allow_lan"]
+    assert "default('false', true)" in role_vars["opnsense_api_allow_lan"]
+    [launch] = [t for t in tasks if "opnsense_bootstrap_values" in t.get("vars", {})]
+    assert "ternary('1', '0')" in launch["vars"]["opnsense_bootstrap_values"]["api_allow_lan"]
+    assert defaults["opnsense_api_allow_lan"] is False
