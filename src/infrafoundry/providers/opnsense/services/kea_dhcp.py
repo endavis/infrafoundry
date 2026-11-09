@@ -854,7 +854,7 @@ class KeaDHCPService(BaseService):
                 ],
                 KEA_DHCP4_RESERVATIONS: [
                     (
-                        r.get("hw_address", ""),
+                        kea_identity(KEA_DHCP4_RESERVATIONS, r),
                         _host_base(r),
                         _slug_or_empty(r.get("hw_address", "")),
                     )
@@ -870,7 +870,7 @@ class KeaDHCPService(BaseService):
                 ],
                 KEA_DHCP6_RESERVATIONS: [
                     (
-                        r.get("duid") or r.get("ip_address", ""),
+                        kea_identity(KEA_DHCP6_RESERVATIONS, r),
                         _host_base(r, "_v6"),
                         _slug_or_empty(r.get("duid") or r.get("ip_address", "")),
                     )
@@ -1018,6 +1018,40 @@ def _host_base(row: Mapping[str, Any], suffix: str = "") -> str:
     return f"{slug}{suffix}" if slug else ""
 
 
+def kea_identity(kea_type: str, fields: Mapping[str, Any]) -> str:
+    """Return the re-run identity of a Kea entry, from a live row or an env config.
+
+    Kea reserves one MAC (or DUID) once per subnet, so a reservation is told
+    apart by the (MAC or DUID, IP) pair, joined with ``|``. Either part alone is
+    used when the other is empty. Subnets are identified by their CIDR.
+
+    Args:
+        kea_type: One of the four ``kea.dhcp*`` resource types.
+        fields: A live search row or an environment ``config`` mapping.
+
+    Returns:
+        The identity string, ``""`` when the entry has none.
+    """
+
+    def _get(key: str) -> str:
+        return str(fields.get(key) or "").strip().lower()
+
+    if kea_type in (KEA_DHCP4_SUBNETS, KEA_DHCP6_SUBNETS):
+        return str(fields.get("subnet") or "").strip()
+    owner = _get("hw_address") if kea_type == KEA_DHCP4_RESERVATIONS else _get("duid")
+    ip = _get("ip_address")
+    if owner and ip:
+        return f"{owner}|{ip}"
+    return owner or ip
+
+
+def _identity_candidates(identity: str, pinned: Mapping[str, str]) -> list[str]:
+    """Return the environment keys a live ``identity`` may pin to, best first."""
+    if "|" in identity:
+        return [identity, identity.split("|", 1)[0]]
+    return [identity, *(k for k in pinned if k.startswith(f"{identity}|"))]
+
+
 def _slug_or_empty(identity: str) -> str:
     """Return ``identity`` as a handle slug (no dots), ``""`` when nothing remains."""
     return slug_handle(identity)
@@ -1050,10 +1084,14 @@ def _assign_kea_names(
         pinned = existing.get(kea_type, {})
         seen: set[str] = set()
         for i, (identity, _base, _slug) in enumerate(rows.get(kea_type, ())):
-            if identity and identity in pinned and identity not in seen:
-                seen.add(identity)
-                result[kea_type][i] = pinned[identity]
-                taken.add(pinned[identity])
+            if not identity:
+                continue
+            candidates = _identity_candidates(identity, pinned)
+            key = next((c for c in candidates if c in pinned and c not in seen), None)
+            if key is not None:
+                seen.add(key)
+                result[kea_type][i] = pinned[key]
+                taken.add(pinned[key])
     for kea_type in _KEA_TYPES:
         suffix = "_v6" if "dhcp6" in kea_type else ""
         for i, (_identity, base, slug) in enumerate(rows.get(kea_type, ())):

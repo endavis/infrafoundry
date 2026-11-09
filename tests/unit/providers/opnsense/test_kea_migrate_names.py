@@ -195,3 +195,45 @@ def test_generated_yaml_loads_without_duplicates(tmp_path: Path) -> None:
     target.write_text(doc, encoding="utf-8")
     resources = ConfigManager(tmp_path).get_all_resources_all_providers("env")
     assert len([r for r in resources if r.provider == "opnsense"]) == 6
+
+
+def _migrate_with(tmp_path: Path, env_yaml: str, service: KeaDHCPService) -> str:
+    target = tmp_path / "env" / "resources" / "existing.yaml"
+    target.parent.mkdir(parents=True)
+    target.write_text(env_yaml, encoding="utf-8")
+    with patch.object(KeaDHCPService, "from_environment", return_value=service):
+        return KeaDHCPManager(tmp_path).migrate("env")
+
+
+def test_v4_reservations_sharing_a_mac_keep_their_names(tmp_path: Path) -> None:
+    mac = "02:00:00:00:00:64"
+    ips = ["192.0.2.100", "198.51.100.100", "203.0.113.100"]
+    names = ["lan-device-100", "opt2-device-100", "host-x"]
+    env_yaml = "opnsense:\n  kea:\n    dhcp4:\n      reservations:\n" + "".join(
+        f"        - name: {n}\n          config:\n            hw_address: {mac.upper()}\n"
+        f"            ip_address: {ip}\n"
+        for n, ip in zip(names, ips, strict=True)
+    )
+    service = _service(
+        v4r=[
+            {"hostname": "device-100", "hw_address": mac, "ip_address": ip} for ip in reversed(ips)
+        ]
+    )
+    doc = _migrate_with(tmp_path, env_yaml, service)
+    assert _names(doc, "dhcp4.reservations") == list(reversed(names))
+
+
+def test_v6_reservations_sharing_a_duid_keep_their_names(tmp_path: Path) -> None:
+    duid = "00:01:00:01:02:03"
+    ips = ["2001:db8:1::10", "2001:db8:2::10"]
+    names = ["first-host", "second-host"]
+    env_yaml = "opnsense:\n  kea:\n    dhcp6:\n      reservations:\n" + "".join(
+        f"        - name: {n}\n          config:\n            duid: '{duid}'\n"
+        f"            ip_address: {ip}\n"
+        for n, ip in zip(names, ips, strict=True)
+    )
+    service = _service(
+        v6r=[{"hostname": "dev", "duid": duid, "ip_address": ip} for ip in reversed(ips)]
+    )
+    doc = _migrate_with(tmp_path, env_yaml, service)
+    assert _names(doc, "dhcp6.reservations") == list(reversed(names))
