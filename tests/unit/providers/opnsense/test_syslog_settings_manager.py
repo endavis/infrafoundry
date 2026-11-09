@@ -106,3 +106,67 @@ def test_get_resource_ids(tmp_path: Path) -> None:
 def test_two_resources_rejected(tmp_path: Path) -> None:
     with pytest.raises(InvalidConfigurationError):
         _run("plan", tmp_path, [_resource({}), _resource({})])
+
+
+def _migrate_service() -> SyslogSettingsService:
+    service = SyslogSettingsService(MagicMock())
+    client = MagicMock()
+    client.request.return_value = LIVE
+    service.client = client
+    return service
+
+
+def test_migrate_exports_yaml_that_loads_and_plans_clean(tmp_path: Path) -> None:
+    """The exported YAML parses into one resource and plans with no changes."""
+    import yaml
+
+    from infrafoundry.core.config.package_loader import PackageLoader
+
+    with patch(SERVICE_PATH) as cls:
+        cls.from_environment.return_value = _migrate_service()
+        text = SyslogSettingsManager(tmp_path).migrate("env")
+
+    data = yaml.safe_load(text)
+    assert data == {
+        "opnsense": {
+            "syslog": {
+                "settings": {
+                    "enabled": True,
+                    "log_local": True,
+                    "max_preserve": 31,
+                    "max_file_size": 10,
+                }
+            }
+        }
+    }
+    resources = PackageLoader(tmp_path)._parse_resources_from_data(data, "m.yaml", "opnsense")
+    found = [r for r in resources if r.type == "syslog.settings"]
+    assert len(found) == 1
+    diff, _ = _run("plan", tmp_path, found)
+    assert diff.is_empty
+
+
+def test_migrate_omits_non_integer_value(tmp_path: Path) -> None:
+    import yaml
+
+    service = _migrate_service()
+    service.client.request.return_value = {  # type: ignore[attr-defined]
+        "syslog": {"general": {"enabled": "0", "maxpreserve": "", "maxfilesize": "x"}}
+    }
+    with patch(SERVICE_PATH) as cls:
+        cls.from_environment.return_value = service
+        text = SyslogSettingsManager(tmp_path).migrate("env")
+    assert yaml.safe_load(text)["opnsense"]["syslog"]["settings"] == {"enabled": False}
+
+
+def test_extractor_registry_runs_migrate(tmp_path: Path) -> None:
+    """``get_extractor`` -> adapter -> ``migrate`` works end to end (#1328)."""
+    from infrafoundry.core.extractors import get_extractor
+    from infrafoundry.providers.opnsense import OPNsenseProvider
+
+    OPNsenseProvider(config_dir=tmp_path, output_dir=tmp_path)
+    extractor = get_extractor("opnsense", "syslog.settings")
+    with patch(SERVICE_PATH) as cls:
+        cls.from_environment.return_value = _migrate_service()
+        text = extractor.extract("env")
+    assert "max_preserve: 31" in text
