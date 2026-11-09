@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794233778421,
+  "lastUpdate": 1794236081407,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -589,6 +589,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001536188187967614",
             "extra": "mean: 63.571449988304344 usec\nrounds: 16876"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d0311da3490eab47e965b547bc928e1aa19113b3",
+          "message": "fix: keep migrated opnsense names clear of names already in the env (merges PR #1338, addresses #1337)\n\nconfig migrate for the acmeclient list types derived handles from the live\nrows and de-duplicated them only within one type, but resource names must be\nunique across the whole opnsense provider. A certificate CN slug could match\nan unbound host override name, and the env then failed to load.\n\nThe four acmeclient migrates now share one handle assignment over all four\ntypes, in dependency order. A row whose identity already has an entry of its\nown type in the env keeps that entry's name, so re-running migrate and\nhand-renamed handles are stable and certificate references follow them. Every\nother row gets a slug that skips all opnsense names in the env, suffixed -2,\n-3 and so on. Host override migrate, which synthesizes names in the same\nslug space, reserves the other types' names the same way and also\nde-duplicates within its own type.\n\nA duplicate resource name now raises DuplicateResourceNameError (a\nconfiguration error, IF-CONFIG-002, still a ValueError) and names each\nlocation's resource type, instead of surfacing as IF-GENERAL-001.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T14:53:57Z",
+          "tree_id": "6e2af3d350ab8227e931ebb3608923bc976a478e",
+          "url": "https://github.com/endavis/infrafoundry/commit/d0311da3490eab47e965b547bc928e1aa19113b3"
+        },
+        "date": 1794236080794,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10261.632344353933,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011056042951928009",
+            "extra": "mean: 97.45038278926562 usec\nrounds: 11121"
           }
         ]
       }
