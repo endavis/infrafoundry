@@ -358,3 +358,34 @@ class TestDiskImageValidation:
         assert call["passed"] is False
         assert call["level"] is ValidationLevel.ERROR
         assert fragment in call["message"]
+
+
+IMAGE: dict[str, Any] = {"disk_image_source": "https://example.com/appliance.img.bz2"}
+
+
+class TestDiskSizeValidation:
+    """Tests for disk_size validation (#1329)."""
+
+    def test_positive_integer_is_ok(self, validator: VMConfigValidator, report: MagicMock) -> None:
+        validator.validate(ProxmoxConfigContext(vms=[_vm(disk_size=16, **IMAGE)]))
+        report.add_check.assert_not_called()
+
+    @pytest.mark.parametrize("value", [0, -1, "16", True])
+    def test_invalid_value_is_an_error(
+        self, validator: VMConfigValidator, report: MagicMock, value: Any
+    ) -> None:
+        validator.validate(ProxmoxConfigContext(vms=[_vm(disk_size=value, **IMAGE)]))
+        kwargs = report.add_check.call_args.kwargs
+        assert kwargs["check_name"] == "proxmox_vm_test-vm_disk_size"
+        assert kwargs["passed"] is False
+        assert kwargs["level"] == ValidationLevel.ERROR
+
+    @pytest.mark.parametrize("extra", [{"clone": "100"}, {"ova_source": "/tmp/a.ova"}])
+    def test_without_disk_image_it_warns(
+        self, validator: VMConfigValidator, report: MagicMock, extra: dict[str, Any]
+    ) -> None:
+        validator.validate(ProxmoxConfigContext(vms=[_vm(disk_size=16, **extra)]))
+        kwargs = report.add_check.call_args.kwargs
+        assert kwargs["check_name"] == "proxmox_vm_test-vm_disk_size"
+        assert kwargs["passed"] is True
+        assert kwargs["level"] == ValidationLevel.WARNING

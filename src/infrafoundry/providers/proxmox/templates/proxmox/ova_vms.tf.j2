@@ -22,6 +22,9 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
 {% if image_source %}
     disk_image_source = "{{ image_source }}"
     disk_image_sha256 = "{{ vm.config.disk_image_sha256 | default('') }}"
+{% if vm.config.disk_size is defined %}
+    disk_size    = "{{ vm.config.disk_size }}"
+{% endif %}
 {% else %}
     ova_source   = "{{ vm.config.ova_source }}"
 {% endif %}
@@ -118,6 +121,20 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
         exit 1
       fi
       qm set ${self.triggers_replace.vmid} --${self.triggers_replace.disk_bus}0 "$DISK_PATH"
+{% if vm.config.disk_size is defined %}
+      # Grow the disk to disk_size GiB when that exceeds the image; never shrink.
+      WANT=$(({{ vm.config.disk_size }} * 1024 * 1024 * 1024))
+      HAVE=$(qemu-img info --output=json {{ image_raw }} | sed -n 's/.*"virtual-size": *\([0-9]*\).*/\1/p' | head -n1)
+      if [ -z "$HAVE" ]; then
+        echo "ERROR: could not read the size of {{ image_raw }}" >&2
+        exit 1
+      fi
+      if [ "$WANT" -gt "$HAVE" ]; then
+        qm resize ${self.triggers_replace.vmid} ${self.triggers_replace.disk_bus}0 {{ vm.config.disk_size }}G
+      else
+        echo "disk_size {{ vm.config.disk_size }}G is not larger than the image; keeping the image size"
+      fi
+{% endif %}
       IMPORT
     EOT
   }

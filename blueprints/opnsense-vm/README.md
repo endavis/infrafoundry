@@ -16,6 +16,11 @@ reach the API. The OPNsense provider can then manage it with no manual steps.
    - `em0` is the LAN, on `lan_bridge` (default `vmbr1`, an isolated bridge);
    - `em1` is the WAN, on `wan_bridge` tagged with `wan_vlan` (default
      `vmbr0`, VLAN 10).
+
+   If `disk_size` is set above the image's own size, the provider resizes the
+   imported disk after the import and before first boot. A value that is not
+   larger than the image is skipped at apply time (the image size is kept); the
+   disk is never shrunk.
 2. **Bootstrap (`on_create` event).** `scripts/opnsense-post-terraform.sh` runs
    `opnsense-bootstrap.yml` against the Proxmox host. The role starts the VM
    with an expect script listening on its serial socket. The script logs in as
@@ -30,6 +35,10 @@ reach the API. The OPNsense provider can then manage it with no manual steps.
    - dnsmasq off, with its DHCP ranges removed, so the image's default LAN
      DHCP does not run and Kea can serve the LAN instead;
    - a WAN pass rule for TCP 443 from `api_allow_cidr`.
+
+   When `disk_size` is above 0, the script first runs a best-effort grow step
+   in the shell (`gpart recover`, `gpart resize`, `growfs -y /`). It logs to
+   `/tmp/ifb-grow.log` on the box and never fails the bootstrap.
 
    The box then reboots. The handler waits until
    `https://<wan_ip>/api/core/firmware/status` turns away an
@@ -99,6 +108,7 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 | `pve_host` | `172.20.10.102` | Address Ansible uses to SSH to `target_node` as root |
 | `disk_storage` | `local-lvm` | Storage for the imported disk |
 | `memory` / `cores` | `2048` / `2` | VM size |
+| `disk_size` | `0` | Boot disk size in GiB; `0` keeps the image's own size (about 3 GB). Larger values resize the disk before first boot. Changing it replaces the VM |
 | `image_source` | nano 26.1.6 on pkg.opnsense.org | URL or absolute path on the PVE host of a `.img` or `.img.bz2` |
 | `image_sha256` | `""` | sha256 of `image_source`; empty skips the check |
 | `image_cache_dir` | `/var/lib/vz/template/cache/infrafoundry` | Where downloads and decompressed images are kept |
@@ -125,6 +135,9 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 
 ## Notes
 
+- Whether the nano image grows its root filesystem by itself on first boot is
+  UNVERIFIED until a live rebuild. The bootstrap's grow step is a no-op when
+  there is nothing to grow.
 - The bootstrap runs once, on create. On a box that is already bootstrapped,
   the default credentials are rejected and the bootstrap fails; destroy and
   re-apply to start over.

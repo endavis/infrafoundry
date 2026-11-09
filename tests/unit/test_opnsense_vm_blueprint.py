@@ -167,11 +167,11 @@ def test_bootstrap_php_is_valid_php(tmp_path: Path) -> None:
     subprocess.run(["php", "-l", str(script)], check=True, capture_output=True)
 
 
-def _expect_script() -> str:
+def _expect_script(**overrides: Any) -> str:
     defaults_file = BLUEPRINT_DIR / "roles" / "opnsense-bootstrap" / "defaults" / "main.yml"
     import yaml
 
-    defaults = yaml.safe_load(defaults_file.read_text())
+    defaults = yaml.safe_load(defaults_file.read_text()) | overrides
     return (
         _ansible_like_env().get_template("bootstrap.exp.j2").render(opnsense_vmid=950, **defaults)
     )
@@ -243,3 +243,53 @@ def test_readiness_probe_sends_no_credentials() -> None:
     assert "opnsense_api_key" not in probe
     assert "opnsense_api_secret" not in probe
     assert '[ "$code" = "302" ] || [ "$code" = "401" ]' in probe
+
+
+def test_default_package_keeps_the_image_disk_size(loaded: Any) -> None:
+    resources, _events, variables = loaded
+
+    assert variables["disk_size"] == 0
+    assert "disk_size" not in resources[0].config
+
+
+def test_disk_size_input_reaches_the_vm(tmp_path: Path) -> None:
+    package = tmp_path / "dev" / "proxmox" / "fw-test"
+    package.mkdir(parents=True)
+    source = (PACKAGE_DIR / "infrafoundry.yml").read_text()
+    (package / "infrafoundry.yml").write_text(source.rstrip("\n") + "\n  disk_size: 16\n")
+    resolver = BlueprintResolver(EXAMPLE_ENVS)
+    loader = PackageLoader(EXAMPLE_ENVS, blueprint_resolver=resolver)
+
+    resources, _events, variables = loader.load_package(package, provider="proxmox", env_name="dev")
+
+    assert variables["disk_size"] == 16
+    assert resources[0].config["disk_size"] == 16
+
+
+def test_expect_script_has_no_grow_step_by_default() -> None:
+    script = _expect_script()
+
+    for text in ("gpart", "growfs", "ifb-grow"):
+        assert text not in script
+
+
+def test_expect_script_grows_the_filesystem_when_disk_size_is_set() -> None:
+    script = _expect_script(opnsense_disk_size=16)
+
+    first_shell = script.index("Timed out waiting for the shell")
+    grow = script.index("gpart recover")
+    assert first_shell < grow < script.index("log_user 0")
+    assert "gpart resize -i" in script
+    assert "growfs -y /" in script
+    assert "/tmp/ifb-grow.log" in script
+    block = script[script.index("set grow {") : script.index("log_user 0")]
+    assert "ERROR:" not in block
+    assert 'puts "WARNING: Growing the root filesystem timed out; continuing"' in block
+
+
+def test_grow_step_is_valid_sh() -> None:
+    script = _expect_script(opnsense_disk_size=16)
+    body = re.search(r"set grow \{sh -c '(.*)'\}\n", script)
+    assert body is not None
+
+    subprocess.run(["sh", "-n", "-c", body.group(1)], check=True, capture_output=True)

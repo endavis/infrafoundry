@@ -19,6 +19,9 @@ vms:
     memory: {{ memory }}
     disk_bus: ide
     disk_storage: "{{ disk_storage }}"
+# {% if disk_size %}
+    disk_size: {{ disk_size }}
+# {% endif %}
     serial: true
     boot_order: [ide0]
     onboot: false
