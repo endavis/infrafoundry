@@ -2,8 +2,8 @@
 
 Loads the environment's secret tree once, resolves every ``secret://env_secrets/...``
 URI in the config of the resources of one type, and returns copies. The originals
-are untouched. ``components/virtual_ip.py`` carries an older inline copy of this
-logic; moving it here is a follow-up (its tests patch ``virtual_ip.ConfigManager``).
+are untouched. Used by the ``system_users``, ``openvpn_instances`` and ``virtual_ip``
+managers; tests patch ``_secrets.ConfigManager``.
 """
 
 from __future__ import annotations
