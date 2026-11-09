@@ -458,3 +458,67 @@ class TestOPNsenseResourceTypes:
             "interfaces.virtual_ips",
         ):
             assert getattr(table[type_name], "SPLIT_DELETE_PHASE", None) is True, type_name
+
+
+class TestAcmeclientRegistration:
+    """The five ``acmeclient.*`` types are wired in order with one shared hook (#790)."""
+
+    @pytest.fixture
+    def provider(self, tmp_path: Path) -> OPNsenseProvider:
+        return OPNsenseProvider(config_dir=tmp_path, output_dir=tmp_path)
+
+    TYPES = (
+        "acmeclient.settings",
+        "acmeclient.accounts",
+        "acmeclient.validations",
+        "acmeclient.actions",
+        "acmeclient.certs",
+    )
+
+    def test_dispatch_order(self, provider: OPNsenseProvider) -> None:
+        types = list(provider.get_direct_api_resource_types())
+        positions = [types.index(t) for t in self.TYPES]
+        assert positions == sorted(positions)
+        assert types.index("system.firmware") < positions[0]
+        assert all(t in provider.get_resource_types() for t in self.TYPES)
+
+    def test_dependencies(self, provider: OPNsenseProvider) -> None:
+        deps = provider.get_dependencies()
+        assert deps["acmeclient.certs"] == [
+            "acmeclient.accounts",
+            "acmeclient.validations",
+            "acmeclient.actions",
+        ]
+        for name in ("settings", "accounts", "validations", "actions"):
+            assert deps[f"acmeclient.{name}"] == []
+
+    def test_all_managers_share_the_hook_and_it_calls_the_service_once(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        from unittest.mock import patch
+
+        from infrafoundry.providers.opnsense.services.acmeclient_settings import (
+            AcmeClientSettingsService,
+        )
+
+        managers = provider.get_direct_api_resource_types()
+        assert {managers[t].FINALIZATION_HOOK for t in self.TYPES} == {"acmeclient_reconfigure"}
+        with patch.object(AcmeClientSettingsService, "from_environment") as factory:
+            provider.get_finalization_hooks()["acmeclient_reconfigure"]("env")
+        factory.return_value.reconfigure.assert_called_once_with()
+
+    def test_cert_manager_splits_deletes_and_declares_tuple_siblings(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        certs = provider.get_direct_api_resource_types()["acmeclient.certs"]
+        assert certs.SPLIT_DELETE_PHASE is True
+        assert certs.SIBLING_RESOURCE_TYPE == (
+            "acmeclient.accounts",
+            "acmeclient.validations",
+            "acmeclient.actions",
+        )
+
+    def test_every_extractor_manager_has_migrate(self, provider: OPNsenseProvider) -> None:
+        managers = provider.get_direct_api_resource_types()
+        for t in self.TYPES:
+            assert callable(getattr(managers[t], "migrate", None))

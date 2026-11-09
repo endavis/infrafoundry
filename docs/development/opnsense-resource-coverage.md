@@ -52,7 +52,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<ca>`, `<cert>`, `<OPNsense>/trust` (MVC `trust/ca/*`, `trust/cert/*`) | `trust.cas`, `trust.certs` | Supported (direct-API; #807). Identity is the live `descr` against the YAML `description` (default: the resource name). `prv` should be a `secret://` URI. Deletes use the managed set; objects the box reports in use, and CAs that look AcmeClient-issued, are never deleted. No `config migrate` extractor. Several behaviours are not verified yet, see [Trust CAs and certificates (#807)](#trust-cas-and-certificates-807). |
 | `<OPNsense>/OpenVPN` (MVC `openvpn/instances/*`) | `openvpn.instances` | Supported (direct-API; #808). Client instances only; server instances are not managed and are never touched. Identity is the live `description` (default: the resource name). `username` and `password` are `secret://` URIs. `ca_ref` names a `trust.cas` resource. Deletes use the managed set. No `config migrate` extractor. Write behaviour is not verified yet, see [OpenVPN client instances (#808)](#openvpn-client-instances-808). |
 | `<openvpn>` (legacy `os-openvpn-legacy` plugin) | none | Unmanaged. A cutover recreates the client as a modern `openvpn.instances` entry; import any legacy server or other legacy configuration by hand. |
-| `<OPNsense>/AcmeClient` | `acmeclient_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#790](https://github.com/endavis/infrafoundry/issues/790) ships. In scope since ADR-0013's 2026-10-27 amendment; needs `os-acme-client` from `system.firmware`. |
+| `<OPNsense>/AcmeClient` (`os-acme-client` plugin, `acmeclient/*`) | `acmeclient.settings`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs` | Supported (direct-API; #790). The wire `name` is the identity (the CN for certs), and certs reference accounts, validations and actions by handle. Secret fields take `secret://` URIs. The four list types delete only managed rows; `config migrate` extractors exist for all five. The plugin comes from `system.firmware`; its renewal cron job is plugin-managed. Add, update, delete, re-plan and `config migrate` are verified live; `fetchCronIntegration` is not. See [ACME client (#790)](#acme-client-790). |
 | `<OPNsense>/tailscale` | `tailscale_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#787](https://github.com/endavis/infrafoundry/issues/787) ships. |
 | `<OPNsense>/Syslog` | `syslog.settings` | Supported (direct-API; #804). A singleton over the `general` section of the syslog model (local logging switch and log rotation); only declared fields are compared, the whole live `general` object is echoed back on write; destroy is a no-op; the `syslog_reconfigure` hook fires one reconfigure per apply. Remote `destinations` are not managed. The `set` and `reconfigure` calls are verified live. See [Syslog settings](#syslog-settings-804). |
 | `<OPNsense>/monit` | `monit_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#791](https://github.com/endavis/infrafoundry/issues/791) ships. |
@@ -121,6 +121,149 @@ opnsense:
 **`type` is not honoured on import.** The box stored `cert_type` as `usr_cert` for a certificate sent with `type: server` (`server_cert`); the stored type appears to follow the imported certificate, not the request. `type` is not compared, so it causes no drift.
 
 **Not verified.** Whether the box refuses to delete an in-use object (the guard above does not rely on it), and the CA row shape beyond the fields read here.
+
+## ACME client (#790)
+
+The `os-acme-client` plugin is managed through five direct-API types: `acmeclient.settings` (a singleton dict) and `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions` and `acmeclient.certs` (lists). The four lists are managed-set types ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). The plugin itself is installed by `system.firmware` (declare `os-acme-client` under its plugins); the five types are applied after it.
+
+```yaml
+opnsense:
+  acmeclient:
+    settings:
+      enabled: true
+      auto_renewal: true
+      environment: stg
+      log_level: normal
+    accounts:
+      - name: example-account
+        config:
+          email: admin@example.com
+          ca: letsencrypt_test
+    validations:
+      - name: example-dns
+        config:
+          method: dns01
+          dns_service: dns_cf
+          dns_cf_token: secret://env_secrets/opnsense/acmeclient/validations/example-dns/dns_cf_token
+    actions:
+      - name: restart-gui
+        config:
+          type: configd_restart_gui
+    certs:
+      - name: example-cert
+        config:
+          common_name: fw-test.example.com
+          alt_names:
+            - www.example.com
+          account: example-account
+          validation: example-dns
+          restart_actions:
+            - restart-gui
+          key_length: key_ec256
+          auto_renewal: true
+          enabled: false
+```
+
+### Identity and `display_name`
+
+The YAML `name` is the cross-reference handle. The identity on the box is the wire `name`:
+
+- **accounts, validations, actions:** `display_name` when set, else the handle. `description` is a separate optional field.
+- **certs:** `common_name`, which is the certificate's CN. A CN change is a delete plus an add, which is correct: it is a different certificate.
+
+A handle must not contain a `.`. Two live rows of one type with the same name stop the plan with a drift error. Accounts are not keyed by `(ca, email)`: OPNsense does not enforce that pair, and a key on it would turn an email change into a delete plus an add. A repeated `(ca, email)` is a validator warning, and an update that changes `ca` or `email` warns that the stored account key belongs to the old registration.
+
+### Settings (`acmeclient.settings`)
+
+| YAML | wire field | type |
+|---|---|---|
+| `enabled` | `enabled` | bool |
+| `auto_renewal` | `autoRenewal` | bool |
+| `environment` | `environment` | `""`, `prod` or `stg` |
+| `challenge_port` | `challengePort` | 1-65535 |
+| `tls_challenge_port` | `TLSchallengePort` | 1-65535 |
+| `restart_timeout` | `restartTimeout` | integer >= 0 |
+| `haproxy_integration` | `haproxyIntegration` | bool |
+| `haproxy_acl_ref`, `haproxy_action_ref`, `haproxy_server_ref`, `haproxy_backend_ref` | `haproxyAclRef` and the like | passive strings |
+| `log_level` | `logLevel` | `normal`, `extended`, `debug`, `debug2`, `debug3` |
+| `show_intro` | `showIntro` | bool |
+
+An omitted key is not managed. The write posts the whole live settings object with the declared keys overwritten.
+
+**Renewal cron is plugin-managed.** `UpdateCron` is not a YAML key and is never diffed; its live value is echoed back unchanged on write. After a settings write where `enabled` and `auto_renewal` are both on, InfraFoundry calls `acmeclient/settings/fetchCronIntegration` so the plugin creates or repairs its own job. The job carries no InfraFoundry marker, so `cron.jobs` treats it as unmanaged and keeps it. There is no cross-reference to `cron.jobs`.
+
+### Lists
+
+| type | YAML key | wire field | type |
+|---|---|---|---|
+| accounts | `enabled`, `description` | same | bool, string |
+| | `email` | `email` | string |
+| | `ca` | `ca` | `buypass`, `buypass_test`, `google`, `google_test`, `letsencrypt`, `letsencrypt_test`, `sslcom`, `zerossl`, `custom` |
+| | `custom_ca`, `eab_kid` | same | string |
+| | `eab_hmac` | `eab_hmac` | `secret://` URI |
+| validations | `enabled`, `description` | same | bool, string |
+| | `method` | `method` | `http01`, `dns01`, `tlsalpn01` |
+| | `http_service` | `http_service` | `opnsense`, `haproxy` |
+| | `http_opn_autodiscovery`, `http_opn_interface`, `http_opn_ipaddresses` | same | bool, string, list |
+| | `http_haproxy_inject`, `http_haproxy_frontends` | `http_haproxyInject`, `http_haproxyFrontends` | bool, list |
+| | `tlsalpn_service`, `tlsalpn_acme_autodiscovery`, `tlsalpn_acme_interface`, `tlsalpn_acme_ipaddresses` | same | string, bool, string, list |
+| | `dns_service`, `dns_sleep`, `dns_lexicon_provider` | same | string, integer, string |
+| | `dns_<provider>_<field>` | same | passed through verbatim, `secret://` URI |
+| actions | `enabled`, `description` | same | bool, string |
+| | `type` | `type` | one of 18 (`configd_restart_gui`, `configd_restart_haproxy`, `configd_restart_nginx`, `configd_reload_caddy`, `configd_upload_sftp`, `configd_remote_ssh`, `configd_generic`, and the `acme_*` deploy hooks) |
+| | `sftp_*`, `remote_ssh_*`, `configd*`, `acme_<type>_*` | same | passed through verbatim; credential-like names take `secret://` URIs |
+| certs | `common_name` | `name` | string, required |
+| | `enabled`, `description` | same | bool, string |
+| | `alt_names` | `altNames` | list |
+| | `account` | `account` | reference |
+| | `validation` | `validationMethod` | reference |
+| | `restart_actions` | `restartActions` | list of references |
+| | `key_length` | `keyLength` | `key_2048`, `key_3072`, `key_4096`, `key_ec256`, `key_ec384` |
+| | `ocsp`, `auto_renewal` | `ocsp`, `autoRenewal` | bool |
+| | `renew_interval` | `renewInterval` | integer >= 1 |
+| | `alias_mode` | `aliasmode` | `none`, `automatic`, `domain`, `challenge` |
+| | `domain_alias`, `challenge_alias` | `domainalias`, `challengealias` | string |
+
+`id`, `key`, `statusCode`, `statusLastUpdate`, `lastUpdate` and `certRefId` are server-managed and rejected as YAML keys. Comparison is sparse: only declared fields are compared and written. Lists such as `alt_names` compare as sets. At plan, a pass-through key that the plugin's item template (`GET acmeclient/<sub>/get` without a UUID) does not know raises an error.
+
+### References
+
+`account`, `validation` and each `restart_actions` entry take a handle in one of three forms: `name`, `accounts.name` (in-plugin) or `acmeclient.accounts.name`. The manager maps the handle to the sibling resource's wire name, then to the live UUID. A reference whose target is not on the box yet is planned with a warning; at apply an unresolved reference raises `ReferenceValidationError` before any write.
+
+Apply order is settings, accounts, validations, actions, certs. Certs are deleted first, before the types they use. **Limitation:** moving a cert from account A to account B and removing A in the same apply deletes A before the cert is updated. Do it in two applies.
+
+### DNS credential check
+
+For `method: dns01`, `dns_service` is required. A `dns_<provider>_*` field that belongs to a provider other than `dns_service` is an error. Required fields are enforced only for a small curated map, today `dns_cf` (needs `dns_cf_token`); for any other provider the validator warns that its required fields are not checked. A non-`dns01` method that sets `dns_<provider>_*` fields gets a warning. **Looseness:** a provider whose name is a prefix of another (for example `dns_he` and `dns_he_ddns`) lets the longer provider's fields through when the shorter one is selected. At plan, a warning names credential fields of another provider still stored on the box (names only).
+
+### Secrets
+
+`eab_hmac`, every `dns_<provider>_*` field and action fields named like a credential (`*_password`, `*_pass`, `*_tokenkey`, `*_apikey`, `*_token`, `*_key`) take `secret://` URIs, resolved before the diff. A literal value is a validator warning. Values are compared, but never logged, never put in a warning or error, and never in the changed-field list. `config migrate` emits `secret://env_secrets/opnsense/acmeclient/<type>/<handle>/<field>` for every non-empty secret and never the value.
+
+### Plugin not installed
+
+A 404 on the first read at plan means `os-acme-client` is not installed. Every desired row becomes an add (the settings map becomes the update), with the warning "os-acme-client is not installed; declare it under system.firmware plugins", so a fresh box plans cleanly when `system.firmware` installs the plugin in the same apply. At apply a 404 still raises.
+
+### Reconfigure and never-called endpoints
+
+One `acmeclient/service/reconfigure` fires per apply, through the shared `acmeclient_reconfigure` finalization hook. InfraFoundry never calls `register`, `sign`, `revoke`, `removekey`, `automation`, `import`, `signallcerts` or `toggle`: they contact a CA or a remote host. Issuance stays with the plugin's own cron job or the GUI; an account is registered from the GUI.
+
+### Verified and not verified
+
+Verified read-only on a 26.1 test firewall: the endpoints and wire fields above (item keys, `update/{uuid}`, enums).
+
+**Verified live** on a 26.1 test firewall, with a throwaway disabled certificate, a `letsencrypt_test` account, a dns01 validation holding a dummy token, and a restart-GUI action:
+
+- adds of all four list types and a settings update in one apply, with the certificate's references resolved in the same apply and one `service/reconfigure` (one finalization hook) per apply;
+- the list `search` endpoints answer `GET`, and `get` without a UUID returns the item template with the plugin's defaults;
+- updates of one field per type, where `update/{uuid}` kept the omitted fields (a certificate's `renewInterval`);
+- the dns01 token read back in plain text, so the re-plan after each apply showed no change;
+- deletes, certificates first;
+- `config migrate` output for all five types, planned as the config, showed no change.
+
+Every validation and action carries the fields of every DNS provider and action type, and the plugin gives some of them non-empty defaults (a port, a host, an `insecure` flag). The stale-field warning and `config migrate` ignore them: the warning skips fields still at the template default, and migrate emits only the fields of the row's own provider or action type.
+
+**Not verified:** `settings/fetchCronIntegration` (the test left the plugin disabled, so it was never called). Nothing contacts a CA or a DNS provider and a certificate is never signed, so a valid account and an issued certificate are not live-verified.
 
 ## OpenVPN client instances (#808)
 
@@ -342,13 +485,13 @@ opnsense:
 
 **Two kinds of type.**
 
-- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs` and `openvpn.instances`.
+- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.instances`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions` and `acmeclient.certs`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
-- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `radvd`) are unaffected.
+- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `acmeclient.settings`, `radvd`) are unaffected.
 
 **Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
 
-**Parent and child types.** Unbound host overrides are applied before host aliases, and kea subnets before kea reservations. Kea deletes run in reverse order first (reservations, then subnets), so a managed reservation is deleted while its subnet is still live (#1264). OPNsense does not cascade a kea subnet delete to its reservations and does not refuse it, so without this order they would be left pointing at a subnet that no longer exists. Gateways and static routes are applied before firewall rules, so a rule's `gateway:` names a gateway that already exists (#1269). The same reverse-order delete phase covers firewall rules, NAT, static routes, gateways and virtual IPs, so a child is deleted while its parent is still live. Interface assignments use it too: OPNsense refuses to delete an assigned VLAN (HTTP 500), so the assignment is deleted first (#1271). An assignment's apply installs the controller (an SSH step) only when it has something to write, so the delete phase and the forward pass do not repeat it. Radvd uses it too, so a radvd record is deleted before its interface assignment (#1272). Trust CAs are applied before trust certificates, and certificates are deleted first (#807). OpenVPN client instances are applied after the CAs they reference and deleted before them (#808). Deleting an Unbound host override does remove its aliases. If a managed child still cannot be matched to its parent, it is matched through live orphans (same MAC/DUID, or for an alias the same hostname and domain; an alias only when exactly one live orphan fits), and with no match it is skipped with a warning and retried on the next run.
+**Parent and child types.** Unbound host overrides are applied before host aliases, and kea subnets before kea reservations. Kea deletes run in reverse order first (reservations, then subnets), so a managed reservation is deleted while its subnet is still live (#1264). OPNsense does not cascade a kea subnet delete to its reservations and does not refuse it, so without this order they would be left pointing at a subnet that no longer exists. Gateways and static routes are applied before firewall rules, so a rule's `gateway:` names a gateway that already exists (#1269). The same reverse-order delete phase covers firewall rules, NAT, static routes, gateways and virtual IPs, so a child is deleted while its parent is still live. Interface assignments use it too: OPNsense refuses to delete an assigned VLAN (HTTP 500), so the assignment is deleted first (#1271). An assignment's apply installs the controller (an SSH step) only when it has something to write, so the delete phase and the forward pass do not repeat it. Radvd uses it too, so a radvd record is deleted before its interface assignment (#1272). Trust CAs are applied before trust certificates, and certificates are deleted first (#807). OpenVPN client instances are applied after the CAs they reference and deleted before them (#808). ACME certificates are applied after the accounts, validations and actions they reference and deleted before them (#790). Deleting an Unbound host override does remove its aliases. If a managed child still cannot be matched to its parent, it is matched through live orphans (same MAC/DUID, or for an alias the same hostname and domain; an alias only when exactly one live orphan fits), and with no match it is skipped with a warning and retried on the next run.
 
 **A subnet with reservations you did not create.** InfraFoundry does not delete a kea subnet while a reservation it does not manage, such as one made by hand, still uses it. `infra plan` shows `N blocked (kept)` and a warning naming the subnet and each reservation's MAC or DUID and IP. `infra apply` leaves the subnet in place with the same warning, does not fail, and retries on the next run. To finish the removal, delete or move the reservation on the box, then re-run apply. `infra destroy` skips such a subnet the same way.
 

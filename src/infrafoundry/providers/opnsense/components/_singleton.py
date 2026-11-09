@@ -114,14 +114,18 @@ class SingletonDiff:
             ``None`` for an in-sync singleton.
         adds: Entries to add, for singletons that also create things
             (``system.firmware`` plugins). Defaults to none.
+        warnings: Plan warnings the runner prints (``acmeclient.settings`` uses
+            one for a plugin that is not installed yet, #790). Defaults to none.
     """
 
     def __init__(
         self,
         update: dict[str, Any] | None,
         adds: list[dict[str, Any]] | None = None,
+        warnings: list[str] | None = None,
     ) -> None:
         """Initialize the singleton diff."""
+        self.warnings: list[str] = list(warnings) if warnings else []
         self.adds: list[dict[str, Any]] = list(adds) if adds else []
         self.updates: list[dict[str, Any]] = [update] if update is not None else []
         self.deletes: list[Any] = []

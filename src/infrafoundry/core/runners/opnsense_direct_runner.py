@@ -220,8 +220,9 @@ class OPNsenseDirectRunner(BaseRunner):
         Managers that need cross-resource context at dispatch time (e.g.,
         the kea reservation managers needing the matching kea subnets to
         resolve ``subnet_ref`` to a CIDR) declare a class-level
-        ``SIBLING_RESOURCE_TYPE: ClassVar[str | None]`` whose value is
-        the dotted resource type to slice from ``all_resources``.
+        ``SIBLING_RESOURCE_TYPE: ClassVar[str | tuple[str, ...] | None]`` whose
+        value is the dotted resource type (or a tuple of them, #790) to slice
+        from ``all_resources``.
 
         Managers that don't declare the attribute return ``None`` here —
         the dispatch loops check for ``None`` before threading the
@@ -238,10 +239,36 @@ class OPNsenseDirectRunner(BaseRunner):
             The sibling slice (possibly empty if the type isn't present
             in YAML) or ``None`` when the manager doesn't opt in.
         """
-        sibling_type = getattr(manager_cls, "SIBLING_RESOURCE_TYPE", None)
-        if not isinstance(sibling_type, str) or not sibling_type:
+        sibling_types = OPNsenseDirectRunner._sibling_types(manager_cls)
+        if not sibling_types:
             return None
-        return [r for r in all_resources if r.type == sibling_type]
+        return [r for r in all_resources if r.type in sibling_types]
+
+    @staticmethod
+    def _sibling_types(manager_cls: type[Any]) -> tuple[str, ...]:
+        """Return the sibling resource types a manager declares (#802, #790).
+
+        ``SIBLING_RESOURCE_TYPE`` is a type name, or a tuple of type names for a
+        manager that resolves references into several types (the ACME certificate
+        manager reads accounts, validations and actions).
+
+        Args:
+            manager_cls: The manager class registered in the dispatch table.
+
+        Returns:
+            The declared types; empty when the attribute is absent, empty or of
+            another type.
+        """
+        declared = getattr(manager_cls, "SIBLING_RESOURCE_TYPE", None)
+        if isinstance(declared, str):
+            return (declared,) if declared else ()
+        if (
+            isinstance(declared, tuple)
+            and declared
+            and all(isinstance(t, str) and t for t in declared)
+        ):
+            return tuple(declared)
+        return ()
 
     @staticmethod
     def _splits_deletes(manager_cls: type[Any]) -> bool:
@@ -388,9 +415,11 @@ class OPNsenseDirectRunner(BaseRunner):
         if managed is None or self._delete_scope(manager_cls) != "managed_set":
             return {}
         kwargs: dict[str, Any] = {"managed_resources": list(managed.get(type_name, []))}
-        sibling_type = getattr(manager_cls, "SIBLING_RESOURCE_TYPE", None)
-        if isinstance(sibling_type, str) and sibling_type:
-            kwargs["managed_sibling_resources"] = list(managed.get(sibling_type, []))
+        sibling_types = self._sibling_types(manager_cls)
+        if sibling_types:
+            kwargs["managed_sibling_resources"] = [
+                row for sibling_type in sibling_types for row in managed.get(sibling_type, [])
+            ]
         return kwargs
 
     @staticmethod

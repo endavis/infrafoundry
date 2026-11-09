@@ -18,6 +18,7 @@ import pytest
 from infrafoundry.core.exceptions import ReferenceValidationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.components import (
+    acmeclient,
     kea_dhcp4_reservation,
     kea_dhcp4_subnet,
     kea_dhcp6_reservation,
@@ -68,6 +69,10 @@ class TestConfigKeyedManagers:
             kea_dhcp4_reservation.KeaDHCPv4ReservationManager,
             kea_dhcp6_reservation.KeaDHCPv6ReservationManager,
             OpenVpnInstanceManager,
+            acmeclient.AcmeClientAccountsManager,
+            acmeclient.AcmeClientValidationsManager,
+            acmeclient.AcmeClientActionsManager,
+            acmeclient.AcmeClientCertsManager,
         ):
             assert manager.DELETE_SCOPE == "managed_set"
 
