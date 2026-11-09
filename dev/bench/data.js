@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794226188324,
+  "lastUpdate": 1794226563705,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -465,6 +465,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004691968953184645",
             "extra": "mean: 94.49146467006354 usec\nrounds: 11152"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ae602128a1f7b370cf5ec41d4fd34bfb68f0905a",
+          "message": "feat: add a disk_size option to the opnsense-vm blueprint (merges PR #1331, addresses #1329)\n\nAdd an optional disk_size (GiB) to the opnsense-vm blueprint, passed to the\nProxmox provider as a disk_size VM field for disk-image VMs.\n\n- ova_vms.tf.j2: disk_size joins triggers_replace; after the image is imported\n  and before first boot, qm resize runs only when disk_size is larger than the\n  image's virtual size (qemu-img info), otherwise a skip is logged. The\n  \"at least the image size\" check lives at apply time, not in the validator,\n  by decision: the validator cannot know the remote image's size.\n- VMConfigValidator: disk_size must be a positive integer; a warning is given\n  when it is set on a VM without disk_image_source.\n- Blueprint: disk_size input (default 0 keeps the image size); the bootstrap\n  expect script runs an idempotent gpart recover/resize + growfs step only\n  when disk_size is set, never failing the bootstrap.\n- Without disk_size the generated Terraform is byte-for-byte unchanged\n  (pinned by a digest test).\n\nUnverified: whether the nano image grows its root filesystem on first boot by\nitself, and the bootstrap grow step, are untested until a live rebuild.\n\nAddresses #1329\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T12:15:16Z",
+          "tree_id": "e0382d528e72f9f79cdda2bf74eee25f2802f7c3",
+          "url": "https://github.com/endavis/infrafoundry/commit/ae602128a1f7b370cf5ec41d4fd34bfb68f0905a"
+        },
+        "date": 1794226563111,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12683.529272295224,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002620655708557622",
+            "extra": "mean: 78.84240880685404 usec\nrounds: 13762"
           }
         ]
       }
