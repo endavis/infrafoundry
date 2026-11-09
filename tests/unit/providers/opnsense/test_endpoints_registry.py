@@ -146,6 +146,14 @@ def test_syslog_settings_registers_the_settings_endpoints() -> None:
     assert endpoints.SYSLOG_RECONFIGURE in registered
 
 
+def test_source_nat_registers_get_set_apply() -> None:
+    registered = endpoints.RESOURCE_TYPE_ENDPOINTS["firewall.source_nat"]
+    assert endpoints.SOURCE_NAT_GET in registered
+    assert endpoints.SOURCE_NAT_SET in registered
+    assert endpoints.SOURCE_NAT.apply in registered
+    assert endpoints.SOURCE_NAT_GET in endpoints.RESOURCE_TYPE_ENDPOINTS["firewall.nat"]
+
+
 _ACME_FORBIDDEN = (
     "register",
     "sign",

@@ -42,6 +42,19 @@ The diff is computed per-kind: ``compute_diff`` accepts a list of mixed-kind
 results into a single ``Diff`` object. An outbound rule named ``foo`` and a
 1:1 rule named ``foo`` co-exist as separate identities (different
 controllers; same name allowed).
+
+Outbound read path (#1333)
+--------------------------
+
+``searchRule`` on ``firewall/source_nat`` lists the manual outbound rules only when
+the outbound NAT mode (``filter.general.snat_mode``) is ``hybrid`` or ``advanced``.
+In ``automatic`` and ``disabled`` it returns ``total: 0``, so every declared rule
+looked absent and each apply added a copy. ``search("outbound")`` therefore reads the
+mode from ``GET firewall/source_nat/get`` first. ``hybrid``/``advanced`` and an
+unreadable mode (OPNsense before 26.1) keep using ``searchRule``, whose rows hold the
+raw field values; ``automatic``/``disabled`` read ``filter.snatrules.rule`` from the
+model, flattening each option dict to its selected keys. 1:1 and port_forward are
+unaffected.
 """
 
 from __future__ import annotations
@@ -61,7 +74,7 @@ from ._identity import encode_identity as encode_identity
 from ._identity import has_identity_marker
 from ._identity import parse_identity as parse_identity
 from ._nested_emit import emit_nested_list_yaml
-from .base import BaseService
+from .base import BaseService, raise_on_failed_write
 
 logger = logging.getLogger(__name__)
 
@@ -320,8 +333,9 @@ class LiveNATRule:
         kind: ``"outbound"`` or ``"one_to_one"``.
         managed_name: Parsed InfraFoundry name (``None`` if unmanaged).
         description: Free-form description with the prefix stripped.
-        raw: Full original row dict from ``searchRule`` for field
-            comparison during update detection.
+        raw: Full original row dict (from ``searchRule``, or, for outbound
+            rules in a mode that hides them, flattened from the model) for
+            field comparison during update detection.
     """
 
     uuid: str
@@ -329,6 +343,43 @@ class LiveNATRule:
     managed_name: str | None
     description: str
     raw: dict[str, Any] = field(default_factory=dict)
+
+
+#: Values of ``filter.general.snat_mode`` (#1333).
+SNAT_MODES: tuple[str, ...] = ("automatic", "hybrid", "advanced", "disabled")
+
+#: Modes in which ``searchRule`` lists the manual outbound rules.
+SNAT_MODES_LISTING_MANUAL: frozenset[str] = frozenset({"hybrid", "advanced"})
+
+#: Modes in which manual outbound rules have no effect and ``searchRule`` hides them.
+SNAT_MODES_INERT: frozenset[str] = frozenset({"automatic", "disabled"})
+
+
+def _flatten_model_value(value: Any) -> str:
+    """Flatten a model field into its wire string.
+
+    An option dict flattens to the comma-joined selected keys. ``None`` and ``[]``
+    flatten to ``""``.
+    """
+    if isinstance(value, dict):
+        return ",".join(
+            str(key)
+            for key, meta in value.items()
+            if str(key) and isinstance(meta, dict) and meta.get("selected")
+        )
+    if value is None or value == []:
+        return ""
+    if isinstance(value, str):
+        return value
+    return str(value)
+
+
+def snat_mode_from_model(filter_model: dict[str, Any]) -> str | None:
+    """Return the selected ``general.snat_mode`` key, or ``None`` when absent."""
+    general = filter_model.get("general")
+    if not isinstance(general, dict) or "snat_mode" not in general:
+        return None
+    return _flatten_model_value(general["snat_mode"]) or None
 
 
 @dataclass
@@ -346,6 +397,7 @@ class Diff:
     updates: list[tuple[LiveNATRule, NATRuleConfig]] = field(default_factory=list)
     deletes: list[LiveNATRule] = field(default_factory=list)
     locked: list[tuple[NATRuleConfig, LiveNATRule | None]] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def is_empty(self) -> bool:
@@ -881,6 +933,36 @@ class NATRuleService(BaseService):
     # API operations (CRUD + applyChanges)
     # ------------------------------------------------------------------
 
+    def get_source_nat_model(self) -> dict[str, Any]:
+        """Fetch ``filter`` from ``firewall/source_nat/get``.
+
+        Returns:
+            The ``filter`` object, or ``{}`` when the envelope is missing, which
+            reads as "mode unknown".
+        """
+        response = self.client.request(
+            endpoints.SOURCE_NAT_GET.method, endpoints.SOURCE_NAT_GET.path()
+        )
+        filter_model = response.get("filter") if isinstance(response, dict) else None
+        return filter_model if isinstance(filter_model, dict) else {}
+
+    def get_snat_mode(self) -> str | None:
+        """Return the live outbound NAT mode, or ``None`` when it cannot be read."""
+        return snat_mode_from_model(self.get_source_nat_model())
+
+    @staticmethod
+    def _outbound_rows_from_model(filter_model: dict[str, Any]) -> list[dict[str, Any]]:
+        """Build ``searchRule``-shaped rows from ``filter.snatrules.rule``."""
+        snatrules = filter_model.get("snatrules")
+        rules = snatrules.get("rule") if isinstance(snatrules, dict) else None
+        if not isinstance(rules, dict):
+            return []
+        return [
+            {"uuid": uuid, **{key: _flatten_model_value(val) for key, val in rule.items()}}
+            for uuid, rule in rules.items()
+            if isinstance(rule, dict)
+        ]
+
     def search(self, kind: NATRuleKind) -> list[LiveNATRule]:
         """Fetch the live rule list for one kind.
 
@@ -893,6 +975,14 @@ class NATRuleService(BaseService):
         Raises:
             OpnsenseDriftError: If any row has a malformed identity prefix.
         """
+        if kind == "outbound":
+            filter_model = self.get_source_nat_model()
+            mode = snat_mode_from_model(filter_model)
+            if mode is not None and mode not in SNAT_MODES_LISTING_MANUAL:
+                return [
+                    _row_to_live(row, kind) for row in self._outbound_rows_from_model(filter_model)
+                ]
+
         eps = self._endpoints_for(kind)
         response = self.client.request(eps.search.method, eps.search.path())
 
@@ -963,9 +1053,11 @@ class NATRuleService(BaseService):
             API response dict.
         """
         eps = self._endpoints_for(rule.kind)
-        return self.client.request(
+        response = self.client.request(
             eps.add.method, eps.add.path(), data=self._payload_with_category(rule)
         )
+        raise_on_failed_write(response, f"add {rule.kind} NAT rule {rule.name}")
+        return response
 
     def update(self, uuid: str, rule: NATRuleConfig) -> dict[str, Any]:
         """Update an existing NAT rule by UUID.
@@ -981,11 +1073,13 @@ class NATRuleService(BaseService):
             API response dict.
         """
         eps = self._endpoints_for(rule.kind)
-        return self.client.request(
+        response = self.client.request(
             eps.update.method,
             eps.update.path(uuid=uuid),
             data=self._payload_with_category(rule),
         )
+        raise_on_failed_write(response, f"update {rule.kind} NAT rule {rule.name}")
+        return response
 
     def delete(self, uuid: str, kind: NATRuleKind) -> dict[str, Any]:
         """Delete a NAT rule by UUID.

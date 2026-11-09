@@ -31,6 +31,7 @@ EXPECTED_RESOURCE_TYPES = [
     "unbound.settings",
     "interfaces.settings",
     "syslog.settings",
+    "firewall.source_nat",
     "interfaces.virtual_ips",
     "interfaces.vlans",
     "hostdiscovery",

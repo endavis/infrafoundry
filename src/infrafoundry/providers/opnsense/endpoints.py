@@ -368,6 +368,9 @@ KEA_RECONFIGURE = Endpoint("POST", "kea/service/reconfigure")
 FILTER = _rules("firewall/filter")
 FILTER_SAVEPOINT = Endpoint("POST", "firewall/filter/savepoint")
 SOURCE_NAT = _rules("firewall/source_nat")
+# #1333: the model document (outbound NAT mode) and its write.
+SOURCE_NAT_GET = Endpoint("GET", "firewall/source_nat/get")
+SOURCE_NAT_SET = Endpoint("POST", "firewall/source_nat/set")
 ONE_TO_ONE = _rules("firewall/one_to_one")
 # OPNsense routes DNatController as ``d_nat`` (not ``dnat``).
 D_NAT = _rules("firewall/d_nat")
@@ -501,8 +504,11 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     "interfaces.assignments": (*ASSIGN_SETTINGS.all(), INTERFACES_INFO),
     "interfaces.virtual_ips": VIP.all(),
     "firewall.aliases": ALIAS.all(),
+    # #1333
+    "firewall.source_nat": (SOURCE_NAT_GET, SOURCE_NAT_SET, SOURCE_NAT.apply),
     "firewall.nat": (
         *SOURCE_NAT.all(),
+        SOURCE_NAT_GET,
         *ONE_TO_ONE.all(),
         *D_NAT.all(),
         CATEGORY_SEARCH,

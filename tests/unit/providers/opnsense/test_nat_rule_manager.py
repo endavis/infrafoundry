@@ -452,3 +452,100 @@ class TestDeletesOnly:
         assert result["resources_updated"] == 0
         assert result["resources_deleted"] == 1
         assert [o.action for o in result["resource_outcomes"]] == ["delete"]
+
+
+# ---------------------------------------------------------------------------
+# Inert outbound NAT mode diagnostic (#1333)
+# ---------------------------------------------------------------------------
+
+
+def _sibling(mode: str) -> list[ResourceConfig]:
+    return [
+        ResourceConfig(
+            name="firewall.source_nat",
+            type="firewall.source_nat",
+            provider="opnsense",
+            config={"snat_mode": mode},
+        )
+    ]
+
+
+def _plan_warnings(
+    tmp_path: Path,
+    resources: list[ResourceConfig],
+    *,
+    live_mode: str | None,
+    siblings: list[ResourceConfig] | None = None,
+) -> tuple[list[str], MagicMock]:
+    service = _make_service_mock()
+    service.get_snat_mode.return_value = live_mode
+    with patch(SERVICE_PATH) as svc_cls:
+        svc_cls.from_environment.return_value = service
+        diff = NATRuleManager(tmp_path).plan("env", resources, sibling_resources=siblings)
+    return diff.warnings, service
+
+
+class TestSnatModeWarning:
+    def test_sibling_type_is_declared(self) -> None:
+        assert NATRuleManager.SIBLING_RESOURCE_TYPE == "firewall.source_nat"
+
+    def test_warns_when_live_mode_is_automatic(self, tmp_path: Path) -> None:
+        warnings, _ = _plan_warnings(tmp_path, [_outbound_resource("a")], live_mode="automatic")
+        assert len(warnings) == 1
+        assert "'automatic'" in warnings[0]
+        assert "firewall.source_nat" in warnings[0]
+
+    def test_warns_when_live_mode_is_disabled(self, tmp_path: Path) -> None:
+        warnings, _ = _plan_warnings(tmp_path, [_outbound_resource("a")], live_mode="disabled")
+        assert len(warnings) == 1
+
+    def test_silent_in_hybrid(self, tmp_path: Path) -> None:
+        warnings, _ = _plan_warnings(tmp_path, [_outbound_resource("a")], live_mode="hybrid")
+        assert warnings == []
+
+    def test_silent_when_live_mode_unknown(self, tmp_path: Path) -> None:
+        warnings, _ = _plan_warnings(tmp_path, [_outbound_resource("a")], live_mode=None)
+        assert warnings == []
+
+    def test_silent_without_enabled_outbound_rules(self, tmp_path: Path) -> None:
+        disabled = _outbound_resource("a")
+        disabled.config["enabled"] = False
+        for resources in (
+            [_one_to_one_resource("b")],
+            [_port_forward_resource("c")],
+            [disabled],
+        ):
+            warnings, service = _plan_warnings(tmp_path, resources, live_mode="automatic")
+            assert warnings == []
+            service.get_snat_mode.assert_not_called()
+
+    def test_declared_hybrid_overrides_live_automatic(self, tmp_path: Path) -> None:
+        warnings, service = _plan_warnings(
+            tmp_path,
+            [_outbound_resource("a")],
+            live_mode="automatic",
+            siblings=_sibling("hybrid"),
+        )
+        assert warnings == []
+        service.get_snat_mode.assert_not_called()
+
+    def test_declared_automatic_warns(self, tmp_path: Path) -> None:
+        warnings, service = _plan_warnings(
+            tmp_path,
+            [_outbound_resource("a")],
+            live_mode="hybrid",
+            siblings=_sibling("automatic"),
+        )
+        assert len(warnings) == 1
+        service.get_snat_mode.assert_not_called()
+
+    def test_apply_returns_warnings_but_not_on_the_delete_pass(self, tmp_path: Path) -> None:
+        service = _make_service_mock()
+        service.get_snat_mode.return_value = "automatic"
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            manager = NATRuleManager(tmp_path)
+            result = manager.apply("env", [_outbound_resource("a")])
+            deletes = manager.apply("env", [_outbound_resource("a")], deletes_only=True)
+        assert len(result["warnings"]) == 1
+        assert "warnings" not in deletes
