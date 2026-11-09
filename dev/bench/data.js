@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794162574099,
+  "lastUpdate": 1794219443103,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -403,6 +403,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008283177652925946",
             "extra": "mean: 127.49388563157989 usec\nrounds: 8289"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "36b2fd9774291042f21a32141cad86bd7248d706",
+          "message": "chore: record live login verification for opnsense system.users (merges PR #1326, addresses #1322)\n\nOn a test firewall, a throwaway user with the dashboard privilege and a\nsecret:// password could log in to the web GUI, and a wrong password was\nrejected. After a rotation with update_password, the new password logged in\nand the old one was rejected. The user was then removed and the box returned\nto its starting state.\n\nRecorded in the system.users section of ADR-0014 and in the coverage doc.\n\nAddresses #1322\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T10:16:41Z",
+          "tree_id": "3e32d36b049445145c3c98c33c5ee7a549500d3f",
+          "url": "https://github.com/endavis/infrafoundry/commit/36b2fd9774291042f21a32141cad86bd7248d706"
+        },
+        "date": 1794219442683,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12823.412321875385,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000022028556335205256",
+            "extra": "mean: 77.98236342241806 usec\nrounds: 14446"
           }
         ]
       }
