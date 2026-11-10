@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794238376661,
+  "lastUpdate": 1794304517805,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -713,6 +713,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001971532874353035",
             "extra": "mean: 63.07070676955586 usec\nrounds: 17106"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "285b44237c273050098bfefe083af7322438eb9e",
+          "message": "feat: support a client cert_ref on opnsense openvpn.instances (merges PR #1344, addresses #1320)\n\nopenvpn.instances gains an optional cert_ref naming a trust.certs\nresource. It resolves to the live certificate refid through the new\ncert_refids_by_name (which shares its lookup with ca_refids_by_name) and\nis sent as the wire cert. Omitted, cert is neither sent nor compared, and\nthe trust.certs search runs only when an instance sets cert_ref.\n\nA pending certificate is an add plus a warning at plan; an unresolved\ncert_ref at apply raises before any write. The validator requires\ncert_ref to name a declared trust.certs entry. The manager declares the\ntuple SIBLING_RESOURCE_TYPE (\"trust.cas\", \"trust.certs\"); the runner\nalready accepted a tuple, so it is unchanged. Dependencies and the\nendpoint registry list trust.certs and trust/cert/search.\n\nVerified live on a test firewall; ADR-0014 and the coverage doc record\nthe results.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-10T09:54:38Z",
+          "tree_id": "d4fe537e90d3c16a7693af330fbab1f9563a72d8",
+          "url": "https://github.com/endavis/infrafoundry/commit/285b44237c273050098bfefe083af7322438eb9e"
+        },
+        "date": 1794304517415,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7789.973821513324,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000921138901553702",
+            "extra": "mean: 128.3701361406802 usec\nrounds: 8359"
           }
         ]
       }
