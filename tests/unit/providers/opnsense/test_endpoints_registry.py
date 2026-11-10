@@ -136,8 +136,24 @@ def test_openvpn_instances_register_their_endpoints() -> None:
         "openvpn/service/reconfigure",
         "trust/ca/search",
         "trust/cert/search",
+        "openvpn/instances/searchStaticKey",
     }
     assert endpoints.OPENVPN_INSTANCE.search.method == "GET"
+
+
+def test_openvpn_static_keys_register_their_endpoints() -> None:
+    registered = endpoints.RESOURCE_TYPE_ENDPOINTS["openvpn.static_keys"]
+    assert {e.template for e in registered} == {
+        "openvpn/instances/searchStaticKey",
+        "openvpn/instances/getStaticKey/{uuid}",
+        "openvpn/instances/addStaticKey",
+        "openvpn/instances/setStaticKey/{uuid}",
+        "openvpn/instances/delStaticKey/{uuid}",
+        "openvpn/service/reconfigure",
+        "openvpn/instances/search",
+        "openvpn/instances/get/{uuid}",
+    }
+    assert endpoints.OPENVPN_STATIC_KEY.search.method == "POST"
 
 
 def test_syslog_settings_registers_the_settings_endpoints() -> None:

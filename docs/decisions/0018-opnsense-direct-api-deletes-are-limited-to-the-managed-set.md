@@ -22,6 +22,8 @@ Accepted
 
 **Amended:** 2026-11-08 (#808) - `openvpn.instances` (OpenVPN client instances) joins the managed-set types and splits its deletes ahead of `trust.cas`; only client instances are ever matched or deleted, a live server instance is never touched
 
+**Amended:** 2026-11-10 (#1319) - `openvpn.static_keys` joins the managed-set types, keyed by `description`; it does not split its deletes (it depends on no other table type), and a managed key a live instance still references is kept, warned about and reported as unresolved
+
 **Amended:** 2026-11-09 (#790) - `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions` and `acmeclient.certs` join the managed-set types, keyed by the wire name (the CN for certs); certs split their deletes ahead of the other three
 
 ## Decision
@@ -46,6 +48,7 @@ A type with no YAML entries is dispatched only when the run has a managed set, i
 | `interfaces.vlans`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.forwards` | The type's natural key | The type's `*_configs_from_resources` parser, then `.diff_key` (`components/_managed.py::managed_keys`) |
 | `trust.cas`, `trust.certs` | `descr` (the YAML `description`, default the name) | The type's `*_configs_from_resources` parser, then `.diff_key`; no secret resolution is needed |
 | `openvpn.instances` | `description` (the YAML `description`, default the name) | The type's `openvpn_instance_configs_from_resources` parser, then `.diff_key`; secrets stay `secret://` URIs, so no resolution is needed |
+| `openvpn.static_keys` | `description` (the YAML `description`, default the name) | The type's `static_key_configs_from_resources` parser (`require_key=False`), then `.diff_key`; the key stays a `secret://` URI, so no resolution is needed |
 | `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs` | The wire `name` (`display_name`, else the YAML name; `common_name` for certs) | The type's `configs_from_resources` parser, then `.diff_key`; secrets stay `secret://` URIs, so no resolution is needed |
 | `kea.dhcp4.subnets`, `kea.dhcp6.subnets` | Subnet CIDR | `config["subnet"]` of the row |
 | `unbound.host_aliases` | `(parent_uuid, hostname)` | The row's `host_name` resolved against the live host overrides, without raising |

@@ -550,3 +550,69 @@ class TestCertRef:
         assert counts["created"] == 1
         sent = client.request.call_args.kwargs["data"]["instance"]
         assert "cert" not in sent
+
+
+class TestTlsKeyRef:
+    """Optional ``tls_key_ref`` resolved to the wire ``tls_key`` (#1319)."""
+
+    def test_parsed_and_defaulted(self) -> None:
+        assert _cfg(tls_key_ref="vpn-key").tls_key_ref == "vpn-key"
+        assert _cfg().tls_key_ref == ""
+        assert "tls_key_ref" in ALLOWED_KEYS
+        assert "tls_key" not in ALLOWED_KEYS
+
+    @pytest.mark.parametrize("bad", ["", 5])
+    def test_bad_values_rejected(self, bad: Any) -> None:
+        with pytest.raises(ValueError, match="tls_key_ref"):
+            _cfg(tls_key_ref=bad)
+
+    def test_payload(self) -> None:
+        cfg = _cfg(tls_key_ref="vpn-key")
+        assert cfg.to_payload("r1", tls_key_uuid="k1")["instance"]["tls_key"] == "k1"
+        assert "tls_key" not in cfg.to_payload("r1")["instance"]
+
+    def test_changed_fields(self) -> None:
+        live = _live(remote=_opt("vpn.example.com"), ca=_opt("r1"), tls_key=_opt("k1", "k2"))
+        cfg = _cfg(tls_key_ref="vpn-key")
+        assert changed_fields(live, cfg, "r1", "", "k1") == []
+        assert changed_fields(live, cfg, "r1", "", "k2") == ["tls_key"]
+        assert changed_fields(live, cfg, "r1", "", "") == []
+
+    def test_compute_diff_key_only_update(self) -> None:
+        live = _live(remote=_opt("vpn.example.com"), ca=_opt("r1"), tls_key=_opt("k1", "k2"))
+        desired = [_cfg(tls_key_ref="vpn-key")]
+        diff = compute_diff(
+            desired, [live], ca_refids={"vpn-ca": "r1"}, static_key_uuids={"vpn-key": "k2"}
+        )
+        assert len(diff.updates) == 1
+        same = compute_diff(
+            desired, [live], ca_refids={"vpn-ca": "r1"}, static_key_uuids={"vpn-key": "k1"}
+        )
+        assert same.updates == []
+
+    def test_hand_set_key_not_cleared_without_ref(self) -> None:
+        live = _live(remote=_opt("vpn.example.com"), ca=_opt("r1"), tls_key=_opt("k1"))
+        assert compute_diff([_cfg()], [live], ca_refids={"vpn-ca": "r1"}).updates == []
+
+    def test_apply_diff_sends_key_on_add_and_update(self) -> None:
+        client = MagicMock()
+        client.request.return_value = {"result": "saved"}
+        diff = compute_diff(
+            [_cfg("new", tls_key_ref="vpn-key"), _cfg("upd", tls_key_ref="vpn-key")],
+            [_live("upd", remote=_opt("old.example.com"))],
+        )
+        counts = OpenVpnInstanceService(client).apply_diff(
+            diff, {"vpn-ca": "r1"}, None, {"vpn-key": "k1"}
+        )
+        assert counts == {"created": 1, "updated": 1, "deleted": 0}
+        calls = {c.args[1]: c.kwargs.get("data") for c in client.request.call_args_list}
+        assert calls["openvpn/instances/add"]["instance"]["tls_key"] == "k1"
+        assert calls["openvpn/instances/set/u-upd"]["instance"]["tls_key"] == "k1"
+
+    def test_unresolved_key_raises_before_writes(self) -> None:
+        client = MagicMock()
+        diff = compute_diff([_cfg("new", tls_key_ref="vpn-key", password=SECRET_PW)], [])
+        with pytest.raises(ReferenceValidationError, match="tls_key_ref 'vpn-key'") as exc:
+            OpenVpnInstanceService(client).apply_diff(diff, {"vpn-ca": "r1"}, {}, {})
+        client.request.assert_not_called()
+        assert SECRET_PW not in str(exc.value)

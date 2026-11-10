@@ -210,8 +210,20 @@ class TestOPNsenseResourceTypes:
         types = list(provider.get_direct_api_resource_types())
         assert types.index("trust.cas") < types.index("openvpn.instances")
         assert types.index("trust.certs") < types.index("openvpn.instances")
-        assert provider.get_dependencies()["openvpn.instances"] == ["trust.cas", "trust.certs"]
+        assert provider.get_dependencies()["openvpn.instances"] == [
+            "trust.cas",
+            "trust.certs",
+            "openvpn.static_keys",
+        ]
         assert "openvpn.instances" in provider.get_resource_types()
+
+    def test_openvpn_static_keys_registered_before_instances(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        types = list(provider.get_direct_api_resource_types())
+        assert types.index("openvpn.static_keys") < types.index("openvpn.instances")
+        assert provider.get_dependencies()["openvpn.static_keys"] == []
+        assert "openvpn.static_keys" in provider.get_resource_types()
 
     def test_openvpn_reconfigure_hook_calls_service(self, provider: OPNsenseProvider) -> None:
         from unittest.mock import patch

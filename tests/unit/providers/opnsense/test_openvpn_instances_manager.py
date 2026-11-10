@@ -62,14 +62,20 @@ def _set_live(
     cas: list[dict[str, Any]] | None = None,
     certs: list[dict[str, Any]] | None = None,
     instances: dict[str, dict[str, Any]] | None = None,
+    static_keys: dict[str, dict[str, Any]] | None = None,
 ) -> None:
     instances = instances or {}
+    static_keys = static_keys or {}
 
     def fake(method: str, path: str, data: Any = None) -> dict[str, Any]:
         if path == "trust/ca/search":
             return {"rows": cas or []}
         if path == "trust/cert/search":
             return {"rows": certs or []}
+        if path == "openvpn/instances/searchStaticKey":
+            return {"rows": [{"uuid": u} for u in static_keys]}
+        if path.startswith("openvpn/instances/getStaticKey/"):
+            return {"statickey": static_keys[path.rsplit("/", 1)[1]]}
         if path == "openvpn/instances/search":
             return {"rows": [{"uuid": u} for u in instances]}
         if path.startswith("openvpn/instances/get/"):
@@ -100,7 +106,11 @@ def _client_row(description: str, **extra: Any) -> dict[str, Any]:
 
 
 def test_class_markers() -> None:
-    assert OpenVpnInstanceManager.SIBLING_RESOURCE_TYPE == ("trust.cas", "trust.certs")
+    assert OpenVpnInstanceManager.SIBLING_RESOURCE_TYPE == (
+        "trust.cas",
+        "trust.certs",
+        "openvpn.static_keys",
+    )
     assert OpenVpnInstanceManager.SPLIT_DELETE_PHASE is True
     assert OpenVpnInstanceManager.DELETE_SCOPE == "managed_set"
     assert OpenVpnInstanceManager.FINALIZATION_HOOK == "openvpn_reconfigure"
@@ -308,3 +318,96 @@ def test_no_cert_search_without_cert_ref(
     _set_live(client, cas=[_ca_row()])
     manager.apply("env", [_inst("a")], sibling_resources=[_ca(), _cert()])
     assert not _searched(client, "trust/cert/search")
+
+
+def _key(name: str = "vpn-key") -> ResourceConfig:
+    return ResourceConfig(
+        name=name,
+        type="openvpn.static_keys",
+        provider="opnsense",
+        config={"mode": "crypt", "key": "secret://env_secrets/vpn/key"},
+    )
+
+
+def _key_row(description: str = "vpn-key") -> dict[str, Any]:
+    return {"description": description, "mode": {"crypt": {"value": "crypt", "selected": 1}}}
+
+
+def test_apply_sends_resolved_tls_key_uuid(
+    manager: OpenVpnInstanceManager, client: MagicMock
+) -> None:
+    _set_live(client, cas=[_ca_row()], static_keys={"k1": _key_row()})
+    result = manager.apply(
+        "env", [_inst("a", tls_key_ref="vpn-key")], sibling_resources=[_ca(), _key()]
+    )
+    assert result["resources_created"] == 1
+    add = next(c for c in client.request.call_args_list if c.args[1] == "openvpn/instances/add")
+    assert add.kwargs["data"]["instance"]["tls_key"] == "k1"
+
+
+def test_managed_sibling_resolves_key(manager: OpenVpnInstanceManager, client: MagicMock) -> None:
+    _set_live(client, cas=[_ca_row()], static_keys={"k1": _key_row()})
+    result = manager.apply(
+        "env",
+        [_inst("a", tls_key_ref="vpn-key")],
+        managed_sibling_resources=[_ca(), _key()],
+    )
+    assert result["resources_created"] == 1
+
+
+def test_pending_key_warns_in_plan(manager: OpenVpnInstanceManager, client: MagicMock) -> None:
+    _set_live(client, cas=[_ca_row()])
+    diff = manager.plan(
+        "env", [_inst("a", tls_key_ref="vpn-key")], sibling_resources=[_ca(), _key()]
+    )
+    assert [a.name for a in diff.adds] == ["a"]
+    assert any("static key 'vpn-key' is not on the box yet" in w for w in diff.warnings)
+
+
+def test_unresolved_key_raises_before_writes(
+    manager: OpenVpnInstanceManager, client: MagicMock
+) -> None:
+    _set_live(client, cas=[_ca_row()])
+    with pytest.raises(ReferenceValidationError, match="tls_key_ref 'vpn-key'"):
+        manager.apply("env", [_inst("a", tls_key_ref="vpn-key")], sibling_resources=[_ca(), _key()])
+    assert not [p for p in _writes(client) if "/add" in p or "/set/" in p or "/del/" in p]
+
+
+def test_deletes_only_drops_key_warning(manager: OpenVpnInstanceManager, client: MagicMock) -> None:
+    _set_live(client, cas=[_ca_row()], instances={"u1": _client_row("old")})
+    result = manager.apply(
+        "env",
+        [_inst("a", tls_key_ref="vpn-key")],
+        deletes_only=True,
+        managed_resources=[_inst("old")],
+        sibling_resources=[_ca(), _key()],
+    )
+    assert result["resources_created"] == 0
+    assert result["warnings"] == []
+
+
+def test_key_change_updates_instance(manager: OpenVpnInstanceManager, client: MagicMock) -> None:
+    _set_live(
+        client,
+        cas=[_ca_row()],
+        static_keys={"k2": _key_row()},
+        instances={
+            "u1": _client_row(
+                "a",
+                ca={"ref-1": {"value": "ref-1", "selected": 1}},
+                tls_key={"k1": {"value": "k1", "selected": 1}},
+            )
+        },
+    )
+    diff = manager.plan(
+        "env", [_inst("a", tls_key_ref="vpn-key")], sibling_resources=[_ca(), _key()]
+    )
+    assert [w.name for _, w in diff.updates] == ["a"]
+
+
+def test_no_static_key_search_without_tls_key_ref(
+    manager: OpenVpnInstanceManager, client: MagicMock
+) -> None:
+    _set_live(client, cas=[_ca_row()])
+    manager.apply("env", [_inst("a")], sibling_resources=[_ca(), _key()])
+    assert not _searched(client, "openvpn/instances/searchStaticKey")

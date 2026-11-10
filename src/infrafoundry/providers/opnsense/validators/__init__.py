@@ -28,6 +28,9 @@ from infrafoundry.providers.opnsense.validators.nat_rule_validator import NATRul
 from infrafoundry.providers.opnsense.validators.openvpn_instances_validator import (
     OpenVpnInstanceValidator,
 )
+from infrafoundry.providers.opnsense.validators.openvpn_static_keys_validator import (
+    OpenVpnStaticKeyValidator,
+)
 from infrafoundry.providers.opnsense.validators.radvd_validator import RadvdValidator
 from infrafoundry.providers.opnsense.validators.resource_name_validator import (
     ResourceNameValidator,
@@ -81,6 +84,7 @@ __all__ = [
     "KeaReservationValidator",
     "NATRuleValidator",
     "OpenVpnInstanceValidator",
+    "OpenVpnStaticKeyValidator",
     "RadvdValidator",
     "ResourceNameValidator",
     "SourceNatValidator",  # #1333

@@ -342,6 +342,16 @@ OPENVPN_INSTANCE = _crud(
     delete="del",
     search_method="GET",
 )
+# Static keys (#1319): tls-auth / tls-crypt keys an instance references by uuid. The
+# grid search is a POST (probed), unlike the instance search.
+OPENVPN_STATIC_KEY = _crud(
+    "openvpn/instances",
+    search="searchStaticKey",
+    get="getStaticKey",
+    add="addStaticKey",
+    update="setStaticKey",
+    delete="delStaticKey",
+)
 OPENVPN_RECONFIGURE = Endpoint("POST", "openvpn/service/reconfigure")
 
 # --- kea ----------------------------------------------------------------------------
@@ -544,11 +554,18 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     "system.groups": (*AUTH_GROUP.all(), AUTH_USER.search),
     "trust.cas": TRUST_CA.all(),
     "trust.certs": (*TRUST_CERT.all(), TRUST_CA.search),
+    "openvpn.static_keys": (
+        *OPENVPN_STATIC_KEY.all(),
+        OPENVPN_RECONFIGURE,
+        OPENVPN_INSTANCE.search,
+        OPENVPN_INSTANCE.read,
+    ),
     "openvpn.instances": (
         *OPENVPN_INSTANCE.all(),
         OPENVPN_RECONFIGURE,
         TRUST_CA.search,
         TRUST_CERT.search,
+        OPENVPN_STATIC_KEY.search,
     ),
     "hostdiscovery": (
         HOSTDISCOVERY_SETTINGS_GET,

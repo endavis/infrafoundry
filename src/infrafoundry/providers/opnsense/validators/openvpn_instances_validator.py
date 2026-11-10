@@ -7,6 +7,7 @@ resource and the field, never a value: ``username`` and ``password`` are secrets
   (``role``, ``ca``, ``cert``, ``tls_key``, hyphenated wire spellings) carry a hint.
 - ``remote`` and ``ca_ref`` are required; ``ca_ref`` must name a ``trust.cas`` resource.
 - ``cert_ref`` is optional; set, it must name a ``trust.certs`` resource (#1320).
+- ``tls_key_ref`` is optional; set, it must name an ``openvpn.static_keys`` resource (#1319).
 - ``username`` and ``password`` must be ``secret://`` URIs; a literal is an ERROR.
 - Enums, integer ranges and list shapes are checked with the parser's own rules.
 - Duplicate descriptions and duplicate explicit ``vpnid`` values within the type.
@@ -94,6 +95,7 @@ class OpenVpnInstanceValidator(SpecializedValidator[OPNsenseValidationContext]):
         self._check_secrets(prefix, label, config)
         self._check_ca_ref(prefix, label, config, context)
         self._check_cert_ref(prefix, label, config, context)
+        self._check_tls_key_ref(prefix, label, config, context)
         if not config.get("remote"):
             self._error(f"{prefix}_remote_required", f"{label} requires a non-empty 'remote' list")
         for key in ("lock", "update_password"):
@@ -156,6 +158,34 @@ class OpenVpnInstanceValidator(SpecializedValidator[OPNsenseValidationContext]):
             self._error(
                 f"{prefix}_cert_ref",
                 f"{label} cert_ref '{cert_ref}' does not match any trust.certs resource",
+            )
+
+    def _check_tls_key_ref(
+        self, prefix: str, label: str, config: dict[str, Any], context: OPNsenseValidationContext
+    ) -> None:
+        if "tls_key_ref" not in config or config["tls_key_ref"] is None:
+            return
+        tls_key_ref = config["tls_key_ref"]
+        if not isinstance(tls_key_ref, str) or not tls_key_ref:
+            self._error(
+                f"{prefix}_tls_key_ref_type", f"{label} tls_key_ref must be a non-empty string"
+            )
+            return
+        try:
+            found = (
+                resolve_xref(
+                    tls_key_ref, "openvpn.static_keys", context.index, current_plugin="openvpn"
+                )
+                if context.index is not None
+                else None
+            )
+        except ValueError:
+            found = None
+        if found is None:
+            self._error(
+                f"{prefix}_tls_key_ref",
+                f"{label} tls_key_ref '{tls_key_ref}' does not match any "
+                f"openvpn.static_keys resource",
             )
 
     def _check_ca_ref(

@@ -150,3 +150,33 @@ def test_cert_ref_type_errors() -> None:
 def test_cert_ref_absent_adds_no_check() -> None:
     assert _failed(_run([_ca(), _inst()])) == []
     assert _failed(_run([_ca(), _inst(cert_ref=None)])) == []
+
+
+def _static_key(name: str = "vpn-key") -> ResourceConfig:
+    return ResourceConfig(
+        name=name,
+        type="openvpn.static_keys",
+        provider="opnsense",
+        config={"mode": "crypt", "key": "secret://env_secrets/vpn/key"},
+    )
+
+
+def test_tls_key_ref_valid_bare_and_absolute_forms() -> None:
+    for ref in ("vpn-key", "openvpn.static_keys.vpn-key"):
+        assert _failed(_run([_ca(), _static_key(), _inst(tls_key_ref=ref)])) == [], ref
+
+
+def test_tls_key_ref_unknown_or_wrong_type_fails() -> None:
+    assert _fails(_run([_ca(), _inst(tls_key_ref="missing")]), "openvpn_instance_vpn-a_tls_key_ref")
+    assert _fails(_run([_ca(), _inst(tls_key_ref="vpn-ca")]), "openvpn_instance_vpn-a_tls_key_ref")
+
+
+def test_tls_key_ref_type_errors() -> None:
+    for bad in ("", 5):
+        report = _run([_ca(), _static_key(), _inst(tls_key_ref=bad)])
+        assert _fails(report, "openvpn_instance_vpn-a_tls_key_ref_type"), bad
+
+
+def test_tls_key_ref_absent_adds_no_check() -> None:
+    assert _failed(_run([_ca(), _inst()])) == []
+    assert _failed(_run([_ca(), _inst(tls_key_ref=None)])) == []
