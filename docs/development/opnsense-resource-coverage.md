@@ -55,7 +55,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<OPNsense>/OpenVPN` static keys (MVC `openvpn/instances/*StaticKey`) | `openvpn.static_keys` | Supported (direct-API; #1319). A tls-auth, tls-crypt or tls-crypt-v2 key an instance references with `tls_key_ref`. Identity is the live `description` (default: the resource name). `key` is a `secret://` URI; `mode` is required. Deletes use the managed set, and a key a live instance still references is kept. No `config migrate` extractor. See [OpenVPN static keys (#1319)](#openvpn-static-keys-1319). |
 | `<openvpn>` (legacy `os-openvpn-legacy` plugin) | none | Unmanaged. A cutover recreates the client as a modern `openvpn.instances` entry; import any legacy server or other legacy configuration by hand. |
 | `<OPNsense>/AcmeClient` (`os-acme-client` plugin, `acmeclient/*`) | `acmeclient.settings`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs` | Supported (direct-API; #790). The wire `name` is the identity (the CN for certs), and certs reference accounts, validations and actions by handle. Secret fields take `secret://` URIs. The four list types delete only managed rows; `config migrate` extractors exist for all five. The plugin comes from `system.firmware`; its renewal cron job is plugin-managed. Add, update, delete, re-plan and `config migrate` are verified live; `fetchCronIntegration` is not. See [ACME client (#790)](#acme-client-790). |
-| `<OPNsense>/tailscale` | `tailscale_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#787](https://github.com/endavis/infrafoundry/issues/787) ships. |
+| `<OPNsense>/tailscale` (`os-tailscale` plugin, `tailscale/*`) | `tailscale.settings`, `tailscale.auth`, `tailscale.subnets` | Supported (direct-API; #787). `settings` and `auth` are singletons, `subnets` is a managed-set list keyed by the normalized CIDR. The pre-auth key must be a `secret://` URI. One `tailscale/service/reconfigure` fires per apply; the plugin is never started and no tailnet is joined. A `config migrate` extractor exists for each. See [Tailscale (#787)](#tailscale-787). |
 | `<OPNsense>/Syslog` | `syslog.settings` | Supported (direct-API; #804). A singleton over the `general` section of the syslog model (local logging switch and log rotation); only declared fields are compared, the whole live `general` object is echoed back on write; destroy is a no-op; the `syslog_reconfigure` hook fires one reconfigure per apply. Remote `destinations` are not managed. The `set` and `reconfigure` calls are verified live. See [Syslog settings](#syslog-settings-804). |
 | `<OPNsense>/monit` | `monit_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#791](https://github.com/endavis/infrafoundry/issues/791) ships. |
 | `<OPNsense>/Hostwatch` | `hostdiscovery` | Supported (direct-API; #792). The YAML key is `hostdiscovery`, not `hostwatch`, to match the wire API. A singleton; only declared fields are compared (lists as sets), the whole live `general` section is echoed back on write; destroy is a no-op; the `hostdiscovery_reconfigure` hook fires one reconfigure per apply. The `set` and `reconfigure` calls are verified live. See [Host discovery](#host-discovery-792). |
@@ -441,6 +441,104 @@ opnsense:
 - `config migrate` writes the live category with its exact name and skips the marker;
 - after clean-up only the marker is left, and a final plan is clean.
 
+## Tailscale (#787)
+
+The `os-tailscale` plugin is managed through three direct-API types: `tailscale.settings` and `tailscale.auth` (singleton dicts) and `tailscale.subnets` (a list). The plugin is installed by `system.firmware`, so the three types run after it, in the order settings, auth, subnets. The endpoints are plugin-kind: the bundled specs cover core only, so the version check skips them (see [Endpoint registry and version check](#endpoint-registry-and-version-check-1239)). The provider never starts the service and never joins a tailnet: only the settings, authentication and subnet endpoints and `service/reconfigure` are registered.
+
+```yaml
+opnsense:
+  tailscale:
+    settings:
+      enabled: false
+      listen_port: 41641
+      accept_dns: false
+      enable_snat: true
+    auth:
+      login_server: https://controlplane.example.com
+      pre_auth_key: secret://env_secrets/opnsense/tailscale/auth/pre_auth_key
+    subnets:
+      - name: lab-v4
+        config:
+          subnet: 192.0.2.0/24
+          description: Lab IPv4
+      - name: lab-v6
+        config:
+          subnet: 2001:db8::/64
+          description: Lab IPv6
+```
+
+### Settings (`tailscale.settings`)
+
+Every key is optional; only declared keys are compared and written. Keys are snake_case and map to the plugin's camelCase fields.
+
+| Field | Wire | Type |
+| --- | --- | --- |
+| `enabled` | `enabled` | bool |
+| `login_timeout` | `loginTimeout` | integer, 0 or more |
+| `listen_port` | `listenPort` | integer, 0-65535 (0 is accepted so a live 0 round-trips through `config migrate`) |
+| `accept_dns` | `acceptDNS` | bool |
+| `advertise_exit_node` | `advertiseExitNode` | bool |
+| `use_exit_node` | `useExitNode` | string, `""` for none |
+| `accept_subnet_routes` | `acceptSubnetRoutes` | bool |
+| `enable_ssh` | `enableSSH` | bool |
+| `enable_snat` | `disableSNAT` | bool, **inverted** |
+
+**`enable_snat` is inverted.** The plugin stores `disableSNAT`, so `enable_snat: true` is sent as `"0"` and `enable_snat: false` as `"1"`; `config migrate` inverts back. `disable_snat` is refused with a hint.
+
+**`use_exit_node`.** On the box this is an option dict of the offers, which depend on peers. The live value is the selected key. A declared value the box does not offer is a plan warning and an apply error raised before any write. `""` always means none.
+
+**The write omits `subnets`.** The settings `get` nests the subnet list inside the settings model as `subnets: {subnet4: [...]}`. The write body echoes the other live fields with the declared ones overwritten, but never carries `subnets`: OPNsense MVC `set` updates only the nodes posted, so leaving it out keeps the list for the subnet CRUD. A `subnets` key in the settings YAML is refused with a hint to use `tailscale.subnets`. `hostname` and `exit_node` are refused too: they are not plugin settings.
+
+### Authentication (`tailscale.auth`)
+
+| Field | Meaning |
+| --- | --- |
+| `login_server` | An `http(s)://` URL (`loginServer`). |
+| `pre_auth_key` | A `secret://` URI (`preAuthKey`). A literal is a validation ERROR. |
+| `update_pre_auth_key` | Bool. Forces the key to be written; see below. |
+
+**Key policy.** The key is resolved through the environment secrets and is never logged, put in an exception, shown in a plan or echoed back from the box.
+
+- When the box returns a non-empty `preAuthKey`, it is compared with the declared one (both stripped) and written on a difference.
+- When the box returns an empty or masked value, the key is write-only: it is sent only with `update_pre_auth_key: true`. Declared without the flag, the plan carries a warning telling you to set it.
+- With `update_pre_auth_key: true` the key is always sent and counts as a change, like `update_password` on `system.users`. Remove the flag after the apply.
+- The write body echoes the live `loginServer` overwritten by the declared one, but never the live `preAuthKey`: echoing an empty or masked value would clear the stored key. A change to `login_server` alone therefore leaves the key untouched.
+- The plan shows the key as `[REDACTED]`.
+
+### Subnets (`tailscale.subnets`)
+
+Entries are `name` plus `config` with `subnet` (required), `description` and `lock`. The identity is the normalized CIDR, so `2001:DB8::/64` and `2001:db8::/64` are the same subnet; a CIDR with host bits set is a validation error, and so are two entries with the same normalized CIDR. `description` defaults to the empty string and is always compared and sent. IPv4 and IPv6 share the wire envelope `subnet4`. The box assigns `uuid`; it is rejected as a key.
+
+Deletes use the managed set ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)): a subnet added by hand is kept and shown as unmanaged. Two live subnets with one desired or managed CIDR raise a drift error. Subnets do not split the delete phase.
+
+### Migrate
+
+`foundry config migrate --provider opnsense --component tailscale.settings` writes every mapped field present on the box. `tailscale.auth` writes `login_server`, and `pre_auth_key` only as the placeholder `secret://env_secrets/opnsense/tailscale/auth/pre_auth_key` when the box holds a key; the key itself is never written. `tailscale.subnets` writes one entry per live subnet. The handle is a slug of the description, else of the CIDR, with `-2`, `-3` ... when a resource of the environment or an earlier row already uses it.
+
+### Plugin not installed
+
+A 404 on the first read at plan means `os-tailscale` is not installed. The plan carries the warning `os-tailscale is not installed; declare it under system.firmware plugins`: the singletons plan the declared map as an update and every subnet is an add. A 404 at apply raises.
+
+### Reconfigure
+
+One `tailscale/service/reconfigure` fires per apply, through the shared `tailscale_reconfigure` finalization hook, when any of the three types changed state. `tailscale.subnets` `destroy` reconfigures directly when it deleted a row, because the hook does not fire on destroy.
+
+### Verified and not verified
+
+**Verified by a read-only probe** of a test firewall with the plugin installed and Tailscale disabled: `settings/get` (envelope `settings`, with `useExitNode` as an option dict and `subnets` nested), `authentication/get` (envelope `authentication` with `loginServer` and `preAuthKey`), `settings/searchSubnet` (the usual grid) and `settings/getSubnet` (the item template, envelope `subnet4` with `subnet` and `description`).
+
+**Verified live** on a test firewall: the plugin was installed for the test, Tailscale stayed disabled throughout with a throwaway, non-functional pre-auth key, and the plugin was removed afterwards with its settings restored to the defaults:
+
+- `addSubnet`, `setSubnet/{uuid}` (same uuid) and `delSubnet/{uuid}` (reply `{"result": "deleted"}`) work; `searchSubnet` rows carry `uuid`, `subnet` and `description`; an IPv6 CIDR declared in upper case re-plans clean;
+- a subnet added outside the YAML is kept as unmanaged; dropping a managed one deletes it;
+- `settings/set` writes `enable_snat: false` as `disableSNAT` `"1"` and leaves the subnet list untouched;
+- `authentication/set` stores the key, and `authentication/get` **echoes it**, so a changed key is detected without `update_pre_auth_key`; `loginServer` is not touched when it is not declared;
+- `tailscale/service/reconfigure` answers `{"status": "ok"}`; one fires per apply, and the service stays stopped;
+- every re-plan is idempotent; `config migrate` re-creates all three types and writes only the `secret://` placeholder for the key;
+- the key never appears in plan, apply or migrate output.
+
+**Not verified:** a running tunnel (Tailscale stayed disabled), `use_exit_node` with real peers, and the "plugin not installed" plan warning against a box (covered by unit tests).
+
 ## Unbound advanced settings (#1254)
 
 `opnsense.unbound.advanced` is a singleton dict with three list fields:
@@ -620,9 +718,9 @@ opnsense:
 
 **Two kinds of type.**
 
-- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.static_keys`, `openvpn.instances`, `firewall.categories`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions` and `acmeclient.certs`.
+- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.static_keys`, `openvpn.instances`, `firewall.categories`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs` and `tailscale.subnets`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
-- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `firewall.source_nat`, `acmeclient.settings`, `radvd`) are unaffected.
+- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `firewall.source_nat`, `acmeclient.settings`, `tailscale.settings`, `tailscale.auth`, `radvd`) are unaffected.
 
 **Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
 
@@ -679,6 +777,7 @@ Every OPNsense API path the provider calls lives in `src/infrafoundry/providers/
 - **Offline conformance.** `test_endpoint_conformance.py` checks each stock endpoint against every spec bundled with `opnsense-openapi` for the supported series (`SUPPORTED_SERIES`, 26.1). It runs without a box. Gaps in newer series are reported as warnings, not failures.
 - **Plan and doctor.** `infra plan` (and so `infra apply`) and `infra doctor` read the box version from `core/firmware/info` through `opnsense-openapi`'s `detect_version`. A resource type whose endpoints that version lacks is rejected, naming the endpoint and the version. A version with no exact bundled spec, or one that cannot be read, produces a warning and the check is skipped or run against the nearest older spec.
 - **Extension exemption.** `interfaces/assign_settings/*` is served by the in-tree plugin, not stock OPNsense, so the check skips it; a test asserts it stays absent from the specs so the exemption is dropped if upstream ships it.
+- **Plugin exemption.** `acmeclient/*` (`os-acme-client`) and `tailscale/*` (`os-tailscale`) are served by contrib plugins, so the check skips them; tests assert they stay absent from the specs and that only the expected `tailscale/*` endpoints are registered.
 - **Strict mode stays off.** `opnsense-openapi`'s `validate_endpoints=True` needs a known box version, but the wrapper sets `auto_detect_version=False`, and strict mode cannot exempt the extension.
 
 ## Closing the gaps

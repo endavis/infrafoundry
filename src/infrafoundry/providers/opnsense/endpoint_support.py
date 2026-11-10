@@ -3,8 +3,9 @@
 The check reads the specs bundled with ``opnsense-openapi``; it never calls the box
 except to read its version in :func:`check_box`. ``interfaces/assign_settings/*``
 (``EndpointKind.EXTENSION``) is skipped because stock OPNsense does not serve it, and so
-is every ``acmeclient/*`` endpoint (``EndpointKind.PLUGIN``, #790): the specs cover core
-only and the ``os-acme-client`` plugin is installed by ``system.firmware``.
+is every ``acmeclient/*`` and ``tailscale/*`` endpoint (``EndpointKind.PLUGIN``, #790,
+#787): the specs cover core only and the ``os-acme-client`` and ``os-tailscale`` plugins
+are installed by ``system.firmware``.
 """
 
 from __future__ import annotations

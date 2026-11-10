@@ -41,6 +41,9 @@ EXPECTED_RESOURCE_TYPES = [
     "acmeclient.validations",
     "acmeclient.actions",
     "acmeclient.certs",
+    "tailscale.settings",
+    "tailscale.auth",
+    "tailscale.subnets",
 ]
 
 

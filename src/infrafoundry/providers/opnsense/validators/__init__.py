@@ -55,6 +55,7 @@ from infrafoundry.providers.opnsense.validators.system_firmware_validator import
 from infrafoundry.providers.opnsense.validators.system_tuning_validator import (
     SystemTuningValidator,
 )
+from infrafoundry.providers.opnsense.validators.tailscale_validator import TailscaleValidator
 from infrafoundry.providers.opnsense.validators.trust_validator import TrustValidator
 from infrafoundry.providers.opnsense.validators.unbound_advanced_validator import (
     UnboundAdvancedValidator,
@@ -98,6 +99,7 @@ __all__ = [
     "SystemGroupValidator",
     "SystemTuningValidator",
     "SystemUserValidator",
+    "TailscaleValidator",
     "TrustValidator",
     "UnboundAdvancedValidator",
     "UnboundForwardValidator",

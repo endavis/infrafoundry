@@ -2078,3 +2078,26 @@ class TestAcmeclientHookCoalescing:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             OPNsenseDirectRunner().apply(provider_with_env)
         hook.assert_called_once_with("test-env")
+
+
+class TestTailscaleHookCoalescing:
+    """Two Tailscale managers that change state fire ``tailscale_reconfigure`` once (#787)."""
+
+    def test_multi_type_apply_fires_the_shared_hook_once(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        resources = [
+            ResourceConfig(name=n, type=t, provider="opnsense", config={})
+            for n, t in (("a", "tailscale.settings"), ("s", "tailscale.subnets"))
+        ]
+        settings, _ = _hook_manager(hook_key="tailscale_reconfigure", updated=1)
+        subnets, _ = _hook_manager(hook_key="tailscale_reconfigure", created=1)
+        provider_with_env.get_direct_api_resource_types.return_value = {
+            "tailscale.settings": settings,
+            "tailscale.subnets": subnets,
+        }
+        hook = MagicMock()
+        provider_with_env.get_finalization_hooks.return_value = {"tailscale_reconfigure": hook}
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            OPNsenseDirectRunner().apply(provider_with_env)
+        hook.assert_called_once_with("test-env")

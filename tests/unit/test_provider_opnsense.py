@@ -506,6 +506,53 @@ class TestOPNsenseResourceTypes:
             assert getattr(table[type_name], "SPLIT_DELETE_PHASE", None) is True, type_name
 
 
+class TestTailscaleTypes:
+    """The three ``tailscale.*`` types are wired in order with one shared hook (#787)."""
+
+    @pytest.fixture
+    def provider(self, tmp_path: Path) -> OPNsenseProvider:
+        return OPNsenseProvider(config_dir=tmp_path, output_dir=tmp_path)
+
+    TYPES = ("tailscale.settings", "tailscale.auth", "tailscale.subnets")
+
+    def test_dispatch_order(self, provider: OPNsenseProvider) -> None:
+        types = list(provider.get_direct_api_resource_types())
+        positions = [types.index(t) for t in self.TYPES]
+        assert positions == sorted(positions)
+        assert types.index("system.firmware") < positions[0]
+        assert types.index("acmeclient.certs") < positions[0]
+        assert all(t in provider.get_resource_types() for t in self.TYPES)
+
+    def test_dependencies(self, provider: OPNsenseProvider) -> None:
+        deps = provider.get_dependencies()
+        for t in self.TYPES:
+            assert deps[t] == []
+
+    def test_all_managers_share_the_hook_and_it_calls_the_service_once(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        from unittest.mock import patch
+
+        from infrafoundry.providers.opnsense.services.tailscale_settings import (
+            TailscaleSettingsService,
+        )
+
+        managers = provider.get_direct_api_resource_types()
+        assert {managers[t].FINALIZATION_HOOK for t in self.TYPES} == {"tailscale_reconfigure"}
+        with patch.object(TailscaleSettingsService, "from_environment") as factory:
+            provider.get_finalization_hooks()["tailscale_reconfigure"]("env")
+        factory.return_value.reconfigure.assert_called_once_with()
+
+    def test_subnets_do_not_split_deletes(self, provider: OPNsenseProvider) -> None:
+        subnets = provider.get_direct_api_resource_types()["tailscale.subnets"]
+        assert not getattr(subnets, "SPLIT_DELETE_PHASE", False)
+
+    def test_every_extractor_manager_has_migrate(self, provider: OPNsenseProvider) -> None:
+        managers = provider.get_direct_api_resource_types()
+        for t in self.TYPES:
+            assert callable(getattr(managers[t], "migrate", None))
+
+
 class TestAcmeclientRegistration:
     """The five ``acmeclient.*`` types are wired in order with one shared hook (#790)."""
 

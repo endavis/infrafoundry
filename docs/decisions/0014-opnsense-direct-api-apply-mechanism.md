@@ -45,6 +45,7 @@ tags:
 **Amended:** 2026-11-08 (#1091) — `unbound.settings` per-component decision recorded (direct-REST singleton over the `general` and `advanced` sections of `unbound/settings/*`; sparse comparison; the `unbound.advanced` fields stay owned by that type; shares the `unbound_reconfigure` hook)
 **Amended:** 2026-11-08 (#808) — `openvpn.instances` per-component decision recorded (stock direct-REST against `openvpn/instances/*` for client instances only; legacy `os-openvpn-legacy` stays unmanaged; identity is `description`; `ca_ref` through the trust sibling pattern; credentials as `secret://` URIs; reconfigure through the `openvpn_reconfigure` finalization hook; write behaviour not yet verified on a box)
 **Amended:** 2026-11-09 (#790) — `acmeclient.settings`, `.accounts`, `.validations`, `.actions` and `.certs` per-component decision recorded (plugin direct-REST against `acmeclient/*`; the wire `name` is the identity, the CN for certs; certificates reference the other three by handle through a tuple `SIBLING_RESOURCE_TYPE`; plugin-managed renewal cron through `fetchCronIntegration`; shared `acmeclient_reconfigure` hook; new `EndpointKind.PLUGIN` registry exemption; set, add, update and reconfigure not yet verified by a live apply)
+**Amended:** 2026-11-10 (#787) — `tailscale.settings`, `tailscale.auth` and `tailscale.subnets` per-component decision recorded (plugin direct-REST against `tailscale/*`; `settings` write omits the nested `subnets` list; `pre_auth_key` is a `secret://` URI with a write-only key policy; subnets keyed by the normalized CIDR on the managed set; shared `tailscale_reconfigure` hook). The subnet write actions and `service/reconfigure` are assumed names.
 **Amended:** 2026-11-10 (#1319) — new `openvpn.static_keys` per-component decision (list-shape, managed-set direct-API type over `openvpn/instances/*StaticKey`), and `openvpn.instances` gains an optional `tls_key_ref` that resolves to the live static key `uuid` and is sent as the wire `tls_key`. The manager's `SIBLING_RESOURCE_TYPE` becomes `("trust.cas", "trust.certs", "openvpn.static_keys")`.
 
 **Amended:** 2026-11-10 (#1286) — new `firewall.categories` per-component decision (list-shape, managed-set direct-API type over `firewall/category/*Item`; the `infrafoundry` marker is never part of the diff; registered after rules, NAT and aliases so its deletes run last without a split phase; a category the box reports in use is kept with a warning; write and refusal behaviour not yet verified on a box)
@@ -582,6 +583,19 @@ The dispatch order is settings, accounts, validations, actions, certs. Certs set
 
 **Verified live** on a test firewall: the list `search` method (GET), the item template, that `update/{uuid}` keeps omitted fields, secret read-back with a clean re-plan, one reconfigure per apply, certificate-first deletes, and a clean plan of `config migrate` output. **Not verified:** `fetchCronIntegration`. The live check is config-only and never calls `register`, `sign` or `signallcerts`, so a valid account and an issued certificate are not live-verified. See [ACME client](../development/opnsense-resource-coverage.md#acme-client-790).
 
+### `tailscale.*` (#787, 2026-11-10)
+
+**Mechanism:** Direct-REST against the `os-tailscale` plugin's `tailscale/*` MVC controllers. Three types: `tailscale.settings` and `tailscale.auth` (singleton dicts) and `tailscale.subnets` (a list). Documented in [Tailscale (#787)](../development/opnsense-resource-coverage.md#tailscale-787).
+
+- **Endpoints and kind:** `settings/{get,set}`, `authentication/{get,set}`, the subnet CRUD under `settings/` (`searchSubnet`, `addSubnet`, `setSubnet/{uuid}`, `delSubnet/{uuid}`) and `service/reconfigure`. All carry `EndpointKind.PLUGIN`, so the offline conformance test and `check_resource_types` skip them; a test asserts the registered `tailscale/*` set is exactly this one. No status, start or login endpoint is registered: the provider never starts the service or joins a tailnet. `searchSubnet`, `getSubnet`, `settings/get` and `authentication/get` were probed read-only; `addSubnet`, `setSubnet`, `delSubnet`, the two `set` calls and `service/reconfigure` were verified by live writes.
+- **Settings and subnets coexist:** the settings `get` nests the subnet list as `subnets: {subnet4: [...]}`. The settings write body drops that node and never echoes it, so the subnet list is managed only through the subnet CRUD; `subnets` in the settings YAML is refused. `enable_snat` is the inverse of the wire `disableSNAT`. `use_exit_node` is checked against the live offers: a plan warning, an apply error before any write.
+- **Auth key policy:** `pre_auth_key` must be a `secret://` URI (a literal is a validator ERROR, not a warning). A non-empty live key is compared and written on a difference; an empty or masked one is write-only and sent only with `update_pre_auth_key: true`. The write never echoes the live key, and the key is never logged, put in an exception or shown in a plan (`[REDACTED]`).
+- **Identity:** the normalized `subnet` CIDR; `description` is always compared. IPv4 and IPv6 share the envelope `subnet4`.
+- **Plugin not installed:** a 404 at plan gives a warning, the singletons plan the declared map and every subnet is an add; a 404 at apply raises.
+- **Reconfigure:** the three managers share the `tailscale_reconfigure` finalization hook, one `tailscale/service/reconfigure` per apply. `tailscale.subnets` destroy reconfigures directly.
+- **Migrate:** each type has an extractor; the auth export writes only a `secret://` placeholder for the key.
+- **Verified on a test box** (plugin installed for the test and removed afterwards, Tailscale disabled throughout, throwaway key): subnet add, set (same uuid) and delete; an unmanaged subnet kept; the settings write inverting `enable_snat` and leaving subnets untouched; `authentication/get` echoes the stored key, so key changes are detected without the flag; one `service/reconfigure` per apply with the service still stopped; idempotent re-plans; migrate with only the key placeholder; no key text in any output. **Not verified:** a running tunnel and `use_exit_node` with real peers.
+
 ### `firewall.source_nat` (#1333, 2026-11-09)
 
 **Mechanism:** Direct-REST singleton over `snat_mode`, the one field of the `filter.general` node that this type manages. Only a declared key is compared and written. Destroy is a no-op. Applies ADR-0014 and ADR-0016 unchanged.
@@ -633,6 +647,8 @@ A fourth hook, `cron_reconfigure` (#789), is declared on `CronJobsManager`. The 
 
 A fifth hook, `acmeclient_reconfigure` (#790), is shared by the five `acmeclient.*` managers (settings and four lists), so one `acmeclient/service/reconfigure` call fires per apply when any of them changed state.
 
+A sixth hook, `tailscale_reconfigure` (#787), is shared by the three `tailscale.*` managers (two singletons and the subnet list), so one `tailscale/service/reconfigure` call fires per apply when any of them changed state. The endpoint was verified live (`{"status": "ok"}`).
+
 Future components with shared post-apply work register their own key here.
 
 ### Marker bootstrap (#746, amended 2026-05-05)
@@ -654,6 +670,8 @@ The validator (plan-time) accepts `secret://...` URIs as a valid placeholder wit
 **First consumer:** `virtual_ips` (CARP `password`, #723).
 
 **Second consumer:** `system.users` (#805) resolves through the shared `components/_secrets.py::resolve_resource_secrets`. Follow-up: move `virtual_ips` onto the same helper.
+
+**`tailscale.auth` (#787)** resolves `pre_auth_key` through the same `resolve_resource_secrets` helper; a literal is a validator ERROR, the strict convention of `system.users`, `openvpn.instances` and `openvpn.static_keys`.
 
 **Future-proofing:** if a follow-up direct-API resource needs secrets, that issue is the place to consolidate this pattern (e.g., generalize to runner-level pre-resolution rather than per-component manager). The current component-manager-level resolution is the smallest viable path.
 
@@ -714,6 +732,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#1319](https://github.com/endavis/infrafoundry/issues/1319): feat: add `openvpn.static_keys` and a `tls_key_ref` on `openvpn.instances`.
 - Issue [#1286](https://github.com/endavis/infrafoundry/issues/1286): feat: manage OPNsense firewall categories.
 - Issue [#790](https://github.com/endavis/infrafoundry/issues/790): feat: add the `acmeclient.*` direct-API resources for the OPNsense ACME client plugin.
+- Issue [#787](https://github.com/endavis/infrafoundry/issues/787): feat: add `tailscale.settings`, `tailscale.auth` and `tailscale.subnets` direct-API resources for the OPNsense Tailscale plugin.
 - Issue [#1091](https://github.com/endavis/infrafoundry/issues/1091): feat: add `unbound.settings` resource for OPNsense Unbound general and advanced settings.
 - Issue [#1254](https://github.com/endavis/infrafoundry/issues/1254): feat: manage Unbound advanced settings (private and insecure domains) on OPNsense.
 - Issue [#1244](https://github.com/endavis/infrafoundry/issues/1244): refactor: remove the unreachable implementation of the five retired OPNsense system types.

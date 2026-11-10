@@ -40,6 +40,7 @@ from infrafoundry.providers.opnsense.validators import (
     SystemGroupValidator,
     SystemTuningValidator,
     SystemUserValidator,
+    TailscaleValidator,  # #787
     TrustValidator,
     UnboundAdvancedValidator,
     UnboundForwardValidator,
@@ -122,6 +123,7 @@ class OPNsenseValidator:
         self.openvpn_static_key_validator = OpenVpnStaticKeyValidator(report)  # #1319
         self.firewall_category_validator = FirewallCategoryValidator(report)  # #1286
         self.acmeclient_validator = AcmeClientValidator(report)  # #790
+        self.tailscale_validator = TailscaleValidator(report)  # #787
         self.system_firmware_validator = SystemFirmwareValidator(report)
         self.system_tuning_validator = SystemTuningValidator(report)
         self.system_user_validator = SystemUserValidator(report)
@@ -397,6 +399,9 @@ class OPNsenseValidator:
             self.acmeclient_validator.validate(
                 replace(context, resources=resource_refs["acmeclient"])
             )
+            self.tailscale_validator.validate(
+                replace(context, resources=resource_refs["tailscale"])
+            )
             self.system_firmware_validator.validate(
                 replace(context, resources=resource_refs["system_firmware"])
             )
@@ -458,6 +463,7 @@ class OPNsenseValidator:
         openvpn_static_keys = [r for r in resources if r.type == "openvpn.static_keys"]
         firewall_categories = [r for r in resources if r.type == "firewall.categories"]
         acmeclient = [r for r in resources if r.type.startswith("acmeclient.")]
+        tailscale = [r for r in resources if r.type.startswith("tailscale.")]
         system_firmware = [r for r in resources if r.type == "system.firmware"]
         system_tuning = [r for r in resources if r.type == "system.tuning"]
         system_users = [r for r in resources if r.type == "system.users"]
@@ -516,6 +522,7 @@ class OPNsenseValidator:
             "openvpn_static_keys": openvpn_static_keys,
             "firewall_categories": firewall_categories,
             "acmeclient": acmeclient,
+            "tailscale": tailscale,
             "system_firmware": system_firmware,
             "system_tuning": system_tuning,
             "system_users": system_users,

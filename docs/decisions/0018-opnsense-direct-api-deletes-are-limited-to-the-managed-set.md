@@ -26,6 +26,7 @@ Accepted
 
 **Amended:** 2026-11-10 (#1286) - `firewall.categories` joins the managed-set types, keyed by the wire `name`; it does not split its deletes (it is registered after rules, NAT and aliases, the only types that can reference a category by uuid, so it deletes after them), the `infrafoundry` marker is never part of the set, and a category the box reports in use is kept, warned about and reported as unresolved
 **Amended:** 2026-11-09 (#790) - `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions` and `acmeclient.certs` join the managed-set types, keyed by the wire name (the CN for certs); certs split their deletes ahead of the other three
+**Amended:** 2026-11-10 (#787) - `tailscale.subnets` joins the managed-set types, keyed by the normalized `subnet` CIDR; it does not split its deletes (it depends on no other table type).
 
 ## Decision
 
@@ -52,6 +53,7 @@ A type with no YAML entries is dispatched only when the run has a managed set, i
 | `openvpn.static_keys` | `description` (the YAML `description`, default the name) | The type's `static_key_configs_from_resources` parser (`require_key=False`), then `.diff_key`; the key stays a `secret://` URI, so no resolution is needed |
 | `firewall.categories` | The wire `name` (`config.name`, default the resource name) | The type's `category_configs_from_resources` parser, then `.diff_key`; the `infrafoundry` marker is never part of the set |
 | `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs` | The wire `name` (`display_name`, else the YAML name; `common_name` for certs) | The type's `configs_from_resources` parser, then `.diff_key`; secrets stay `secret://` URIs, so no resolution is needed |
+| `tailscale.subnets` | The normalized `subnet` CIDR (`2001:DB8::/64` and `2001:db8::/64` are one subnet) | The type's `subnet_configs_from_resources` parser, then `.diff_key` |
 | `kea.dhcp4.subnets`, `kea.dhcp6.subnets` | Subnet CIDR | `config["subnet"]` of the row |
 | `unbound.host_aliases` | `(parent_uuid, hostname)` | The row's `host_name` resolved against the live host overrides, without raising |
 | `kea.dhcp4.reservations`, `kea.dhcp6.reservations` | `(hw_address or duid, subnet_uuid)` | The row's subnet CIDR (through the YAML and managed subnets), then the live subnet UUID |

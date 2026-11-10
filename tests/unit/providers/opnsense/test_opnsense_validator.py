@@ -285,6 +285,27 @@ class TestValidateReferences:
 
         assert validator.firewall_category_validator.validate.call_args.args[0].resources == [cat]
 
+    def test_dispatches_tailscale(self, validator: OPNsenseValidator) -> None:
+        """The Tailscale validator receives only the ``tailscale.*`` slice (#787)."""
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "api_url": "https://opnsense.example.com",
+                "api_key": "key",
+                "api_secret": "secret",
+            }
+        )
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
+        validator.tailscale_validator = MagicMock()
+        subnet = ResourceConfig(name="s", type="tailscale.subnets", provider="opnsense", config={})
+        auth = ResourceConfig(
+            name="tailscale.auth", type="tailscale.auth", provider="opnsense", config={}
+        )
+        other = ResourceConfig(name="g", type="system.groups", provider="opnsense", config={})
+
+        validator.validate_references([subnet, auth, other])
+
+        assert validator.tailscale_validator.validate.call_args.args[0].resources == [subnet, auth]
+
     def test_exception_caught_gracefully(self, validator: OPNsenseValidator) -> None:
         """Exceptions during validation are caught and reported."""
         validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
