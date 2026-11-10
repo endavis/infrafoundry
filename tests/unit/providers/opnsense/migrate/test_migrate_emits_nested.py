@@ -417,6 +417,81 @@ class TestMigrateFirewallCategoriesEmitsNested:
         assert {(r.name, r.type) for r in parsed} == {("lab-servers", "firewall.categories")}
 
 
+class TestMigrateTailscaleEmitsNested:
+    """Migrate emits each Tailscale type at its nested path (#787)."""
+
+    PATH = "infrafoundry.providers.opnsense.components.{module}.{service}"
+
+    def _migrate(
+        self, tmp_path: Path, module: str, manager: type, service: type, response: Any
+    ) -> str:
+        client = MagicMock()
+        client.request.return_value = response
+        with patch(self.PATH.format(module=module, service=service.__name__)) as svc_cls:
+            svc_cls.from_environment.return_value = service(client)
+            return str(manager(tmp_path).migrate("test-env"))
+
+    def test_settings_emit_nested(self, tmp_path: Path) -> None:
+        from infrafoundry.providers.opnsense.components.tailscale_settings import (
+            TailscaleSettingsManager,
+        )
+        from infrafoundry.providers.opnsense.services.tailscale_settings import (
+            TailscaleSettingsService,
+        )
+
+        yaml_text = self._migrate(
+            tmp_path,
+            "tailscale_settings",
+            TailscaleSettingsManager,
+            TailscaleSettingsService,
+            {"settings": {"enabled": "0", "disableSNAT": "1", "subnets": {"subnet4": []}}},
+        )
+        leaf = _assert_nested_path_present(yaml_text, "tailscale.settings", expected_shape="dict")
+        assert leaf == {"enabled": False, "enable_snat": False}
+        _assert_no_flat_resources_key(yaml_text)
+        parsed = _round_trip(yaml_text, "tailscale_settings.yaml")
+        assert {(r.name, r.type) for r in parsed} == {("tailscale.settings", "tailscale.settings")}
+
+    def test_auth_emit_nested_placeholder_only(self, tmp_path: Path) -> None:
+        from infrafoundry.providers.opnsense.components.tailscale_auth import TailscaleAuthManager
+        from infrafoundry.providers.opnsense.services.tailscale_auth import TailscaleAuthService
+
+        sentinel = "tskey-auth-SENTINEL-0001"  # nosec B105
+        yaml_text = self._migrate(
+            tmp_path,
+            "tailscale_auth",
+            TailscaleAuthManager,
+            TailscaleAuthService,
+            {"authentication": {"loginServer": "https://c.example.com", "preAuthKey": sentinel}},
+        )
+        assert sentinel not in yaml_text
+        leaf = _assert_nested_path_present(yaml_text, "tailscale.auth", expected_shape="dict")
+        assert leaf["pre_auth_key"].startswith("secret://")
+        parsed = _round_trip(yaml_text, "tailscale_auth.yaml")
+        assert {(r.name, r.type) for r in parsed} == {("tailscale.auth", "tailscale.auth")}
+
+    def test_subnets_emit_nested(self, tmp_path: Path) -> None:
+        from infrafoundry.providers.opnsense.components.tailscale_subnets import (
+            TailscaleSubnetManager,
+        )
+        from infrafoundry.providers.opnsense.services.tailscale_subnets import (
+            TailscaleSubnetService,
+        )
+
+        yaml_text = self._migrate(
+            tmp_path,
+            "tailscale_subnets",
+            TailscaleSubnetManager,
+            TailscaleSubnetService,
+            {"rows": [{"uuid": "u1", "subnet": "192.0.2.0/24", "description": "Lab Net"}]},
+        )
+        leaf = _assert_nested_path_present(yaml_text, "tailscale.subnets", expected_shape="list")
+        assert [e["name"] for e in leaf] == ["lab-net"]
+        assert leaf[0]["config"] == {"subnet": "192.0.2.0/24", "description": "Lab Net"}
+        parsed = _round_trip(yaml_text, "tailscale_subnets.yaml")
+        assert {(r.name, r.type) for r in parsed} == {("lab-net", "tailscale.subnets")}
+
+
 # ---------------------------------------------------------------------------
 # 6. routing.gateways -- GatewayManager
 # ---------------------------------------------------------------------------
@@ -1068,6 +1143,7 @@ class TestDottedTypeRegistrySanity:
         "acmeclient.validations",
         "acmeclient.actions",
         "acmeclient.certs",
+        "tailscale.subnets",
     )
 
     def test_each_phase_1_dotted_type_registered_as_list(self) -> None:

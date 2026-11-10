@@ -1039,3 +1039,30 @@ class TestAcmeclientNested:
         data = {"opnsense": {"acmeclient": {"accounts": {"name": "x", "config": {}}}}}
         with pytest.raises(InvalidConfigurationError, match=r"acmeclient\.accounts"):
             PackageLoader(temp_dir)._parse_resources_from_data(data, "bad.yaml", "opnsense")
+
+
+@pytest.mark.unit
+class TestTailscaleNested:
+    """Tailscale settings and auth are dicts, subnets a list (#787)."""
+
+    def test_shapes_load(self, temp_dir: Path) -> None:
+        data = {
+            "opnsense": {
+                "tailscale": {
+                    "settings": {"enabled": False},
+                    "auth": {"login_server": "https://c.example.com"},
+                    "subnets": [{"name": "lab", "config": {"subnet": "192.0.2.0/24"}}],
+                }
+            }
+        }
+        resources = PackageLoader(temp_dir)._parse_resources_from_data(data, "t.yaml", "opnsense")
+        by_type = {r.type: r for r in resources}
+        assert set(by_type) == {"tailscale.settings", "tailscale.auth", "tailscale.subnets"}
+        assert by_type["tailscale.auth"].config == {"login_server": "https://c.example.com"}
+        assert by_type["tailscale.subnets"].name == "lab"
+        assert by_type["tailscale.subnets"].config["name"] == "lab"
+
+    def test_subnets_given_as_dict_is_rejected(self, temp_dir: Path) -> None:
+        data = {"opnsense": {"tailscale": {"subnets": {"name": "x", "config": {}}}}}
+        with pytest.raises(InvalidConfigurationError, match=r"tailscale\.subnets"):
+            PackageLoader(temp_dir)._parse_resources_from_data(data, "bad.yaml", "opnsense")

@@ -22,7 +22,9 @@ Plugin exemption (#790): the ``acmeclient/*`` controllers belong to the contrib 
 :attr:`EndpointKind.PLUGIN` and are skipped by the checks; a test asserts they are
 absent from the specs and that no endpoint that contacts a CA or a remote host
 (register, sign, revoke, removekey, automation, import, signallcerts, toggle) is ever
-registered.
+registered. The same holds for ``tailscale/*`` (#787, ``os-tailscale``): only settings,
+authentication, the subnet CRUD and ``service/reconfigure`` are registered, never an
+endpoint that starts the service or joins a tailnet.
 
 Strict mode of ``opnsense-openapi`` (``validate_endpoints=True``) stays off. It
 needs a known box version, but the wrapper builds the client with
@@ -454,6 +456,27 @@ ACMECLIENT_CERTIFICATE_TEMPLATE = Endpoint(
 )
 ACMECLIENT_ACTION_TEMPLATE = Endpoint("GET", "acmeclient/actions/get", EndpointKind.PLUGIN)
 
+# --- tailscale (#787, os-tailscale plugin) ----------------------------------------------
+# Probed on a test box: settings/get, authentication/get, settings/searchSubnet and
+# settings/getSubnet (the item template). The add, set and del subnet actions and
+# service/reconfigure are ASSUMED names, to be confirmed by a live write. Never
+# registered on purpose: status, up, login and any start/stop action; the provider does
+# not start the service or join a tailnet.
+TAILSCALE_SETTINGS_GET = Endpoint("GET", "tailscale/settings/get", EndpointKind.PLUGIN)
+TAILSCALE_SETTINGS_SET = Endpoint("POST", "tailscale/settings/set", EndpointKind.PLUGIN)
+TAILSCALE_AUTH_GET = Endpoint("GET", "tailscale/authentication/get", EndpointKind.PLUGIN)
+TAILSCALE_AUTH_SET = Endpoint("POST", "tailscale/authentication/set", EndpointKind.PLUGIN)
+TAILSCALE_SUBNET = _crud(
+    "tailscale/settings",
+    search="searchSubnet",
+    get=None,
+    add="addSubnet",
+    update="setSubnet",
+    delete="delSubnet",
+    kind=EndpointKind.PLUGIN,
+)
+TAILSCALE_RECONFIGURE = Endpoint("POST", "tailscale/service/reconfigure", EndpointKind.PLUGIN)
+
 # --- core -----------------------------------------------------------------------------
 CORE_MENU_SEARCH = Endpoint("GET", "core/menu/search")
 CORE_SYSTEM_STATUS = Endpoint("GET", "core/system/status")
@@ -608,6 +631,21 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
         ACMECLIENT_ACTION.search,
         ACMECLIENT_ACTION.read,
         ACMECLIENT_RECONFIGURE,
+    ),
+    # #787 (os-tailscale). Subnets live under the settings controller.
+    "tailscale.settings": (
+        TAILSCALE_SETTINGS_GET,
+        TAILSCALE_SETTINGS_SET,
+        TAILSCALE_RECONFIGURE,
+    ),
+    "tailscale.auth": (
+        TAILSCALE_AUTH_GET,
+        TAILSCALE_AUTH_SET,
+        TAILSCALE_RECONFIGURE,
+    ),
+    "tailscale.subnets": (
+        *TAILSCALE_SUBNET.all(),
+        TAILSCALE_RECONFIGURE,
     ),
 }
 

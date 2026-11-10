@@ -183,13 +183,14 @@ _ACME_FORBIDDEN = (
 )
 
 
-def test_plugin_entries_are_exactly_the_acmeclient_endpoints() -> None:
+def test_plugin_entries_are_exactly_the_contrib_plugin_endpoints() -> None:
     registered = endpoints.registered_endpoints()
     plugin = {e.template for e in registered if e.kind is EndpointKind.PLUGIN}
     assert plugin
-    assert all(t.startswith("acmeclient/") for t in plugin)
+    assert all(t.startswith(("acmeclient/", "tailscale/")) for t in plugin)
     stock = [e for e in registered if e.kind is EndpointKind.STOCK]
     assert not any(e.template.startswith("acmeclient/") for e in stock)
+    assert not any(e.template.startswith("tailscale/") for e in stock)
 
 
 def test_acmeclient_lists_register_update_not_set() -> None:
@@ -239,3 +240,43 @@ def test_firewall_categories_register_their_endpoints() -> None:
     # The marker helper's endpoints are the same values, so rules and NAT keep working.
     assert category.search == endpoints.CATEGORY_SEARCH
     assert category.add == endpoints.CATEGORY_ADD
+
+
+def test_tailscale_registers_exactly_the_expected_endpoints() -> None:
+    registered = {
+        (e.method, e.template)
+        for e in endpoints.registered_endpoints()
+        if e.template.startswith("tailscale/")
+    }
+    assert registered == {
+        ("GET", "tailscale/settings/get"),
+        ("POST", "tailscale/settings/set"),
+        ("GET", "tailscale/authentication/get"),
+        ("POST", "tailscale/authentication/set"),
+        ("POST", "tailscale/settings/searchSubnet"),
+        ("POST", "tailscale/settings/addSubnet"),
+        ("POST", "tailscale/settings/setSubnet/{uuid}"),
+        ("POST", "tailscale/settings/delSubnet/{uuid}"),
+        ("POST", "tailscale/service/reconfigure"),
+    }
+    assert all(
+        e.kind is EndpointKind.PLUGIN
+        for e in endpoints.registered_endpoints()
+        if e.template.startswith("tailscale/")
+    )
+
+
+def test_tailscale_types_register_their_endpoints() -> None:
+    types = endpoints.RESOURCE_TYPE_ENDPOINTS
+    assert types["tailscale.settings"] == (
+        endpoints.TAILSCALE_SETTINGS_GET,
+        endpoints.TAILSCALE_SETTINGS_SET,
+        endpoints.TAILSCALE_RECONFIGURE,
+    )
+    assert types["tailscale.auth"] == (
+        endpoints.TAILSCALE_AUTH_GET,
+        endpoints.TAILSCALE_AUTH_SET,
+        endpoints.TAILSCALE_RECONFIGURE,
+    )
+    assert endpoints.TAILSCALE_RECONFIGURE in types["tailscale.subnets"]
+    assert endpoints.TAILSCALE_SUBNET.add in types["tailscale.subnets"]

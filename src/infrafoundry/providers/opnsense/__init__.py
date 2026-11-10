@@ -163,6 +163,9 @@ class OPNsenseProvider(
         from .components.source_nat import SourceNatManager  # #1333
         from .components.static_route import StaticRouteManager
         from .components.syslog_settings import SyslogSettingsManager  # #804
+        from .components.tailscale_auth import TailscaleAuthManager  # #787
+        from .components.tailscale_settings import TailscaleSettingsManager  # #787
+        from .components.tailscale_subnets import TailscaleSubnetManager  # #787
         from .components.unbound_forward import UnboundForwardManager
         from .components.unbound_host_alias import UnboundHostAliasManager
         from .components.unbound_host_override import UnboundHostOverrideManager
@@ -197,6 +200,10 @@ class OPNsenseProvider(
             ("acmeclient.validations", AcmeClientValidationsManager),
             ("acmeclient.actions", AcmeClientActionsManager),
             ("acmeclient.certs", AcmeClientCertsManager),
+            # #787
+            ("tailscale.settings", TailscaleSettingsManager),
+            ("tailscale.auth", TailscaleAuthManager),
+            ("tailscale.subnets", TailscaleSubnetManager),
         ]
         for resource_type, manager_class in components:
             register_extractor(
@@ -304,6 +311,9 @@ class OPNsenseProvider(
         from .components.system_groups import GroupManager
         from .components.system_tuning import SystemTuningManager
         from .components.system_users import UserManager
+        from .components.tailscale_auth import TailscaleAuthManager  # #787
+        from .components.tailscale_settings import TailscaleSettingsManager  # #787
+        from .components.tailscale_subnets import TailscaleSubnetManager  # #787
         from .components.trust_ca import TrustCaManager
         from .components.trust_cert import TrustCertManager
         from .components.unbound_advanced import UnboundAdvancedManager
@@ -392,6 +402,11 @@ class OPNsenseProvider(
             "acmeclient.validations": AcmeClientValidationsManager,
             "acmeclient.actions": AcmeClientActionsManager,
             "acmeclient.certs": AcmeClientCertsManager,
+            # #787 (os-tailscale, installed by ``system.firmware``): settings, then auth,
+            # then the subnet list.
+            "tailscale.settings": TailscaleSettingsManager,
+            "tailscale.auth": TailscaleAuthManager,
+            "tailscale.subnets": TailscaleSubnetManager,
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
@@ -432,6 +447,9 @@ class OPNsenseProvider(
         - ``acmeclient_reconfigure`` (#790) — shared by the five ``acmeclient.*``
           managers so a single ``acmeclient/service/reconfigure`` call fires per apply.
 
+        - ``tailscale_reconfigure`` (#787) — shared by the three ``tailscale.*``
+          managers so a single ``tailscale/service/reconfigure`` call fires per apply.
+
         The mechanism is generic — future components with shared post-apply
         work register their own key here.
 
@@ -451,6 +469,7 @@ class OPNsenseProvider(
             "source_nat_apply": self._apply_source_nat,  # #1333
             "hostdiscovery_reconfigure": self._reconfigure_hostdiscovery,
             "acmeclient_reconfigure": self._reconfigure_acmeclient,  # #790
+            "tailscale_reconfigure": self._reconfigure_tailscale,  # #787
         }
 
     def check_endpoint_support(
@@ -650,6 +669,22 @@ class OPNsenseProvider(
         service = AcmeClientSettingsService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
+    def _reconfigure_tailscale(self, env_name: str) -> None:
+        """Reconfigure Tailscale after any settings, auth or subnet change (#787).
+
+        Used by :meth:`get_finalization_hooks` so one ``tailscale/service/reconfigure``
+        call fires per apply, shared by the three ``tailscale.*`` managers. The endpoint
+        was verified on a test firewall. Hook errors propagate,
+        failing the apply.
+
+        Args:
+            env_name: Active environment name.
+        """
+        from .services.tailscale_settings import TailscaleSettingsService
+
+        service = TailscaleSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
     def _reconfigure_hostdiscovery(self, env_name: str) -> None:
         """Reconfigure host discovery after a settings change (#792).
 
@@ -784,6 +819,10 @@ class OPNsenseProvider(
                 "acmeclient.validations",
                 "acmeclient.actions",
             ],
+            # #787
+            "tailscale.settings": [],
+            "tailscale.auth": [],
+            "tailscale.subnets": [],
         }
 
     @override

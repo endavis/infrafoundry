@@ -84,7 +84,7 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     # Singletons / surfaces from in-flight feature issues (ADR-0016).
     # #786 firewall_log
     "firewall.log": "dict",
-    # #787 tailscale (settings singleton + subnets/auth lists)
+    # #787 tailscale (settings and auth singletons, subnets list)
     "tailscale.settings": "dict",
     "tailscale.subnets": "list",
     "tailscale.auth": "dict",

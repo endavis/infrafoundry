@@ -34,6 +34,7 @@ from infrafoundry.providers.opnsense.components.openvpn_instances import OpenVpn
 from infrafoundry.providers.opnsense.components.openvpn_static_keys import (
     OpenVpnStaticKeyManager,
 )
+from infrafoundry.providers.opnsense.components.tailscale_subnets import TailscaleSubnetManager
 from infrafoundry.providers.opnsense.components.unbound_forward import UnboundForwardManager
 from infrafoundry.providers.opnsense.components.unbound_host_alias import (
     UnboundHostAliasManager,
@@ -81,6 +82,7 @@ class TestConfigKeyedManagers:
             acmeclient.AcmeClientValidationsManager,
             acmeclient.AcmeClientActionsManager,
             acmeclient.AcmeClientCertsManager,
+            TailscaleSubnetManager,
         ):
             assert manager.DELETE_SCOPE == "managed_set"
 
