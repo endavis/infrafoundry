@@ -523,7 +523,7 @@ A 404 on the first read at plan means `os-tailscale` is not installed. The plan 
 
 ### Node stays logged out after the key is set
 
-A box can stay out of the tailnet after `tailscale.auth` has written a valid, unused pre-auth key. The cause is in the plugin, not the provider. Its generated `/etc/rc.conf.d/tailscaled` passes `--auth-key` to `tailscale up` only when `/var/db/tailscale/tailscaled.state` exists and holds no `"_current-profile"`. That check came from opnsense/plugins#5047, the fix for a key being reused at boot (opnsense/plugins#4661). It was seen with os-tailscale 1.4 and tailscale 1.98.5_1 on OPNsense 26.1.11.
+A box can stay out of the tailnet after `tailscale.auth` has written a valid, unused pre-auth key. The cause is in the plugin, not the provider. Its generated `/etc/rc.conf.d/tailscaled` passes `--auth-key` to `tailscale up` only when `/var/db/tailscale/tailscaled.state` exists and holds no `"_current-profile"`. That check came from opnsense/plugins#5047, the fix for a key being reused at boot (opnsense/plugins#4661). It was seen with os-tailscale 1.4 and tailscale 1.98.5_1 on OPNsense 26.1.11, and is reported upstream as [opnsense/plugins#5903](https://github.com/opnsense/plugins/issues/5903). Once a plugin release fixes it, the recovery below is no longer needed.
 
 There are two cases:
 
