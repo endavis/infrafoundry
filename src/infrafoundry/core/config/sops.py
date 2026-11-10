@@ -11,6 +11,8 @@ from typing import Any
 
 import yaml
 
+from infrafoundry.core.config.yaml_loader import load_config_yaml
+
 
 def load_yaml_with_sops(file_path: Path) -> dict[str, Any]:
     """Load a YAML file, decrypting with SOPS if encrypted.
@@ -35,9 +37,9 @@ def load_yaml_with_sops(file_path: Path) -> dict[str, Any]:
             text=True,
             check=True,
         )
-        return yaml.safe_load(result.stdout) or {}
+        return load_config_yaml(result.stdout) or {}
 
-    return yaml.safe_load(raw) or {}
+    return load_config_yaml(raw) or {}
 
 
 def save_yaml_with_sops(

@@ -11,6 +11,7 @@ from typing import Any
 import jinja2
 import yaml
 
+from infrafoundry.core.config.yaml_loader import load_config_yaml
 from infrafoundry.core.exceptions import InvalidConfigurationError
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,7 @@ class InventoryGenerator:
             ) from e
 
         try:
-            data = yaml.safe_load(rendered_yaml)
+            data = load_config_yaml(rendered_yaml)
         except yaml.YAMLError as e:
             raise InvalidConfigurationError(f"Invalid YAML after rendering inventory: {e}") from e
 

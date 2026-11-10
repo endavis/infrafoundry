@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 
 from infrafoundry.core.config.manifest_utils import extract_inventory_block
+from infrafoundry.core.config.yaml_loader import load_config_yaml
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.requirements.models import BlueprintRequirements
 
@@ -247,7 +248,7 @@ class BlueprintResolver:
         text_without_inventory, inventory_raw = extract_inventory_block(file_text)
 
         try:
-            data = yaml.safe_load(text_without_inventory)
+            data = load_config_yaml(text_without_inventory)
         except yaml.YAMLError as e:
             raise InvalidConfigurationError(
                 f"Invalid YAML in blueprint manifest {manifest_path}: {e}"

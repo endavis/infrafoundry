@@ -25,6 +25,7 @@ from infrafoundry.core.config.filters import create_jinja2_env
 from infrafoundry.core.config.inventory_generator import InventoryGenerator
 from infrafoundry.core.config.manifest_utils import extract_inventory_block
 from infrafoundry.core.config.models import PackageManifest
+from infrafoundry.core.config.yaml_loader import load_config_yaml
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.secrets.provider import SecretProvider
@@ -461,7 +462,7 @@ class PackageLoader:
         text_without_inventory, inventory_raw = extract_inventory_block(file_text)
 
         try:
-            data = yaml.safe_load(text_without_inventory)
+            data = load_config_yaml(text_without_inventory)
         except yaml.YAMLError as e:
             raise InvalidConfigurationError(
                 f"Invalid YAML in package manifest {manifest_path}: {e}"
@@ -528,7 +529,7 @@ class PackageLoader:
 
         # Parse rendered content as YAML
         try:
-            data = yaml.safe_load(rendered)
+            data = load_config_yaml(rendered)
         except yaml.YAMLError as e:
             raise InvalidConfigurationError(
                 f"Invalid YAML after rendering {resource_path}: {e}"
