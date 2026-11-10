@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794321273611,
+  "lastUpdate": 1794322009554,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -899,6 +899,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001563092206132753",
             "extra": "mean: 62.024467373735035 usec\nrounds: 17348"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6bf753db3383cf7cecc527a6b005f04f48fbc884",
+          "message": "docs: troubleshoot os-tailscale nodes that stay logged out after the auth key is set (merges PR #1352, addresses #1351)\n\nAdd a \"Node stays logged out after the key is set\" section to the\nTailscale part of the OPNsense coverage page (#1351). The os-tailscale\nplugin passes --auth-key only when tailscaled.state exists and holds no\nprofile, so a missing state file skips the key on the first start, and\na stale profile left after a plugin removal or a deleted node skips it\nfor good. The section gives the status check, the second apply or\nreconfigure, and the SSH reset of the state file.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-10T14:46:09Z",
+          "tree_id": "b61a09309cd106a7c028bc89fe7d8a82a12178e9",
+          "url": "https://github.com/endavis/infrafoundry/commit/6bf753db3383cf7cecc527a6b005f04f48fbc884"
+        },
+        "date": 1794322009122,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14507.526182091036,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001702327602432288",
+            "extra": "mean: 68.92973946409005 usec\nrounds: 15898"
           }
         ]
       }
