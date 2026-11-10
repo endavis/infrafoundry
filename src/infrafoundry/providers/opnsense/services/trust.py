@@ -261,6 +261,22 @@ class Diff[C: (TrustCaConfig, TrustCertConfig)]:
 # ---------------------------------------------------------------------------
 
 
+def _refids_by_name(
+    type_name: str, resources: list[ResourceConfig], live: list[LiveTrustObject]
+) -> dict[str, str]:
+    """Map each ``type_name`` resource name to the ``refid`` of its live row."""
+    refid_by_descr = {row.description: row.refid for row in live if row.refid}
+    result: dict[str, str] = {}
+    for resource in resources:
+        if resource.type != type_name:
+            continue
+        description = description_of(resource.name, resource.config)
+        refid = refid_by_descr.get(description)
+        if refid:
+            result[resource.name] = refid
+    return result
+
+
 def ca_refids_by_name(
     ca_resources: list[ResourceConfig], live_cas: list[LiveTrustObject]
 ) -> dict[str, str]:
@@ -277,16 +293,26 @@ def ca_refids_by_name(
     Returns:
         ``{resource_name: refid}``.
     """
-    refid_by_descr = {live.description: live.refid for live in live_cas if live.refid}
-    result: dict[str, str] = {}
-    for resource in ca_resources:
-        if resource.type != "trust.cas":
-            continue
-        description = description_of(resource.name, resource.config)
-        refid = refid_by_descr.get(description)
-        if refid:
-            result[resource.name] = refid
-    return result
+    return _refids_by_name("trust.cas", ca_resources, live_cas)
+
+
+def cert_refids_by_name(
+    cert_resources: list[ResourceConfig], live_certs: list[LiveTrustObject]
+) -> dict[str, str]:
+    """Map each managed certificate resource name to the ``refid`` of its live row.
+
+    Counterpart of :func:`ca_refids_by_name` for anything that holds a ``cert_ref``
+    (the OpenVPN instances, #1320). A certificate with no live row, or a live row
+    with no ``refid``, is left out of the result.
+
+    Args:
+        cert_resources: ``trust.certs`` resources (secrets need not be resolved).
+        live_certs: Live certificate rows from :meth:`TrustService.search_certs`.
+
+    Returns:
+        ``{resource_name: refid}``.
+    """
+    return _refids_by_name("trust.certs", cert_resources, live_certs)
 
 
 def compute_diff[C: (TrustCaConfig, TrustCertConfig)](

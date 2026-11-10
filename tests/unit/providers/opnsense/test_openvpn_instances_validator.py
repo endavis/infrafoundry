@@ -32,6 +32,12 @@ def _ca(name: str = "vpn-ca") -> ResourceConfig:
     return ResourceConfig(name=name, type="trust.cas", provider="opnsense", config={"crt": "x"})
 
 
+def _cert(name: str = "vpn-cert") -> ResourceConfig:
+    return ResourceConfig(
+        name=name, type="trust.certs", provider="opnsense", config={"crt": "x", "ca_ref": "vpn-ca"}
+    )
+
+
 def _run(resources: list[ResourceConfig]) -> ValidationReport:
     report = ValidationReport()
     OpenVpnInstanceValidator(report).validate(
@@ -122,3 +128,25 @@ def test_flag_types() -> None:
 def test_duplicate_descriptions() -> None:
     report = _run([_ca(), _inst("a", description="Same"), _inst("b", description="Same")])
     assert _fails(report, "openvpn_instances_unique_descriptions")
+
+
+def test_cert_ref_valid_bare_and_absolute_forms() -> None:
+    for ref in ("vpn-cert", "trust.certs.vpn-cert"):
+        assert _failed(_run([_ca(), _cert(), _inst(cert_ref=ref)])) == [], ref
+
+
+def test_cert_ref_unknown_or_wrong_type_fails() -> None:
+    assert _fails(_run([_ca(), _inst(cert_ref="missing")]), "openvpn_instance_vpn-a_cert_ref")
+    # A name that only exists as a CA is not a certificate.
+    assert _fails(_run([_ca(), _inst(cert_ref="vpn-ca")]), "openvpn_instance_vpn-a_cert_ref")
+
+
+def test_cert_ref_type_errors() -> None:
+    for bad in ("", 5):
+        report = _run([_ca(), _cert(), _inst(cert_ref=bad)])
+        assert _fails(report, "openvpn_instance_vpn-a_cert_ref_type"), bad
+
+
+def test_cert_ref_absent_adds_no_check() -> None:
+    assert _failed(_run([_ca(), _inst()])) == []
+    assert _failed(_run([_ca(), _inst(cert_ref=None)])) == []

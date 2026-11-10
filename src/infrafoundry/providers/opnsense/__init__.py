@@ -367,7 +367,8 @@ class OPNsenseProvider(
             "cron.jobs": CronJobsManager,
             "trust.cas": TrustCaManager,
             "trust.certs": TrustCertManager,
-            # #808: client instances resolve ``ca_ref`` against trust.cas.
+            # #808, #1320: client instances resolve ``ca_ref`` against trust.cas and
+            # ``cert_ref`` against trust.certs.
             "openvpn.instances": OpenVpnInstanceManager,
             # #792: depends on interfaces.assignments for its interface list.
             "hostdiscovery": HostDiscoveryManager,
@@ -750,7 +751,7 @@ class OPNsenseProvider(
             "cron.jobs": [],
             "trust.cas": [],
             "trust.certs": ["trust.cas"],
-            "openvpn.instances": ["trust.cas"],
+            "openvpn.instances": ["trust.cas", "trust.certs"],
             "system.firmware": [],
             "system.tuning": [],
             # #805

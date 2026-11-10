@@ -18,6 +18,7 @@ from infrafoundry.providers.opnsense.services.trust import (
     TrustCertConfig,
     TrustService,
     ca_refids_by_name,
+    cert_refids_by_name,
     compute_diff,
     is_acme_issued_descr,
     normalize_pem,
@@ -215,6 +216,21 @@ def test_ca_refids_by_name() -> None:
     ]
     live = [_live("vpn.example.com CA", refid="abc123"), _live("noref", refid="")]
     assert ca_refids_by_name(cas, live) == {"vpn-ca": "abc123"}
+
+
+def test_cert_refids_by_name() -> None:
+    resources = [
+        _res("client", "trust.certs", crt=CRT, description="client.example.com"),
+        _res("no-live", "trust.certs", crt=CRT),
+        _res("empty-ref", "trust.certs", crt=CRT),
+        _res("vpn-ca", "trust.cas", crt=CRT),
+    ]
+    live = [
+        _live("client.example.com", refid="cert1"),
+        _live("empty-ref", refid=""),
+        _live("vpn-ca", refid="ca1"),
+    ]
+    assert cert_refids_by_name(resources, live) == {"client": "cert1"}
 
 
 class TestService:
