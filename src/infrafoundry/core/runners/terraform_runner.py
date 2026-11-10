@@ -27,6 +27,11 @@ from infrafoundry.core.types import ResourceOutcome
 logger = logging.getLogger(__name__)
 
 
+# Terraform's plan summary line. The import count is present only when an import is
+# pending: ``Plan: 1 to import, 4 to add, 1 to change, 0 to destroy.``
+_PLAN_LINE_RE = re.compile(
+    r"Plan: (?:(\d+) to import, )?(\d+) to add, (\d+) to change, (\d+) to destroy"
+)
 _SDN_OBJECT_TYPE = re.compile(r"^proxmox_sdn_(zone|vnet)")
 _SDN_APPLY_ADDRESS = "proxmox_sdn_applier.apply"
 _SDN_APPLIER_ADDRESSES = (_SDN_APPLY_ADDRESS, "proxmox_sdn_applier.finalize")
@@ -1040,7 +1045,7 @@ class TerraformRunner(BaseRunner):
                 pipe, and the embedded escapes block the regex match.
 
         Returns:
-            A short summary like ``"21 to add, 0 to change, 0 to destroy"``,
+            A short summary like ``"21 to add"``, ``"1 to import, 4 to add"``,
             ``"No changes"``, or ``"Unable to parse plan output"`` when
             neither marker is found.
         """
@@ -1050,18 +1055,20 @@ class TerraformRunner(BaseRunner):
         # No-op on already-clean strings.
         output = re.sub(r"\x1b\[[0-9;]*m", "", output)
 
-        plan_pattern = r"Plan: (\d+) to add, (\d+) to change, (\d+) to destroy"
-        match = re.search(plan_pattern, output)
+        match = _PLAN_LINE_RE.search(output)
 
         if match:
-            to_add = int(match.group(1))
-            to_change = int(match.group(2))
-            to_destroy = int(match.group(3))
+            to_import = int(match.group(1) or 0)
+            to_add = int(match.group(2))
+            to_change = int(match.group(3))
+            to_destroy = int(match.group(4))
 
             # Mirror parse_plan_for_drift's summary: omit zero-counts so
             # "Plan: 1 to add, 0 to change, 0 to destroy." renders as
             # "1 to add" rather than the noisier full triple.
             parts = []
+            if to_import > 0:
+                parts.append(f"{to_import} to import")
             if to_add > 0:
                 parts.append(f"{to_add} to add")
             if to_change > 0:
@@ -1094,6 +1101,7 @@ class TerraformRunner(BaseRunner):
         if plan_result.get("skipped"):
             return {
                 "has_changes": False,
+                "to_import": 0,
                 "to_add": 0,
                 "to_change": 0,
                 "to_destroy": 0,
@@ -1101,20 +1109,23 @@ class TerraformRunner(BaseRunner):
                 "raw_output": output,
             }
 
-        # Look for Terraform's plan summary line
-        plan_pattern = r"Plan: (\d+) to add, (\d+) to change, (\d+) to destroy"
-        match = re.search(plan_pattern, output)
+        # Look for Terraform's plan summary line. Real terraform output is coloured
+        # (see extract_plan_summary), so strip the escapes before matching; the
+        # raw output is still returned unchanged.
+        match = _PLAN_LINE_RE.search(re.sub(r"\x1b\[[0-9;]*m", "", output))
 
         if match:
-            to_add = int(match.group(1))
-            to_change = int(match.group(2))
-            to_destroy = int(match.group(3))
+            to_import = int(match.group(1) or 0)
+            to_add = int(match.group(2))
+            to_change = int(match.group(3))
+            to_destroy = int(match.group(4))
 
-            has_changes = (to_add + to_change + to_destroy) > 0
+            has_changes = (to_import + to_add + to_change + to_destroy) > 0
             summary = self.extract_plan_summary(output)
 
             return {
                 "has_changes": has_changes,
+                "to_import": to_import,
                 "to_add": to_add,
                 "to_change": to_change,
                 "to_destroy": to_destroy,
@@ -1126,6 +1137,7 @@ class TerraformRunner(BaseRunner):
         if "No changes" in output or "no changes are needed" in output.lower():
             return {
                 "has_changes": False,
+                "to_import": 0,
                 "to_add": 0,
                 "to_change": 0,
                 "to_destroy": 0,

@@ -427,6 +427,67 @@ class TestExtractPlanSummary:
         )
         assert TerraformRunner.extract_plan_summary(output) == "32 to add, 8 to change"
 
+    def test_summary_lists_import_before_other_counts(self) -> None:
+        """A pending import is listed first, in Terraform's order (#1353)."""
+        output = "Plan: 1 to import, 4 to add, 1 to change, 0 to destroy."
+        assert TerraformRunner.extract_plan_summary(output) == "1 to import, 4 to add, 1 to change"
+
+    def test_summary_for_import_only_plan(self) -> None:
+        """An import-only plan is not reported as unparsable or unchanged (#1353)."""
+        output = "Plan: 1 to import, 0 to add, 0 to change, 0 to destroy."
+        assert TerraformRunner.extract_plan_summary(output) == "1 to import"
+
+    def test_summary_for_ansi_coloured_import_line(self) -> None:
+        """Colour escapes around the import line are stripped before parsing (#1353)."""
+        output = (
+            "\x1b[1mPlan:\x1b[0m \x1b[0m1 to import, 4 to add, 1 to change, 0 to destroy.\x1b[0m\n"
+        )
+        assert TerraformRunner.extract_plan_summary(output) == "1 to import, 4 to add, 1 to change"
+
+    def test_summary_without_import_is_unchanged(self) -> None:
+        """A plan line with no import count keeps its existing summary (#1353)."""
+        output = "Plan: 4 to add, 1 to change, 0 to destroy."
+        assert TerraformRunner.extract_plan_summary(output) == "4 to add, 1 to change"
+
+    def test_drift_counts_import_only_plan(self, runner: TerraformRunner) -> None:
+        """An import-only plan reports the import and counts as a change (#1353)."""
+        output = "Plan: 1 to import, 0 to add, 0 to change, 0 to destroy."
+        drift = runner.parse_plan_for_drift({"success": True, "output": output})
+        assert drift["has_changes"] is True
+        assert drift.get("to_import") == 1
+        assert drift.get("to_add") == 0
+        assert drift.get("to_change") == 0
+        assert drift.get("to_destroy") == 0
+        assert drift["summary"] == "1 to import"
+        assert "parsed" not in drift
+
+    def test_drift_counts_import_with_changes(self, runner: TerraformRunner) -> None:
+        """Import plus other counts are all parsed from one plan line (#1353)."""
+        output = "Plan: 1 to import, 4 to add, 1 to change, 2 to destroy."
+        drift = runner.parse_plan_for_drift({"success": True, "output": output})
+        assert drift["has_changes"] is True
+        assert drift.get("to_import") == 1
+        assert drift.get("to_add") == 4
+        assert drift.get("to_change") == 1
+        assert drift.get("to_destroy") == 2
+        assert drift["summary"] == "1 to import, 4 to add, 1 to change, 2 to destroy"
+
+    def test_drift_to_import_is_zero_when_absent(self, runner: TerraformRunner) -> None:
+        """A plan line without an import count reports ``to_import`` as 0 (#1353)."""
+        output = "Plan: 1 to add, 0 to change, 0 to destroy."
+        drift = runner.parse_plan_for_drift({"success": True, "output": output})
+        assert drift.get("to_import") == 0
+
+    def test_drift_parses_ansi_coloured_plan_line(self, runner: TerraformRunner) -> None:
+        """Real terraform output is coloured; drift must still read the counts (#1353)."""
+        output = "\x1b[1mPlan:\x1b[0m 1 to import, 4 to add, 1 to change, 0 to destroy.\n"
+        drift = runner.parse_plan_for_drift({"success": True, "output": output})
+        assert drift["has_changes"] is True
+        assert drift.get("to_import") == 1
+        assert drift.get("to_add") == 4
+        assert drift.get("to_change") == 1
+        assert drift["raw_output"] == output
+
 
 class TestResolveTargets:
     """Tests for _resolve_terraform_targets."""
