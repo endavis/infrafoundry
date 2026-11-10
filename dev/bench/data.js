@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794306127333,
+  "lastUpdate": 1794308343080,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -775,6 +775,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001688060659838726",
             "extra": "mean: 63.94542347383266 usec\nrounds: 17151"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "db71ee4959e0f35c6bf22539df27d0fccbdac18f",
+          "message": "feat: manage opnsense firewall categories (merges PR #1346, addresses #1286)\n\nAdd firewall.categories, a list-shape, managed-set direct-API type over\nfirewall/category/*Item, with a validator, a config migrate extractor and\ndocs. Identity is the wire name (config.name, default the resource name);\nauto and color are compared, color without '#' and lowercase, which is\nhow the box stores it.\n\nThe provider's own infrafoundry marker category is dropped from every\ndiff, export and resource-id lookup, so it is never deleted or reported,\nand a resource may not use that name.\n\nRules and aliases reference categories by uuid, so only delete order\nmatters: the type is registered after rules, NAT and aliases and deletes\nafter them without a split phase. A category the box reports in use\n(HTTP 500, errorTitle \"... in use by:\") is kept with a warning, stays\nmanaged and is retried; any other delete failure raises.\n\nVerified live on a test firewall; ADR-0014, ADR-0018 and the coverage\ndoc record the results.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-10T10:58:24Z",
+          "tree_id": "a3d8a846dc55b36c143b868b715b2f06ba046095",
+          "url": "https://github.com/endavis/infrafoundry/commit/db71ee4959e0f35c6bf22539df27d0fccbdac18f"
+        },
+        "date": 1794308342457,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12672.186250532633,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000022002043448293524",
+            "extra": "mean: 78.91298156685224 usec\nrounds: 13888"
           }
         ]
       }
