@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794308343080,
+  "lastUpdate": 1794310533269,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -806,6 +806,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000022002043448293524",
             "extra": "mean: 78.91298156685224 usec\nrounds: 13888"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "05fc2438a836b0203ff54c99b0871d8cda205edb",
+          "message": "feat: manage the opnsense os-tailscale plugin (settings, auth, subnets) (merges PR #1347, addresses #787)\n\nAdd three direct-API types for the os-tailscale plugin, all plugin-kind\nendpoints under tailscale/*:\n\n- tailscale.settings: singleton; snake_case YAML mapped to the wire, only\n  declared fields compared, enable_snat inverting disableSNAT. The write\n  drops the nested subnets node so the subnet list is never clobbered;\n  use_exit_node is checked against the live offers.\n- tailscale.auth: singleton; pre_auth_key must be a secret:// URI (a literal\n  is a validator error). The live key is echoed by the box and compared;\n  update_pre_auth_key forces a re-send. The write never echoes the live key,\n  and the key is never logged, raised or shown (plan shows [REDACTED]).\n- tailscale.subnets: managed-set list keyed by the normalized CIDR, with\n  description compared; IPv4 and IPv6 share the subnet4 envelope.\n\nThe three share a tailscale_reconfigure finalization hook, run after\nsystem.firmware, tolerate a missing plugin at plan with a warning, and\nhave config migrate extractors (auth writes only a secret placeholder).\n\nVerified live on a test firewall with the plugin installed for the test,\nTailscale disabled and a throwaway key; ADR-0014, ADR-0018 and the\ncoverage doc record the results.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-10T11:34:51Z",
+          "tree_id": "7af43e93fadbe79bac849159abc7dbfbc32635d4",
+          "url": "https://github.com/endavis/infrafoundry/commit/05fc2438a836b0203ff54c99b0871d8cda205edb"
+        },
+        "date": 1794310532585,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14835.818872103622,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000022740625585907413",
+            "extra": "mean: 67.40443575247065 usec\nrounds: 16273"
           }
         ]
       }
