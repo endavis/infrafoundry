@@ -149,6 +149,18 @@ def _get_orchestrator(
     except ImportError:
         pass
 
+    try:
+        from infrafoundry.providers.tailscale import TailscaleProvider
+
+        orchestrator.register_provider(
+            TailscaleProvider(
+                config_dir=config_manager.base_dir,
+                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+            )
+        )
+    except ImportError:
+        pass
+
     return orchestrator
 
 
