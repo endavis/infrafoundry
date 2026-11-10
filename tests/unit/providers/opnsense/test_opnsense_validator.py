@@ -267,6 +267,24 @@ class TestValidateReferences:
 
         assert validator.openvpn_static_key_validator.validate.call_args.args[0].resources == [key]
 
+    def test_dispatches_firewall_categories(self, validator: OPNsenseValidator) -> None:
+        """The category validator receives only its own resource slice (#1286)."""
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "api_url": "https://opnsense.example.com",
+                "api_key": "key",
+                "api_secret": "secret",
+            }
+        )
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
+        validator.firewall_category_validator = MagicMock()
+        cat = ResourceConfig(name="c", type="firewall.categories", provider="opnsense", config={})
+        other = ResourceConfig(name="g", type="system.groups", provider="opnsense", config={})
+
+        validator.validate_references([cat, other])
+
+        assert validator.firewall_category_validator.validate.call_args.args[0].resources == [cat]
+
     def test_exception_caught_gracefully(self, validator: OPNsenseValidator) -> None:
         """Exceptions during validation are caught and reported."""
         validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]

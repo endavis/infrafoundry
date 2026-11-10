@@ -151,6 +151,7 @@ class OPNsenseProvider(
         from .components.acmeclient_settings import AcmeClientSettingsManager
         from .components.alias import AliasManager
         from .components.cron_jobs import CronJobsManager
+        from .components.firewall_categories import FirewallCategoryManager  # #1286
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
         from .components.hostdiscovery import HostDiscoveryManager
@@ -178,6 +179,7 @@ class OPNsenseProvider(
             ("firewall.source_nat", SourceNatManager),  # #1333
             ("firewall.nat", NATRuleManager),
             ("firewall.rules", FirewallRuleManager),
+            ("firewall.categories", FirewallCategoryManager),  # #1286
             ("routing.gateways", GatewayManager),
             ("routing.static", StaticRouteManager),
             ("interfaces.virtual_ips", VirtualIPManager),
@@ -281,6 +283,7 @@ class OPNsenseProvider(
         from .components.acmeclient_settings import AcmeClientSettingsManager
         from .components.alias import AliasManager
         from .components.cron_jobs import CronJobsManager
+        from .components.firewall_categories import FirewallCategoryManager  # #1286
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
         from .components.hostdiscovery import HostDiscoveryManager
@@ -337,6 +340,8 @@ class OPNsenseProvider(
         # ``unbound_host_override`` is applied before ``unbound_host_alias``
         # so a brand-new override exists on the box before any aliases
         # reference it (#776).
+        # ``firewall.categories`` (#1286) follows rules, NAT and aliases, so its deletes
+        # run after theirs without a split phase; a category still in use is kept.
         return {
             "system.firmware": SystemFirmwareManager,
             "system.tuning": SystemTuningManager,
@@ -354,6 +359,9 @@ class OPNsenseProvider(
             "routing.gateways": GatewayManager,
             "routing.static": StaticRouteManager,
             "firewall.rules": FirewallRuleManager,
+            # #1286: references to a category are uuids, so only delete order matters.
+            # Placed after rules, NAT and aliases, it deletes after them without a split.
+            "firewall.categories": FirewallCategoryManager,
             "interfaces.virtual_ips": VirtualIPManager,
             "unbound.host_overrides": UnboundHostOverrideManager,
             "unbound.host_aliases": UnboundHostAliasManager,
@@ -756,6 +764,7 @@ class OPNsenseProvider(
             "trust.cas": [],
             "trust.certs": ["trust.cas"],
             "openvpn.static_keys": [],  # #1319
+            "firewall.categories": [],  # #1286: references are uuids, not names
             "openvpn.instances": ["trust.cas", "trust.certs", "openvpn.static_keys"],
             "system.firmware": [],
             "system.tuning": [],

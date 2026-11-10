@@ -21,6 +21,7 @@ from infrafoundry.providers.opnsense.api_client import OPNsenseClient
 from infrafoundry.providers.opnsense.validators import (
     AcmeClientValidator,
     CronJobsValidator,
+    FirewallCategoryValidator,  # #1286
     FirewallRuleValidator,
     GatewayValidator,
     HostDiscoveryValidator,
@@ -119,6 +120,7 @@ class OPNsenseValidator:
         self.trust_validator = TrustValidator(report)
         self.openvpn_instance_validator = OpenVpnInstanceValidator(report)
         self.openvpn_static_key_validator = OpenVpnStaticKeyValidator(report)  # #1319
+        self.firewall_category_validator = FirewallCategoryValidator(report)  # #1286
         self.acmeclient_validator = AcmeClientValidator(report)  # #790
         self.system_firmware_validator = SystemFirmwareValidator(report)
         self.system_tuning_validator = SystemTuningValidator(report)
@@ -389,6 +391,9 @@ class OPNsenseValidator:
             self.openvpn_static_key_validator.validate(
                 replace(context, resources=resource_refs["openvpn_static_keys"])
             )
+            self.firewall_category_validator.validate(
+                replace(context, resources=resource_refs["firewall_categories"])
+            )
             self.acmeclient_validator.validate(
                 replace(context, resources=resource_refs["acmeclient"])
             )
@@ -451,6 +456,7 @@ class OPNsenseValidator:
         trust = [r for r in resources if r.type in {"trust.cas", "trust.certs"}]
         openvpn_instances = [r for r in resources if r.type == "openvpn.instances"]
         openvpn_static_keys = [r for r in resources if r.type == "openvpn.static_keys"]
+        firewall_categories = [r for r in resources if r.type == "firewall.categories"]
         acmeclient = [r for r in resources if r.type.startswith("acmeclient.")]
         system_firmware = [r for r in resources if r.type == "system.firmware"]
         system_tuning = [r for r in resources if r.type == "system.tuning"]
@@ -508,6 +514,7 @@ class OPNsenseValidator:
             "trust": trust,
             "openvpn_instances": openvpn_instances,
             "openvpn_static_keys": openvpn_static_keys,
+            "firewall_categories": firewall_categories,
             "acmeclient": acmeclient,
             "system_firmware": system_firmware,
             "system_tuning": system_tuning,

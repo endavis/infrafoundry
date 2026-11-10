@@ -383,6 +383,40 @@ class TestMigrateFirewallRulesEmitsNested:
         assert {(r.name, r.type) for r in parsed} == {("lan-allow", "firewall.rules")}
 
 
+class TestMigrateFirewallCategoriesEmitsNested:
+    SERVICE_PATH = (
+        "infrafoundry.providers.opnsense.components.firewall_categories.FirewallCategoryService"
+    )
+
+    def test_firewall_categories_emit_nested(self, tmp_path: Path) -> None:
+        from infrafoundry.providers.opnsense.components.firewall_categories import (
+            FirewallCategoryManager,
+        )
+        from infrafoundry.providers.opnsense.services.firewall_categories import (
+            FirewallCategoryService,
+        )
+
+        client = MagicMock()
+        client.request.return_value = {
+            "rows": [
+                {"uuid": "u0", "name": "infrafoundry", "auto": "0", "color": ""},
+                {"uuid": "u1", "name": "Lab Servers", "auto": "1", "color": "336699"},
+            ]
+        }
+        manager = FirewallCategoryManager(tmp_path)
+        with patch(self.SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = FirewallCategoryService(client)
+            yaml_text = manager.migrate("test-env")
+
+        leaf = _assert_nested_path_present(yaml_text, "firewall.categories", expected_shape="list")
+        assert [entry["name"] for entry in leaf] == ["lab-servers"]
+        assert leaf[0]["config"] == {"name": "Lab Servers", "auto": True, "color": "336699"}
+        _assert_no_flat_resources_key(yaml_text)
+
+        parsed = _round_trip(yaml_text, "firewall_categories.yaml")
+        assert {(r.name, r.type) for r in parsed} == {("lab-servers", "firewall.categories")}
+
+
 # ---------------------------------------------------------------------------
 # 6. routing.gateways -- GatewayManager
 # ---------------------------------------------------------------------------
@@ -1029,6 +1063,7 @@ class TestDottedTypeRegistrySanity:
         "trust.certs",
         "openvpn.instances",
         "openvpn.static_keys",
+        "firewall.categories",
         "acmeclient.accounts",
         "acmeclient.validations",
         "acmeclient.actions",

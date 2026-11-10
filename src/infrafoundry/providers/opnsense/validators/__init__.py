@@ -8,6 +8,9 @@ from infrafoundry.providers.opnsense.validators._xref import (
 from infrafoundry.providers.opnsense.validators.acmeclient_validator import AcmeClientValidator
 from infrafoundry.providers.opnsense.validators.alias_validator import AliasValidator
 from infrafoundry.providers.opnsense.validators.cron_jobs_validator import CronJobsValidator
+from infrafoundry.providers.opnsense.validators.firewall_categories_validator import (
+    FirewallCategoryValidator,
+)
 from infrafoundry.providers.opnsense.validators.firewall_rule_validator import (
     FirewallRuleValidator,
 )
@@ -76,6 +79,7 @@ __all__ = [
     "AcmeClientValidator",
     "AliasValidator",
     "CronJobsValidator",
+    "FirewallCategoryValidator",
     "FirewallRuleValidator",
     "GatewayValidator",
     "HostDiscoveryValidator",

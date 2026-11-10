@@ -19,6 +19,7 @@ EXPECTED_RESOURCE_TYPES = [
     "cron.jobs",
     "firewall.aliases",
     "firewall.rules",
+    "firewall.categories",
     "routing.gateways",
     "interfaces.assignments",
     "isc_to_kea",

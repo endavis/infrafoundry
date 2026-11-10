@@ -24,6 +24,9 @@ from infrafoundry.providers.opnsense.components import (
     kea_dhcp6_reservation,
     kea_dhcp6_subnet,
 )
+from infrafoundry.providers.opnsense.components.firewall_categories import (
+    FirewallCategoryManager,
+)
 from infrafoundry.providers.opnsense.components.interface_assignment import (
     InterfaceAssignmentManager,
 )
@@ -73,6 +76,7 @@ class TestConfigKeyedManagers:
             kea_dhcp6_reservation.KeaDHCPv6ReservationManager,
             OpenVpnInstanceManager,
             OpenVpnStaticKeyManager,
+            FirewallCategoryManager,
             acmeclient.AcmeClientAccountsManager,
             acmeclient.AcmeClientValidationsManager,
             acmeclient.AcmeClientActionsManager,

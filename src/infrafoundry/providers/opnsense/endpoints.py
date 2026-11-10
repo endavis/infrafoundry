@@ -384,8 +384,10 @@ SOURCE_NAT_SET = Endpoint("POST", "firewall/source_nat/set")
 ONE_TO_ONE = _rules("firewall/one_to_one")
 # OPNsense routes DNatController as ``d_nat`` (not ``dnat``).
 D_NAT = _rules("firewall/d_nat")
-CATEGORY_SEARCH = Endpoint("POST", "firewall/category/searchItem")
-CATEGORY_ADD = Endpoint("POST", "firewall/category/addItem")
+# Categories (#1286): model data, so no reconfigure. The marker helper uses search and add.
+CATEGORY = _item_crud("firewall/category", reconfigure=False)
+CATEGORY_SEARCH = CATEGORY.search
+CATEGORY_ADD = CATEGORY.add
 
 # --- interfaces -----------------------------------------------------------------------
 INTERFACES_INFO = Endpoint("GET", "interfaces/overview/interfacesInfo")
@@ -525,6 +527,8 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
         CATEGORY_ADD,
     ),
     "firewall.rules": (*FILTER.all(), CATEGORY_SEARCH, CATEGORY_ADD),
+    # #1286
+    "firewall.categories": CATEGORY.all(),
     "routing.gateways": GATEWAY.all(),
     "routing.static": STATIC_ROUTE.all(),
     "unbound.host_overrides": (*UNBOUND_HOST_OVERRIDE.all(), UNBOUND_RECONFIGURE),
