@@ -12,7 +12,7 @@ from typing import IO, Any, cast, override
 from rich.console import Console
 from rich.markup import escape
 
-from infrafoundry.core.exceptions import FilteredDestroyRefusedError
+from infrafoundry.core.exceptions import FilteredDestroyRefusedError, TerraformError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.result_types import (
     ApplyResult,
@@ -807,6 +807,46 @@ class TerraformRunner(BaseRunner):
         ]
         if sdn_names:
             raise FilteredDestroyRefusedError(self._refusal_message(sdn_names))
+
+    def forget_kept_on_destroy(
+        self, provider: ProviderBase, resources: list[ResourceConfig]
+    ) -> list[str]:
+        """Remove the addresses the provider keeps on destroy from state (#1349).
+
+        Args:
+            provider: Provider whose resources are being destroyed
+            resources: The resources this destroy covers
+
+        Returns:
+            Addresses removed from state
+
+        Raises:
+            TerraformError: If init or ``state rm`` fails; destroying would
+                otherwise delete what the user asked to keep
+        """
+        # Providers are pluggable: one that does not derive from ProviderBase may
+        # lack the hook, or return something other than a list. Keep nothing then.
+        hook = getattr(provider, "get_state_addresses_kept_on_destroy", None)
+        raw = hook(resources) if callable(hook) else None
+        addresses = [a for a in raw if isinstance(a, str)] if isinstance(raw, list | tuple) else []
+        if not addresses:
+            return []
+        tf_dir = provider.terraform_dir
+        init_result = self.initialize(tf_dir)
+        if not init_result.get("success"):
+            raise TerraformError(
+                f"Could not initialize {tf_dir} to keep {', '.join(addresses)} on destroy"
+            )
+        in_state = set(self.state_list(tf_dir))
+        removed: list[str] = []
+        for addr in addresses:
+            if addr not in in_state:
+                continue
+            if not self.state_rm(tf_dir, addr):
+                raise TerraformError(f"Could not remove {addr} from state; refusing to destroy it")
+            self.console.print(f"Keeping {addr}: removed from state, not destroyed")
+            removed.append(addr)
+        return removed
 
     def _resolve_terraform_targets(
         self, tf_dir: Path, resource_names: list[str], command: str = "apply"

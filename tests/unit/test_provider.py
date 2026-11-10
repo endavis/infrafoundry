@@ -120,3 +120,14 @@ class TestUnsupportedResourceReason:
         assert (
             message == "Resource 'res' has type 't.y', which provider 'opn' does not support: why"
         )
+
+
+class TestStateAddressesKeptOnDestroy:
+    """Optional get_state_addresses_kept_on_destroy hook (#1349)."""
+
+    def test_base_default_is_empty(self, tmp_path: Path) -> None:
+        provider = StubProviderImplementation("stub", tmp_path, tmp_path)
+        res = ResourceConfig(name="r", type="t", provider="stub", config={})
+
+        assert provider.get_state_addresses_kept_on_destroy([]) == []
+        assert provider.get_state_addresses_kept_on_destroy([res]) == []

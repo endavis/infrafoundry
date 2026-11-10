@@ -2683,3 +2683,96 @@ def test_apply_skips_finder_for_unsafe_runs(console: Console, kwargs: dict[str, 
 
     finder.assert_not_called()
     assert "opnsense" not in apply_serial.call_args.args[2]
+
+
+def _forget_orchestrator(
+    console: Console, tf_runner: MagicMock, resources: list[ResourceConfig], provider: MagicMock
+) -> tuple[DestroyOrchestrator, MagicMock]:
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 50
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    providers = cast("dict[str, ProviderBase]", {"proxmox": provider})
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=lambda env: (resources, {"proxmox": resources}),
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"][:1], len(resources))
+        ],
+        get_current_user=lambda: "tester",
+    )
+    orchestrator.runners = cast("dict[str, BaseRunner]", {"terraform": tf_runner})
+    return orchestrator, event_manager
+
+
+def _forget_runner() -> MagicMock:
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.is_iac_runner = True
+    tf_runner.destroy = MagicMock(return_value={"success": True})
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
+    # Set explicitly: runtime protocols use static lookup, which misses MagicMock's
+    # auto-created attributes.
+    tf_runner.forget_kept_on_destroy = MagicMock(return_value=[])
+    return tf_runner
+
+
+def test_destroy_forgets_kept_resources_before_destroy(console: Console) -> None:
+    """forget_kept_on_destroy gets the batch resources and runs before runner.destroy (#1349)."""
+    tf_runner = _forget_runner()
+    parent = MagicMock()
+    parent.attach_mock(tf_runner.forget_kept_on_destroy, "forget")
+    parent.attach_mock(tf_runner.destroy, "tf_destroy")
+    provider = MagicMock()
+    resources = [_resource("vm1"), _resource("vm2")]
+    orchestrator, _ = _forget_orchestrator(console, tf_runner, resources, provider)
+
+    orchestrator.destroy(
+        env_name="dev", resource_filter=None, auto_approve=True, confirm_callback=lambda: True
+    )
+
+    # The batch is narrowed to the first resource, as a filter would do.
+    tf_runner.forget_kept_on_destroy.assert_called_once_with(provider, resources[:1])
+    names = [c[0] for c in parent.mock_calls]
+    assert names.index("forget") < names.index("tf_destroy")
+
+
+def test_destroy_forget_failure_skips_destroy(console: Console) -> None:
+    """A TerraformError from the forget step stops the destroy and emits RUNNER_FAILED."""
+    from infrafoundry.core.exceptions import TerraformError
+
+    tf_runner = _forget_runner()
+    tf_runner.forget_kept_on_destroy.side_effect = TerraformError("cannot remove from state")
+    orchestrator, event_manager = _forget_orchestrator(
+        console, tf_runner, [_resource("vm1")], MagicMock()
+    )
+
+    with pytest.raises(TerraformError):
+        orchestrator.destroy(
+            env_name="dev", resource_filter=None, auto_approve=True, confirm_callback=lambda: True
+        )
+
+    tf_runner.destroy.assert_not_called()
+    emitted = [c[0][0] for c in event_manager.emit_event.call_args_list]
+    assert EventType.RUNNER_FAILED in emitted
+
+
+def test_destroy_skips_forget_when_runner_lacks_method(console: Console) -> None:
+    """A runner without forget_kept_on_destroy still destroys."""
+    tf_runner = MagicMock(spec=["priority", "is_iac_runner", "destroy"])
+    tf_runner.priority = 0
+    tf_runner.is_iac_runner = True
+    tf_runner.destroy = MagicMock(return_value={"success": True, "exit_code": 0})
+    orchestrator, _ = _forget_orchestrator(console, tf_runner, [_resource("vm1")], MagicMock())
+
+    orchestrator.destroy(
+        env_name="dev", resource_filter=None, auto_approve=True, confirm_callback=lambda: True
+    )
+
+    tf_runner.destroy.assert_called_once()

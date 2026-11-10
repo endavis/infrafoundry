@@ -194,12 +194,13 @@ device_tags:
   - name: fw-test-tags
     device_id: "example-device-id"
     tags: ["tag:server"]
+    keep_tags_on_destroy: true  # optional; see below
 ```
 
 Each resource owns the device's full set of routes or tags, so at most one `device_subnet_routes` and one `device_tags` resource may point at a device. Routes must be CIDRs with no host bits set.
 
 !!! warning "Destroying `device_tags` on a tagged node fails"
-    Destroying a `device_tags` resource clears the device's tags. For a node that joined with a tagged auth key, the Tailscale API refuses that with `tagged nodes cannot be untagged without reauth (400)`, and `foundry infra destroy` stops. Delete the device from the tailnet first, or remove the resource from state with `terraform state rm tailscale_device_tags.<name>`.
+    Destroying a `device_tags` resource clears the device's tags. For a node that joined with a tagged auth key, the Tailscale API refuses that with `tagged nodes cannot be untagged without reauth (400)`, and `foundry infra destroy` stops. Set `keep_tags_on_destroy: true` on the resource: `foundry infra destroy` then removes `tailscale_device_tags.<name>` from state instead of clearing the tags, so the device keeps them. The destroy prints `Keeping tailscale_device_tags.<name>: removed from state, not destroyed` and completes; this was verified against a node that joined with a tagged key. The field takes effect on the next destroy and needs no apply first. Without it, destroy clears the tags as before. For a resource applied without the field, the manual fallback is to delete the device from the tailnet first, or to run `terraform state rm tailscale_device_tags.<name>`.
 
 ### Joining an OPNsense node with a minted key
 

@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from infrafoundry.core.protocols import HasSnippetStrictness, VerifiesDestroy
+from infrafoundry.core.protocols import ForgetsKeptOnDestroy, HasSnippetStrictness, VerifiesDestroy
 from infrafoundry.core.runners.ansible_runner import AnsibleRunner
 from infrafoundry.core.runners.terraform_runner import TerraformRunner
 
@@ -51,3 +51,8 @@ def test_terraform_runner_verifies_destroy_and_ansible_does_not() -> None:
     """The destroy workflow's defense-in-depth check still runs for terraform only."""
     assert isinstance(TerraformRunner(), VerifiesDestroy)
     assert not isinstance(AnsibleRunner(), VerifiesDestroy)
+
+
+def test_terraform_runner_forgets_kept_on_destroy_and_ansible_does_not() -> None:
+    assert isinstance(TerraformRunner(), ForgetsKeptOnDestroy)
+    assert not isinstance(AnsibleRunner(), ForgetsKeptOnDestroy)

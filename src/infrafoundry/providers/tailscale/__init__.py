@@ -144,6 +144,22 @@ class TailscaleProvider(
         }
 
     @override
+    def get_state_addresses_kept_on_destroy(self, resources: list[ResourceConfig]) -> list[str]:
+        """Return the ``device_tags`` addresses opted out of destroy (#1349).
+
+        Args:
+            resources: The resources this destroy covers.
+
+        Returns:
+            Terraform addresses of ``device_tags`` with ``keep_tags_on_destroy: true``.
+        """
+        return [
+            f"tailscale_device_tags.{r.name.replace('-', '_')}"
+            for r in resources
+            if r.type == "device_tags" and r.config.get("keep_tags_on_destroy") is True
+        ]
+
+    @override
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* variables, resolving ``secret://`` URIs in the settings."""
         return self.build_terraform_env_vars(

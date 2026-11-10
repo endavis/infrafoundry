@@ -347,3 +347,29 @@ class TestCredentials:
     def test_env_fallbacks_suppress_warning(self) -> None:
         assert not _warnings(self._run({}, env_oauth=True))
         assert not _warnings(self._run({}, env_api_key=True))
+
+
+class TestKeepTagsOnDestroy:
+    def _validate(self, value: Any) -> set[str]:
+        report = ValidationReport()
+        DeviceReferenceValidator(report).validate(
+            _ctx(
+                [
+                    res(
+                        "t",
+                        "device_tags",
+                        device={"hostname": "fw-test"},
+                        tags=["tag:server"],
+                        keep_tags_on_destroy=value,
+                    )
+                ]
+            )
+        )
+        return _errors(report)
+
+    def test_non_bool_is_error(self) -> None:
+        assert self._validate("yes") == {"tailscale_keep_tags_t"}
+
+    def test_bool_passes(self) -> None:
+        assert not self._validate(True)
+        assert not self._validate(False)

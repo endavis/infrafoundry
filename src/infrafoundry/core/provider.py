@@ -165,6 +165,21 @@ class ProviderBase(ABC):
         """
         return {}
 
+    def get_state_addresses_kept_on_destroy(self, resources: list[ResourceConfig]) -> list[str]:
+        """List Terraform addresses to drop from state before a destroy.
+
+        Optional hook (#1349). A Terraform runner removes these addresses from
+        state before ``terraform destroy`` so the remote object outlives the
+        destroy instead of being deleted.
+
+        Args:
+            resources: The resources this destroy covers (already filtered)
+
+        Returns:
+            Terraform resource addresses to forget; empty by default
+        """
+        return []
+
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* environment variables for this provider.
 

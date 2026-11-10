@@ -29,6 +29,7 @@ from infrafoundry.core.protocols import (
     ChecksFilteredDestroy,
     Destroyable,
     DispatchesManagedSet,
+    ForgetsKeptOnDestroy,
     Plannable,
     ValidatesReferencesInContext,
     VerifiesDestroy,
@@ -1467,6 +1468,8 @@ class DestroyOrchestrator(HookExecutionMixin):
                     )
 
                     try:
+                        if isinstance(runner, ForgetsKeptOnDestroy):
+                            runner.forget_kept_on_destroy(provider, resources)
                         runner_result = runner.destroy(
                             provider,
                             auto_approve=auto_approve,
