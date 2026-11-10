@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794322009554,
+  "lastUpdate": 1794322593486,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -930,6 +930,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001702327602432288",
             "extra": "mean: 68.92973946409005 usec\nrounds: 15898"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f47d8aec67a05cd49ebb063556a49a17ce2fc7e2",
+          "message": "docs: link the upstream os-tailscale auth-key report from the troubleshooting section (merges PR #1355, addresses #1354)\n\nPoint the \"Node stays logged out after the key is set\" section at the\nupstream os-tailscale report, so readers can follow the fix and drop\nthe recovery steps once a plugin release ships it (#1354).\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-10T14:55:48Z",
+          "tree_id": "9badaf7ff8b60bf29c0b6dc821e0cfbc59429d87",
+          "url": "https://github.com/endavis/infrafoundry/commit/f47d8aec67a05cd49ebb063556a49a17ce2fc7e2"
+        },
+        "date": 1794322592589,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7851.536163827301,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000904485550308424",
+            "extra": "mean: 127.36361129011742 usec\nrounds: 8379"
           }
         ]
       }
