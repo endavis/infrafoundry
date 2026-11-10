@@ -106,6 +106,9 @@ class DriftInfo(TypedDict):
     summary: str
     """Human-readable drift summary."""
 
+    to_import: NotRequired[int]
+    """Number of existing resources the plan would import into state."""
+
     to_add: NotRequired[int]
     """Number of resources the plan would create."""
 

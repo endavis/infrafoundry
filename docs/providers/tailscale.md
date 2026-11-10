@@ -133,9 +133,6 @@ Resource files are Jinja-rendered. If a HuJSON block contains `{{`, `{%` or `{#`
 
 A new `tailscale_acl` needs one of two things, or the provider refuses to take over the existing policy: import it with `import_id: acl`, or set `overwrite_existing_content: true`, which can overwrite the policy file. The import id `acl` was confirmed by the live test: the first plan reads `1 to import`, and the import is a no-op on later runs.
 
-!!! note "Plan summary with an import"
-    When an import is pending, `foundry infra plan` prints `terraform: Unable to parse plan output` instead of a summary. The shared runner's summary does not recognise Terraform's `Plan: N to import, ...` line. The plan itself is correct and `apply` performs the import.
-
 Destroying an `acl` without `reset_acl_on_destroy` only removes it from state; the policy stays in the tailnet as last applied.
 
 !!! warning "Resetting on destroy opens access"
