@@ -6,12 +6,11 @@ Loads resources from envs/{env}/resources/*.yaml files.
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from infrafoundry.core.config.package_loader import (
     NESTED_PROVIDER_NAMESPACE,
     PackageLoader,
 )
+from infrafoundry.core.config.yaml_loader import load_config_yaml
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 
@@ -79,7 +78,7 @@ class ResourceCentricLoader:
                 ``opnsense:`` with other top-level keys.
         """
         with open(config_file) as f:
-            data = yaml.safe_load(f)
+            data = load_config_yaml(f)
 
         if not data:
             return []
