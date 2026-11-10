@@ -43,6 +43,14 @@ that certificate's live ``refid``, sent as ``cert``. Omitted, ``cert`` is neithe
 nor compared, so a certificate set by hand is never cleared. Certificate-only,
 username/password-only and combined authentication all work.
 
+Static key
+----------
+
+``tls_key_ref`` is optional and names an ``openvpn.static_keys`` resource (#1319). It
+resolves to that key's live ``uuid``, sent as ``tls_key``. Omitted, ``tls_key`` is
+neither sent nor compared, so a key set by hand is never cleared. ``tls_key`` is
+keyed by the static key's uuid (verified on a test firewall).
+
 Secrets
 -------
 
@@ -158,6 +166,7 @@ ALLOWED_KEYS: frozenset[str] = frozenset(
         "description",
         "ca_ref",
         "cert_ref",
+        "tls_key_ref",
         "update_password",
         "lock",
         *SECRET_FIELDS,
@@ -171,7 +180,7 @@ REJECTED_KEY_HINTS: dict[str, str] = {
     "role": "only client instances are managed; the role is always client",
     "ca": "use 'ca_ref' with the name of a trust.cas resource",
     "cert": "use 'cert_ref' with the name of a trust.certs resource",
-    "tls_key": "static keys are not managed yet (follow-up)",
+    "tls_key": "use 'tls_key_ref' with the name of an openvpn.static_keys resource",
     "data-ciphers": "use 'data_ciphers'",
     "data-ciphers-fallback": "use 'data_ciphers_fallback'",
     "reneg-sec": "use 'reneg_sec'",
@@ -248,6 +257,9 @@ class OpenVpnInstanceConfig:
         cert_ref: Optional name of the ``trust.certs`` resource, resolved to the
             certificate refid at apply and sent as ``cert``. Empty: ``cert`` is
             neither sent nor compared.
+        tls_key_ref: Optional name of the ``openvpn.static_keys`` resource, resolved
+            to the static key uuid at apply and sent as ``tls_key``. Empty:
+            ``tls_key`` is neither sent nor compared.
         username: Plaintext username (never logged or shown in ``repr``), or empty.
         password: Plaintext password (never compared, logged or shown in ``repr``).
         update_password: Send ``password`` on update too.
@@ -259,6 +271,7 @@ class OpenVpnInstanceConfig:
     fields: tuple[tuple[str, str], ...] = ()
     ca_ref: str = ""
     cert_ref: str = ""
+    tls_key_ref: str = ""
     username: str = field(default="", repr=False)
     password: str = field(default="", repr=False)
     update_password: bool = False
@@ -276,12 +289,15 @@ class OpenVpnInstanceConfig:
         include_password: bool = False,
         default_vpnid: str = "",
         cert_refid: str = "",
+        tls_key_uuid: str = "",
     ) -> dict[str, Any]:
         """Serialize to the ``add``/``set`` envelope.
 
         Args:
             ca_refid: Resolved CA refid; omitted when empty.
             cert_refid: Resolved certificate refid; omitted when empty.
+            tls_key_uuid: Resolved static key uuid, sent as ``tls_key``; omitted
+                when empty.
             include_password: Add ``password`` (when set). True on add; on update
                 only with ``update_password``.
             default_vpnid: ``vpnid`` to send when the config sets none (allocated on
@@ -298,6 +314,8 @@ class OpenVpnInstanceConfig:
             body["ca"] = ca_refid
         if cert_refid:
             body["cert"] = cert_refid
+        if tls_key_uuid:
+            body["tls_key"] = tls_key_uuid
         if self.username:
             body["username"] = self.username
         if include_password and self.password:
@@ -375,6 +393,7 @@ def changed_fields(
     want: OpenVpnInstanceConfig,
     ca_refid: str = "",
     cert_refid: str = "",
+    tls_key_uuid: str = "",
 ) -> list[str]:
     """Return the wire keys whose live value differs from the desired one.
 
@@ -384,6 +403,8 @@ def changed_fields(
         ca_refid: Resolved refid of ``want.ca_ref``; empty skips the CA comparison.
         cert_refid: Resolved refid of ``want.cert_ref``; empty skips the certificate
             comparison.
+        tls_key_uuid: Resolved uuid of ``want.tls_key_ref``; empty skips the static
+            key comparison.
 
     Returns:
         Field names only, never values (some are secrets). ``password`` appears
@@ -405,6 +426,8 @@ def changed_fields(
         changed.append("ca")
     if cert_refid and flatten_option(have.raw.get("cert")).strip() != cert_refid:
         changed.append("cert")
+    if tls_key_uuid and flatten_option(have.raw.get("tls_key")).strip() != tls_key_uuid:
+        changed.append("tls_key")
     if want.username and flatten_option(have.raw.get("username")).strip() != want.username:
         changed.append("username")
     if want.update_password and want.password:
@@ -420,6 +443,7 @@ def compute_diff(
     managed_keys: set[str] | None = None,
     ca_refids: Mapping[str, str] | None = None,
     cert_refids: Mapping[str, str] | None = None,
+    static_key_uuids: Mapping[str, str] | None = None,
 ) -> Diff:
     """Compare desired client instances to live instances, keyed by description.
 
@@ -435,6 +459,8 @@ def compute_diff(
             is not compared.
         cert_refids: ``cert_ref`` name to live certificate refid. A ``cert_ref``
             missing from it is not compared.
+        static_key_uuids: ``tls_key_ref`` name to live static key uuid. A
+            ``tls_key_ref`` missing from it is not compared.
 
     Returns:
         The diff.
@@ -445,6 +471,7 @@ def compute_diff(
     """
     refids = ca_refids or {}
     cert_ids = cert_refids or {}
+    key_uuids = static_key_uuids or {}
     clients: dict[str, LiveOpenVpnInstance] = {}
     server_keys: set[str] = set()
     for live in current:
@@ -478,6 +505,7 @@ def compute_diff(
             want,
             refids.get(want.ca_ref, "") if want.ca_ref else "",
             cert_ids.get(want.cert_ref, "") if want.cert_ref else "",
+            key_uuids.get(want.tls_key_ref, "") if want.tls_key_ref else "",
         ):
             diff.updates.append((have, want))
 
@@ -589,6 +617,11 @@ def _build_config(name: str, config: dict[str, Any]) -> OpenVpnInstanceConfig:
         cert_ref = ""
     elif not isinstance(cert_ref, str) or not cert_ref:
         raise ValueError(f"{label} 'cert_ref' must be a non-empty string")
+    tls_key_ref = config.get("tls_key_ref")
+    if tls_key_ref is None:
+        tls_key_ref = ""
+    elif not isinstance(tls_key_ref, str) or not tls_key_ref:
+        raise ValueError(f"{label} 'tls_key_ref' must be a non-empty string")
     if not config.get("remote"):
         raise ValueError(f"{label} requires a non-empty 'remote' list")
 
@@ -611,6 +644,7 @@ def _build_config(name: str, config: dict[str, Any]) -> OpenVpnInstanceConfig:
         fields=tuple(sorted(values.items())),
         ca_ref=ca_ref,
         cert_ref=cert_ref,
+        tls_key_ref=tls_key_ref,
         username=secrets["username"],
         password=secrets["password"],
         update_password=bool(config.get("update_password", False)),
@@ -667,6 +701,7 @@ class OpenVpnInstanceService(BaseService):
         vpnid: str = "",
         *,
         cert_refid: str = "",
+        tls_key_uuid: str = "",
     ) -> dict[str, Any]:
         """Create a client instance; raises when OPNsense rejects it.
 
@@ -675,6 +710,7 @@ class OpenVpnInstanceService(BaseService):
             ca_refid: Resolved CA refid.
             vpnid: Allocated ``vpnid``, used when the config sets none.
             cert_refid: Resolved certificate refid, when ``cert_ref`` is set.
+            tls_key_uuid: Resolved static key uuid, when ``tls_key_ref`` is set.
         """
         ep = endpoints.OPENVPN_INSTANCE.add
         response = self.client.request(
@@ -685,6 +721,7 @@ class OpenVpnInstanceService(BaseService):
                 include_password=True,
                 default_vpnid=vpnid,
                 cert_refid=cert_refid,
+                tls_key_uuid=tls_key_uuid,
             ),
         )
         raise_on_failed_write(response, f"add openvpn instance {config.name!r}")
@@ -698,6 +735,7 @@ class OpenVpnInstanceService(BaseService):
         vpnid: str = "",
         *,
         cert_refid: str = "",
+        tls_key_uuid: str = "",
     ) -> dict[str, Any]:
         """Update a client instance by UUID; raises when OPNsense rejects it.
 
@@ -707,6 +745,7 @@ class OpenVpnInstanceService(BaseService):
             ca_refid: Resolved CA refid.
             vpnid: Live ``vpnid``, sent when the config sets none.
             cert_refid: Resolved certificate refid, when ``cert_ref`` is set.
+            tls_key_uuid: Resolved static key uuid, when ``tls_key_ref`` is set.
         """
         ep = endpoints.OPENVPN_INSTANCE.update
         response = self.client.request(
@@ -717,6 +756,7 @@ class OpenVpnInstanceService(BaseService):
                 include_password=config.update_password,
                 default_vpnid=vpnid,
                 cert_refid=cert_refid,
+                tls_key_uuid=tls_key_uuid,
             ),
         )
         raise_on_failed_write(response, f"update openvpn instance {config.name!r}")
@@ -755,6 +795,7 @@ class OpenVpnInstanceService(BaseService):
         managed_keys: set[str] | None = None,
         ca_refids: Mapping[str, str] | None = None,
         cert_refids: Mapping[str, str] | None = None,
+        static_key_uuids: Mapping[str, str] | None = None,
     ) -> Diff:
         """Service-method form of :func:`compute_diff`."""
         return compute_diff(
@@ -764,6 +805,7 @@ class OpenVpnInstanceService(BaseService):
             managed_keys=managed_keys,
             ca_refids=ca_refids,
             cert_refids=cert_refids,
+            static_key_uuids=static_key_uuids,
         )
 
     def apply_diff(
@@ -771,6 +813,7 @@ class OpenVpnInstanceService(BaseService):
         diff: Diff,
         ca_refids: Mapping[str, str] | None = None,
         cert_refids: Mapping[str, str] | None = None,
+        static_key_uuids: Mapping[str, str] | None = None,
     ) -> dict[str, int]:
         """Dispatch the diff. The caller reconfigures through the finalization hook.
 
@@ -778,19 +821,22 @@ class OpenVpnInstanceService(BaseService):
             diff: The diff to apply.
             ca_refids: ``ca_ref`` name to live CA refid.
             cert_refids: ``cert_ref`` name to live certificate refid.
+            static_key_uuids: ``tls_key_ref`` name to live static key uuid.
 
         Returns:
             ``{"created": N, "updated": M, "deleted": K}``.
 
         Raises:
             ReferenceValidationError: If an added or updated instance's ``ca_ref``
-                has no live CA, or its ``cert_ref`` has no live certificate. Checked
-                before any write.
+                has no live CA, or its ``cert_ref`` has no live certificate, or its
+                ``tls_key_ref`` has no live static key. Checked before any write.
         """
         refids = ca_refids or {}
         cert_ids = cert_refids or {}
         resolved: dict[str, str] = {}
         resolved_certs: dict[str, str] = {}
+        resolved_keys: dict[str, str] = {}
+        key_ids = static_key_uuids or {}
         for config in [*diff.adds, *(want for _, want in diff.updates)]:
             if config.ca_ref not in refids:
                 raise ReferenceValidationError(
@@ -798,14 +844,21 @@ class OpenVpnInstanceService(BaseService):
                     f"match any live CA; apply the trust.cas resource first"
                 )
             resolved[config.name] = refids[config.ca_ref]
-            if not config.cert_ref:
-                continue
-            if config.cert_ref not in cert_ids:
-                raise ReferenceValidationError(
-                    f"openvpn instance '{config.name}' cert_ref '{config.cert_ref}' does not "
-                    f"match any live certificate; apply the trust.certs resource first"
-                )
-            resolved_certs[config.name] = cert_ids[config.cert_ref]
+            if config.cert_ref:
+                if config.cert_ref not in cert_ids:
+                    raise ReferenceValidationError(
+                        f"openvpn instance '{config.name}' cert_ref '{config.cert_ref}' does "
+                        f"not match any live certificate; apply the trust.certs resource first"
+                    )
+                resolved_certs[config.name] = cert_ids[config.cert_ref]
+            if config.tls_key_ref:
+                if config.tls_key_ref not in key_ids:
+                    raise ReferenceValidationError(
+                        f"openvpn instance '{config.name}' tls_key_ref '{config.tls_key_ref}' "
+                        f"does not match any live static key; apply the openvpn.static_keys "
+                        f"resource first"
+                    )
+                resolved_keys[config.name] = key_ids[config.tls_key_ref]
 
         taken = [*diff.live_vpnids]
         desired = [*diff.adds, *(want for _, want in diff.updates), *(w for w, _ in diff.locked)]
@@ -826,13 +879,20 @@ class OpenVpnInstanceService(BaseService):
                 resolved[config.name],
                 allocated,
                 cert_refid=resolved_certs.get(config.name, ""),
+                tls_key_uuid=resolved_keys.get(config.name, ""),
             )
             created += 1
         for live, want in diff.updates:
             logger.info(
                 "opnsense openvpn.instances: updating %s (fields: %s)",
                 want.name,
-                changed_fields(live, want, resolved[want.name], resolved_certs.get(want.name, "")),
+                changed_fields(
+                    live,
+                    want,
+                    resolved[want.name],
+                    resolved_certs.get(want.name, ""),
+                    resolved_keys.get(want.name, ""),
+                ),
             )
             self.update(
                 live.uuid,
@@ -840,6 +900,7 @@ class OpenVpnInstanceService(BaseService):
                 resolved[want.name],
                 live.vpnid,
                 cert_refid=resolved_certs.get(want.name, ""),
+                tls_key_uuid=resolved_keys.get(want.name, ""),
             )
             updated += 1
         for live in diff.deletes:

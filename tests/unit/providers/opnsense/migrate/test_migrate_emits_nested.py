@@ -1028,6 +1028,7 @@ class TestDottedTypeRegistrySanity:
         "trust.cas",
         "trust.certs",
         "openvpn.instances",
+        "openvpn.static_keys",
         "acmeclient.accounts",
         "acmeclient.validations",
         "acmeclient.actions",

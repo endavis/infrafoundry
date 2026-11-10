@@ -78,6 +78,8 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     "trust.certs": "list",
     # #808 OpenVPN client instances (modern MVC ``openvpn.instances``, list)
     "openvpn.instances": "list",
+    # #1319 OpenVPN static keys (``openvpn.static_keys``, list)
+    "openvpn.static_keys": "list",
     # Singletons / surfaces from in-flight feature issues (ADR-0016).
     # #786 firewall_log
     "firewall.log": "dict",

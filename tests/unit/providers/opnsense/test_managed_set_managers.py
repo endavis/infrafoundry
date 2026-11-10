@@ -28,6 +28,9 @@ from infrafoundry.providers.opnsense.components.interface_assignment import (
     InterfaceAssignmentManager,
 )
 from infrafoundry.providers.opnsense.components.openvpn_instances import OpenVpnInstanceManager
+from infrafoundry.providers.opnsense.components.openvpn_static_keys import (
+    OpenVpnStaticKeyManager,
+)
 from infrafoundry.providers.opnsense.components.unbound_forward import UnboundForwardManager
 from infrafoundry.providers.opnsense.components.unbound_host_alias import (
     UnboundHostAliasManager,
@@ -69,6 +72,7 @@ class TestConfigKeyedManagers:
             kea_dhcp4_reservation.KeaDHCPv4ReservationManager,
             kea_dhcp6_reservation.KeaDHCPv6ReservationManager,
             OpenVpnInstanceManager,
+            OpenVpnStaticKeyManager,
             acmeclient.AcmeClientAccountsManager,
             acmeclient.AcmeClientValidationsManager,
             acmeclient.AcmeClientActionsManager,

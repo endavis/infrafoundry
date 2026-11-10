@@ -2,8 +2,8 @@
 
 Loads the environment's secret tree once, resolves every ``secret://env_secrets/...``
 URI in the config of the resources of one type, and returns copies. The originals
-are untouched. Used by the ``system_users``, ``openvpn_instances`` and ``virtual_ip``
-managers; tests patch ``_secrets.ConfigManager``.
+are untouched. Used by the ``system_users``, ``openvpn_instances``,
+``openvpn_static_keys`` and ``virtual_ip`` managers; tests patch ``_secrets.ConfigManager``.
 """
 
 from __future__ import annotations

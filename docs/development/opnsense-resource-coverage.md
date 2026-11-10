@@ -52,6 +52,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<system>/group` | `system.groups` | Supported (direct-API; #805). `gid` is assigned by the box and is not configurable. Groups own membership: `member_refs` name `system.users` resources and are written as uids. Applied after `system.users`; group deletes run before user deletes. See [ADR-0014 system.users and system.groups](../decisions/0014-opnsense-direct-api-apply-mechanism.md#systemusers-and-systemgroups-805). |
 | `<ca>`, `<cert>`, `<OPNsense>/trust` (MVC `trust/ca/*`, `trust/cert/*`) | `trust.cas`, `trust.certs` | Supported (direct-API; #807). Identity is the live `descr` against the YAML `description` (default: the resource name). `prv` should be a `secret://` URI. Deletes use the managed set; objects the box reports in use, and CAs that look AcmeClient-issued, are never deleted. No `config migrate` extractor. Several behaviours are not verified yet, see [Trust CAs and certificates (#807)](#trust-cas-and-certificates-807). |
 | `<OPNsense>/OpenVPN` (MVC `openvpn/instances/*`) | `openvpn.instances` | Supported (direct-API; #808). Client instances only; server instances are not managed and are never touched. Identity is the live `description` (default: the resource name). `username` and `password` are `secret://` URIs. `ca_ref` names a `trust.cas` resource and the optional `cert_ref` a `trust.certs` resource. Deletes use the managed set. No `config migrate` extractor. Add, update, delete and `cert_ref` are verified live, see [OpenVPN client instances (#808)](#openvpn-client-instances-808). |
+| `<OPNsense>/OpenVPN` static keys (MVC `openvpn/instances/*StaticKey`) | `openvpn.static_keys` | Supported (direct-API; #1319). A tls-auth, tls-crypt or tls-crypt-v2 key an instance references with `tls_key_ref`. Identity is the live `description` (default: the resource name). `key` is a `secret://` URI; `mode` is required. Deletes use the managed set, and a key a live instance still references is kept. No `config migrate` extractor. See [OpenVPN static keys (#1319)](#openvpn-static-keys-1319). |
 | `<openvpn>` (legacy `os-openvpn-legacy` plugin) | none | Unmanaged. A cutover recreates the client as a modern `openvpn.instances` entry; import any legacy server or other legacy configuration by hand. |
 | `<OPNsense>/AcmeClient` (`os-acme-client` plugin, `acmeclient/*`) | `acmeclient.settings`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs` | Supported (direct-API; #790). The wire `name` is the identity (the CN for certs), and certs reference accounts, validations and actions by handle. Secret fields take `secret://` URIs. The four list types delete only managed rows; `config migrate` extractors exist for all five. The plugin comes from `system.firmware`; its renewal cron job is plugin-managed. Add, update, delete, re-plan and `config migrate` are verified live; `fetchCronIntegration` is not. See [ACME client (#790)](#acme-client-790). |
 | `<OPNsense>/tailscale` | `tailscale_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#787](https://github.com/endavis/infrafoundry/issues/787) ships. |
@@ -308,6 +309,7 @@ opnsense:
 | `topology` | `net30`, `p2p` or `subnet`. |
 | `ca_ref` | Required. Name of the `trust.cas` resource; resolved to the live CA `refid` (sent as wire `ca`). |
 | `cert_ref` | Optional. Name of the `trust.certs` resource; resolved to the live certificate `refid` (sent as wire `cert`). Omitted: `cert` is neither sent nor compared, so a certificate set by hand is never cleared. Certificate-only, username/password-only and combined authentication all work. |
+| `tls_key_ref` | Optional. Name of the `openvpn.static_keys` resource ([#1319](#openvpn-static-keys-1319)); resolved to the live static key `uuid` (sent as wire `tls_key`). Omitted: `tls_key` is neither sent nor compared, so a key set by hand is never cleared. |
 | `username`, `password` | `secret://env_secrets/<path>` URIs; a literal is a validation error. `password` is write-only: never compared, sent on add and on update only with `update_password: true`. |
 | `update_password` | Boolean; send `password` on update too. |
 | `auth` | Auth digest name. |
@@ -321,11 +323,11 @@ opnsense:
 | `verb` | Log verbosity, integer 0-11. |
 | `lock` | Never add, update or delete. |
 
-Fields are sparse: only the ones you set are written and compared. `uuid` is assigned by the box and rejected, as are `role`, `ca`, `cert` (use `cert_ref`), `tls_key` and the hyphenated wire spellings.
+Fields are sparse: only the ones you set are written and compared. `uuid` is assigned by the box and rejected, as are `role`, `ca`, `cert` (use `cert_ref`), `tls_key` (use `tls_key_ref`) and the hyphenated wire spellings.
 
-**Not managed (follow-ups).** `tls_key` (a reference to a static key, which needs its own `openvpn.static_keys` type), and server instances. Messages and logs name the resource and field and never include `username` or `password`.
+**Not managed (follow-ups).** Server instances. Messages and logs name the resource and field and never include `username` or `password`.
 
-**Order and pending references.** CAs and certificates are applied before instances, and instances are deleted before certificates and CAs. A plan for an instance whose `ca_ref` CA or `cert_ref` certificate is not on the box yet shows an add plus a warning; at apply an unresolved `ca_ref` or `cert_ref` raises an error before any write. The `trust.certs` search runs only when an instance sets `cert_ref`. Changes are applied with one `openvpn/service/reconfigure` call after the instance writes.
+**Order and pending references.** CAs, certificates and static keys are applied before instances, and instances are deleted before them. A plan for an instance whose `ca_ref` CA, `cert_ref` certificate or `tls_key_ref` static key is not on the box yet shows an add plus a warning; at apply an unresolved `ca_ref`, `cert_ref` or `tls_key_ref` raises an error before any write. The `trust.certs` search runs only when an instance sets `cert_ref`, and the static-key search only when one sets `tls_key_ref`. Changes are applied with one `openvpn/service/reconfigure` call after the instance writes.
 
 **What is verified.** A live plan and apply on a test firewall, with a throwaway disabled client and CA that were removed afterwards:
 
@@ -342,6 +344,57 @@ Fields are sparse: only the ones you set are written and compared. `uuid` is ass
 - a re-plan is idempotent;
 - pointing `cert_ref` at the second certificate is one update, and `cert` then selects that certificate;
 - removing the config deletes the instance, then both certificates, then the CA, and none of them is left on the box.
+
+## OpenVPN static keys (#1319)
+
+`openvpn.static_keys` manages the static keys (tls-auth, tls-crypt, tls-crypt-v2) that an OpenVPN instance references through `tls_key`. They live in a sub-API of the instances controller: `openvpn/instances/{search,get,add,set,del}StaticKey`. It is a list-shape, managed-set type ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). An instance names a key with `tls_key_ref`.
+
+```yaml
+opnsense:
+  openvpn:
+    static_keys:
+      - name: office-tls-key
+        config:
+          description: Office tls-crypt key
+          mode: crypt
+          key: secret://env_secrets/openvpn/office/tls_key
+    instances:
+      - name: office-vpn
+        config:
+          ca_ref: vpn-ca
+          tls_key_ref: office-tls-key
+          remote:
+            - vpn.example.com
+```
+
+| Field | Meaning |
+| --- | --- |
+| `description` | Wire `description` and the identity. Defaults to the resource `name`. A changed description is a delete plus an add; two live keys with the same description raise a drift error. |
+| `mode` | Required. `auth`, `crypt` or `crypt-v2`. Always sent and compared: the model's empty template silently selects `crypt`, and a wrong mode breaks the tunnel. |
+| `key` | Required. A `secret://env_secrets/<path>` URI; a literal is a validation error. After resolution it must be a PEM-style block with BEGIN and END markers. |
+| `update_key` | Boolean. Send `key` on update too, whatever the comparison found. |
+| `lock` | Never add, update or delete. |
+
+`uuid` is assigned by the box and rejected, as are unknown keys. The `genKey` endpoint is not used: the key comes from the secret.
+
+**Key comparison.** `key` is compared only when the live row returns a non-empty value. Only the `-----BEGIN`..`-----END` block counts, whitespace-normalized, so the `#` comment header that `genKey` and `openvpn --genkey` write does not read as drift. The box echoes the key (verified), so a changed key is detected and sent automatically; `update_key: true` only matters on a box that does not return it, where the key is otherwise sent on add only. Key material is never logged, put in an error message or shown in a `repr`; messages name the resource and the field only.
+
+**In-use guard.** A managed static key that a live instance of any role (client or server) still points at through `tls_key` is not deleted. It is kept with a warning and reported as unresolved, so it stays managed and the next apply retries. The guard reads the instances only when the diff has deletes (and on destroy). When one apply switches an instance to a new key and drops the old key from YAML, the old key is kept and removed on the next apply.
+
+**Order.** Static keys are applied before instances and, because instances split their deletes, deleted after them. Static keys depend on no other table type, so they do not split their own deletes. Changes are applied with one shared `openvpn/service/reconfigure` call.
+
+**What is verified.** A live plan and apply on a test firewall, with a throwaway CA, two generated static keys (kept as `secret://` URIs) and a disabled client instance, all removed afterwards:
+
+- the first plan shows adds for the CA, the key and the instance, with pending-reference warnings on the instance; the apply adds all three and runs one `openvpn/service/reconfigure`;
+- `getStaticKey/{uuid}` echoes `key`, and `searchStaticKey` rows carry `uuid`, `description`, `mode`, `%mode` and `key`;
+- the instance's `tls_key` is a reference option keyed by static key `uuid`, and it selects the key named by `tls_key_ref`;
+- a re-plan is idempotent, including for a key stored with its `#` comment header;
+- a `mode` change is one update; pointing `key` at the second secret is one in-place update (same `uuid`, the instance still references it), detected without `update_key`;
+- dropping the key from YAML while the live instance still references it keeps the key with a warning on every run;
+- removing everything deletes the instance first, then the key and the CA, and nothing is left on the box;
+- no key text appears in plan or apply output.
+
+**Not verified:** `crypt-v2` is accepted but has not been tried on a box, and tunnel behaviour, since the test client stayed disabled.
 
 The password reads back from the API, but it is not compared; use `update_password` to rotate it. **Not verified:** whether `mssfix` takes an integer, and tunnel behaviour, since the test client stayed disabled.
 
@@ -524,7 +577,7 @@ opnsense:
 
 **Two kinds of type.**
 
-- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.instances`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions` and `acmeclient.certs`.
+- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.static_keys`, `openvpn.instances`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions` and `acmeclient.certs`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
 - **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `firewall.source_nat`, `acmeclient.settings`, `radvd`) are unaffected.
 

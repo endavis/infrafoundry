@@ -292,6 +292,7 @@ class OPNsenseProvider(
         from .components.kea_dhcp6_subnet import KeaDHCPv6SubnetManager
         from .components.nat_rule import NATRuleManager
         from .components.openvpn_instances import OpenVpnInstanceManager
+        from .components.openvpn_static_keys import OpenVpnStaticKeyManager
         from .components.radvd import RadvdManager
         from .components.source_nat import SourceNatManager  # #1333
         from .components.static_route import StaticRouteManager
@@ -367,8 +368,10 @@ class OPNsenseProvider(
             "cron.jobs": CronJobsManager,
             "trust.cas": TrustCaManager,
             "trust.certs": TrustCertManager,
-            # #808, #1320: client instances resolve ``ca_ref`` against trust.cas and
-            # ``cert_ref`` against trust.certs.
+            # #1319: static keys apply before the instances that reference them.
+            "openvpn.static_keys": OpenVpnStaticKeyManager,
+            # #808, #1320, #1319: client instances resolve ``ca_ref`` against trust.cas,
+            # ``cert_ref`` against trust.certs and ``tls_key_ref`` against static keys.
             "openvpn.instances": OpenVpnInstanceManager,
             # #792: depends on interfaces.assignments for its interface list.
             "hostdiscovery": HostDiscoveryManager,
@@ -415,7 +418,8 @@ class OPNsenseProvider(
           when the host-discovery settings changed.
 
         - ``openvpn_reconfigure`` (#808) — fired by :class:`OpenVpnInstanceManager`
-          so a single ``openvpn/service/reconfigure`` call fires per apply.
+          so a single ``openvpn/service/reconfigure`` call fires per apply. The
+          :class:`OpenVpnStaticKeyManager` (#1319) shares the key; the runner dedupes it.
 
         - ``acmeclient_reconfigure`` (#790) — shared by the five ``acmeclient.*``
           managers so a single ``acmeclient/service/reconfigure`` call fires per apply.
@@ -546,7 +550,7 @@ class OPNsenseProvider(
         service.reconfigure()
 
     def _reconfigure_openvpn(self, env_name: str) -> None:
-        """Reconfigure OpenVPN after any client-instance mutation (#808).
+        """Reconfigure OpenVPN after any client-instance or static-key mutation (#808, #1319).
 
         Used by :meth:`get_finalization_hooks` so the direct-API runner fires a
         single ``openvpn/service/reconfigure`` call after the instance adds,
@@ -751,7 +755,8 @@ class OPNsenseProvider(
             "cron.jobs": [],
             "trust.cas": [],
             "trust.certs": ["trust.cas"],
-            "openvpn.instances": ["trust.cas", "trust.certs"],
+            "openvpn.static_keys": [],  # #1319
+            "openvpn.instances": ["trust.cas", "trust.certs", "openvpn.static_keys"],
             "system.firmware": [],
             "system.tuning": [],
             # #805

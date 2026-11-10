@@ -249,6 +249,24 @@ class TestValidateReferences:
             instance
         ]
 
+    def test_dispatches_openvpn_static_keys(self, validator: OPNsenseValidator) -> None:
+        """The static-key validator receives only its own resource slice (#1319)."""
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "api_url": "https://opnsense.example.com",
+                "api_key": "key",
+                "api_secret": "secret",
+            }
+        )
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
+        validator.openvpn_static_key_validator = MagicMock()
+        key = ResourceConfig(name="k", type="openvpn.static_keys", provider="opnsense", config={})
+        other = ResourceConfig(name="g", type="system.groups", provider="opnsense", config={})
+
+        validator.validate_references([key, other])
+
+        assert validator.openvpn_static_key_validator.validate.call_args.args[0].resources == [key]
+
     def test_exception_caught_gracefully(self, validator: OPNsenseValidator) -> None:
         """Exceptions during validation are caught and reported."""
         validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
