@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794325732182,
+  "lastUpdate": 1794330817131,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -992,6 +992,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006697823397866848",
             "extra": "mean: 101.82497705548404 usec\nrounds: 10460"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3a5087be023dd91a0df11a9f3cfd8b557cc7402c",
+          "message": "perf: parse config yaml with libyaml when available (merges PR #1357, addresses #243)\n\nProfiling config loading showed ~94% of the time in PyYAML's pure-Python\nparser; only the requested environment is read, no file is parsed twice,\nand glob() is negligible, so the lazy loading and glob caching #243 first\nproposed would save nothing. The issue was re-scoped to the parser.\n\n- New core/config/yaml_loader.load_config_yaml parses with\n  yaml.CSafeLoader when PyYAML has libyaml, else yaml.SafeLoader. The\n  choice is made per call so tests can simulate a build without libyaml.\n- The eight parse sites under core/config/ (sops, provider- and\n  resource-centric loaders, package loader, blueprint resolver,\n  inventory generator) use it. core/secrets is unchanged.\n- Callers still get yaml.YAMLError; libyaml's error text has no source\n  snippet or caret but keeps line and column.\n- New config-loading benchmark (20 envs, 250 resources): mean 62.96 ms\n  -> 11.48 ms against the saved baseline.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-10T17:12:53Z",
+          "tree_id": "0a3c434f7225770888b386c56405641be9207809",
+          "url": "https://github.com/endavis/infrafoundry/commit/3a5087be023dd91a0df11a9f3cfd8b557cc7402c"
+        },
+        "date": 1794330816421,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 65.99803111230324,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00025157906213473967",
+            "extra": "mean: 15.151967159420028 msec\nrounds: 69"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10558.443651287242,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000026019468107006485",
+            "extra": "mean: 94.71092833630685 usec\nrounds: 10940"
           }
         ]
       }
