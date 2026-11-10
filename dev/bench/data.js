@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794304517805,
+  "lastUpdate": 1794306127333,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -744,6 +744,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000921138901553702",
             "extra": "mean: 128.3701361406802 usec\nrounds: 8359"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ad00509415329ee276a6094bb2de13d58446d2b2",
+          "message": "feat: add openvpn.static_keys and tls_key_ref for opnsense openvpn instances (merges PR #1345, addresses #1319)\n\nAdd a list-shape, managed-set direct-API type opnsense.openvpn.static_keys\nover openvpn/instances/*StaticKey. Identity is the description; mode\n(auth, crypt, crypt-v2) is required; key must be a secret:// URI and is\nnever logged, put in an error or shown in a repr. key is compared on its\nBEGIN..END block only, so the '#' header genKey writes causes no drift,\nand only when the box returns it; update_key forces a re-send otherwise.\nA managed key that a live instance still references is kept with a\nwarning. Static keys share the openvpn_reconfigure hook.\n\nopenvpn.instances gains an optional tls_key_ref, resolved to the static\nkey's uuid and sent as tls_key; omitted, tls_key is neither sent nor\ncompared. Static keys apply before instances, and instances delete first.\n\nVerified live on a test firewall; ADR-0014, ADR-0018 and the coverage doc\nrecord the results.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-10T10:21:28Z",
+          "tree_id": "f864291000bde0a7269d9e8eb41aa3c65a962d74",
+          "url": "https://github.com/endavis/infrafoundry/commit/ad00509415329ee276a6094bb2de13d58446d2b2"
+        },
+        "date": 1794306126946,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15638.33571935314,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001688060659838726",
+            "extra": "mean: 63.94542347383266 usec\nrounds: 17151"
           }
         ]
       }
