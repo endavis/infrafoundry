@@ -135,6 +135,7 @@ def test_openvpn_instances_register_their_endpoints() -> None:
         "openvpn/instances/del/{uuid}",
         "openvpn/service/reconfigure",
         "trust/ca/search",
+        "trust/cert/search",
     }
     assert endpoints.OPENVPN_INSTANCE.search.method == "GET"
 

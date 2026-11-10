@@ -1,11 +1,12 @@
 """OpenVPN client-instance component manager for OPNsense (ADR-0014, #808).
 
 Manages ``openvpn.instances`` (modern MVC client instances). Follows the trust
-certificate pattern: the runner threads the ``trust.cas`` resources in as
-``sibling_resources`` (and the managed ones as ``managed_sibling_resources``), and
-``ca_ref`` is resolved to the live CA ``refid``. A ``ca_ref`` whose CA is not on the
-box yet is planned with a warning; at apply an unresolved ``ca_ref`` raises
-:class:`ReferenceValidationError` before any write.
+certificate pattern: the runner threads the ``trust.cas`` and ``trust.certs``
+resources in as ``sibling_resources`` (and the managed ones as
+``managed_sibling_resources``). ``ca_ref`` is resolved to the live CA ``refid`` and the
+optional ``cert_ref`` (#1320) to the live certificate ``refid``. A reference whose
+object is not on the box yet is planned with a warning; at apply an unresolved
+``ca_ref`` or ``cert_ref`` raises :class:`ReferenceValidationError` before any write.
 
 Deletes run in the runner's delete phase (``SPLIT_DELETE_PHASE``), before CAs are
 touched. Reconfigure is deferred to the ``openvpn_reconfigure`` finalization hook on
@@ -28,7 +29,7 @@ from ..services.openvpn_instances import (
     description_of,
     openvpn_instance_configs_from_resources,
 )
-from ..services.trust import TrustService, ca_refids_by_name
+from ..services.trust import TrustService, ca_refids_by_name, cert_refids_by_name
 from ._managed import managed_keys as derive_managed_keys
 from ._secrets import resolve_resource_secrets
 from .base import BaseComponentManager
@@ -41,8 +42,9 @@ _TYPE = "openvpn.instances"
 class OpenVpnInstanceManager(BaseComponentManager):
     """Manager for ``openvpn.instances`` operations."""
 
-    #: Resource type threaded in as ``sibling_resources`` to resolve ``ca_ref``.
-    SIBLING_RESOURCE_TYPE: ClassVar[str | None] = "trust.cas"
+    #: Resource types threaded in as ``sibling_resources`` to resolve ``ca_ref`` and
+    #: ``cert_ref``.
+    SIBLING_RESOURCE_TYPE: ClassVar[tuple[str, ...]] = ("trust.cas", "trust.certs")
 
     #: Deletes are limited to the rows InfraFoundry applied before (ADR-0018).
     DELETE_SCOPE: ClassVar[str] = "managed_set"
@@ -69,12 +71,13 @@ class OpenVpnInstanceManager(BaseComponentManager):
         sibling_resources: list[ResourceConfig] | None,
         managed_sibling_resources: list[ResourceConfig] | None,
         unresolved: set[str] | None = None,
-    ) -> tuple[Diff, dict[str, str]]:
+    ) -> tuple[Diff, dict[str, str], dict[str, str]]:
         trust = TrustService(service.client)
-        ca_refids = ca_refids_by_name(
-            [*(managed_sibling_resources or []), *(sibling_resources or [])],
-            trust.search_cas(),
-        )
+        siblings = [*(managed_sibling_resources or []), *(sibling_resources or [])]
+        ca_refids = ca_refids_by_name(siblings, trust.search_cas())
+        cert_refids: dict[str, str] = {}
+        if any(c.cert_ref for c in desired):
+            cert_refids = cert_refids_by_name(siblings, trust.search_certs())
         keys = derive_managed_keys(
             managed_resources,
             openvpn_instance_configs_from_resources,
@@ -87,6 +90,7 @@ class OpenVpnInstanceManager(BaseComponentManager):
             add_only=add_only,
             managed_keys=keys,
             ca_refids=ca_refids,
+            cert_refids=cert_refids,
         )
         for want in [*diff.adds, *(w for _, w in diff.updates)]:
             if want.ca_ref not in ca_refids:
@@ -94,7 +98,12 @@ class OpenVpnInstanceManager(BaseComponentManager):
                     f"openvpn instance '{want.name}': CA '{want.ca_ref}' is not on the box "
                     f"yet; it must be applied first"
                 )
-        return diff, ca_refids
+            if want.cert_ref and want.cert_ref not in cert_refids:
+                diff.warnings.append(
+                    f"openvpn instance '{want.name}': certificate '{want.cert_ref}' is not on "
+                    f"the box yet; it must be applied first"
+                )
+        return diff, ca_refids, cert_refids
 
     def plan(
         self,
@@ -114,15 +123,15 @@ class OpenVpnInstanceManager(BaseComponentManager):
             resources: ``openvpn.instances`` resources.
             add_only: If True, suppress deletes.
             managed_resources: Rows InfraFoundry applied before (ADR-0018).
-            managed_sibling_resources: Managed ``trust.cas`` rows.
+            managed_sibling_resources: Managed ``trust.cas`` and ``trust.certs`` rows.
             provider_name: Provider identifier.
-            sibling_resources: ``trust.cas`` resources from YAML.
+            sibling_resources: ``trust.cas`` and ``trust.certs`` resources from YAML.
 
         Returns:
-            The diff apply would execute; a pending CA is a warning.
+            The diff apply would execute; a pending CA or certificate is a warning.
         """
         service = OpenVpnInstanceService.from_environment(env_name, provider_name, self.config_dir)
-        diff, _ = self._diff(
+        diff, _, _ = self._diff(
             service,
             self._desired(env_name, resources),
             add_only=add_only,
@@ -154,21 +163,21 @@ class OpenVpnInstanceManager(BaseComponentManager):
             add_only: If True, suppress deletes.
             deletes_only: If True, only delete (the runner's delete phase).
             managed_resources: Rows InfraFoundry applied before (ADR-0018).
-            managed_sibling_resources: Managed ``trust.cas`` rows.
+            managed_sibling_resources: Managed ``trust.cas`` and ``trust.certs`` rows.
             provider_name: Provider identifier.
-            sibling_resources: ``trust.cas`` resources from YAML.
+            sibling_resources: ``trust.cas`` and ``trust.certs`` resources from YAML.
 
         Returns:
             Counts, ``resource_outcomes``, ``warnings`` and ``unresolved_managed``.
 
         Raises:
             ReferenceValidationError: If an added or updated instance's ``ca_ref``
-                matches no live CA.
+                matches no live CA, or its ``cert_ref`` no live certificate.
         """
         del auto_approve
         service = OpenVpnInstanceService.from_environment(env_name, provider_name, self.config_dir)
         unresolved: set[str] = set()
-        diff, ca_refids = self._diff(
+        diff, ca_refids, cert_refids = self._diff(
             service,
             self._desired(env_name, resources),
             add_only=add_only,
@@ -204,7 +213,7 @@ class OpenVpnInstanceManager(BaseComponentManager):
             )
             for d in diff.deletes
         ]
-        counts = service.apply_diff(diff, ca_refids)
+        counts = service.apply_diff(diff, ca_refids, cert_refids)
         return {
             "success": True,
             "resources_created": counts["created"],

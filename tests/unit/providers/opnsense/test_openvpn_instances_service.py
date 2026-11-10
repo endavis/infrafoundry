@@ -475,3 +475,78 @@ class TestLoaderRoundTrip:
         assert resources[0].config["name"] == "vpn-a"
         configs = openvpn_instance_configs_from_resources(resources)
         assert [c.description for c in configs] == ["Example VPN"]
+
+
+class TestCertRef:
+    """Optional ``cert_ref`` resolved to the wire ``cert`` (#1320)."""
+
+    def test_parsed_and_defaulted(self) -> None:
+        assert _cfg(cert_ref="vpn-cert").cert_ref == "vpn-cert"
+        assert _cfg().cert_ref == ""
+        assert "cert_ref" in ALLOWED_KEYS
+
+    @pytest.mark.parametrize("bad", ["", 5])
+    def test_bad_values_rejected(self, bad: Any) -> None:
+        with pytest.raises(ValueError, match="cert_ref"):
+            _cfg(cert_ref=bad)
+
+    def test_payload(self) -> None:
+        cfg = _cfg(cert_ref="vpn-cert")
+        assert cfg.to_payload("r1", cert_refid="c1")["instance"]["cert"] == "c1"
+        assert "cert" not in cfg.to_payload("r1")["instance"]
+
+    def test_changed_fields(self) -> None:
+        live = _live(remote=_opt("vpn.example.com"), ca=_opt("r1"), cert=_opt("c1", "c2"))
+        cfg = _cfg(cert_ref="vpn-cert")
+        assert changed_fields(live, cfg, "r1", "c1") == []
+        assert changed_fields(live, cfg, "r1", "c2") == ["cert"]
+        assert changed_fields(live, cfg, "r1", "") == []
+
+    def test_compute_diff_cert_only_update(self) -> None:
+        live = _live(remote=_opt("vpn.example.com"), ca=_opt("r1"), cert=_opt("c1", "c2"))
+        desired = [_cfg(cert_ref="vpn-cert")]
+        diff = compute_diff(
+            desired, [live], ca_refids={"vpn-ca": "r1"}, cert_refids={"vpn-cert": "c2"}
+        )
+        assert len(diff.updates) == 1
+        same = compute_diff(
+            desired, [live], ca_refids={"vpn-ca": "r1"}, cert_refids={"vpn-cert": "c1"}
+        )
+        assert same.updates == []
+
+    def test_hand_set_cert_not_cleared_without_cert_ref(self) -> None:
+        live = _live(remote=_opt("vpn.example.com"), ca=_opt("r1"), cert=_opt("c1"))
+        diff = compute_diff([_cfg()], [live], ca_refids={"vpn-ca": "r1"})
+        assert diff.updates == []
+
+    def test_apply_diff_sends_cert_on_add_and_update(self) -> None:
+        client = MagicMock()
+        client.request.return_value = {"result": "saved"}
+        diff = compute_diff(
+            [_cfg("new", cert_ref="vpn-cert"), _cfg("upd", cert_ref="vpn-cert")],
+            [_live("upd", remote=_opt("old.example.com"))],
+        )
+        counts = OpenVpnInstanceService(client).apply_diff(
+            diff, {"vpn-ca": "r1"}, {"vpn-cert": "c1"}
+        )
+        assert counts == {"created": 1, "updated": 1, "deleted": 0}
+        calls = {c.args[1]: c.kwargs.get("data") for c in client.request.call_args_list}
+        assert calls["openvpn/instances/add"]["instance"]["cert"] == "c1"
+        assert calls["openvpn/instances/set/u-upd"]["instance"]["cert"] == "c1"
+
+    def test_unresolved_cert_raises_before_writes(self) -> None:
+        client = MagicMock()
+        diff = compute_diff([_cfg("new", cert_ref="vpn-cert", password=SECRET_PW)], [])
+        with pytest.raises(ReferenceValidationError, match="cert_ref 'vpn-cert'") as exc:
+            OpenVpnInstanceService(client).apply_diff(diff, {"vpn-ca": "r1"}, {})
+        client.request.assert_not_called()
+        assert SECRET_PW not in str(exc.value)
+
+    def test_no_cert_ref_needs_no_cert_refids(self) -> None:
+        client = MagicMock()
+        client.request.return_value = {"result": "saved"}
+        diff = compute_diff([_cfg("new")], [])
+        counts = OpenVpnInstanceService(client).apply_diff(diff, {"vpn-ca": "r1"})
+        assert counts["created"] == 1
+        sent = client.request.call_args.kwargs["data"]["instance"]
+        assert "cert" not in sent

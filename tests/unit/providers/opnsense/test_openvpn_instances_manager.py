@@ -28,6 +28,12 @@ def _ca(name: str = "vpn-ca") -> ResourceConfig:
     return ResourceConfig(name=name, type="trust.cas", provider="opnsense", config={"crt": CRT})
 
 
+def _cert(name: str = "vpn-cert") -> ResourceConfig:
+    return ResourceConfig(
+        name=name, type="trust.certs", provider="opnsense", config={"crt": CRT, "ca_ref": "vpn-ca"}
+    )
+
+
 @pytest.fixture(autouse=True)
 def _no_secret_lookup() -> Iterator[None]:
     with patch(
@@ -54,6 +60,7 @@ def _set_live(
     client: MagicMock,
     *,
     cas: list[dict[str, Any]] | None = None,
+    certs: list[dict[str, Any]] | None = None,
     instances: dict[str, dict[str, Any]] | None = None,
 ) -> None:
     instances = instances or {}
@@ -61,6 +68,8 @@ def _set_live(
     def fake(method: str, path: str, data: Any = None) -> dict[str, Any]:
         if path == "trust/ca/search":
             return {"rows": cas or []}
+        if path == "trust/cert/search":
+            return {"rows": certs or []}
         if path == "openvpn/instances/search":
             return {"rows": [{"uuid": u} for u in instances]}
         if path.startswith("openvpn/instances/get/"):
@@ -91,10 +100,18 @@ def _client_row(description: str, **extra: Any) -> dict[str, Any]:
 
 
 def test_class_markers() -> None:
-    assert OpenVpnInstanceManager.SIBLING_RESOURCE_TYPE == "trust.cas"
+    assert OpenVpnInstanceManager.SIBLING_RESOURCE_TYPE == ("trust.cas", "trust.certs")
     assert OpenVpnInstanceManager.SPLIT_DELETE_PHASE is True
     assert OpenVpnInstanceManager.DELETE_SCOPE == "managed_set"
     assert OpenVpnInstanceManager.FINALIZATION_HOOK == "openvpn_reconfigure"
+
+
+def _cert_row(descr: str = "vpn-cert") -> dict[str, Any]:
+    return {"uuid": "ku", "refid": "cert-1", "descr": descr, "crt_payload": CRT}
+
+
+def _searched(client: MagicMock, path: str) -> bool:
+    return any(c.args[1] == path for c in client.request.call_args_list)
 
 
 def test_apply_adds_with_ca_refid(manager: OpenVpnInstanceManager, client: MagicMock) -> None:
@@ -216,3 +233,78 @@ def test_no_secrets_in_logs(
     assert SECRET_PW not in caplog.text
     assert "user-a" not in caplog.text
     assert SECRET_PW not in repr(result)
+
+
+def test_apply_adds_with_cert_refid(manager: OpenVpnInstanceManager, client: MagicMock) -> None:
+    _set_live(client, cas=[_ca_row()], certs=[_cert_row()])
+    result = manager.apply(
+        "env", [_inst("a", cert_ref="vpn-cert")], sibling_resources=[_ca(), _cert()]
+    )
+    assert result["resources_created"] == 1
+    add = next(c for c in client.request.call_args_list if c.args[1] == "openvpn/instances/add")
+    assert add.kwargs["data"]["instance"]["ca"] == "ref-1"
+    assert add.kwargs["data"]["instance"]["cert"] == "cert-1"
+
+
+def test_managed_sibling_resolves_cert(manager: OpenVpnInstanceManager, client: MagicMock) -> None:
+    _set_live(client, cas=[_ca_row()], certs=[_cert_row()])
+    result = manager.apply(
+        "env",
+        [_inst("a", cert_ref="vpn-cert")],
+        managed_sibling_resources=[_ca(), _cert()],
+    )
+    assert result["resources_created"] == 1
+
+
+def test_pending_cert_warns_in_plan(manager: OpenVpnInstanceManager, client: MagicMock) -> None:
+    _set_live(client, cas=[_ca_row()])
+    diff = manager.plan(
+        "env", [_inst("a", cert_ref="vpn-cert")], sibling_resources=[_ca(), _cert()]
+    )
+    assert [a.name for a in diff.adds] == ["a"]
+    assert any("certificate 'vpn-cert' is not on the box yet" in w for w in diff.warnings)
+
+
+def test_unresolved_cert_raises_before_writes(
+    manager: OpenVpnInstanceManager, client: MagicMock
+) -> None:
+    _set_live(client, cas=[_ca_row()])
+    with pytest.raises(ReferenceValidationError, match="cert_ref 'vpn-cert'"):
+        manager.apply("env", [_inst("a", cert_ref="vpn-cert")], sibling_resources=[_ca(), _cert()])
+    assert not [p for p in _writes(client) if "/add" in p or "/set/" in p or "/del/" in p]
+
+
+def test_deletes_only_drops_cert_warning(
+    manager: OpenVpnInstanceManager, client: MagicMock
+) -> None:
+    _set_live(client, cas=[_ca_row()], instances={"u1": _client_row("old")})
+    result = manager.apply(
+        "env",
+        [_inst("a", cert_ref="vpn-cert")],
+        deletes_only=True,
+        managed_resources=[_inst("old")],
+        sibling_resources=[_ca(), _cert()],
+    )
+    assert result["resources_created"] == 0
+    assert result["warnings"] == []
+
+
+def test_cert_change_updates_instance(manager: OpenVpnInstanceManager, client: MagicMock) -> None:
+    _set_live(
+        client,
+        cas=[_ca_row()],
+        certs=[_cert_row()],
+        instances={"u1": _client_row("a", ca={"ref-1": {"value": "ref-1", "selected": 1}})},
+    )
+    diff = manager.plan(
+        "env", [_inst("a", cert_ref="vpn-cert")], sibling_resources=[_ca(), _cert()]
+    )
+    assert [w.name for _, w in diff.updates] == ["a"]
+
+
+def test_no_cert_search_without_cert_ref(
+    manager: OpenVpnInstanceManager, client: MagicMock
+) -> None:
+    _set_live(client, cas=[_ca_row()])
+    manager.apply("env", [_inst("a")], sibling_resources=[_ca(), _cert()])
+    assert not _searched(client, "trust/cert/search")

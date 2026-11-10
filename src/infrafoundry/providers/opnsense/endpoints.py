@@ -544,7 +544,12 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     "system.groups": (*AUTH_GROUP.all(), AUTH_USER.search),
     "trust.cas": TRUST_CA.all(),
     "trust.certs": (*TRUST_CERT.all(), TRUST_CA.search),
-    "openvpn.instances": (*OPENVPN_INSTANCE.all(), OPENVPN_RECONFIGURE, TRUST_CA.search),
+    "openvpn.instances": (
+        *OPENVPN_INSTANCE.all(),
+        OPENVPN_RECONFIGURE,
+        TRUST_CA.search,
+        TRUST_CERT.search,
+    ),
     "hostdiscovery": (
         HOSTDISCOVERY_SETTINGS_GET,
         HOSTDISCOVERY_SETTINGS_SET,

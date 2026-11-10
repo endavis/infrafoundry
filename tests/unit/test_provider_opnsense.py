@@ -209,7 +209,8 @@ class TestOPNsenseResourceTypes:
     def test_openvpn_instances_registered_after_trust_cas(self, provider: OPNsenseProvider) -> None:
         types = list(provider.get_direct_api_resource_types())
         assert types.index("trust.cas") < types.index("openvpn.instances")
-        assert provider.get_dependencies()["openvpn.instances"] == ["trust.cas"]
+        assert types.index("trust.certs") < types.index("openvpn.instances")
+        assert provider.get_dependencies()["openvpn.instances"] == ["trust.cas", "trust.certs"]
         assert "openvpn.instances" in provider.get_resource_types()
 
     def test_openvpn_reconfigure_hook_calls_service(self, provider: OPNsenseProvider) -> None:
