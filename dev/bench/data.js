@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794322593486,
+  "lastUpdate": 1794325732182,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -961,6 +961,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000904485550308424",
             "extra": "mean: 127.36361129011742 usec\nrounds: 8379"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b5bcf94125735de6a89f02c2fee9659d09cff54c",
+          "message": "fix: parse terraform plans with a pending import (merges PR #1356, addresses #1353)\n\nWith an import pending, Terraform prints \"Plan: N to import, A to add,\nC to change, D to destroy.\" The runner's regex required \"to add\" right\nafter \"Plan:\", so extract_plan_summary returned \"Unable to parse plan\noutput\" and parse_plan_for_drift reported no changes at all, even when\nthe plan added and changed resources (#1353).\n\n- One module-level regex accepts the optional \"N to import, \" part; the\n  installed Terraform (v1.13.5) has only these two summary formats.\n- The summary lists non-zero counts in Terraform's order, import first.\n- DriftInfo gains to_import (NotRequired, additive); has_changes counts\n  a pending import, since apply would perform it.\n- parse_plan_for_drift strips ANSI colour codes before matching, as\n  extract_plan_summary already did: real terraform output is coloured,\n  so without it the drift counts were still unparsable.\n- The tailscale guide's note describing the symptom is removed.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-10T15:48:10Z",
+          "tree_id": "f786a92a992c824deec1bbea1a96e74cfe18ee68",
+          "url": "https://github.com/endavis/infrafoundry/commit/b5bcf94125735de6a89f02c2fee9659d09cff54c"
+        },
+        "date": 1794325731748,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9820.773143460705,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006697823397866848",
+            "extra": "mean: 101.82497705548404 usec\nrounds: 10460"
           }
         ]
       }
