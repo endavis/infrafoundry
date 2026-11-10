@@ -521,6 +521,31 @@ Deletes use the managed set ([ADR-0018](../decisions/0018-opnsense-direct-api-de
 
 A 404 on the first read at plan means `os-tailscale` is not installed. The plan carries the warning `os-tailscale is not installed; declare it under system.firmware plugins`: the singletons plan the declared map as an update and every subnet is an add. A 404 at apply raises.
 
+### Node stays logged out after the key is set
+
+A box can stay out of the tailnet after `tailscale.auth` has written a valid, unused pre-auth key. The cause is in the plugin, not the provider. Its generated `/etc/rc.conf.d/tailscaled` passes `--auth-key` to `tailscale up` only when `/var/db/tailscale/tailscaled.state` exists and holds no `"_current-profile"`. That check came from opnsense/plugins#5047, the fix for a key being reused at boot (opnsense/plugins#4661). It was seen with os-tailscale 1.4 and tailscale 1.98.5_1 on OPNsense 26.1.11.
+
+There are two cases:
+
+- **No state file yet.** The rc script reads its config before `tailscaled` creates the state file, so the first start runs `tailscale up` without the key. The start times out waiting for the `Running` state. A second start passes the key and joins. Seen once, after the state file had been moved aside; not checked on a newly installed box.
+- **Stale profile.** Removing the plugin leaves `/var/db/tailscale` behind. After the node was deleted from the tailnet, or after a reinstall, the old profile is still in the state file and the key is never passed. `tailscale status` shows `Logged out.`, and the plugin's `service/start` and `service/restart` return `Error (1)`. A reconfigure or another apply does not help.
+
+To recover:
+
+1. After an apply that writes `tailscale.auth`, read `tailscale/status/status` and check `BackendState`. `Running` means the node joined.
+2. If it is `NeedsLogin`, apply again, or call `tailscale/service/reconfigure`. That covers the first case.
+3. If it still is `NeedsLogin`, the profile is stale. The API cannot reset it; over SSH on the box, run:
+
+    ```sh
+    service tailscaled stop
+    mv /var/db/tailscale/tailscaled.state /var/db/tailscale/tailscaled.state.bak
+    mv /var/db/tailscale/profile-data /var/db/tailscale/profile-data.bak
+    service tailscaled start   # creates a fresh state file; times out without the key
+    service tailscaled restart # now passes the key and joins
+    ```
+
+    Delete the `.bak` copies once the node shows `Running`.
+
 ### Reconfigure
 
 One `tailscale/service/reconfigure` fires per apply, through the shared `tailscale_reconfigure` finalization hook, when any of the three types changed state. `tailscale.subnets` `destroy` reconfigures directly when it deleted a row, because the hook does not fire on destroy.
