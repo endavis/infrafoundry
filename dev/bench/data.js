@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794310533269,
+  "lastUpdate": 1794313696254,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -837,6 +837,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000022740625585907413",
             "extra": "mean: 67.40443575247065 usec\nrounds: 16273"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5967285fc44491ddb82dc3d017ff1c6193dd0855",
+          "message": "feat: add tailscale control-plane provider wrapping the official terraform provider (merges PR #1348, addresses #870)\n\nAdd a `tailscale` provider that generates Terraform for the official\ntailscale/tailscale provider (pinned ~> 0.29.3) and manages a tailnet's\ncontrol plane: acl, tailnet_key, device_subnet_routes, device_tags,\ndns_nameservers, dns_preferences and dns_search_paths.\n\n- Credentials (OAuth client or API key) come from\n  provider_settings.tailscale; secret:// URIs are resolved and reach\n  Terraform only as sensitive TF_VAR_* variables, never in .tf files.\n  build_terraform_env_vars gains a keyword-only resolve_secret_uris flag.\n- acl takes a structured `policy` or verbatim `hujson`, imports with\n  `import_id: acl`; overwrite and reset-on-destroy are opt-in.\n- tailnet_key exposes the key as a sensitive output; under OAuth a key\n  without tags is an error, a tag missing from tagOwners a warning.\n- device_subnet_routes and device_tags look a device up by hostname or\n  name (data source, node_id) or take a raw device_id.\n- Validators for naming, ACL, keys, device references, DNS and\n  credentials; ADR-0020 and a provider guide.\n\nLive-tested on a throwaway tailnet: every type applied, re-planned clean\nand destroyed; a test firewall joined with a minted key through the\nopnsense.tailscale types and its route was approved.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-10T12:27:32Z",
+          "tree_id": "3a647caa9fd9724dc759b257d18d7fb8306b81d8",
+          "url": "https://github.com/endavis/infrafoundry/commit/5967285fc44491ddb82dc3d017ff1c6193dd0855"
+        },
+        "date": 1794313695375,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7743.673116738691,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009499361289255129",
+            "extra": "mean: 129.13768245697307 usec\nrounds: 8254"
           }
         ]
       }
