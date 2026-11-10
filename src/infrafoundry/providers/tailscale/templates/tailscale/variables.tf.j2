@@ -1,0 +1,38 @@
+variable "tailscale_api_key" {
+  description = "Tailscale API key (alternative to OAuth)"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "tailscale_oauth_client_id" {
+  description = "Tailscale OAuth client ID"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "tailscale_oauth_client_secret" {
+  description = "Tailscale OAuth client secret"
+  type        = string
+  sensitive   = true
+  default     = null
+}
+
+variable "tailscale_scopes" {
+  description = "OAuth scopes to request"
+  type        = list(string)
+  default     = null
+}
+
+variable "tailscale_tailnet" {
+  description = "Tailnet name; \"-\" means the credential's own tailnet"
+  type        = string
+  default     = null
+}
+
+variable "tailscale_base_url" {
+  description = "Tailscale API base URL"
+  type        = string
+  default     = null
+}

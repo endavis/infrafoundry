@@ -167,6 +167,7 @@ nav:
     - ADR-0017 Blueprint Requirements: decisions/0017-blueprint-declared-requirements-with-a-preflight-check.md
     - ADR-0018 OPNsense Managed-Set Deletes: decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md
     - ADR-0019 Provider Validator Contract: decisions/0019-provider-sub-validators-share-one-validatecontext-contract.md
+    - ADR-0020 Tailscale Provider: decisions/0020-wrap-the-official-tailscale-terraform-provider-for-tailnet-control-plane-management.md
     - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
     - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
     - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md
@@ -203,6 +204,7 @@ nav:
     - OCI: providers/oci.md
     - Kubernetes: providers/kubernetes.md
     - Proxmox: providers/proxmox.md
+    - Tailscale: providers/tailscale.md
     - OPNsense Resource Coverage: development/opnsense-resource-coverage.md
 
   - Guides:

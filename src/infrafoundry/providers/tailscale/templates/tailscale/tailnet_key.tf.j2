@@ -1,0 +1,26 @@
+{% for r in keys %}
+{% set tf = r.name | to_terraform_name %}
+resource "tailscale_tailnet_key" "{{ tf }}" {
+{% if r.config.description is defined %}
+  description         = {{ r.config.description | hcl_string }}
+{% endif %}
+{% for flag in ['ephemeral', 'preauthorized', 'reusable'] %}
+{% if flag in r.config %}
+  {{ '%-19s' | format(flag) }} = {{ 'true' if r.config[flag] else 'false' }}
+{% endif %}
+{% endfor %}
+{% if r.config.expiry is defined %}
+  expiry              = {{ r.config.expiry }}
+{% endif %}
+{% if r.config.tags %}
+  tags                = {{ r.config.tags | hcl_list }}
+{% endif %}
+{% if r.config.recreate_if_invalid is defined %}
+  recreate_if_invalid = {{ r.config.recreate_if_invalid | hcl_string }}
+{% endif %}
+{% if acl_tf %}
+  depends_on          = [tailscale_acl.{{ acl_tf }}]
+{% endif %}
+}
+
+{% endfor %}

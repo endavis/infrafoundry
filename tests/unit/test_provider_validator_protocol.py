@@ -19,6 +19,7 @@ from infrafoundry.providers.kubernetes.validator import KubernetesValidator
 from infrafoundry.providers.oci.validator import OCIValidator
 from infrafoundry.providers.opnsense.validator import OPNsenseValidator
 from infrafoundry.providers.proxmox.validator import ProxmoxValidator
+from infrafoundry.providers.tailscale.validator import TailscaleValidator
 
 ValidatorClass = (
     type[EsxiValidator]
@@ -26,6 +27,7 @@ ValidatorClass = (
     | type[OCIValidator]
     | type[OPNsenseValidator]
     | type[ProxmoxValidator]
+    | type[TailscaleValidator]
 )
 
 
@@ -36,7 +38,14 @@ def _as_protocol(cls: ValidatorClass, env: EnvironmentConfig) -> ProviderValidat
 
 @pytest.mark.parametrize(
     "cls",
-    [EsxiValidator, KubernetesValidator, OCIValidator, OPNsenseValidator, ProxmoxValidator],
+    [
+        EsxiValidator,
+        KubernetesValidator,
+        OCIValidator,
+        OPNsenseValidator,
+        ProxmoxValidator,
+        TailscaleValidator,
+    ],
 )
 def test_validator_satisfies_protocol(cls: ValidatorClass) -> None:
     env = EnvironmentConfig(name="dev")

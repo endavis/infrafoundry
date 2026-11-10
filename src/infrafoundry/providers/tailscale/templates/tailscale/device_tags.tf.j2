@@ -1,0 +1,29 @@
+{% for r in device_tags %}
+{% set tf = r.name | to_terraform_name %}
+{% set dev = r.config.get('device') %}
+{% if dev %}
+data "tailscale_device" "{{ tf }}_device" {
+{% if dev.get('hostname') %}
+  hostname = {{ dev.hostname | hcl_string }}
+{% else %}
+  name     = {{ dev.name | hcl_string }}
+{% endif %}
+{% if dev.get('wait_for') %}
+  wait_for = {{ dev.wait_for | hcl_string }}
+{% endif %}
+}
+
+{% endif %}
+resource "tailscale_device_tags" "{{ tf }}" {
+{% if dev %}
+  device_id = data.tailscale_device.{{ tf }}_device.node_id
+{% else %}
+  device_id = {{ r.config.device_id | hcl_string }}
+{% endif %}
+  tags      = {{ r.config.tags | hcl_list }}
+{% if acl_tf %}
+  depends_on = [tailscale_acl.{{ acl_tf }}]
+{% endif %}
+}
+
+{% endfor %}

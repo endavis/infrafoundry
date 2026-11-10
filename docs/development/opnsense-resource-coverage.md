@@ -445,6 +445,8 @@ opnsense:
 
 The `os-tailscale` plugin is managed through three direct-API types: `tailscale.settings` and `tailscale.auth` (singleton dicts) and `tailscale.subnets` (a list). The plugin is installed by `system.firmware`, so the three types run after it, in the order settings, auth, subnets. The endpoints are plugin-kind: the bundled specs cover core only, so the version check skips them (see [Endpoint registry and version check](#endpoint-registry-and-version-check-1239)). The provider never starts the service and never joins a tailnet: only the settings, authentication and subnet endpoints and `service/reconfigure` are registered.
 
+Route approval and ACLs are on the control-plane side and are handled by the separate `tailscale` provider; see [Tailscale provider](../providers/tailscale.md).
+
 ```yaml
 opnsense:
   tailscale:

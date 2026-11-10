@@ -45,6 +45,17 @@ class OPNsenseProviderSettings(TypedDict, total=False):
     ssh_key: str
 
 
+class TailscaleProviderSettings(TypedDict, total=False):
+    """Provider settings expected by the Tailscale provider."""
+
+    api_key: str
+    oauth_client_id: str
+    oauth_client_secret: str
+    scopes: list[str]
+    tailnet: str
+    base_url: str
+
+
 class EsxiHostSettings(TypedDict, total=False):
     """Settings for a single ESXi host."""
 
@@ -223,4 +234,5 @@ __all__ = [
     "RollbackResourceSnapshot",
     "RunnerEventData",
     "SSHConfigData",
+    "TailscaleProviderSettings",
 ]

@@ -558,6 +558,7 @@ class TerraformGeneratorMixin:
         include_ssh: bool = False,
         ssh_prefix: str | None = None,
         resources: list[ResourceConfig] | None = None,
+        resolve_secret_uris: bool = False,
     ) -> dict[str, str]:
         """Build TF_VAR_* env vars from provider settings (and resource secrets).
 
@@ -582,6 +583,11 @@ class TerraformGeneratorMixin:
             resources: Optional resource list. When provided, each
                 resource's ``terraform_secrets`` field is resolved against
                 the env's decrypted secrets and emitted as TF vars.
+            resolve_secret_uris: When True, ``secret://env_secrets/...`` URIs
+                in the provider settings are resolved against the env's
+                decrypted secrets (after any gated env-var override) before
+                they are mapped. Defaults to False, which passes settings
+                through unchanged.
 
         Returns:
             Dict mapping ``TF_VAR_<name>`` to string values
@@ -589,6 +595,8 @@ class TerraformGeneratorMixin:
         Raises:
             KeyError: If a resource references a secret path that does not
                 exist in ``env_config.secrets``.
+            SecretResolutionError: If ``resolve_secret_uris`` is set and a URI
+                cannot be resolved. The message names the URI, never a value.
         """
         env_config = self._load_environment_config()
         if not env_config:
@@ -599,6 +607,10 @@ class TerraformGeneratorMixin:
         if provider_settings:
             # Gated <PROVIDER>_<KEY> env vars can redirect the apply (#783).
             provider_settings = resolve_settings(provider_name, provider_settings, mapping)
+            if resolve_secret_uris:
+                provider_settings = self._resolve_settings_secret_uris(
+                    env_config, provider_settings
+                )
             for source_key, tfvar_name in mapping.items():
                 value = provider_settings.get(source_key)
                 if value not in (None, ""):
@@ -623,6 +635,34 @@ class TerraformGeneratorMixin:
             result.update(secret_vars)
 
         return result
+
+    @staticmethod
+    def _resolve_settings_secret_uris(
+        env_config: EnvironmentConfig, provider_settings: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Resolve ``secret://env_secrets/...`` URIs in provider settings.
+
+        Args:
+            env_config: Environment configuration carrying the decrypted secrets.
+            provider_settings: Provider settings that may contain secret URIs.
+
+        Returns:
+            A new settings dict with the URIs replaced by their values.
+
+        Raises:
+            SecretResolutionError: If a URI cannot be resolved.
+        """
+        # Local import to avoid a circular import at module load time.
+        from infrafoundry.secrets.resolver import SecretResolver
+
+        resolver = SecretResolver()
+        resolver.configure_backend(
+            "env_secrets", {"secrets": env_config.secrets if env_config.secrets is not None else {}}
+        )
+        try:
+            return resolver.resolve_config(provider_settings)
+        finally:
+            resolver.close()
 
     @staticmethod
     def collect_terraform_secret_refs(

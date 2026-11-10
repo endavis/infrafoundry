@@ -1,0 +1,13 @@
+{% for r in acls %}
+{% set tf = r.name | to_terraform_name %}
+resource "tailscale_acl" "{{ tf }}" {
+  acl = {{ acl_texts[r.name] | hcl_string }}
+{% if 'overwrite_existing_content' in r.config %}
+  overwrite_existing_content = {{ 'true' if r.config.overwrite_existing_content else 'false' }}
+{% endif %}
+{% if 'reset_acl_on_destroy' in r.config %}
+  reset_acl_on_destroy = {{ 'true' if r.config.reset_acl_on_destroy else 'false' }}
+{% endif %}
+}
+
+{% endfor %}

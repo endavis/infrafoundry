@@ -47,7 +47,7 @@ CLASSES = [cls for _, cls in DISCOVERED]
 def test_discovery_covers_every_provider_with_validators() -> None:
     """Discovery finds validators in each provider that ships a validators package."""
     providers = {provider for provider, _ in DISCOVERED}
-    assert {"esxi", "kubernetes", "oci", "opnsense", "proxmox"} <= providers
+    assert {"esxi", "kubernetes", "oci", "opnsense", "proxmox", "tailscale"} <= providers
 
 
 @pytest.mark.parametrize("cls", CLASSES, ids=IDS)

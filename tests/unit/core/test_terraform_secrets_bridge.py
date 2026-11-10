@@ -314,3 +314,77 @@ class TestTerraformSecretsValidator:
         assert len(matching) == 1
         assert matching[0].passed is False
         assert "non-string" in matching[0].message
+
+
+# ---------------------------------------------------------------------------
+# build_terraform_env_vars provider-settings secret:// resolution (#870)
+# ---------------------------------------------------------------------------
+
+
+class TestResolveSecretUris:
+    """``resolve_secret_uris`` resolves ``secret://env_secrets/...`` in settings."""
+
+    _SECRET = "sentinel-client-secret-870"  # pragma: allowlist secret
+
+    def _env(self, secrets: dict[str, Any] | None) -> EnvironmentConfig:
+        return _make_env(
+            provider_settings={
+                "test": {
+                    "client_id": "secret://env_secrets/test/client_id",
+                    "client_secret": "secret://env_secrets/test/client_secret",
+                    "tailnet": "-",
+                }
+            },
+            secrets=secrets,
+        )
+
+    def test_default_passes_uri_through(self) -> None:
+        harness = _BridgeHarness(self._env({"test": {"client_id": "id-1"}}))
+        result = harness.build_terraform_env_vars(
+            provider_name="test", mapping={"client_id": "test_client_id"}
+        )
+        assert result == {"TF_VAR_test_client_id": "secret://env_secrets/test/client_id"}
+
+    def test_enabled_resolves_against_secrets(self) -> None:
+        harness = _BridgeHarness(
+            self._env({"test": {"client_id": "id-1", "client_secret": self._SECRET}})
+        )
+        result = harness.build_terraform_env_vars(
+            provider_name="test",
+            mapping={
+                "client_id": "test_client_id",
+                "client_secret": "test_client_secret",
+                "tailnet": "test_tailnet",
+            },
+            resolve_secret_uris=True,
+        )
+        assert result == {
+            "TF_VAR_test_client_id": "id-1",
+            "TF_VAR_test_client_secret": self._SECRET,
+            "TF_VAR_test_tailnet": "-",
+        }
+
+    def test_unknown_path_error_names_uri_not_values(self) -> None:
+        from infrafoundry.secrets.resolver import SecretResolutionError
+
+        harness = _BridgeHarness(self._env({"test": {"client_id": "id-1", "other": self._SECRET}}))
+        with pytest.raises(SecretResolutionError) as excinfo:
+            harness.build_terraform_env_vars(
+                provider_name="test",
+                mapping={"client_secret": "test_client_secret"},
+                resolve_secret_uris=True,
+            )
+        assert "client_secret" in str(excinfo.value)
+        assert self._SECRET not in str(excinfo.value)
+
+    def test_none_secrets_still_allows_plaintext(self) -> None:
+        env = _make_env(
+            provider_settings={"test": {"tailnet": "example.com"}},
+            secrets=None,
+        )
+        result = _BridgeHarness(env).build_terraform_env_vars(
+            provider_name="test",
+            mapping={"tailnet": "test_tailnet"},
+            resolve_secret_uris=True,
+        )
+        assert result == {"TF_VAR_test_tailnet": "example.com"}

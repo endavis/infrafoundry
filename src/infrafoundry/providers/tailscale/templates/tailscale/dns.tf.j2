@@ -1,0 +1,18 @@
+{% for r in nameservers %}
+resource "tailscale_dns_nameservers" "{{ r.name | to_terraform_name }}" {
+  nameservers = {{ r.config.nameservers | map('string') | hcl_list }}
+}
+
+{% endfor %}
+{% for r in preferences %}
+resource "tailscale_dns_preferences" "{{ r.name | to_terraform_name }}" {
+  magic_dns = {{ 'true' if r.config.magic_dns else 'false' }}
+}
+
+{% endfor %}
+{% for r in search_paths %}
+resource "tailscale_dns_search_paths" "{{ r.name | to_terraform_name }}" {
+  search_paths = {{ r.config.search_paths | hcl_list }}
+}
+
+{% endfor %}

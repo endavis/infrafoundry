@@ -1,0 +1,20 @@
+terraform {
+  required_providers {
+    tailscale = {
+      source  = "tailscale/tailscale"
+      version = "~> 0.29.3"
+    }
+  }
+}
+
+# Credentials arrive through TF_VAR_* environment variables, never through files.
+# Unset variables stay null, so the provider falls back to its own TAILSCALE_*
+# environment variables.
+provider "tailscale" {
+  api_key             = var.tailscale_api_key
+  oauth_client_id     = var.tailscale_oauth_client_id
+  oauth_client_secret = var.tailscale_oauth_client_secret
+  scopes              = var.tailscale_scopes
+  tailnet             = var.tailscale_tailnet
+  base_url            = var.tailscale_base_url
+}

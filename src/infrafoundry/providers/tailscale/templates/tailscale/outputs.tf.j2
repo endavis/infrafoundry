@@ -1,0 +1,27 @@
+# Outputs for Tailscale resources
+
+{% set keys = resources_by_type.get('tailnet_key', []) %}
+{% if keys %}
+# The key value is also in the Terraform state; read it with
+# `terraform output -raw tailnet_key_<name>`.
+{% for r in keys %}
+output "tailnet_key_{{ r.name | to_terraform_name }}" {
+  description = "Auth key value for {{ r.name }}"
+  value       = tailscale_tailnet_key.{{ r.name | to_terraform_name }}.key
+  sensitive   = true
+}
+
+{% endfor %}
+output "tailnet_keys" {
+  description = "Non-sensitive tailnet key details"
+  value = {
+{% for r in keys %}
+    "{{ r.name }}" = {
+      id         = tailscale_tailnet_key.{{ r.name | to_terraform_name }}.id
+      expires_at = tailscale_tailnet_key.{{ r.name | to_terraform_name }}.expires_at
+      invalid    = tailscale_tailnet_key.{{ r.name | to_terraform_name }}.invalid
+    }
+{% endfor %}
+  }
+}
+{% endif %}
