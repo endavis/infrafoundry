@@ -64,7 +64,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<OPNsense>/Interfaces/settings` | `interfaces.settings` | Supported (direct-API; #1092). A singleton over the whole settings model; only declared fields are compared, the whole live object is echoed back on write; destroy is a no-op; the `interfaces_settings_reconfigure` hook fires one reconfigure per apply. **The `set` and `reconfigure` calls are not yet verified against a live box.** See [Interface settings](#interface-settings-1092). |
 | `<system>/lb_use_sticky`, `<system>/pf_share_forward`, `<system>/disablenatreflection`, `<system>/pfdebug` (firewall advanced) | none | **Out of scope.** Exist only on a legacy PHP page (`system_advanced_firewall.php`) with no MVC API, and the usual setup leaves them at the defaults. |
 | `<system>/timeservers` (NTP) | none | **Out of scope.** Same reason: legacy PHP page only (`services_ntpd.php`), usually left at the defaults. |
-| `<OPNsense>/Firewall/Category` | `firewall.categories` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#1286](https://github.com/endavis/infrafoundry/issues/1286) ships. |
+| `<OPNsense>/Firewall/Category` (MVC `firewall/category/*Item`) | `firewall.categories` | Supported (direct-API; #1286). Identity is the wire `name` (`config.name`, default the resource name). `auto` and `color` are optional. Deletes use the managed set; the provider's `infrafoundry` marker category is never part of the diff; a category the box reports in use is kept with a warning. A `config migrate` extractor exists. See [Firewall categories (#1286)](#firewall-categories-1286). |
 
 Sections intentionally **out of IaC scope** (per ADR-0013): `<hasync>`, `<gres>`, `<gifs>`, `<laggs>`, `<bridges>`, `<ppps>`, `<wireless>`. These are set-once items and are migrated via selective `config.xml` import on the target box.
 
@@ -398,6 +398,49 @@ opnsense:
 
 The password reads back from the API, but it is not compared; use `update_password` to rotate it. **Not verified:** whether `mssfix` takes an integer, and tunnel behaviour, since the test client stayed disabled.
 
+## Firewall categories (#1286)
+
+`firewall.categories` manages the categories a firewall rule, NAT rule or alias can carry, through `firewall/category/{search,get,add,set,del}Item`. It is a list-shape, managed-set type ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). Categories are model data: the controller has no reconfigure action, so there is no finalization hook.
+
+```yaml
+opnsense:
+  firewall:
+    categories:
+      - name: lab-servers
+        config:
+          color: "#336699"
+      - name: lab-clients
+        config:
+          name: Lab Clients
+          auto: true
+```
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Wire `name` and the identity. Defaults to the resource name. A changed name is a delete plus an add; two live categories with the same desired or managed name raise a drift error. `infrafoundry` is reserved for the provider's marker. |
+| `auto` | Boolean, default `false`. Sent as `"0"`/`"1"` and always compared. |
+| `color` | String, default empty. Empty, or `#rrggbb` / `rrggbb`. Both sides are compared lowercase and without a leading `#`, so either form causes no drift. It is sent without the `#`. |
+| `lock` | Never add, update or delete. |
+
+`uuid` is assigned by the box and rejected, as are unknown keys.
+
+**The `infrafoundry` marker.** The provider tags its managed rules with its own `infrafoundry` category. That row is dropped from every diff, so it is never deleted, never updated and never counted in `N unmanaged (kept)`. `config migrate` and the resource-id lookup skip it too, and a resource whose effective name is `infrafoundry` is a validation error.
+
+**Order.** Nothing in YAML references a category by name: `firewall.rules` and `firewall.aliases` take category UUIDs, and NAT carries only the marker. Add order therefore does not matter. Categories are registered after rules, NAT and aliases, so the runner deletes them after those types without a split delete phase, and they declare no dependencies. If rules ever gain a name-based category reference, this ordering must be revisited.
+
+**A category in use.** The controller deletes safely and refuses a category that something still references, including models this provider does not manage. `infra plan` therefore shows the delete, and `infra apply` keeps the category with a warning (`firewall category '<name>' kept: the box reports it in use`) instead of failing. It is not counted as deleted, stays managed and is retried on the next apply. `infra destroy` skips it the same way.
+
+**`config migrate`.** `foundry config migrate --provider opnsense --component firewall.categories` writes one entry per live category except the marker. The handle is a slug of the name (lowercase, runs of other characters become `-`, `-2`, `-3` ... when a resource of the environment or an earlier row already uses it), and `config.name` carries the exact live name. `auto` appears only when set and `color` only when non-empty.
+
+**What is verified.** The envelope is `category` with `name`, `auto` (a `"0"`/`"1"` string) and `color` (a string), and `searchItem` rows carry every field, so a plan makes one call and no per-row `getItem`. A live plan and apply on a test firewall, with throwaway categories and a disabled throwaway rule, all removed afterwards, confirmed:
+
+- adds store `auto` as `"1"`/`"0"` and `color` without the `#`, lowercase (`#336699` is stored as `336699`); a re-plan is idempotent and the marker is not counted as unmanaged;
+- a `color` change is one in-place update (same uuid);
+- with a rule still carrying a category's uuid, `delItem` is refused with HTTP 500 and a JSON body whose `errorTitle` reads `Item categories.category {<name>} in use by:`; `infra apply` keeps the category with the warning above, and the next plan shows the delete again;
+- removing the rule and the category together deletes the rule in the delete phase and the category later in the same apply;
+- `config migrate` writes the live category with its exact name and skips the marker;
+- after clean-up only the marker is left, and a final plan is clean.
+
 ## Unbound advanced settings (#1254)
 
 `opnsense.unbound.advanced` is a singleton dict with three list fields:
@@ -577,13 +620,13 @@ opnsense:
 
 **Two kinds of type.**
 
-- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.static_keys`, `openvpn.instances`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions` and `acmeclient.certs`.
+- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.static_keys`, `openvpn.instances`, `firewall.categories`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions` and `acmeclient.certs`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
 - **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `firewall.source_nat`, `acmeclient.settings`, `radvd`) are unaffected.
 
 **Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
 
-**Parent and child types.** Unbound host overrides are applied before host aliases, and kea subnets before kea reservations. Kea deletes run in reverse order first (reservations, then subnets), so a managed reservation is deleted while its subnet is still live (#1264). OPNsense does not cascade a kea subnet delete to its reservations and does not refuse it, so without this order they would be left pointing at a subnet that no longer exists. Gateways and static routes are applied before firewall rules, so a rule's `gateway:` names a gateway that already exists (#1269). The same reverse-order delete phase covers firewall rules, NAT, static routes, gateways and virtual IPs, so a child is deleted while its parent is still live. Interface assignments use it too: OPNsense refuses to delete an assigned VLAN (HTTP 500), so the assignment is deleted first (#1271). An assignment's apply installs the controller (an SSH step) only when it has something to write, so the delete phase and the forward pass do not repeat it. Radvd uses it too, so a radvd record is deleted before its interface assignment (#1272). Trust CAs are applied before trust certificates, and certificates are deleted first (#807). OpenVPN client instances are applied after the CAs and certificates they reference and deleted before them (#808, #1320). ACME certificates are applied after the accounts, validations and actions they reference and deleted before them (#790). Deleting an Unbound host override does remove its aliases. If a managed child still cannot be matched to its parent, it is matched through live orphans (same MAC/DUID, or for an alias the same hostname and domain; an alias only when exactly one live orphan fits), and with no match it is skipped with a warning and retried on the next run.
+**Parent and child types.** Unbound host overrides are applied before host aliases, and kea subnets before kea reservations. Kea deletes run in reverse order first (reservations, then subnets), so a managed reservation is deleted while its subnet is still live (#1264). OPNsense does not cascade a kea subnet delete to its reservations and does not refuse it, so without this order they would be left pointing at a subnet that no longer exists. Gateways and static routes are applied before firewall rules, so a rule's `gateway:` names a gateway that already exists (#1269). The same reverse-order delete phase covers firewall rules, NAT, static routes, gateways and virtual IPs, so a child is deleted while its parent is still live. Interface assignments use it too: OPNsense refuses to delete an assigned VLAN (HTTP 500), so the assignment is deleted first (#1271). An assignment's apply installs the controller (an SSH step) only when it has something to write, so the delete phase and the forward pass do not repeat it. Radvd uses it too, so a radvd record is deleted before its interface assignment (#1272). Firewall categories are applied after rules, NAT and aliases, so they are deleted after them, and a category the box reports in use is kept with a warning (#1286). Trust CAs are applied before trust certificates, and certificates are deleted first (#807). OpenVPN client instances are applied after the CAs and certificates they reference and deleted before them (#808, #1320). ACME certificates are applied after the accounts, validations and actions they reference and deleted before them (#790). Deleting an Unbound host override does remove its aliases. If a managed child still cannot be matched to its parent, it is matched through live orphans (same MAC/DUID, or for an alias the same hostname and domain; an alias only when exactly one live orphan fits), and with no match it is skipped with a warning and retried on the next run.
 
 **A subnet with reservations you did not create.** InfraFoundry does not delete a kea subnet while a reservation it does not manage, such as one made by hand, still uses it. `infra plan` shows `N blocked (kept)` and a warning naming the subnet and each reservation's MAC or DUID and IP. `infra apply` leaves the subnet in place with the same warning, does not fail, and retries on the next run. To finish the removal, delete or move the reservation on the box, then re-run apply. `infra destroy` skips such a subnet the same way.
 

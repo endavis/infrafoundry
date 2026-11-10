@@ -37,6 +37,7 @@ class TestNestedFormatConstants:
         """The 15 currently-shipped direct-OPNsense paths are list-shape."""
         assert DOTTED_RESOURCE_SHAPES["firewall.aliases"] == "list"
         assert DOTTED_RESOURCE_SHAPES["firewall.rules"] == "list"
+        assert DOTTED_RESOURCE_SHAPES["firewall.categories"] == "list"
         assert DOTTED_RESOURCE_SHAPES["routing.gateways"] == "list"
         assert DOTTED_RESOURCE_SHAPES["routing.static"] == "list"
         assert DOTTED_RESOURCE_SHAPES["interfaces.vlans"] == "list"

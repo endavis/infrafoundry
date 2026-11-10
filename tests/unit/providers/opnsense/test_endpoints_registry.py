@@ -227,3 +227,15 @@ def test_no_registered_template_can_contact_a_ca_or_remote_host() -> None:
         if e.template.startswith("acmeclient/"):
             actions = e.template.split("/")[1:]
             assert not any(word in part.lower() for part in actions for word in _ACME_FORBIDDEN), e
+
+
+def test_firewall_categories_register_their_endpoints() -> None:
+    category = endpoints.CATEGORY
+    assert endpoints.RESOURCE_TYPE_ENDPOINTS["firewall.categories"] == category.all()
+    assert category.reconfigure is None
+    assert category.search.template == "firewall/category/searchItem"
+    assert category.update.template == "firewall/category/setItem/{uuid}"
+    assert category.delete.template == "firewall/category/delItem/{uuid}"
+    # The marker helper's endpoints are the same values, so rules and NAT keep working.
+    assert category.search == endpoints.CATEGORY_SEARCH
+    assert category.add == endpoints.CATEGORY_ADD

@@ -225,6 +225,20 @@ class TestOPNsenseResourceTypes:
         assert provider.get_dependencies()["openvpn.static_keys"] == []
         assert "openvpn.static_keys" in provider.get_resource_types()
 
+    def test_firewall_categories_registered_after_their_referrers(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        types = list(provider.get_direct_api_resource_types())
+        for referrer in ("firewall.aliases", "firewall.nat", "firewall.rules"):
+            assert types.index(referrer) < types.index("firewall.categories")
+        manager = provider.get_direct_api_resource_types()["firewall.categories"]
+        assert not getattr(manager, "SPLIT_DELETE_PHASE", False)
+        deps = provider.get_dependencies()
+        assert deps["firewall.categories"] == []
+        for referrer in ("firewall.aliases", "firewall.nat", "firewall.rules"):
+            assert "firewall.categories" not in deps[referrer]
+        assert "firewall.categories" in provider.get_resource_types()
+
     def test_openvpn_reconfigure_hook_calls_service(self, provider: OPNsenseProvider) -> None:
         from unittest.mock import patch
 

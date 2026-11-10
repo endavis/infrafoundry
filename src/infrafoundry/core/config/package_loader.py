@@ -60,6 +60,7 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     "firewall.nat": "list",
     "firewall.source_nat": "dict",  # #1333
     "firewall.rules": "list",
+    "firewall.categories": "list",  # #1286
     "routing.gateways": "list",
     "routing.static": "list",
     "unbound.host_overrides": "list",
