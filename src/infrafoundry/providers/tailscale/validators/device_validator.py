@@ -67,6 +67,15 @@ class DeviceReferenceValidator(SpecializedValidator[TailscaleConfigContext]):
                     ok = False
             else:
                 ok = self._check_device(name, config["device"])
+            if resource.type == "device_tags" and not isinstance(
+                config.get("keep_tags_on_destroy", False), bool
+            ):
+                fail(
+                    self.report,
+                    f"tailscale_keep_tags_{name}",
+                    f"'{name}': keep_tags_on_destroy must be a boolean",
+                )
+                ok = False
             if resource.type == "device_subnet_routes":
                 ok = self._check_routes(name, config.get("routes")) and ok
             else:

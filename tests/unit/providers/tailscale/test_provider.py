@@ -4,6 +4,7 @@ from pathlib import Path
 
 import infrafoundry.providers as providers_pkg
 from infrafoundry.core.config.package_loader import PackageLoader
+from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_registry import ProviderRegistry
 from infrafoundry.providers.tailscale import TailscaleProvider
 
@@ -91,3 +92,35 @@ class TestPackageLoading:
             "tailscale",
         )
         assert [(r.provider, r.type) for r in resources] == [("opnsense", "tailscale.settings")]
+
+
+class TestKeptOnDestroy:
+    """device_tags opt out of destroy with keep_tags_on_destroy (#1349)."""
+
+    @staticmethod
+    def _r(name: str, rtype: str, **config: object) -> ResourceConfig:
+        return ResourceConfig(name=name, type=rtype, provider="tailscale", config=dict(config))
+
+    def test_opted_in_device_tags(self, provider: TailscaleProvider) -> None:
+        r = self._r("fw-test-tags", "device_tags", keep_tags_on_destroy=True)
+        assert provider.get_state_addresses_kept_on_destroy([r]) == [
+            "tailscale_device_tags.fw_test_tags"
+        ]
+
+    def test_missing_or_false_is_empty(self, provider: TailscaleProvider) -> None:
+        rs = [
+            self._r("a", "device_tags"),
+            self._r("b", "device_tags", keep_tags_on_destroy=False),
+        ]
+        assert provider.get_state_addresses_kept_on_destroy(rs) == []
+
+    def test_other_type_ignored(self, provider: TailscaleProvider) -> None:
+        r = self._r("a", "device_subnet_routes", keep_tags_on_destroy=True)
+        assert provider.get_state_addresses_kept_on_destroy([r]) == []
+
+    def test_mix_returns_only_opted_in(self, provider: TailscaleProvider) -> None:
+        rs = [
+            self._r("a", "device_tags", keep_tags_on_destroy=True),
+            self._r("b", "device_tags"),
+        ]
+        assert provider.get_state_addresses_kept_on_destroy(rs) == ["tailscale_device_tags.a"]

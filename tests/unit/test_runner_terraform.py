@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrafoundry.core.exceptions import FilteredDestroyRefusedError
+from infrafoundry.core.exceptions import FilteredDestroyRefusedError, TerraformError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY
 from infrafoundry.core.runners.terraform_runner import TerraformRunner
@@ -1158,3 +1158,93 @@ class TestSdnAddition(_SdnRunHelpers):
         change.assert_not_called()
         assert cmd is not None
         assert "-replace" not in cmd
+
+
+class TestForgetKeptOnDestroy:
+    """forget_kept_on_destroy drops opted-out addresses from state (#1349)."""
+
+    ADDR = "tailscale_device_tags.fw_test_tags"
+
+    def _run(
+        self,
+        runner: TerraformRunner,
+        provider: MagicMock,
+        addresses: list[str],
+        *,
+        init_ok: bool = True,
+        state: list[str] | None = None,
+        rm_ok: bool = True,
+    ) -> tuple[Any, list[str] | None, Exception | None]:
+        provider.get_state_addresses_kept_on_destroy.return_value = addresses
+        err: Exception | None = None
+        result: list[str] | None = None
+        with (
+            patch.object(runner, "initialize", return_value={"success": init_ok}) as init,
+            patch.object(runner, "state_list", return_value=state or []) as slist,
+            patch.object(runner, "state_rm", return_value=rm_ok) as rm,
+        ):
+            try:
+                result = runner.forget_kept_on_destroy(provider, [])
+            except TerraformError as e:
+                err = e
+        return SimpleNamespace(init=init, slist=slist, rm=rm), result, err
+
+    def test_no_addresses_runs_nothing(self, runner: TerraformRunner, provider: MagicMock) -> None:
+        m, result, err = self._run(runner, provider, [])
+        assert result == [] and err is None
+        m.init.assert_not_called()
+        m.slist.assert_not_called()
+        m.rm.assert_not_called()
+
+    def test_address_in_state_is_removed(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        m, result, _ = self._run(runner, provider, [self.ADDR], state=[self.ADDR, "other.x"])
+        assert result == [self.ADDR]
+        m.rm.assert_called_once_with(provider.terraform_dir, self.ADDR)
+
+    def test_address_not_in_state_is_skipped(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        m, result, _ = self._run(runner, provider, [self.ADDR], state=["other.x"])
+        assert result == []
+        m.rm.assert_not_called()
+
+    def test_state_rm_failure_raises(self, runner: TerraformRunner, provider: MagicMock) -> None:
+        _, _, err = self._run(runner, provider, [self.ADDR], state=[self.ADDR], rm_ok=False)
+        assert isinstance(err, TerraformError)
+
+    def test_init_failure_raises_before_state_list(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        m, _, err = self._run(runner, provider, [self.ADDR], init_ok=False)
+        assert isinstance(err, TerraformError)
+        m.slist.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "make_provider",
+        [
+            pytest.param(lambda: MagicMock(spec=["terraform_dir"]), id="no-hook"),
+            pytest.param(
+                lambda: MagicMock(**{"get_state_addresses_kept_on_destroy.return_value": None}),
+                id="hook-returns-none",
+            ),
+            pytest.param(
+                lambda: MagicMock(
+                    **{"get_state_addresses_kept_on_destroy.return_value": MagicMock()}
+                ),
+                id="hook-returns-non-list",
+            ),
+        ],
+    )
+    def test_pluggable_provider_without_list_hook_keeps_nothing(
+        self, runner: TerraformRunner, make_provider: Any
+    ) -> None:
+        """A provider lacking the hook, or returning no list, leaves state alone."""
+        with (
+            patch.object(runner, "initialize") as init,
+            patch.object(runner, "state_rm") as rm,
+        ):
+            assert runner.forget_kept_on_destroy(make_provider(), []) == []
+        init.assert_not_called()
+        rm.assert_not_called()

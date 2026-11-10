@@ -265,6 +265,28 @@ class ChecksFilteredDestroy(Protocol):
 
 
 @runtime_checkable
+class ForgetsKeptOnDestroy(Protocol):
+    """Protocol for runners that can drop opted-out resources from state (#1349).
+
+    ``isinstance`` against it checks that ``forget_kept_on_destroy`` exists.
+    """
+
+    def forget_kept_on_destroy(
+        self, provider: "ProviderBase", resources: "list[ResourceConfig]"
+    ) -> list[str]:
+        """Remove the resources the provider keeps on destroy from state.
+
+        Args:
+            provider: Provider whose resources are being destroyed
+            resources: The resources this destroy covers
+
+        Returns:
+            Addresses removed from state
+        """
+        ...
+
+
+@runtime_checkable
 class HasSnippetStrictness(Protocol):
     """Protocol for providers that can fail on missing cloud-init snippets.
 

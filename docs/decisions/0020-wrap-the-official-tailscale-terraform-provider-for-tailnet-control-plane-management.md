@@ -23,7 +23,7 @@ Add a `tailscale` provider that generates Terraform for the official provider in
 - **Credentials:** OAuth first, with `api_key` as the alternative. Values in `provider_settings.tailscale` may be `secret://env_secrets/...` URIs. `TerraformGeneratorMixin.build_terraform_env_vars` gains an opt-in, keyword-only `resolve_secret_uris` parameter (default False, so no other provider changes) that resolves them against the environment's decrypted secrets. The values reach Terraform only as `TF_VAR_*` environment variables. Every variable defaults to null, so the provider falls back to its own `TAILSCALE_*` variables.
 - **Tailnet key output:** `tailnet_key.key` is sensitive and is exposed as one sensitive output per key. It is already in the Terraform state, so the output adds no exposure, and `terraform output -raw` is the way to read it without opening the state. The docs state that local state holds the key and ACL in plaintext and recommend an encrypted remote backend.
 - **ACL:** exactly one of `policy` (a mapping, serialised to JSON) or `hujson` (a string kept verbatim). A fresh `tailscale_acl` needs an import (`import_id`) or `overwrite_existing_content: true`; the provider refuses otherwise. `reset_acl_on_destroy` is opt-in because resetting restores Tailscale's allow-all default policy.
-- **Devices:** `device_subnet_routes` and `device_tags` take a `device:` lookup (hostname or name, rendered as a `tailscale_device` data source) or a raw `device_id`. At most one of each per device.
+- **Devices:** `device_subnet_routes` and `device_tags` take a `device:` lookup (hostname or name, rendered as a `tailscale_device` data source) or a raw `device_id`. At most one of each per device. `device_tags` accepts an opt-in `keep_tags_on_destroy: true`, which removes the resource from Terraform state before destroy so a tagged node keeps its tags (the API refuses to untag it). It uses the additive `ProviderBase.get_state_addresses_kept_on_destroy` hook.
 - **Validation:** config-only checks. Doctor makes no network call. Under OAuth, a `tailnet_key` without `tags` is an error, because OAuth clients can only create tagged keys.
 - **Version pin:** `~> 0.29.3`. The provider is pre-1.0, where minor versions may break, and only that schema was measured.
 
@@ -40,6 +40,7 @@ Alternatives rejected:
 
 - Issue #870: Tailscale control-plane provider
 - Issue #787: OPNsense os-tailscale plugin (the node side)
+- Issue #1349: keep tags on destroy for tagged nodes
 
 ## Related Documentation
 

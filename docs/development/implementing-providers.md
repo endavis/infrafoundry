@@ -93,6 +93,23 @@ A type listed here must not appear in `get_resource_types()`. `Orchestrator.vali
 generic "does not support" error. The default returns `{}`. OPNsense uses it for the system
 types that have no API on 26.1 (#1149).
 
+### get_state_addresses_kept_on_destroy()
+
+**Purpose:** Name Terraform addresses to drop from state before a destroy, so the remote object
+outlives the destroy.
+
+```python
+def get_state_addresses_kept_on_destroy(self, resources: list[ResourceConfig]) -> list[str]:
+    """Return Terraform addresses to remove from state before destroy."""
+    return []
+```
+
+`resources` is the scoped list the destroy covers (after the resource, package and provider
+filters). The default returns `[]`. The Terraform runner (and OpenTofu, which inherits it)
+runs `terraform init`, then `terraform state rm` for each returned address that is in state,
+right before `terraform destroy`. A failed init or `state rm` aborts the destroy. Other runners
+ignore the hook. Tailscale uses it for `device_tags` with `keep_tags_on_destroy: true` (#1349).
+
 ### validate_connectivity()
 
 **Purpose:** Validate connectivity to provider API and verify credentials.
