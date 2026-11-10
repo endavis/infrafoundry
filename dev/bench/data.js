@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794313696254,
+  "lastUpdate": 1794321273611,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -868,6 +868,37 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009499361289255129",
             "extra": "mean: 129.13768245697307 usec\nrounds: 8254"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "88ce6855d253134bd6786961038ed62428f3eff6",
+          "message": "fix: let tailscale device_tags opt out of clearing tags on destroy (merges PR #1350, addresses #1349)\n\nA node that joined with a tagged auth key cannot be untagged: the\nTailscale API answers \"tagged nodes cannot be untagged without reauth\n(400)\", so `infra destroy -P tailscale` stopped at tailscale_device_tags.\n\ndevice_tags now accepts an opt-in `keep_tags_on_destroy: true`. Destroy\nthen removes that resource from Terraform state before `terraform\ndestroy`, so the device keeps its tags and the destroy completes.\nWithout the field nothing changes.\n\n- ProviderBase.get_state_addresses_kept_on_destroy: additive hook,\n  default []; the tailscale provider returns the opted-in device_tags\n  addresses.\n- TerraformRunner.forget_kept_on_destroy: inits, lists state and runs\n  `state rm` on each returned address in state; a failed init or\n  state rm raises before destroy. A provider without the hook, or one\n  returning no list, keeps nothing.\n- DestroyOrchestrator calls it through the new ForgetsKeptOnDestroy\n  protocol just before runner.destroy, with the filtered resources.\n- The validator requires the field to be a boolean; docs, the\n  implementing-providers guide and ADR-0020 describe it.\n\nVerified live: with the field set, destroy printed the \"Keeping ...\"\nline, completed, and the node kept its tag.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-10T14:33:52Z",
+          "tree_id": "c56909eb28e68179da882d54c7cb527898f2bd6f",
+          "url": "https://github.com/endavis/infrafoundry/commit/88ce6855d253134bd6786961038ed62428f3eff6"
+        },
+        "date": 1794321272956,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16122.669687341182,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001563092206132753",
+            "extra": "mean: 62.024467373735035 usec\nrounds: 17348"
           }
         ]
       }
