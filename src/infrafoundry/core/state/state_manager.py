@@ -13,6 +13,7 @@ from sqlalchemy.orm import sessionmaker
 
 from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.state.deployment_repository import DeploymentRepository
+from infrafoundry.core.state.indexes import ensure_indexes as _ensure_indexes
 from infrafoundry.core.state.lock_repository import LockRepository
 from infrafoundry.core.state.models import (
     Base,
@@ -67,6 +68,9 @@ class StateManager(BaseManager):
         """Initialize database schema."""
         self._log_debug("Initializing database schema")
         Base.metadata.create_all(self.engine)
+        created = _ensure_indexes(self.engine)
+        if created:
+            self._log_info(f"Created missing state indexes: {', '.join(created)}")
         renamed = _rename_legacy_singleton_rows(self.SessionLocal)
         if renamed:
             self._log_info(f"Renamed {renamed} legacy OPNsense singleton rows (#1237)")

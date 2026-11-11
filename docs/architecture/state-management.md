@@ -60,6 +60,10 @@ InfraFoundry manages three artifacts: Terraform state, the InfraFoundry state da
     `INFRAFOUNDRY_STATE_POOL_SIZE` (default `5`), `INFRAFOUNDRY_STATE_MAX_OVERFLOW` (default `10`)
     and `INFRAFOUNDRY_STATE_POOL_RECYCLE` in seconds (default `1800`). Connections are also
     pre-pinged before use. A non-integer or negative value logs a warning and uses the default.
+  - Schema: created and upgraded at initialization. Missing tables come from `create_all`; missing
+    indexes, including the composite `(environment, provider, name)` on `resources` and
+    `(environment, started_at)` on `deployments`, are added to existing SQLite or PostgreSQL
+    databases automatically. There is no migration tool, and old indexes are never dropped.
 - **Generated configs:**
   - Path: `generated/{env}/{terraform|ansible}/{provider}/`.
   - Git-ignored, reproducible from YAML; clean up safely between runs if needed.

@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -42,6 +42,7 @@ class Deployment(Base):
     """Record of a deployment operation."""
 
     __tablename__ = "deployments"
+    __table_args__ = (Index("ix_deployments_env_started_at", "environment", "started_at"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     environment: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
@@ -73,6 +74,7 @@ class Resource(Base):
     """Tracked resource in infrastructure."""
 
     __tablename__ = "resources"
+    __table_args__ = (Index("ix_resources_env_provider_name", "environment", "provider", "name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     deployment_id: Mapped[int] = mapped_column(
