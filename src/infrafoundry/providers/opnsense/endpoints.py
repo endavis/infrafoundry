@@ -477,6 +477,44 @@ TAILSCALE_SUBNET = _crud(
 )
 TAILSCALE_RECONFIGURE = Endpoint("POST", "tailscale/service/reconfigure", EndpointKind.PLUGIN)
 
+# --- monit (#791, core) -----------------------------------------------------------------
+# Monit ships with core OPNsense, so every endpoint is STOCK and the conformance test
+# covers it. The names are the camelCase actions of the bundled spec. The settings
+# document (``settings/get``) returns ``general`` plus the ``alert``, ``service`` and
+# ``test`` rows keyed by UUID, so the managers read live state with that one call; the
+# CRUD ``search`` and ``get`` actions are registered but not called. Never registered on
+# purpose: ``toggle*``, ``service/start|stop|restart|check`` and ``status/*``.
+MONIT_SETTINGS_GET = Endpoint("GET", "monit/settings/get")
+MONIT_SETTINGS_SET = Endpoint("POST", "monit/settings/set")
+MONIT_ALERT = _crud(
+    "monit/settings",
+    search="searchAlert",
+    get="getAlert",
+    add="addAlert",
+    update="setAlert",
+    delete="delAlert",
+    search_method="GET",
+)
+MONIT_SERVICE = _crud(
+    "monit/settings",
+    search="searchService",
+    get="getService",
+    add="addService",
+    update="setService",
+    delete="delService",
+    search_method="GET",
+)
+MONIT_TEST = _crud(
+    "monit/settings",
+    search="searchTest",
+    get="getTest",
+    add="addTest",
+    update="setTest",
+    delete="delTest",
+    search_method="GET",
+)
+MONIT_RECONFIGURE = Endpoint("POST", "monit/service/reconfigure")
+
 # --- core -----------------------------------------------------------------------------
 CORE_MENU_SEARCH = Endpoint("GET", "core/menu/search")
 CORE_SYSTEM_STATUS = Endpoint("GET", "core/system/status")
@@ -646,6 +684,29 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     "tailscale.subnets": (
         *TAILSCALE_SUBNET.all(),
         TAILSCALE_RECONFIGURE,
+    ),
+    # #791 (monit, core). Rows are read through ``MONIT_SETTINGS_GET``.
+    "monit.settings": (MONIT_SETTINGS_GET, MONIT_SETTINGS_SET, MONIT_RECONFIGURE),
+    "monit.alerts": (
+        MONIT_SETTINGS_GET,
+        MONIT_ALERT.add,
+        MONIT_ALERT.update,
+        MONIT_ALERT.delete,
+        MONIT_RECONFIGURE,
+    ),
+    "monit.tests": (
+        MONIT_SETTINGS_GET,
+        MONIT_TEST.add,
+        MONIT_TEST.update,
+        MONIT_TEST.delete,
+        MONIT_RECONFIGURE,
+    ),
+    "monit.services": (
+        MONIT_SETTINGS_GET,
+        MONIT_SERVICE.add,
+        MONIT_SERVICE.update,
+        MONIT_SERVICE.delete,
+        MONIT_RECONFIGURE,
     ),
 }
 

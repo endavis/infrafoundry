@@ -51,6 +51,7 @@ tags:
 **Amended:** 2026-11-10 (#1286) — new `firewall.categories` per-component decision (list-shape, managed-set direct-API type over `firewall/category/*Item`; the `infrafoundry` marker is never part of the diff; registered after rules, NAT and aliases so its deletes run last without a split phase; a category the box reports in use is kept with a warning; write and refusal behaviour not yet verified on a box)
 **Amended:** 2026-11-10 (#1320) — `openvpn.instances` gains an optional `cert_ref` to a `trust.certs` resource, resolved to the live certificate `refid` and sent as the wire `cert`. The manager declares the tuple `SIBLING_RESOURCE_TYPE = ("trust.cas", "trust.certs")`; the runner already accepted a tuple (#790), so it is unchanged.
 **Amended:** 2026-11-09 (#1322) — `system.users` passwords verified live: a GUI login succeeds with the InfraFoundry-set password, fails with a wrong one, and a rotation with `update_password` replaces the old password
+**Amended:** 2026-11-11 (#791) — `monit.settings`, `monit.alerts`, `monit.tests` and `monit.services` per-component decision recorded (core, stock-kind direct-REST against `monit/settings/*`; one `settings/get` read serves all four types; secrets never echoed; services delete before tests and a still-referenced row is blocked, not deleted; new shared finalization hook `monit_reconfigure`).
 **Status:** Accepted
 
 ## Status
@@ -596,6 +597,54 @@ The dispatch order is settings, accounts, validations, actions, certs. Certs set
 - **Migrate:** each type has an extractor; the auth export writes only a `secret://` placeholder for the key.
 - **Verified on a test box** (plugin installed for the test and removed afterwards, Tailscale disabled throughout, throwaway key): subnet add, set (same uuid) and delete; an unmanaged subnet kept; the settings write inverting `enable_snat` and leaving subnets untouched; `authentication/get` echoes the stored key, so key changes are detected without the flag; one `service/reconfigure` per apply with the service still stopped; idempotent re-plans; migrate with only the key placeholder; no key text in any output. **Not verified:** a running tunnel and `use_exit_node` with real peers.
 
+### `monit.*` (#791, 2026-11-11)
+
+**Mechanism:** Direct-REST against the core `monit/*` MVC controllers. Four types: `monit.settings` (a singleton dict) and `monit.alerts`, `monit.tests` and `monit.services` (managed-set lists, [ADR-0018](0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). Documented in [Monit (#791)](../development/opnsense-resource-coverage.md#monit-791). Monit ships with OPNsense, so every endpoint is `EndpointKind.STOCK`: the offline conformance test and the plan-time version check cover them, and there is no missing-plugin tolerance. Never registered: `toggle*`, `service/start|stop|restart|check` and `status/*`; the provider does not start or stop the service.
+
+- **Endpoints:** `GET monit/settings/get`, `POST monit/settings/set`, the CRUD actions `addAlert|addService|addTest`, `setX/{uuid}` and `delX/{uuid}` under `monit/settings/`, and `POST monit/service/reconfigure`. The names are the camelCase actions of the bundled spec. There is no `setGeneral`: the settings write is `settings/set` with `{"monit": {"general": {...}}}`.
+- **One read:** `settings/get` returns the whole model (`general`, plus `alert`, `service` and `test` keyed by UUID, with option dicts). Each manager reads live state with that single call and flattens the option dicts; there is no per-row `get` and no pagination.
+
+#### `monit.settings`
+
+A singleton. Only declared fields are compared (lists as sets); the write body echoes the flattened live `general` with the declared fields overwritten. `password`, `httpd_password` and `mmonit_url` are `secret://` URIs, compared plainly against the live value and never logged, put in an exception or shown in a plan (`[REDACTED]`). The write never echoes a live secret field the operator did not declare: MVC `set` leaves fields it is not sent alone, so a masked value cannot clobber the stored one. Destroy is a no-op. The export writes `secret://env_secrets/opnsense/monit/settings/<field>` for a non-empty secret and `""` for an empty one.
+
+#### `monit.alerts`
+
+Identity is `recipient`, which is required. `events` is a list (an empty list means all events) checked against the 29 event names and compared as a set.
+
+#### `monit.tests`
+
+Identity is the wire `name`: `test_name` when set, else the handle. `type` and `action` are wire enums; the box spells one type `Permisssion` (three `s`) and the provider keeps that spelling. `condition` is required.
+
+#### `monit.services`
+
+Identity is the wire `name`: `service_name` when set, else the handle. Two cross-references are handles, resolved to comma-joined live UUIDs: `tests` (to `monit.tests`, through `sibling_resources`) and `depends` (to other services). A `depends` target added in the same apply is satisfied in-apply: adds are ordered dependencies first and the UUID each add returns is recorded (the model is re-read when a reply carries none). A missing target is a plan warning and an apply `ReferenceValidationError` before any write; a `depends` cycle is a validator ERROR. Per-type required fields: `path` is an ERROR for `filesystem`, `custom`, `file`, `fifo` and `directory`; the unprobed rules for `process`, `host` and `network` are WARNINGs.
+
+#### Deletes
+
+- `monit.services` sets `SPLIT_DELETE_PHASE`, so services delete before the tests they use, in the runner's delete phase and in destroy; service deletes are ordered dependents first.
+- A delete that a surviving live row still references is blocked, not attempted: a test a live service lists, or a service another surviving or declared service depends on. The row goes to `diff.blocked` with a warning, and its name is returned in `unresolved_managed` so it stays managed and the next apply removes it once the reference is gone. This avoids a mid-apply failure when the referencing row is only updated later in the forward pass. The plan reads the live services, so it can report a test as blocked that the apply (services first) would delete.
+
+#### Reconfigure and migrate
+
+The four managers share the `monit_reconfigure` finalization hook, one `monit/service/reconfigure` per apply; a list manager's destroy reconfigures directly. Each type has a `config migrate` extractor. Handles are a kebab slug of the wire name (alerts: of the recipient), assigned once across the three lists and avoiding every opnsense name in the environment, so the references in the services export match the tests and services exports.
+
+#### Verified and not verified
+
+**Verified by a read-only probe** of a test firewall holding the stock monit configuration: the `settings/get` model, the wire fields and enums, and the stock rows. **Verified offline** against the bundled specs: the camelCase action names, `settings/get`, `settings/set` and `service/reconfigure`.
+
+**Verified live** (2026-11-11, test firewall, monit left disabled; details in the coverage document):
+- the export of the stock set re-plans with zero changes;
+- destroy deletes services first;
+- the rebuild creates 16 rows, and the `add` replies carry `uuid`;
+- one reconfigure runs per apply, and the re-plan is clean;
+- the box echoes a stored `httpd_password`, so the plain secret compare holds;
+- `--add-only` suppresses deletes.
+
+**Not verified live:**
+- that a partial `general` write leaves undeclared fields alone;
+- that the box refuses to delete a referenced row. The blocking prevents such deletes before they are sent.
+
 ### `firewall.source_nat` (#1333, 2026-11-09)
 
 **Mechanism:** Direct-REST singleton over `snat_mode`, the one field of the `filter.general` node that this type manages. Only a declared key is compared and written. Destroy is a no-op. Applies ADR-0014 and ADR-0016 unchanged.
@@ -648,6 +697,8 @@ A fourth hook, `cron_reconfigure` (#789), is declared on `CronJobsManager`. The 
 A fifth hook, `acmeclient_reconfigure` (#790), is shared by the five `acmeclient.*` managers (settings and four lists), so one `acmeclient/service/reconfigure` call fires per apply when any of them changed state.
 
 A sixth hook, `tailscale_reconfigure` (#787), is shared by the three `tailscale.*` managers (two singletons and the subnet list), so one `tailscale/service/reconfigure` call fires per apply when any of them changed state. The endpoint was verified live (`{"status": "ok"}`).
+
+A seventh hook, `monit_reconfigure` (#791), is shared by the four `monit.*` managers (the settings singleton and three lists), so one `monit/service/reconfigure` call fires per apply when any of them changed state.
 
 Future components with shared post-apply work register their own key here.
 
@@ -733,6 +784,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#1286](https://github.com/endavis/infrafoundry/issues/1286): feat: manage OPNsense firewall categories.
 - Issue [#790](https://github.com/endavis/infrafoundry/issues/790): feat: add the `acmeclient.*` direct-API resources for the OPNsense ACME client plugin.
 - Issue [#787](https://github.com/endavis/infrafoundry/issues/787): feat: add `tailscale.settings`, `tailscale.auth` and `tailscale.subnets` direct-API resources for the OPNsense Tailscale plugin.
+- Issue [#791](https://github.com/endavis/infrafoundry/issues/791): feat: add `monit.settings`, `monit.alerts`, `monit.tests` and `monit.services` direct-API resource types for core OPNsense monit.
 - Issue [#1091](https://github.com/endavis/infrafoundry/issues/1091): feat: add `unbound.settings` resource for OPNsense Unbound general and advanced settings.
 - Issue [#1254](https://github.com/endavis/infrafoundry/issues/1254): feat: manage Unbound advanced settings (private and insecure domains) on OPNsense.
 - Issue [#1244](https://github.com/endavis/infrafoundry/issues/1244): refactor: remove the unreachable implementation of the five retired OPNsense system types.

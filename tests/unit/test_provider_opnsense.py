@@ -615,3 +615,54 @@ class TestAcmeclientRegistration:
         managers = provider.get_direct_api_resource_types()
         for t in self.TYPES:
             assert callable(getattr(managers[t], "migrate", None))
+
+
+class TestMonitTypes:
+    """The four ``monit.*`` types are wired in order with one shared hook (#791)."""
+
+    @pytest.fixture
+    def provider(self, tmp_path: Path) -> OPNsenseProvider:
+        return OPNsenseProvider(config_dir=tmp_path, output_dir=tmp_path)
+
+    TYPES = ("monit.settings", "monit.alerts", "monit.tests", "monit.services")
+
+    def test_dispatch_order(self, provider: OPNsenseProvider) -> None:
+        types = list(provider.get_direct_api_resource_types())
+        positions = [types.index(t) for t in self.TYPES]
+        assert positions == sorted(positions)
+        assert types.index("tailscale.subnets") < positions[0]
+        assert types.index("monit.tests") < types.index("monit.services")
+        assert all(t in provider.get_resource_types() for t in self.TYPES)
+
+    def test_dependencies(self, provider: OPNsenseProvider) -> None:
+        deps = provider.get_dependencies()
+        assert deps["monit.services"] == ["monit.tests"]
+        for t in self.TYPES[:3]:
+            assert deps[t] == []
+
+    def test_all_managers_share_the_hook_and_it_calls_the_service_once(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        from unittest.mock import patch
+
+        from infrafoundry.providers.opnsense.services.monit_settings import MonitSettingsService
+
+        managers = provider.get_direct_api_resource_types()
+        assert {managers[t].FINALIZATION_HOOK for t in self.TYPES} == {"monit_reconfigure"}
+        with patch.object(MonitSettingsService, "from_environment") as factory:
+            provider.get_finalization_hooks()["monit_reconfigure"]("env")
+        factory.return_value.reconfigure.assert_called_once_with()
+
+    def test_only_services_split_deletes_and_read_tests_as_siblings(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        managers = provider.get_direct_api_resource_types()
+        assert managers["monit.services"].SPLIT_DELETE_PHASE is True
+        assert managers["monit.services"].SIBLING_RESOURCE_TYPE == ("monit.tests",)
+        for t in ("monit.settings", "monit.alerts", "monit.tests"):
+            assert not getattr(managers[t], "SPLIT_DELETE_PHASE", False)
+
+    def test_every_extractor_manager_has_migrate(self, provider: OPNsenseProvider) -> None:
+        managers = provider.get_direct_api_resource_types()
+        for t in self.TYPES:
+            assert callable(getattr(managers[t], "migrate", None))

@@ -28,6 +28,7 @@ from infrafoundry.providers.opnsense.validators import (
     InterfaceAssignmentValidator,
     InterfacesSettingsValidator,
     KeaReservationValidator,
+    MonitValidator,  # #791
     NATRuleValidator,
     OpenVpnInstanceValidator,
     OpenVpnStaticKeyValidator,  # #1319
@@ -124,6 +125,7 @@ class OPNsenseValidator:
         self.firewall_category_validator = FirewallCategoryValidator(report)  # #1286
         self.acmeclient_validator = AcmeClientValidator(report)  # #790
         self.tailscale_validator = TailscaleValidator(report)  # #787
+        self.monit_validator = MonitValidator(report)  # #791
         self.system_firmware_validator = SystemFirmwareValidator(report)
         self.system_tuning_validator = SystemTuningValidator(report)
         self.system_user_validator = SystemUserValidator(report)
@@ -402,6 +404,7 @@ class OPNsenseValidator:
             self.tailscale_validator.validate(
                 replace(context, resources=resource_refs["tailscale"])
             )
+            self.monit_validator.validate(replace(context, resources=resource_refs["monit"]))
             self.system_firmware_validator.validate(
                 replace(context, resources=resource_refs["system_firmware"])
             )
@@ -464,6 +467,7 @@ class OPNsenseValidator:
         firewall_categories = [r for r in resources if r.type == "firewall.categories"]
         acmeclient = [r for r in resources if r.type.startswith("acmeclient.")]
         tailscale = [r for r in resources if r.type.startswith("tailscale.")]
+        monit = [r for r in resources if r.type.startswith("monit.")]
         system_firmware = [r for r in resources if r.type == "system.firmware"]
         system_tuning = [r for r in resources if r.type == "system.tuning"]
         system_users = [r for r in resources if r.type == "system.users"]
@@ -523,6 +527,7 @@ class OPNsenseValidator:
             "firewall_categories": firewall_categories,
             "acmeclient": acmeclient,
             "tailscale": tailscale,
+            "monit": monit,
             "system_firmware": system_firmware,
             "system_tuning": system_tuning,
             "system_users": system_users,

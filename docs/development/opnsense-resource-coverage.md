@@ -57,7 +57,10 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<OPNsense>/AcmeClient` (`os-acme-client` plugin, `acmeclient/*`) | `acmeclient.settings`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs` | Supported (direct-API; #790). The wire `name` is the identity (the CN for certs), and certs reference accounts, validations and actions by handle. Secret fields take `secret://` URIs. The four list types delete only managed rows; `config migrate` extractors exist for all five. The plugin comes from `system.firmware`; its renewal cron job is plugin-managed. Add, update, delete, re-plan and `config migrate` are verified live; `fetchCronIntegration` is not. See [ACME client (#790)](#acme-client-790). |
 | `<OPNsense>/tailscale` (`os-tailscale` plugin, `tailscale/*`) | `tailscale.settings`, `tailscale.auth`, `tailscale.subnets` | Supported (direct-API; #787). `settings` and `auth` are singletons, `subnets` is a managed-set list keyed by the normalized CIDR. The pre-auth key must be a `secret://` URI. One `tailscale/service/reconfigure` fires per apply; the plugin is never started and no tailnet is joined. A `config migrate` extractor exists for each. See [Tailscale (#787)](#tailscale-787). |
 | `<OPNsense>/Syslog` | `syslog.settings` | Supported (direct-API; #804). A singleton over the `general` section of the syslog model (local logging switch and log rotation); only declared fields are compared, the whole live `general` object is echoed back on write; destroy is a no-op; the `syslog_reconfigure` hook fires one reconfigure per apply. Remote `destinations` are not managed. The `set` and `reconfigure` calls are verified live. See [Syslog settings](#syslog-settings-804). |
-| `<OPNsense>/monit` | `monit_*` (proposed) | **Gap.** Not managed yet; import it by hand from the old box's `config.xml` until [#791](https://github.com/endavis/infrafoundry/issues/791) ships. |
+| `<OPNsense>/monit` general (core `monit/settings/*`) | `monit.settings` | Supported (direct-API; #791). A singleton over the `general` section: mail relay, SSL, the `httpd` control interface and the M/Monit link. Only declared fields are compared; lists compare as sets. `password`, `httpd_password` and `mmonit_url` take `secret://` URIs and are never logged or echoed. Destroy is a no-op. See [Monit (#791)](#monit-791). |
+| `<OPNsense>/monit` alerts | `monit.alerts` | Supported (direct-API; #791). A managed-set list keyed by `recipient`. `events` is a list of the 29 monit event names; an empty list means all events. See [Monit (#791)](#monit-791). |
+| `<OPNsense>/monit` tests | `monit.tests` | Supported (direct-API; #791). A managed-set list keyed by the wire `name` (`test_name`, else the handle). `type` and `action` are wire enums. A test a surviving service uses is kept, not deleted. See [Monit (#791)](#monit-791). |
+| `<OPNsense>/monit` services | `monit.services` | Supported (direct-API; #791). A managed-set list keyed by the wire `name` (`service_name`, else the handle). `tests` and `depends` are handle references. Services delete before tests. One `monit/service/reconfigure` fires per apply. See [Monit (#791)](#monit-791). |
 | `<OPNsense>/Hostwatch` | `hostdiscovery` | Supported (direct-API; #792). The YAML key is `hostdiscovery`, not `hostwatch`, to match the wire API. A singleton; only declared fields are compared (lists as sets), the whole live `general` section is echoed back on write; destroy is a no-op; the `hostdiscovery_reconfigure` hook fires one reconfigure per apply. The `set` and `reconfigure` calls are verified live. See [Host discovery](#host-discovery-792). |
 | `<OPNsense>/unboundplus/advanced` (`privatedomain`, `insecuredomain`, `privateaddress`) | `unbound.advanced` | Supported (direct-API; #1254). Only declared fields are compared; the whole `advanced` section is echoed back on write; destroy is a no-op; shares the `unbound_reconfigure` hook. The `set` envelope key `unbound` is verified live through `unbound.settings` (#1091). |
 | `<OPNsense>/unboundplus/general`, the rest of `<OPNsense>/unboundplus/advanced` | `unbound.settings` | Supported (direct-API; #1091). Singleton with optional `general:` and `advanced:` mappings keyed by wire field name; only declared fields are compared, each declared live section is echoed back whole on write; destroy is a no-op; shares the `unbound_reconfigure` hook. See [Unbound general and advanced settings](#unbound-general-and-advanced-settings-1091). |
@@ -566,6 +569,170 @@ One `tailscale/service/reconfigure` fires per apply, through the shared `tailsca
 
 **Not verified:** a running tunnel (Tailscale stayed disabled), `use_exit_node` with real peers, and the "plugin not installed" plan warning against a box (covered by unit tests).
 
+## Monit (#791)
+
+Monit is part of core OPNsense, not a plugin, so every endpoint is stock: the offline conformance test and the plan-time version check cover them. It is managed through four direct-API types: `monit.settings` (a singleton dict) and `monit.alerts`, `monit.tests` and `monit.services` (lists). The three lists are managed-set types ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). Dispatch order is settings, alerts, tests, services, after `tailscale.subnets`. Monit stays whatever `monit.settings.enabled` says; the provider never starts, stops or restarts the service and never calls `toggle*`, `status/*` or `service/start|stop|restart|check`.
+
+```yaml
+opnsense:
+  monit:
+    settings:
+      enabled: false
+      interval: 120
+      mailserver:
+        - mail.example.com
+      port: 25
+      password: secret://env_secrets/opnsense/monit/settings/password
+      httpd_password: secret://env_secrets/opnsense/monit/settings/httpd_password
+      mmonit_url: secret://env_secrets/opnsense/monit/settings/mmonit_url
+    alerts:
+      - name: ops-example-com
+        config:
+          recipient: ops@example.com
+          enabled: false
+          events:
+            - connection
+            - timeout
+    tests:
+      - name: memory-usage
+        config:
+          test_name: MemoryUsage
+          type: SystemResource
+          condition: memory usage is greater than 75%
+          action: alert
+      - name: space-usage
+        config:
+          test_name: SpaceUsage
+          type: SpaceUsage
+          condition: space usage is greater than 75%
+          action: alert
+      - name: changed-status
+        config:
+          test_name: ChangedStatus
+          type: ProgramStatus
+          condition: changed status
+          action: alert
+    services:
+      - name: host
+        config:
+          service_name: "$HOST"
+          enabled: true
+          type: system
+          tests:
+            - memory-usage
+      - name: root-fs
+        config:
+          service_name: RootFs
+          enabled: true
+          type: filesystem
+          path: /
+          tests:
+            - space-usage
+      - name: nightly-check
+        config:
+          service_name: nightly_check
+          enabled: false
+          type: custom
+          path: /opt/example/nightly_check.sh
+          tests:
+            - changed-status
+          depends:
+            - host
+```
+
+### Settings (`monit.settings`)
+
+Every key is optional; only declared keys are compared and written. The OPNsense API has no `setGeneral` action: the write is `POST monit/settings/set` with `{"monit": {"general": {...}}}`, and the read is `GET monit/settings/get`, which returns the whole model.
+
+| Field | Wire | Type |
+| --- | --- | --- |
+| `enabled` | `enabled` | bool |
+| `interval` | `interval` | integer, 1 or more |
+| `start_delay` | `startdelay` | integer, 0 or more |
+| `mailserver` | `mailserver` | list of strings |
+| `port` | `port` | integer, 1-65535 |
+| `username`, `logfile`, `statefile` | same | string |
+| `password` | `password` | string, secret |
+| `ssl`, `ssl_verify` | `ssl`, `sslverify` | bool |
+| `ssl_version` | `sslversion` | `auto`, `tlsv1`, `tlsv11`, `tlsv12`, `tlsv13` |
+| `eventqueue_path` | `eventqueuePath` | string |
+| `eventqueue_slots` | `eventqueueSlots` | integer, 0 or more |
+| `httpd_enabled` | `httpdEnabled` | bool |
+| `httpd_username` | `httpdUsername` | string |
+| `httpd_password` | `httpdPassword` | string, secret |
+| `httpd_port` | `httpdPort` | integer, 1-65535 |
+| `httpd_allow` | `httpdAllow` | list of strings |
+| `mmonit_url` | `mmonitUrl` | string, secret (it may carry credentials) |
+| `mmonit_timeout` | `mmonitTimeout` | integer, 0 or more |
+| `mmonit_register_credentials` | `mmonitRegisterCredentials` | bool |
+
+Lists (`mailserver`, `httpd_allow`) are written in the order given and compared as sets. The stock defaults are `interval: 120`, `start_delay: 120`, `port: 25`, `httpd_port: 2812` and `mmonit_timeout: 5`.
+
+**Secrets.** `password`, `httpd_password` and `mmonit_url` take `secret://` URIs, resolved before the diff; an empty string is allowed. A non-empty literal is a validator WARNING. They are compared plainly against the live value and are never logged, put in an error message or shown in a plan: the plan map shows `[REDACTED]`. The write body echoes the flattened live `general` with the declared fields overwritten, but never a live secret field you did not declare. MVC `set` leaves fields it is not sent alone, so a masked value on the box can never overwrite the stored one. `config migrate` writes `secret://env_secrets/opnsense/monit/settings/<field>` for a non-empty secret and `""` for an empty one, never the value.
+
+### Identity, handles and references
+
+The YAML `name` is the reference handle and must not contain a `.`. The wire identity is:
+
+- **Services and tests:** the wire `name`, taken from `service_name` / `test_name` when set, else from the handle. Stock names such as `$HOST` and `MemoryUsage` therefore go in `service_name` / `test_name`.
+- **Alerts:** `recipient`, which is required. Two entries with one identity are a validation ERROR; two live rows with one identity raise a drift error.
+
+A change of identity is a delete plus an add.
+
+`tests` (to `monit.tests`) and `depends` (to `monit.services`) take handles in one of three forms: `name`, `tests.name` (in-plugin) or `monit.tests.name`. The manager maps a handle to the sibling or managed resource's wire name, then to the live UUID, and writes the UUIDs comma-joined. A reference to a row that is not on the box yet is planned with a warning; at apply an unresolved one raises `ReferenceValidationError` before any write. A `depends` target that the same apply adds is satisfied in the apply: services are added dependencies first, and the UUID each add returns is used for the next. A `depends` cycle or a self-dependency is a validation ERROR.
+
+### Lists
+
+| Type | Fields (YAML key, wire name when different) |
+| --- | --- |
+| `monit.alerts` | `recipient`, `enabled`, `noton`, `events` (list), `format`, `reminder` (integer), `description` |
+| `monit.tests` | `test_name`, `type`, `condition`, `action`, `path` |
+| `monit.services` | `service_name`, `enabled`, `description`, `type`, `pidfile`, `match`, `path`, `timeout`, `start_timeout` (`starttimeout`), `address`, `interface`, `start`, `stop`, `tests`, `depends`, `poll_time` (`polltime`) |
+
+Enums, as the box spells them:
+
+- Service `type`: `process`, `file`, `fifo`, `filesystem`, `directory`, `host`, `system`, `custom`, `network`.
+- Test `type`: `Existence`, `SystemResource`, `ProcessResource`, `ProcessDiskIO`, `FileChecksum`, `Timestamp`, `FileSize`, `FileContent`, `FilesystemMountFlags`, `SpaceUsage`, `InodeUsage`, `DiskIO`, `Permisssion` (three `s`, as on the wire; `Permission` is rejected), `UID`, `GID`, `PID`, `PPID`, `Uptime`, `ProgramStatus`, `NetworkInterface`, `NetworkPing`, `Connection`, `Custom`.
+- Test `action`: `alert`, `restart`, `start`, `stop`, `exec`, `unmonitor`.
+- Alert `events`: `action`, `checksum`, `bytein`, `byteout`, `connection`, `content`, `data`, `exec`, `fsflags`, `gid`, `icmp`, `instance`, `invalid`, `link`, `nonexist`, `packetin`, `packetout`, `permission`, `pid`, `ppid`, `resource`, `saturation`, `size`, `speed`, `status`, `timeout`, `timestamp`, `uid`, `uptime`. An empty list means all events.
+
+Comparison is sparse: only declared fields are compared and written. Lists and references compare as sets. `interface` holds an interface key such as `lan` or `wan` (not a device name); the box validates it.
+
+**Required fields per service type.** A service `path` is an ERROR for `filesystem` and `custom` (the stock rows show it) and for `file`, `fifo` and `directory` (monit's `check ... path` syntax cannot render without one). These rules are only WARNINGs, because they were not probed: `process` without `pidfile` or `match`, `host` without `address`, and `network` without `address` or `interface`. A test needs `condition` (ERROR); `action: exec` without `path` is a WARNING. Whether a test type suits a service type is not checked at plan; the box rejects a bad write and InfraFoundry raises its validation message.
+
+### Deletes
+
+The lists delete only managed rows ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)); a row added by hand is kept and shown as unmanaged. `monit.services` splits the delete phase, so services delete before tests, and `destroy` runs services first too. Within the services, a service goes before the services it depends on.
+
+A delete that a surviving live row still references is blocked, not attempted: a test a live service still lists in `tests`, or a service another surviving service still lists in `depends` (or that a declared service depends on). The row is kept, the plan shows it as `blocked (kept)` with a warning, its name stays managed, and the next apply removes it once the reference is gone. The plan is conservative for tests: it reads the live services, so a test that only the services you are also deleting use shows as blocked at plan, while the apply (services delete first) removes it.
+
+### Migrate
+
+`foundry config migrate --provider opnsense --component monit.settings` (and `monit.alerts`, `monit.tests`, `monit.services`) exports the live state. Handles are a kebab slug of the wire name: CamelCase and letter-to-digit boundaries are split, other characters become `-`, and the result is lowercased (`CPUUsage` becomes `cpu-usage`, `LoadAvg1` `load-avg-1`, `$HOST` `host`, `carp_status_change` `carp-status-change`); alerts are slugged from the recipient. One assignment covers all three list types and avoids every opnsense name already in the environment, so the `tests` and `depends` handles in the services export match the other exports. `service_name` / `test_name` is written when it differs from the handle; `recipient` always.
+
+### Reconfigure
+
+One `monit/service/reconfigure` fires per apply, through the shared `monit_reconfigure` finalization hook, when any of the four types changed state. The list managers' `destroy` reconfigure directly when they deleted a row, because the hook does not fire on destroy.
+
+### Verified and not verified
+
+**Verified by a read-only probe** of a test firewall that holds the stock monit configuration (1 alert, 4 services, 11 tests): the `settings/get` model (`general` plus `alert`, `service` and `test` keyed by UUID, with option dicts for the enumerated fields), the wire fields and enums above, the stock rows, and `service/status`. The stock load-average thresholds are 4, 3 and 2.
+
+**Verified offline** against the bundled `opnsense-openapi` specs: the camelCase action names (`searchService`, `addService`, `setService/{uuid}`, `delService/{uuid}` and the same for `Test` and `Alert`), `settings/get`, `settings/set` and `service/reconfigure`. The probe's snake_case spellings answer only because OPNsense routes them.
+
+**Verified live** (2026-11-11, OPNsense 26.1 test firewall, monit left disabled throughout), using a scratch environment that held only the monit tree:
+
+- `config migrate` for all four types exported the stock set (1 alert, 11 tests, 4 services), with the service `tests` written as handles. A plan of that export against the box showed zero changes for all four types.
+- `infra destroy` deleted 4 services, then 1 alert and 11 tests; settings was untouched.
+- The rebuild plan showed 16 adds. The apply created all 16 rows, `add*` replies carried the `uuid` the service references resolve to, and the `monit_reconfigure` hook ran once. The re-plan showed zero changes, and the services' test links on the box matched the stock set.
+- `httpd_password` set through a `secret://env_secrets/...` URI applied as one settings update, and the re-plan showed zero changes, so the box echoes the stored value and the plain compare holds. Setting it back to `""` applied and left the stored value empty, again with a clean re-plan.
+- With one test removed from the YAML, `infra plan --add-only` showed 0 deletes, against 1 delete without the flag.
+
+**Not verified live:**
+
+- that `settings/set` with a partial `general` leaves the undeclared fields alone. The acceptance run declared every field.
+- that the box refuses to delete a referenced test or service. The blocking prevents such deletes before they are sent.
+
 ## Unbound advanced settings (#1254)
 
 `opnsense.unbound.advanced` is a singleton dict with three list fields:
@@ -745,9 +912,9 @@ opnsense:
 
 **Two kinds of type.**
 
-- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.static_keys`, `openvpn.instances`, `firewall.categories`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs` and `tailscale.subnets`.
+- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.static_keys`, `openvpn.instances`, `firewall.categories`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs`, `tailscale.subnets`, `monit.alerts`, `monit.tests` and `monit.services`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
-- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `firewall.source_nat`, `acmeclient.settings`, `tailscale.settings`, `tailscale.auth`, `radvd`) are unaffected.
+- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `firewall.source_nat`, `acmeclient.settings`, `tailscale.settings`, `tailscale.auth`, `monit.settings`, `radvd`) are unaffected.
 
 **Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
 
@@ -804,6 +971,7 @@ Every OPNsense API path the provider calls lives in `src/infrafoundry/providers/
 - **Offline conformance.** `test_endpoint_conformance.py` checks each stock endpoint against every spec bundled with `opnsense-openapi` for the supported series (`SUPPORTED_SERIES`, 26.1). It runs without a box. Gaps in newer series are reported as warnings, not failures.
 - **Plan and doctor.** `infra plan` (and so `infra apply`) and `infra doctor` read the box version from `core/firmware/info` through `opnsense-openapi`'s `detect_version`. A resource type whose endpoints that version lacks is rejected, naming the endpoint and the version. A version with no exact bundled spec, or one that cannot be read, produces a warning and the check is skipped or run against the nearest older spec.
 - **Extension exemption.** `interfaces/assign_settings/*` is served by the in-tree plugin, not stock OPNsense, so the check skips it; a test asserts it stays absent from the specs so the exemption is dropped if upstream ships it.
+- **Core monit.** `monit/*` ships with core OPNsense, so its endpoints are stock and fully checked; tests assert none of them is a `toggle`, start, stop, restart, check or status action.
 - **Plugin exemption.** `acmeclient/*` (`os-acme-client`) and `tailscale/*` (`os-tailscale`) are served by contrib plugins, so the check skips them; tests assert they stay absent from the specs and that only the expected `tailscale/*` endpoints are registered.
 - **Strict mode stays off.** `opnsense-openapi`'s `validate_endpoints=True` needs a known box version, but the wrapper sets `auto_detect_version=False`, and strict mode cannot exempt the extension.
 

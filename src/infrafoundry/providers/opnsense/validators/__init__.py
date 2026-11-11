@@ -27,6 +27,7 @@ from infrafoundry.providers.opnsense.validators.interfaces_settings_validator im
 from infrafoundry.providers.opnsense.validators.kea_reservation_validator import (
     KeaReservationValidator,
 )
+from infrafoundry.providers.opnsense.validators.monit_validator import MonitValidator
 from infrafoundry.providers.opnsense.validators.nat_rule_validator import NATRuleValidator
 from infrafoundry.providers.opnsense.validators.openvpn_instances_validator import (
     OpenVpnInstanceValidator,
@@ -87,6 +88,7 @@ __all__ = [
     "InterfaceAssignmentValidator",
     "InterfacesSettingsValidator",
     "KeaReservationValidator",
+    "MonitValidator",  # #791
     "NATRuleValidator",
     "OpenVpnInstanceValidator",
     "OpenVpnStaticKeyValidator",

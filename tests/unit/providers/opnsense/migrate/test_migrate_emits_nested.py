@@ -492,6 +492,76 @@ class TestMigrateTailscaleEmitsNested:
         assert {(r.name, r.type) for r in parsed} == {("lab-net", "tailscale.subnets")}
 
 
+class TestMigrateMonitEmitsNested:
+    """Migrate emits each monit type at its nested path and round-trips (#791)."""
+
+    @staticmethod
+    def _box() -> Any:
+        from tests.helpers.opnsense_monit import FakeMonitBox
+
+        box = FakeMonitBox()
+        test_uuid = box.seed(
+            "test",
+            {"name": "LoadAvg1", "type": "SystemResource", "condition": "c", "action": "alert"},
+        )
+        box.seed("service", {"name": "$HOST", "type": "system", "tests": test_uuid})
+        box.seed("alert", {"recipient": "ops@example.com", "enabled": "0"})
+        return box
+
+    def _migrate(self, tmp_path: Path, manager_name: str, service_name: str) -> str:
+        from infrafoundry.providers.opnsense.components import monit as comp
+        from infrafoundry.providers.opnsense.services import monit as svc
+
+        manager = getattr(comp, manager_name)
+        service = getattr(svc, service_name)
+        client = MagicMock()
+        client.request.side_effect = self._box().request
+        with patch.object(service, "from_environment", return_value=service(client)):
+            return str(manager(tmp_path).migrate("test-env"))
+
+    def test_settings_emit_nested_dict(self, tmp_path: Path) -> None:
+        from infrafoundry.providers.opnsense.components.monit_settings import (
+            MonitSettingsManager,
+        )
+        from infrafoundry.providers.opnsense.services.monit_settings import MonitSettingsService
+
+        client = MagicMock()
+        client.request.side_effect = self._box().request
+        with patch.object(
+            MonitSettingsService, "from_environment", return_value=MonitSettingsService(client)
+        ):
+            yaml_text = MonitSettingsManager(tmp_path).migrate("test-env")
+        leaf = _assert_nested_path_present(yaml_text, "monit.settings", expected_shape="dict")
+        assert leaf["enabled"] is False and leaf["httpd_password"] == ""
+        _assert_no_flat_resources_key(yaml_text)
+        parsed = _round_trip(yaml_text, "monit_settings.yaml")
+        assert {(r.name, r.type) for r in parsed} == {("monit.settings", "monit.settings")}
+
+    @pytest.mark.parametrize(
+        ("manager", "service", "dotted", "name"),
+        [
+            ("MonitAlertsManager", "MonitAlertsService", "monit.alerts", "ops-example-com"),
+            ("MonitTestsManager", "MonitTestsService", "monit.tests", "load-avg-1"),
+            ("MonitServicesManager", "MonitServicesService", "monit.services", "host"),
+        ],
+    )
+    def test_lists_emit_nested_list_and_round_trip(
+        self, tmp_path: Path, manager: str, service: str, dotted: str, name: str
+    ) -> None:
+        yaml_text = self._migrate(tmp_path, manager, service)
+        leaf = _assert_nested_path_present(yaml_text, dotted, expected_shape="list")
+        assert [entry["name"] for entry in leaf] == [name]
+        _assert_no_flat_resources_key(yaml_text)
+        parsed = _round_trip(yaml_text, f"{dotted}.yaml")
+        assert {(r.name, r.type) for r in parsed} == {(name, dotted)}
+
+    def test_service_rows_reference_tests_by_handle(self, tmp_path: Path) -> None:
+        yaml_text = self._migrate(tmp_path, "MonitServicesManager", "MonitServicesService")
+        leaf = _assert_nested_path_present(yaml_text, "monit.services", expected_shape="list")
+        assert leaf[0]["config"]["service_name"] == "$HOST"
+        assert leaf[0]["config"]["tests"] == ["load-avg-1"]
+
+
 # ---------------------------------------------------------------------------
 # 6. routing.gateways -- GatewayManager
 # ---------------------------------------------------------------------------
