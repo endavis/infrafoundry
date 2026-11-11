@@ -473,7 +473,7 @@ class OPNsenseParser:
         # Write system configuration
         if system_config:
             system_file = opnsense_dir / "system.yaml"
-            with open(system_file, "w") as f:
+            with open(system_file, "w", encoding="utf-8") as f:
                 yaml.dump(
                     {"system": system_config},
                     f,
@@ -485,7 +485,7 @@ class OPNsenseParser:
         # Write interfaces
         if interfaces:
             interfaces_file = opnsense_dir / "interfaces.yaml"
-            with open(interfaces_file, "w") as f:
+            with open(interfaces_file, "w", encoding="utf-8") as f:
                 yaml.dump(
                     {"interfaces": list(interfaces.values())},
                     f,
@@ -497,7 +497,7 @@ class OPNsenseParser:
         # Write VLANs
         if vlans:
             vlans_file = opnsense_dir / "vlans.yaml"
-            with open(vlans_file, "w") as f:
+            with open(vlans_file, "w", encoding="utf-8") as f:
                 yaml.dump(
                     {"vlans": vlans},
                     f,
@@ -509,7 +509,7 @@ class OPNsenseParser:
         # Write aliases
         if aliases:
             aliases_file = opnsense_dir / "aliases.yaml"
-            with open(aliases_file, "w") as f:
+            with open(aliases_file, "w", encoding="utf-8") as f:
                 yaml.dump(
                     {"aliases": list(aliases.values())},
                     f,
@@ -521,7 +521,7 @@ class OPNsenseParser:
         # Write DHCP
         if dhcp:
             dhcp_file = opnsense_dir / "dhcp.yaml"
-            with open(dhcp_file, "w") as f:
+            with open(dhcp_file, "w", encoding="utf-8") as f:
                 yaml.dump(
                     {"dhcp_servers": list(dhcp.values())},
                     f,
@@ -548,7 +548,7 @@ class OPNsenseParser:
             # Write floating rules
             if floating_rules:
                 floating_file = opnsense_dir / "firewall_rules_floating.yaml"
-                with open(floating_file, "w") as f:
+                with open(floating_file, "w", encoding="utf-8") as f:
                     yaml.dump(
                         {"firewall_rules": floating_rules},
                         f,
@@ -561,7 +561,7 @@ class OPNsenseParser:
             # Write per-interface rules
             for iface, iface_rules in rules_by_interface.items():
                 rules_file = opnsense_dir / f"firewall_rules_{iface}.yaml"
-                with open(rules_file, "w") as f:
+                with open(rules_file, "w", encoding="utf-8") as f:
                     yaml.dump(
                         {"firewall_rules": iface_rules},
                         f,
@@ -574,7 +574,7 @@ class OPNsenseParser:
         # Write gateways
         if gateways:
             gateways_file = opnsense_dir / "gateways.yaml"
-            with open(gateways_file, "w") as f:
+            with open(gateways_file, "w", encoding="utf-8") as f:
                 yaml.dump(
                     {"gateways": gateways},
                     f,
@@ -586,7 +586,7 @@ class OPNsenseParser:
         # Write NAT outbound rules
         if nat_outbound and nat_outbound.get("rules"):
             nat_file = opnsense_dir / "nat_outbound.yaml"
-            with open(nat_file, "w") as f:
+            with open(nat_file, "w", encoding="utf-8") as f:
                 yaml.dump(
                     {"nat_outbound": nat_outbound},
                     f,
@@ -601,7 +601,7 @@ class OPNsenseParser:
         # Write OpenVPN clients
         if openvpn_clients:
             vpn_file = opnsense_dir / "openvpn_clients.yaml"
-            with open(vpn_file, "w") as f:
+            with open(vpn_file, "w", encoding="utf-8") as f:
                 yaml.dump(
                     {"openvpn_clients": openvpn_clients},
                     f,
@@ -612,7 +612,7 @@ class OPNsenseParser:
 
         # Generate summary README
         readme_file = output_dir / "README.md"
-        with open(readme_file, "w") as f:
+        with open(readme_file, "w", encoding="utf-8") as f:
             f.write("# OPNsense Configuration\n\n")
             f.write("Generated from OPNsense config.xml backup.\n\n")
             f.write(f"**Source**: {self.config_path.name}\n")

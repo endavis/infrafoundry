@@ -86,7 +86,7 @@ class TestPolicyEngine:
             "level": "warning",
             "rules": [{"field": "cores", "max": 4}],
         }
-        with open(policy_dir / "warning.yaml", "w") as f:
+        with open(policy_dir / "warning.yaml", "w", encoding="utf-8") as f:
             yaml.dump(warning_policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -150,7 +150,7 @@ class TestPolicyEngine:
         policy_dir.mkdir()
 
         # Create invalid YAML file
-        with open(policy_dir / "invalid.yaml", "w") as f:
+        with open(policy_dir / "invalid.yaml", "w", encoding="utf-8") as f:
             f.write("invalid: yaml: content:\n  bad indentation")
 
         # Should not raise exception, just skip the file
@@ -163,7 +163,7 @@ class TestPolicyEngine:
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
 
-        with open(policy_dir / "empty.yaml", "w") as f:
+        with open(policy_dir / "empty.yaml", "w", encoding="utf-8") as f:
             f.write("")
 
         engine = PolicyEngine(policy_dir)
@@ -174,7 +174,7 @@ class TestPolicyEngine:
         policy_dir = temp_dir / "policies"
         policy_dir.mkdir()
 
-        with open(policy_dir / "nopolicies.yaml", "w") as f:
+        with open(policy_dir / "nopolicies.yaml", "w", encoding="utf-8") as f:
             yaml.dump({"other_key": "value"}, f)
 
         engine = PolicyEngine(policy_dir)
@@ -196,7 +196,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "disabled.yaml", "w") as f:
+        with open(policy_dir / "disabled.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -221,7 +221,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "prod.yaml", "w") as f:
+        with open(policy_dir / "prod.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -250,7 +250,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "naming.yaml", "w") as f:
+        with open(policy_dir / "naming.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -280,7 +280,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "naming_wildcard.yaml", "w") as f:
+        with open(policy_dir / "naming_wildcard.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -310,7 +310,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "invalid_regex.yaml", "w") as f:
+        with open(policy_dir / "invalid_regex.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -335,7 +335,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "tags.yaml", "w") as f:
+        with open(policy_dir / "tags.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -374,7 +374,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "tags_req.yaml", "w") as f:
+        with open(policy_dir / "tags_req.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -398,7 +398,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "tags_invalid.yaml", "w") as f:
+        with open(policy_dir / "tags_invalid.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -425,7 +425,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "providers.yaml", "w") as f:
+        with open(policy_dir / "providers.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -457,7 +457,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "no_providers.yaml", "w") as f:
+        with open(policy_dir / "no_providers.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -506,7 +506,7 @@ class TestPolicyEngine:
                 },
             ]
         }
-        with open(policy_dir / "multi.yaml", "w") as f:
+        with open(policy_dir / "multi.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -540,7 +540,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "memory.yaml", "w") as f:
+        with open(policy_dir / "memory.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)
@@ -574,7 +574,7 @@ class TestPolicyEngine:
                 }
             ]
         }
-        with open(policy_dir / "cpu.yaml", "w") as f:
+        with open(policy_dir / "cpu.yaml", "w", encoding="utf-8") as f:
             yaml.dump(policy, f)
 
         engine = PolicyEngine(policy_dir)

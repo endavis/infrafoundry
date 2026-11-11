@@ -453,7 +453,7 @@ class PackageLoader:
             raise InvalidConfigurationError(f"Package manifest not found: {manifest_path}")
 
         try:
-            file_text = manifest_path.read_text()
+            file_text = manifest_path.read_text(encoding="utf-8")
         except OSError as e:
             raise InvalidConfigurationError(
                 f"Failed to read package manifest {manifest_path}: {e}"
@@ -510,7 +510,7 @@ class PackageLoader:
         if not resource_path.exists():
             raise InvalidConfigurationError(f"Resource file not found: {resource_path}")
 
-        content = resource_path.read_text()
+        content = resource_path.read_text(encoding="utf-8")
 
         # Build render context: user variables + injected provider
         render_context = dict(variables)

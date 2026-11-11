@@ -68,7 +68,7 @@ class TestSchemaExportCommand:
             assert schema_file.exists(), f"Schema file {name}.schema.json should exist"
 
             # Verify it's valid JSON
-            with open(schema_file) as f:
+            with open(schema_file, encoding="utf-8") as f:
                 data = json.load(f)
                 assert "type" in data
 

@@ -57,7 +57,7 @@ class NotificationManager(PathBasedManager):
             return
 
         try:
-            with open(self.config_file) as f:
+            with open(self.config_file, encoding="utf-8") as f:
                 config = yaml.safe_load(f)
                 if not config or "channels" not in config:
                     self._log_debug("No channels found in config")

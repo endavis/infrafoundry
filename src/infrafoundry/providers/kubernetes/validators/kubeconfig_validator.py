@@ -149,7 +149,7 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
     def _load_kubeconfig(self, path: Path) -> dict[str, Any] | None:
         """Load and parse the kubeconfig YAML file."""
         try:
-            content = path.read_text()
+            content = path.read_text(encoding="utf-8")
             data = yaml.safe_load(content)
             if not isinstance(data, dict):
                 self.report.add_check(
@@ -276,7 +276,7 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
             token_file = user_info.get("tokenFile")
             if token_file:
                 try:
-                    token = Path(token_file).read_text().strip()
+                    token = Path(token_file).read_text(encoding="utf-8").strip()
                     headers["Authorization"] = f"Bearer {token}"
                 except OSError:
                     self.report.add_check(

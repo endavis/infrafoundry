@@ -37,7 +37,7 @@ def _scripts() -> list[Path]:
 
 def _tokens(path: Path) -> set[str]:
     found: set[str] = set()
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip().startswith("#"):
             continue
         for token in _TOKEN_RE.findall(line):
@@ -67,7 +67,7 @@ def test_script_reads_only_jumphost_available_env(script: Path) -> None:
         if token in JUMPHOST_FORWARDED_ENV:
             continue
         if (rel, token) in JUMPHOST_GUARDED:
-            assert _has_guard(script.read_text(), token), (
+            assert _has_guard(script.read_text(encoding="utf-8"), token), (
                 f"{rel} is allowlisted for {token} but has no INFRAFOUNDRY_ON_JUMPHOST guard for it"
             )
             continue

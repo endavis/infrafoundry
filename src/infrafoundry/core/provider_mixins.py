@@ -1064,7 +1064,7 @@ class CloudInitMixin:
                 self._logger.warning(message)
                 continue
 
-            with open(snippet_path) as f:
+            with open(snippet_path, encoding="utf-8") as f:
                 snippet_content = f.read()
 
             # Substitute variables

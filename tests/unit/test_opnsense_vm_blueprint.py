@@ -259,7 +259,7 @@ def test_post_terraform_script_refuses_to_run_without_the_secrets(tmp_path: Path
 def test_ansible_yaml_parses(path: Path) -> None:
     import yaml
 
-    assert yaml.safe_load(path.read_text()) is not None
+    assert yaml.safe_load(path.read_text(encoding="utf-8")) is not None
 
 
 def test_readiness_probe_sends_no_credentials() -> None:

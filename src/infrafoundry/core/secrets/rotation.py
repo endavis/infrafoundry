@@ -139,7 +139,7 @@ class SecretsRotator:
             ]
         }
 
-        with open(sops_config_path, "w") as f:
+        with open(sops_config_path, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
     def get_encrypted_files(self, file_patterns: list[str] | None = None) -> list[Path]:

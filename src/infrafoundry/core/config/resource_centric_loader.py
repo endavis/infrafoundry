@@ -77,7 +77,7 @@ class ResourceCentricLoader:
             InvalidConfigurationError: If a nested-format file mixes
                 ``opnsense:`` with other top-level keys.
         """
-        with open(config_file) as f:
+        with open(config_file, encoding="utf-8") as f:
             data = load_config_yaml(f)
 
         if not data:

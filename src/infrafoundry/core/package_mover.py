@@ -531,7 +531,7 @@ class PackageMover:
             raise ConfigurationError(f"Manifest not found: {manifest_path}")
 
         try:
-            text = manifest_path.read_text()
+            text = manifest_path.read_text(encoding="utf-8")
         except OSError as e:
             raise ConfigurationError(f"Failed to read manifest {manifest_path}: {e}") from e
 
@@ -600,7 +600,7 @@ class PackageMover:
             manifest_path: Path to the manifest file
             provider_name: Provider name to add
         """
-        lines = manifest_path.read_text().splitlines(keepends=True)
+        lines = manifest_path.read_text(encoding="utf-8").splitlines(keepends=True)
         new_lines: list[str] = []
         inserted = False
 
@@ -617,7 +617,7 @@ class PackageMover:
             # Fallback: prepend provider line
             new_lines.insert(0, f"provider: {provider_name}\n")
 
-        manifest_path.write_text("".join(new_lines))
+        manifest_path.write_text("".join(new_lines), encoding="utf-8")
 
     def _update_state_db(
         self,

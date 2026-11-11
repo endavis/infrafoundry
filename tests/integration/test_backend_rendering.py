@@ -38,7 +38,7 @@ def mock_config_dir_with_backend(temp_dir: Path) -> Path:
             },
         },
     }
-    with open(dev_dir / "settings.yaml", "w") as f:
+    with open(dev_dir / "settings.yaml", "w", encoding="utf-8") as f:
         yaml.dump(env_config, f)
 
     # Proxmox provider directory
@@ -47,7 +47,7 @@ def mock_config_dir_with_backend(temp_dir: Path) -> Path:
 
     # VM config
     vm_config = {"vm": [{"name": "test-vm-01", "template": "ubuntu-22.04"}]}
-    with open(proxmox_dir / "vm.yaml", "w") as f:
+    with open(proxmox_dir / "vm.yaml", "w", encoding="utf-8") as f:
         yaml.dump(vm_config, f)
 
     return config_dir
@@ -77,7 +77,7 @@ def mock_config_dir_with_gcs_backend(temp_dir: Path) -> Path:
             },
         },
     }
-    with open(prod_dir / "settings.yaml", "w") as f:
+    with open(prod_dir / "settings.yaml", "w", encoding="utf-8") as f:
         yaml.dump(env_config, f)
 
     # Proxmox provider directory
@@ -85,7 +85,7 @@ def mock_config_dir_with_gcs_backend(temp_dir: Path) -> Path:
     proxmox_dir.mkdir()
 
     vm_config = {"vm": [{"name": "prod-vm-01", "template": "ubuntu-22.04"}]}
-    with open(proxmox_dir / "vm.yaml", "w") as f:
+    with open(proxmox_dir / "vm.yaml", "w", encoding="utf-8") as f:
         yaml.dump(vm_config, f)
 
     return config_dir
@@ -117,7 +117,7 @@ def mock_config_dir_with_azure_backend(temp_dir: Path) -> Path:
             },
         },
     }
-    with open(prod_dir / "settings.yaml", "w") as f:
+    with open(prod_dir / "settings.yaml", "w", encoding="utf-8") as f:
         yaml.dump(env_config, f)
 
     # Proxmox provider directory
@@ -125,7 +125,7 @@ def mock_config_dir_with_azure_backend(temp_dir: Path) -> Path:
     proxmox_dir.mkdir()
 
     vm_config = {"vm": [{"name": "prod-vm-01", "template": "ubuntu-22.04"}]}
-    with open(proxmox_dir / "vm.yaml", "w") as f:
+    with open(proxmox_dir / "vm.yaml", "w", encoding="utf-8") as f:
         yaml.dump(vm_config, f)
 
     return config_dir
@@ -154,7 +154,7 @@ def mock_config_dir_with_postgres_backend(temp_dir: Path) -> Path:
             },
         },
     }
-    with open(staging_dir / "settings.yaml", "w") as f:
+    with open(staging_dir / "settings.yaml", "w", encoding="utf-8") as f:
         yaml.dump(env_config, f)
 
     # Proxmox provider directory
@@ -162,7 +162,7 @@ def mock_config_dir_with_postgres_backend(temp_dir: Path) -> Path:
     proxmox_dir.mkdir()
 
     vm_config = {"vm": [{"name": "staging-vm-01", "template": "ubuntu-22.04"}]}
-    with open(proxmox_dir / "vm.yaml", "w") as f:
+    with open(proxmox_dir / "vm.yaml", "w", encoding="utf-8") as f:
         yaml.dump(vm_config, f)
 
     return config_dir
@@ -192,7 +192,7 @@ def mock_config_dir_with_terraform_cloud_backend(temp_dir: Path) -> Path:
             },
         },
     }
-    with open(prod_dir / "settings.yaml", "w") as f:
+    with open(prod_dir / "settings.yaml", "w", encoding="utf-8") as f:
         yaml.dump(env_config, f)
 
     # Proxmox provider directory
@@ -200,7 +200,7 @@ def mock_config_dir_with_terraform_cloud_backend(temp_dir: Path) -> Path:
     proxmox_dir.mkdir()
 
     vm_config = {"vm": [{"name": "prod-vm-01", "template": "ubuntu-22.04"}]}
-    with open(proxmox_dir / "vm.yaml", "w") as f:
+    with open(proxmox_dir / "vm.yaml", "w", encoding="utf-8") as f:
         yaml.dump(vm_config, f)
 
     return config_dir
@@ -223,7 +223,7 @@ def mock_config_dir_no_backend(temp_dir: Path) -> Path:
         "description": "Development environment without backend",
         "variables": {"datacenter": "dc1"},
     }
-    with open(dev_dir / "settings.yaml", "w") as f:
+    with open(dev_dir / "settings.yaml", "w", encoding="utf-8") as f:
         yaml.dump(env_config, f)
 
     # Proxmox provider directory
@@ -231,7 +231,7 @@ def mock_config_dir_no_backend(temp_dir: Path) -> Path:
     proxmox_dir.mkdir()
 
     vm_config = {"vm": [{"name": "test-vm-01", "template": "ubuntu-22.04"}]}
-    with open(proxmox_dir / "vm.yaml", "w") as f:
+    with open(proxmox_dir / "vm.yaml", "w", encoding="utf-8") as f:
         yaml.dump(vm_config, f)
 
     return config_dir
@@ -447,14 +447,14 @@ class TestBackendRendering:
             "description": "Development environment with local backend",
             "backend": {"type": "local"},
         }
-        with open(dev_dir / "settings.yaml", "w") as f:
+        with open(dev_dir / "settings.yaml", "w", encoding="utf-8") as f:
             yaml.dump(env_config, f)
 
         proxmox_dir = dev_dir / "proxmox"
         proxmox_dir.mkdir()
 
         vm_config = {"vm": [{"name": "test-vm-01", "template": "ubuntu-22.04"}]}
-        with open(proxmox_dir / "vm.yaml", "w") as f:
+        with open(proxmox_dir / "vm.yaml", "w", encoding="utf-8") as f:
             yaml.dump(vm_config, f)
 
         config_manager = ConfigManager(config_dir / "envs")
@@ -495,14 +495,14 @@ class TestBackendRendering:
             "description": "Development environment with invalid backend",
             "backend": {"type": "s3", "s3": {"bucket": "test-bucket"}},
         }
-        with open(dev_dir / "settings.yaml", "w") as f:
+        with open(dev_dir / "settings.yaml", "w", encoding="utf-8") as f:
             yaml.dump(env_config, f)
 
         proxmox_dir = dev_dir / "proxmox"
         proxmox_dir.mkdir()
 
         vm_config = {"vm": [{"name": "test-vm-01", "template": "ubuntu-22.04"}]}
-        with open(proxmox_dir / "vm.yaml", "w") as f:
+        with open(proxmox_dir / "vm.yaml", "w", encoding="utf-8") as f:
             yaml.dump(vm_config, f)
 
         config_manager = ConfigManager(config_dir / "envs")

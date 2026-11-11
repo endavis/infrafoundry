@@ -113,7 +113,7 @@ class TerraformRunner(BaseRunner):
                 import json
 
                 try:
-                    with open(terraform_state) as f:
+                    with open(terraform_state, encoding="utf-8") as f:
                         state_data = json.load(f)
                         backend_type = state_data.get("backend", {}).get("type")
 
@@ -638,7 +638,7 @@ class TerraformRunner(BaseRunner):
 
         for tf_file in tf_dir.glob("*.tf"):
             try:
-                with open(tf_file) as f:
+                with open(tf_file, encoding="utf-8") as f:
                     for file_line in f:
                         match = resource_pattern.match(file_line)
                         if match:
@@ -714,7 +714,7 @@ class TerraformRunner(BaseRunner):
         # Pattern matches: resource "type" "name" {
         resource_pattern = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
         for tf_file in tf_dir.glob("*.tf"):
-            with open(tf_file) as f:
+            with open(tf_file, encoding="utf-8") as f:
                 for line in f:
                     match = resource_pattern.match(line)
                     if match:

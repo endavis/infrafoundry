@@ -1115,6 +1115,7 @@ class ApplyOrchestrator(HookExecutionMixin):
         # and failure paths.
         warnings_tmp = tempfile.NamedTemporaryFile(  # noqa: SIM115  # closed at once; unlinked in the finally below
             mode="w",
+            encoding="utf-8",
             suffix=".jsonl",
             prefix=f"infrafoundry-warnings-{deployment_id}-",
             delete=False,

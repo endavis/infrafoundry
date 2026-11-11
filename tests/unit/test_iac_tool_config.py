@@ -82,7 +82,7 @@ class TestIaCToolEnvVarOverride:
         """Write a settings.yaml for the given environment."""
         env_dir = tmp_path / env_name
         env_dir.mkdir(parents=True, exist_ok=True)
-        with open(env_dir / "settings.yaml", "w") as f:
+        with open(env_dir / "settings.yaml", "w", encoding="utf-8") as f:
             yaml.dump(data, f)
 
     def test_env_var_overrides_yaml(self, tmp_path: Path) -> None:

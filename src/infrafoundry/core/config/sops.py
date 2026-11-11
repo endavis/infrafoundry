@@ -27,7 +27,7 @@ def load_yaml_with_sops(file_path: Path) -> dict[str, Any]:
     Returns:
         Parsed YAML data as a dictionary.
     """
-    with open(file_path) as f:
+    with open(file_path, encoding="utf-8") as f:
         raw = f.read()
 
     if "sops:" in raw and "ENC[AES256_GCM," in raw:
@@ -64,7 +64,7 @@ def save_yaml_with_sops(
     Raises:
         subprocess.CalledProcessError: If SOPS encryption fails.
     """
-    with open(file_path, "w") as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
 
     if encrypt:

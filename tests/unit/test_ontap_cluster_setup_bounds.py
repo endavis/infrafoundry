@@ -199,9 +199,16 @@ def test_deadline_kills_expect_and_socat(tmp_path: Path) -> None:
     pid = int(pid_file.read_text().strip())
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline and Path(f"/proc/{pid}").exists():
-        stat_text = Path(f"/proc/{pid}/stat").read_text() if Path(f"/proc/{pid}").exists() else ""
+        stat_text = (
+            Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+            if Path(f"/proc/{pid}").exists()
+            else ""
+        )
         if stat_text and stat_text.rsplit(")", 1)[1].split()[0] == "Z":
             break
         time.sleep(0.05)
     if Path(f"/proc/{pid}/stat").exists():
-        assert Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] == "Z"
+        assert (
+            Path(f"/proc/{pid}/stat").read_text(encoding="utf-8").rsplit(")", 1)[1].split()[0]
+            == "Z"
+        )

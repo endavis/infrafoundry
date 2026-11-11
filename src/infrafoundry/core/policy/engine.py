@@ -51,7 +51,7 @@ class PolicyEngine(BaseManager):
         """Load policies from YAML files in policy directory."""
         for policy_file in self.policy_dir.glob("*.yaml"):
             try:
-                with open(policy_file) as f:
+                with open(policy_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
                     if not data or "policies" not in data:
                         continue

@@ -191,7 +191,7 @@ class BlueprintValidator:
         Returns:
             Set of variable names referenced but not defined within the template.
         """
-        content = template_path.read_text()
+        content = template_path.read_text(encoding="utf-8")
         try:
             ast = self._env.parse(content)
         except jinja2.TemplateSyntaxError as e:
@@ -270,7 +270,7 @@ class BlueprintValidator:
             path: Script file path; unreadable or missing files yield no names.
         """
         try:
-            content = path.read_text()
+            content = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             return frozenset()
         return frozenset(_SCRIPT_ENV_VAR_RE.findall(content) + _SCRIPT_JINJA_RE.findall(content))

@@ -112,7 +112,7 @@ def _is_completion_installed(config_path: Path) -> bool:
     """
     if not config_path.exists():
         return False
-    content = config_path.read_text()
+    content = config_path.read_text(encoding="utf-8")
     return COMPLETION_MARKER in content
 
 
@@ -159,7 +159,7 @@ def _install_completion(shell_type: str) -> None:
             config_path.write_text(script)
             console.success(f"Completion installed to {config_path}")
         else:
-            with open(config_path, "a") as f:
+            with open(config_path, "a", encoding="utf-8") as f:
                 f.write(f"\n{script}\n")
             console.success(f"Completion installed to {config_path}")
 

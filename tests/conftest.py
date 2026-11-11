@@ -123,7 +123,7 @@ def mock_config_dir(temp_dir: Path) -> Any:
         "description": "Development environment",
         "variables": {"datacenter": "dc1", "network": "vmbr0"},
     }
-    with open(dev_dir / "settings.yaml", "w") as f:
+    with open(dev_dir / "settings.yaml", "w", encoding="utf-8") as f:
         yaml.dump(env_config, f)
 
     # Proxmox provider directory
@@ -142,7 +142,7 @@ def mock_config_dir(temp_dir: Path) -> Any:
             }
         ]
     }
-    with open(proxmox_dir / "vm.yaml", "w") as f:
+    with open(proxmox_dir / "vm.yaml", "w", encoding="utf-8") as f:
         yaml.dump(vm_config, f)
 
     # Resources directory (resource-centric format)
@@ -164,7 +164,7 @@ def mock_config_dir(temp_dir: Path) -> Any:
             }
         ]
     }
-    with open(resources_dir / "web-servers.yaml", "w") as f:
+    with open(resources_dir / "web-servers.yaml", "w", encoding="utf-8") as f:
         yaml.dump(resource_config, f)
 
     return config_dir
@@ -180,7 +180,7 @@ def mock_secrets_dir(temp_dir: Path) -> Any:
     proxmox_secrets = {
         "proxmox": {"api_url": "https://proxmox.example.com:8006", "api_token": "test-token"}
     }
-    with open(secrets_dir / "proxmox.yaml", "w") as f:
+    with open(secrets_dir / "proxmox.yaml", "w", encoding="utf-8") as f:
         yaml.dump(proxmox_secrets, f)
 
     return secrets_dir
@@ -209,7 +209,7 @@ def mock_policy_dir(temp_dir: Path) -> Any:
             }
         ]
     }
-    with open(policy_dir / "resource_limits.yaml", "w") as f:
+    with open(policy_dir / "resource_limits.yaml", "w", encoding="utf-8") as f:
         yaml.dump(resource_limits_file, f)
 
     # Required tags policy
@@ -224,7 +224,7 @@ def mock_policy_dir(temp_dir: Path) -> Any:
             }
         ]
     }
-    with open(policy_dir / "require_tags.yaml", "w") as f:
+    with open(policy_dir / "require_tags.yaml", "w", encoding="utf-8") as f:
         yaml.dump(required_tags_file, f)
 
     return policy_dir

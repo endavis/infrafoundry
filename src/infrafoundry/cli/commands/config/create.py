@@ -76,7 +76,7 @@ def _create_minimal_environment(target_dir: Path, env_name: str, description: st
     }
 
     settings_file = target_dir / "settings.yaml"
-    with open(settings_file, "w") as f:
+    with open(settings_file, "w", encoding="utf-8") as f:
         yaml.safe_dump(settings, f, default_flow_style=False, sort_keys=False)
 
     # Create empty resources directory
@@ -96,7 +96,7 @@ def _create_minimal_environment(target_dir: Path, env_name: str, description: st
 #     config:
 #       # Add your configuration here
 """
-    with open(sample_file, "w") as f:
+    with open(sample_file, "w", encoding="utf-8") as f:
         f.write(sample_content)
 
 

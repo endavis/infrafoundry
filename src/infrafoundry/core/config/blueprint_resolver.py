@@ -239,7 +239,7 @@ class BlueprintResolver:
             InvalidConfigurationError: On YAML errors.
         """
         try:
-            file_text = manifest_path.read_text()
+            file_text = manifest_path.read_text(encoding="utf-8")
         except OSError as e:
             raise InvalidConfigurationError(
                 f"Failed to read blueprint manifest {manifest_path}: {e}"
