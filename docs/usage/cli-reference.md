@@ -366,11 +366,14 @@ foundry infra apply --env dev --auto-approve
 foundry infra apply --env dev --package ontap-cluster --auto-approve
 foundry infra apply --env dev --provider opnsense --auto-approve
 foundry infra apply --env dev --parallel --max-workers 8
+INFRAFOUNDRY_MAX_WORKERS=8 foundry infra apply --env dev --parallel
 foundry infra apply --env dev --lock-timeout 300 --lock-ttl 1800
 foundry infra apply --env dev --add-only
 ```
 
-**Options:** `-e/--env TEXT` (required), `--auto-approve`, `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `-P/--provider TEXT` (repeatable), `--parallel`, `--max-workers INTEGER` (default: 4), `--lock-timeout INTEGER` (default: 0), `--lock-ttl INTEGER` (default: 600), `--add-only`
+**Options:** `-e/--env TEXT` (required), `--auto-approve`, `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `-P/--provider TEXT` (repeatable), `--parallel`, `--max-workers INTEGER` (default: CPU count; env `INFRAFOUNDRY_MAX_WORKERS`), `--lock-timeout INTEGER` (default: 0), `--lock-ttl INTEGER` (default: 600), `--add-only`
+
+**`--max-workers`:** Only matters with `--parallel`. Precedence: the flag, then `INFRAFOUNDRY_MAX_WORKERS`, then `os.cpu_count()`, then 4. Must be at least 1.
 
 **`--add-only`:** Same semantics as `infra plan --add-only` — suppresses deletes of managed objects missing from YAML during apply. Objects InfraFoundry did not apply are never deleted. Direct-API runners only.
 

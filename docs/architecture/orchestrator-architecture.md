@@ -231,7 +231,7 @@ sequenceDiagram
 
     RollbackOrchestrator->>User: Warning: ensure git repo is at correct state
 
-    RollbackOrchestrator->>ApplyOrchestrator: apply(env_name, None, auto_approve=True, parallel=False, max_workers=4)
+    RollbackOrchestrator->>ApplyOrchestrator: apply(env_name, None, auto_approve=True, parallel=False, max_workers=default_max_workers())
 
     Note over ApplyOrchestrator: Standard apply workflow executes
     ApplyOrchestrator->>ConfigManager: load_resources(env_name)

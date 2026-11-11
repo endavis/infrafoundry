@@ -1,5 +1,6 @@
 """Unit tests for the 'apply' CLI command."""
 
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -8,6 +9,13 @@ from click.testing import CliRunner
 from infrafoundry.cli.main import main
 from infrafoundry.core.exceptions import ProviderFilterError
 from infrafoundry.core.orchestrator import Orchestrator
+
+
+@pytest.fixture(autouse=True)
+def _pin_max_workers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the resolved --max-workers default independent of the host."""
+    monkeypatch.delenv("INFRAFOUNDRY_MAX_WORKERS", raising=False)
+    monkeypatch.setattr("infrafoundry.core.deployment_executor.os.cpu_count", lambda: 4)
 
 
 @pytest.fixture
@@ -321,3 +329,55 @@ def test_apply_unknown_provider_filter_surfaces_error(
         assert "Unknown provider(s): nope. Available: opnsense, proxmox" in result.output
         assert "IF-GENERAL-001" not in result.output
         assert "Traceback" not in result.output
+
+
+def _invoke_apply(cli_runner: CliRunner, mock_orchestrator: Mock, *args: str) -> Any:
+    with patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator):
+        return cli_runner.invoke(main, ["infra", "apply", "--env", "test", "--auto-approve", *args])
+
+
+def test_apply_max_workers_default_is_cpu_count(
+    cli_runner: CliRunner, mock_orchestrator: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without flag or env var, --max-workers resolves to the CPU count."""
+    monkeypatch.setattr("infrafoundry.core.deployment_executor.os.cpu_count", lambda: 9)
+    result = _invoke_apply(cli_runner, mock_orchestrator)
+    assert result.exit_code == 0
+    assert mock_orchestrator.apply.call_args.kwargs["max_workers"] == 9
+
+
+def test_apply_max_workers_env_var(
+    cli_runner: CliRunner, mock_orchestrator: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """INFRAFOUNDRY_MAX_WORKERS overrides the CPU count."""
+    monkeypatch.setenv("INFRAFOUNDRY_MAX_WORKERS", "7")
+    result = _invoke_apply(cli_runner, mock_orchestrator)
+    assert result.exit_code == 0
+    assert mock_orchestrator.apply.call_args.kwargs["max_workers"] == 7
+
+
+def test_apply_max_workers_flag_beats_env_var(
+    cli_runner: CliRunner, mock_orchestrator: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The flag overrides INFRAFOUNDRY_MAX_WORKERS."""
+    monkeypatch.setenv("INFRAFOUNDRY_MAX_WORKERS", "7")
+    result = _invoke_apply(cli_runner, mock_orchestrator, "--max-workers", "3")
+    assert result.exit_code == 0
+    assert mock_orchestrator.apply.call_args.kwargs["max_workers"] == 3
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_apply_max_workers_rejects_below_one(
+    cli_runner: CliRunner, mock_orchestrator: Mock, value: str
+) -> None:
+    """--max-workers must be at least 1."""
+    result = _invoke_apply(cli_runner, mock_orchestrator, "--max-workers", value)
+    assert result.exit_code == 2
+    mock_orchestrator.apply.assert_not_called()
+
+
+def test_apply_help_shows_max_workers_envvar(cli_runner: CliRunner) -> None:
+    """--help documents the environment variable."""
+    result = cli_runner.invoke(main, ["infra", "apply", "--help"])
+    assert result.exit_code == 0
+    assert "INFRAFOUNDRY_MAX_WORKERS" in result.output

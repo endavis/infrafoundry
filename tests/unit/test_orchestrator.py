@@ -755,6 +755,28 @@ class TestOrchestratorLocking:
         # extensions that might have fired before we captured the row.
         assert 590 <= delta <= 1200
 
+    def test_apply_max_workers_defaults_to_cpu_count(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("infrafoundry.core.deployment_executor.os.cpu_count", lambda: 6)
+        orchestrator = self._make_orchestrator(tmp_path)
+
+        orchestrator.apply("dev", auto_approve=True)
+
+        apply_mock = cast(MagicMock, orchestrator.apply_orchestrator.apply)
+        assert apply_mock.call_args.kwargs["max_workers"] == 6
+
+    def test_apply_explicit_max_workers_wins(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("infrafoundry.core.deployment_executor.os.cpu_count", lambda: 6)
+        orchestrator = self._make_orchestrator(tmp_path)
+
+        orchestrator.apply("dev", auto_approve=True, max_workers=2)
+
+        apply_mock = cast(MagicMock, orchestrator.apply_orchestrator.apply)
+        assert apply_mock.call_args.kwargs["max_workers"] == 2
+
     def test_plan_does_not_acquire_lock(self, tmp_path: Path) -> None:
         orchestrator = self._make_orchestrator(tmp_path)
         # Pre-seed an active lock; plan should still proceed.
