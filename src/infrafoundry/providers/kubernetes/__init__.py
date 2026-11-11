@@ -12,6 +12,7 @@ from infrafoundry.core.provider_mixins import (
     TemplateRendererMixin,
     TerraformGeneratorMixin,
 )
+from infrafoundry.providers.kubernetes.names import CONFIG_NAME_TYPES, kubernetes_object_name
 
 
 class KubernetesProvider(
@@ -47,9 +48,7 @@ class KubernetesProvider(
 
     # Resource types whose templates label the Terraform resource from ``config.name``.
     # Every other type labels from the top-level ``name``.
-    _CONFIG_NAME_LABEL_TYPES: ClassVar[frozenset[str]] = frozenset(
-        {"namespaces", "configmaps", "deployments", "services"}
-    )
+    _CONFIG_NAME_LABEL_TYPES: ClassVar[frozenset[str]] = CONFIG_NAME_TYPES
 
     @override
     def get_terraform_env_vars(self) -> dict[str, str]:
@@ -77,10 +76,7 @@ class KubernetesProvider(
         Returns:
             The label, with ``-`` replaced by ``_``.
         """
-        label = resource.name
-        if resource.type in self._CONFIG_NAME_LABEL_TYPES:
-            label = str(resource.config.get("name", resource.name))
-        return label.replace("-", "_")
+        return kubernetes_object_name(resource).replace("-", "_")
 
     def _build_dependency_refs(
         self,

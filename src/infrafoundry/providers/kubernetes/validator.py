@@ -9,6 +9,7 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import KubernetesProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.providers.kubernetes.names import kubernetes_object_name
 from infrafoundry.providers.kubernetes.validators import (
     CRDValidator,
     HelmValidator,
@@ -114,7 +115,7 @@ class KubernetesValidator:
         info = cast(KubeConnectionInfo, conn)
 
         # Collect namespace references and config-defined namespaces
-        config_namespaces = {r.name for r in resources if r.type == "namespaces"}
+        config_namespaces = {kubernetes_object_name(r) for r in resources if r.type == "namespaces"}
         referenced_namespaces: set[str] = set()
         for resource in resources:
             if resource.type == "namespaces":
@@ -149,11 +150,13 @@ class KubernetesValidator:
             resources: List of resources to validate
         """
         # Collect resources by type
-        namespaces = {r.name for r in resources if r.type == "namespaces"}
-        configmaps = {r.name for r in resources if r.type == "configmaps"}
-        secrets = {r.name for r in resources if r.type == "secrets"}
-        deployments = {r.name for r in resources if r.type == "deployments"}
-        serviceaccounts = {r.name for r in resources if r.type == "serviceaccounts"}
+        namespaces = {kubernetes_object_name(r) for r in resources if r.type == "namespaces"}
+        configmaps = {kubernetes_object_name(r) for r in resources if r.type == "configmaps"}
+        secrets = {kubernetes_object_name(r) for r in resources if r.type == "secrets"}
+        deployments = {kubernetes_object_name(r) for r in resources if r.type == "deployments"}
+        serviceaccounts = {
+            kubernetes_object_name(r) for r in resources if r.type == "serviceaccounts"
+        }
 
         # Validate namespace references
         for resource in resources:

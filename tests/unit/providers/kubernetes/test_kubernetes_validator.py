@@ -381,3 +381,78 @@ class TestKubernetesValidatorReferences:
         selector_results = [r for r in validation_report.results if "selector" in r.check_name]
         assert len(selector_results) == 1
         assert selector_results[0].level == ValidationLevel.INFO
+
+
+@pytest.mark.unit
+class TestKubernetesValidatorConfigName:
+    """References resolve through config.name when it differs from the resource name."""
+
+    @staticmethod
+    def _namespace() -> ResourceConfig:
+        return ResourceConfig(
+            provider="kubernetes",
+            type="namespaces",
+            name="ns-key",
+            config={"name": "real-ns"},
+        )
+
+    def test_namespace_reference_uses_config_name(
+        self, validator: KubernetesValidator, validation_report: ValidationReport
+    ) -> None:
+        """A namespace referenced by config.name is not reported as missing."""
+        resources = [
+            self._namespace(),
+            ResourceConfig(
+                provider="kubernetes",
+                type="deployments",
+                name="my-app",
+                config={"namespace": "real-ns"},
+            ),
+        ]
+        validator.validate_references(resources)
+
+        assert not [r for r in validation_report.results if "_namespace" in r.check_name]
+
+    def test_configmap_reference_uses_config_name(
+        self, validator: KubernetesValidator, validation_report: ValidationReport
+    ) -> None:
+        """A configmap referenced by config.name from env_from is not an error."""
+        resources = [
+            ResourceConfig(
+                provider="kubernetes",
+                type="configmaps",
+                name="cm-key",
+                config={"name": "real-cm", "namespace": "default"},
+            ),
+            ResourceConfig(
+                provider="kubernetes",
+                type="deployments",
+                name="my-app",
+                config={"namespace": "default", "env_from": [{"configmap": "real-cm"}]},
+            ),
+        ]
+        validator.validate_references(resources)
+
+        assert not validation_report.has_errors()
+
+    def test_api_references_use_config_name_for_namespaces(
+        self, validator: KubernetesValidator
+    ) -> None:
+        """The API path passes config.name values as config_namespaces."""
+        from infrafoundry.providers.kubernetes.validators.kubeconfig_validator import (
+            KubeConnectionInfo,
+        )
+
+        conn = KubeConnectionInfo(
+            server_url="https://k8s.example.com:6443",
+            headers={},
+            verify_ssl=True,
+            connected=True,
+        )
+        validator.namespace_validator.validate = MagicMock()  # type: ignore[method-assign]
+        validator.crd_validator.validate = MagicMock()  # type: ignore[method-assign]
+
+        validator._validate_api_references([self._namespace()], conn)
+
+        ctx = validator.namespace_validator.validate.call_args.args[0]
+        assert ctx.config_namespaces == {"real-ns"}
