@@ -38,7 +38,7 @@ The Orchestrator is a thin coordinator that wires providers, runners, policy che
 
 - **Delegation pattern:** Top-level Orchestrator is a facade; workflow classes (`Validation/Plan/Apply/Destroy/Rollback/Drift/Status` orchestrators in `core/orchestrator_workflows.py`) implement steps.
 - **Helpers coordinated:**
-  - ConfigManager (resource loading/validation)
+  - ConfigManager (resource loading/validation). It memoizes `load_environment` and `get_all_resources_all_providers` per instance and returns deep copies; it offers `clear_cache()` and `cache_stats()`. Nothing is invalidated when files change, because each run builds a new manager.
   - PolicyEngine (pre-deployment checks)
   - Dependency graph builder (ordering)
   - Provider credential mapping (credentials flow via `TF_VAR_*` env vars)
