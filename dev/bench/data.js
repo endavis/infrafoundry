@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794399833856,
+  "lastUpdate": 1794408246733,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1296,6 +1296,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005440836187337358",
             "extra": "mean: 78.82474017768966 usec\nrounds: 13617"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d59f0cd46295318526e7b2da20528b265e557dc3",
+          "message": "docs: expand provider, ordering, troubleshooting and workflow docs (merges PR #1365, addresses #191)\n\n- add an OPNsense provider page: credentials, the ADR-0016 nested YAML\n  schema, the resource type catalog linked to the coverage document,\n  unsupported types, apply order and managed-set deletes, --add-only,\n  config migrate, finalization hooks, validation and troubleshooting\n- complete the Kubernetes reference: Terraform resource per type,\n  KUBECONFIG and provider pins, per-type config keys from the templates,\n  the config.name naming rule, the jobs/cronjobs namespace and secret\n  data/string_data limitations, common use cases, and the Ansible\n  playbook and inventory it generates\n- add a dependency-ordering page (provider_order, per-provider\n  get_dependencies rules, depends_on, no cross-provider edges, the\n  analyze commands) and a provider_order entry in the settings reference\n- add a troubleshooting guide organised by symptom, linked to the error\n  reference, and add IF-VALIDATION-005 and IF-VALIDATION-006 there\n- add a Common Workflows section to the CLI reference\n- correct claims the code contradicts: infra plan/apply do not generate\n  or run Ansible (overview, orchestrator architecture, Ansible runner\n  guide), and analyze graph has no DOT format or cross-resource edges\n- wire the new pages into mkdocs nav and the docs index\n\nAddresses #191\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T14:43:17Z",
+          "tree_id": "83b561b1e57f2367a08f6476546a675f3de20098",
+          "url": "https://github.com/endavis/infrafoundry/commit/d59f0cd46295318526e7b2da20528b265e557dc3"
+        },
+        "date": 1794408245863,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 48.760725724958284,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006216381435369865",
+            "extra": "mean: 20.508308379999107 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7866.346028376117,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009899870891300869",
+            "extra": "mean: 127.12382552111482 usec\nrounds: 8299"
           }
         ]
       }
