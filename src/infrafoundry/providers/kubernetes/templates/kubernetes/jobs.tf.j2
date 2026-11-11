@@ -2,7 +2,7 @@
 resource "kubernetes_job" "{{ job.name | replace('-', '_') }}" {
   metadata {
     name      = "{{ job.name }}"
-    namespace = "{{ job.namespace | default('default') }}"
+    namespace = "{{ job.config.namespace | default('default') }}"
 
     {% if job.config.labels is defined %}
     labels = {

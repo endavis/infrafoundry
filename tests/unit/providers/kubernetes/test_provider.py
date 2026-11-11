@@ -1,5 +1,6 @@
 """Unit tests for Kubernetes provider."""
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -611,6 +612,141 @@ class TestBuildDependencyRefs:
         deps = provider.get_dependencies()
         for resource_type in deps:
             assert resource_type in refs
+
+    def test_namespace_ref_uses_config_name(self, provider: KubernetesProvider) -> None:
+        """Namespaces are labelled from config.name, so refs must be too."""
+        resources_by_type = {
+            "namespaces": [
+                ResourceConfig(
+                    name="apps-ns",
+                    type="namespaces",
+                    provider="kubernetes",
+                    config={"name": "apps"},
+                )
+            ],
+            "secrets": [ResourceConfig(name="s", type="secrets", provider="kubernetes", config={})],
+        }
+        refs = provider._build_dependency_refs(resources_by_type)
+        assert "kubernetes_namespace.apps" in refs["secrets"]
+        assert "kubernetes_namespace.apps_ns" not in refs["secrets"]
+
+    def test_refs_use_config_name_for_configmaps_deployments_services(
+        self, provider: KubernetesProvider
+    ) -> None:
+        """configmaps, deployments and services are labelled from config.name."""
+        resources_by_type = {
+            "configmaps": [
+                ResourceConfig(
+                    name="cm-res",
+                    type="configmaps",
+                    provider="kubernetes",
+                    config={"name": "cm-real"},
+                )
+            ],
+            "deployments": [
+                ResourceConfig(
+                    name="dep-res",
+                    type="deployments",
+                    provider="kubernetes",
+                    config={"name": "dep-real"},
+                )
+            ],
+            "services": [
+                ResourceConfig(
+                    name="svc-res",
+                    type="services",
+                    provider="kubernetes",
+                    config={"name": "svc-real"},
+                )
+            ],
+            "ingresses": [
+                ResourceConfig(name="ing", type="ingresses", provider="kubernetes", config={})
+            ],
+        }
+        refs = provider._build_dependency_refs(resources_by_type)
+        assert "kubernetes_config_map.cm_real" in refs["deployments"]
+        assert "kubernetes_deployment.dep_real" in refs["services"]
+        assert "kubernetes_service.svc_real" in refs["ingresses"]
+        assert not any("_res" in r for rs in refs.values() for r in rs)
+
+    def test_refs_use_resource_name_for_other_types(self, provider: KubernetesProvider) -> None:
+        """Types labelled from top-level name ignore config.name."""
+        resources_by_type = {
+            "secrets": [
+                ResourceConfig(
+                    name="sec-res",
+                    type="secrets",
+                    provider="kubernetes",
+                    config={"name": "sec-other"},
+                )
+            ],
+            "deployments": [
+                ResourceConfig(
+                    name="dep", type="deployments", provider="kubernetes", config={"name": "dep"}
+                )
+            ],
+        }
+        refs = provider._build_dependency_refs(resources_by_type)
+        assert "kubernetes_secret.sec_res" in refs["deployments"]
+        assert not any("sec_other" in r for rs in refs.values() for r in rs)
+
+    def test_namespace_ref_falls_back_to_name_without_config_name(
+        self, provider: KubernetesProvider
+    ) -> None:
+        """Without config.name the resource name is used."""
+        resources_by_type = {
+            "namespaces": [
+                ResourceConfig(name="my-ns", type="namespaces", provider="kubernetes", config={})
+            ],
+            "secrets": [ResourceConfig(name="s", type="secrets", provider="kubernetes", config={})],
+        }
+        refs = provider._build_dependency_refs(resources_by_type)
+        assert refs["secrets"] == ["kubernetes_namespace.my_ns"]
+
+
+def test_generate_terraform_refs_match_declared_labels(
+    provider: KubernetesProvider, tmp_dirs: Any
+) -> None:
+    """depends_on namespace refs equal the label declared in namespaces.tf."""
+    _config_dir, output_dir = tmp_dirs
+    provider.set_environment("test")
+    resources = [
+        ResourceConfig(
+            name="apps-ns", type="namespaces", provider="kubernetes", config={"name": "apps"}
+        ),
+        ResourceConfig(
+            name="creds",
+            type="secrets",
+            provider="kubernetes",
+            config={
+                "namespace": "apps",
+                "data": {"a": "YQ=="},
+                "string_data": {"b": "plain"},
+            },
+        ),
+        ResourceConfig(
+            name="nightly",
+            type="cronjobs",
+            provider="kubernetes",
+            config={
+                "namespace": "apps",
+                "schedule": "0 * * * *",
+                "containers": [{"name": "task", "image": "task:latest"}],
+            },
+        ),
+    ]
+    provider.generate_terraform(resources)
+
+    terraform_dir = output_dir / "test" / "terraform" / "kubernetes"
+    declared = re.findall(
+        r'resource "kubernetes_namespace" "(\w+)"', (terraform_dir / "namespaces.tf").read_text()
+    )
+    assert declared == ["apps"]
+    for filename in ("secrets.tf", "cronjobs.tf"):
+        content = (terraform_dir / filename).read_text()
+        refs = re.findall(r"kubernetes_namespace\.(\w+)", content)
+        assert refs == declared
+    assert 'namespace = "apps"' in (terraform_dir / "cronjobs.tf").read_text()
 
 
 class TestGenerateTerraformDependsOn:

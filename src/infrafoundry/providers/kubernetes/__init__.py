@@ -45,6 +45,12 @@ class KubernetesProvider(
         "KUBECONFIG": "kubeconfig_path",
     }
 
+    # Resource types whose templates label the Terraform resource from ``config.name``.
+    # Every other type labels from the top-level ``name``.
+    _CONFIG_NAME_LABEL_TYPES: ClassVar[frozenset[str]] = frozenset(
+        {"namespaces", "configmaps", "deployments", "services"}
+    )
+
     @override
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* env vars for Kubernetes provider."""
@@ -57,6 +63,24 @@ class KubernetesProvider(
             if value:
                 result[f"TF_VAR_{tf_var_name}"] = value
         return result
+
+    def _terraform_label(self, resource: ResourceConfig) -> str:
+        """Return the Terraform resource label the templates declare for a resource.
+
+        Must stay in step with the ``resource "<type>" "<label>"`` lines in the templates:
+        namespaces, configmaps, deployments and services use ``config.name``; every other
+        type uses the top-level ``name``. ``config.name`` falls back to ``name`` when missing.
+
+        Args:
+            resource: Resource to label.
+
+        Returns:
+            The label, with ``-`` replaced by ``_``.
+        """
+        label = resource.name
+        if resource.type in self._CONFIG_NAME_LABEL_TYPES:
+            label = str(resource.config.get("name", resource.name))
+        return label.replace("-", "_")
 
     def _build_dependency_refs(
         self,
@@ -89,7 +113,7 @@ class KubernetesProvider(
                 tf_resource_types = tf_types.get(dep_type, [])
                 for tf_type in tf_resource_types:
                     for resource in dep_resources:
-                        ref = f"{tf_type}.{resource.name.replace('-', '_')}"
+                        ref = f"{tf_type}.{self._terraform_label(resource)}"
                         refs.append(ref)
             result[resource_type] = refs
 
