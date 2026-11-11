@@ -19,6 +19,7 @@ tags:
 **Amended:** 2026-05-04 (#725) — port_forward shipped as a third `kind` on `nat_rules` via direct-API at `firewall/d_nat`; implementation-order item #2 closed. The 2026-05-04 re-probe of `26.1.6_2` confirmed the stock `DNatController` ships with the standard CRUD verbs; the original 2026-05-03 probe used the wrong URL (`firewall/dnat` concatenated instead of `firewall/d_nat` snake-case)
 **Amended:** 2026-05-12 (#788) — `radvd` per-component decision recorded (modern MVC controller `radvd/settings/*Entry`; **hybrid YAML-singleton/wire-list** pattern; full-reconcile semantics; new shared finalization hook `radvd_reconfigure`). The legacy `<dhcpdv6>/<optN>/<ra*>` source-XML fields are explicitly **out of scope** — Kea owns DHCPv6 leases (`kea.dhcp6.*`, #758) and the modern `radvd` controller takes over RA emission. Cutover hard blocker for hands-free IPv6: without per-interface RA emission on `opt1`/`opt2`/`opt3`/`opt6`, every IPv6 host on those VLANs loses its default route the moment cutover finishes. See [ADR-0014 §"Per-component decisions" → `radvd`](0014-opnsense-direct-api-apply-mechanism.md#radvd-788-2026-05-12) for the apply mechanism and wire schema.
 **Amended:** 2026-10-27 (#1093) — OpenVPN (`<openvpn>`, `<OPNsense>/OpenVPN`), CAs and certificates (`<ca>`, `<cert>`) and the ACME client (`<OPNsense>/AcmeClient`) move from out of scope to in scope, tracked by [#808](https://github.com/endavis/infrafoundry/issues/808), [#807](https://github.com/endavis/infrafoundry/issues/807) and [#790](https://github.com/endavis/infrafoundry/issues/790). A box rebuilt from YAML otherwise loses its VPN client, its GUI certificate and its renewals, which defeats the drop-in replacement goal.
+**Amended:** 2026-11-11 (#791) — monit (`<OPNsense>/monit`: general settings, alerts, services and tests) is in scope and implemented as `monit.settings`, `monit.alerts`, `monit.tests` and `monit.services`. Monit is core OPNsense, so its endpoints are stock and fully checked; see [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md#monit-791-2026-11-11).
 **Status:** Accepted
 **Issue:** [#701](https://github.com/endavis/infrafoundry/issues/701)
 
@@ -45,6 +46,7 @@ We will close the IaC gap so OPNsense box-to-box migration is achievable through
 | `openvpn.instances` ([#808](https://github.com/endavis/infrafoundry/issues/808)) | Added 2026-10-27 (#1093); renamed from `openvpn_legacy.clients` 2026-11-08 (#808). The VPN client must work on the replacement box without a hand import. It is managed as a modern client instance; the legacy `os-openvpn-legacy` plugin is not managed, and a cutover recreates the client as a modern instance. |
 | `trust.cas`, `trust.certs` ([#807](https://github.com/endavis/infrafoundry/issues/807)) | Added 2026-10-27 (#1093). `system.webgui` and the OpenVPN client refer to certificates by reference, so the references must resolve after a rebuild. |
 | `acmeclient_*` ([#790](https://github.com/endavis/infrafoundry/issues/790)) | Added 2026-10-27 (#1093). Certificates issued by the ACME client stop renewing if its accounts, validations and actions are not carried over. Implemented by #790 as `acmeclient.settings`, `.accounts`, `.validations`, `.actions` and `.certs`; the renewal cron job is plugin-managed, see [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md). |
+| `monit.*` ([#791](https://github.com/endavis/infrafoundry/issues/791)) | Added 2026-11-11 (#791). A rebuilt box otherwise loses its curated monitoring (alerts, services and the tests they run) and the operator re-creates it by hand in the GUI. Implemented as `monit.settings`, `monit.alerts`, `monit.tests` and `monit.services`; see [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md#monit-791-2026-11-11). |
 
 **Tooling work:**
 
@@ -120,6 +122,7 @@ Each step above is a separate feature issue. Issue numbers will be added to this
 - Issue [#808](https://github.com/endavis/infrafoundry/issues/808): feat: add `openvpn.instances` direct-API resource for OpenVPN client instances (moved in scope by #1093; scope changed from the legacy plugin to modern instances).
 - Issue [#807](https://github.com/endavis/infrafoundry/issues/807): feat: add `trust.cas` and `trust.certs` direct-API resources (moved in scope by #1093).
 - Issue [#790](https://github.com/endavis/infrafoundry/issues/790): feat: add the `acmeclient_*` resource types (moved in scope by #1093). Implemented as the `acmeclient.*` types; the renewal cron job is plugin-managed rather than a `cron.jobs` reference.
+- Issue [#791](https://github.com/endavis/infrafoundry/issues/791): feat: add the `monit.*` resource types. Implemented as `monit.settings`, `monit.alerts`, `monit.tests` and `monit.services`.
 
 ## Related Documentation
 

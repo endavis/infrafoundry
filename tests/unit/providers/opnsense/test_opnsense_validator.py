@@ -306,6 +306,27 @@ class TestValidateReferences:
 
         assert validator.tailscale_validator.validate.call_args.args[0].resources == [subnet, auth]
 
+    def test_dispatches_monit(self, validator: OPNsenseValidator) -> None:
+        """The monit validator receives only the ``monit.*`` slice (#791)."""
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "api_url": "https://opnsense.example.com",
+                "api_key": "key",
+                "api_secret": "secret",
+            }
+        )
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
+        validator.monit_validator = MagicMock()
+        test = ResourceConfig(name="t", type="monit.tests", provider="opnsense", config={})
+        settings = ResourceConfig(
+            name="monit.settings", type="monit.settings", provider="opnsense", config={}
+        )
+        other = ResourceConfig(name="g", type="system.groups", provider="opnsense", config={})
+
+        validator.validate_references([test, settings, other])
+
+        assert validator.monit_validator.validate.call_args.args[0].resources == [test, settings]
+
     def test_exception_caught_gracefully(self, validator: OPNsenseValidator) -> None:
         """Exceptions during validation are caught and reported."""
         validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]

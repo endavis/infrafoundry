@@ -44,6 +44,10 @@ EXPECTED_RESOURCE_TYPES = [
     "tailscale.settings",
     "tailscale.auth",
     "tailscale.subnets",
+    "monit.settings",
+    "monit.alerts",
+    "monit.tests",
+    "monit.services",
 ]
 
 

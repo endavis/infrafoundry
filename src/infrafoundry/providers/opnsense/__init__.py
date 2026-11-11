@@ -159,6 +159,12 @@ class OPNsenseProvider(
         from .components.interfaces_settings import InterfacesSettingsManager
         from .components.isc_to_kea_migration import ISCToKeaMigrationManager
         from .components.kea_dhcp import KeaDHCPManager
+        from .components.monit import (
+            MonitAlertsManager,
+            MonitServicesManager,
+            MonitTestsManager,
+        )
+        from .components.monit_settings import MonitSettingsManager
         from .components.nat_rule import NATRuleManager
         from .components.source_nat import SourceNatManager  # #1333
         from .components.static_route import StaticRouteManager
@@ -204,6 +210,11 @@ class OPNsenseProvider(
             ("tailscale.settings", TailscaleSettingsManager),
             ("tailscale.auth", TailscaleAuthManager),
             ("tailscale.subnets", TailscaleSubnetManager),
+            # #791
+            ("monit.settings", MonitSettingsManager),
+            ("monit.alerts", MonitAlertsManager),
+            ("monit.tests", MonitTestsManager),
+            ("monit.services", MonitServicesManager),
         ]
         for resource_type, manager_class in components:
             register_extractor(
@@ -300,6 +311,12 @@ class OPNsenseProvider(
         from .components.kea_dhcp4_subnet import KeaDHCPv4SubnetManager
         from .components.kea_dhcp6_reservation import KeaDHCPv6ReservationManager
         from .components.kea_dhcp6_subnet import KeaDHCPv6SubnetManager
+        from .components.monit import (
+            MonitAlertsManager,
+            MonitServicesManager,
+            MonitTestsManager,
+        )
+        from .components.monit_settings import MonitSettingsManager
         from .components.nat_rule import NATRuleManager
         from .components.openvpn_instances import OpenVpnInstanceManager
         from .components.openvpn_static_keys import OpenVpnStaticKeyManager
@@ -407,6 +424,12 @@ class OPNsenseProvider(
             "tailscale.settings": TailscaleSettingsManager,
             "tailscale.auth": TailscaleAuthManager,
             "tailscale.subnets": TailscaleSubnetManager,
+            # #791 (monit, core OPNsense): settings, alerts, then the tests a service
+            # references, then the services (which delete before the tests).
+            "monit.settings": MonitSettingsManager,
+            "monit.alerts": MonitAlertsManager,
+            "monit.tests": MonitTestsManager,
+            "monit.services": MonitServicesManager,
         }
 
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
@@ -450,6 +473,9 @@ class OPNsenseProvider(
         - ``tailscale_reconfigure`` (#787) — shared by the three ``tailscale.*``
           managers so a single ``tailscale/service/reconfigure`` call fires per apply.
 
+        - ``monit_reconfigure`` (#791) — shared by the four ``monit.*``
+          managers so a single ``monit/service/reconfigure`` call fires per apply.
+
         The mechanism is generic — future components with shared post-apply
         work register their own key here.
 
@@ -470,6 +496,7 @@ class OPNsenseProvider(
             "hostdiscovery_reconfigure": self._reconfigure_hostdiscovery,
             "acmeclient_reconfigure": self._reconfigure_acmeclient,  # #790
             "tailscale_reconfigure": self._reconfigure_tailscale,  # #787
+            "monit_reconfigure": self._reconfigure_monit,  # #791
         }
 
     def check_endpoint_support(
@@ -685,6 +712,21 @@ class OPNsenseProvider(
         service = TailscaleSettingsService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
+    def _reconfigure_monit(self, env_name: str) -> None:
+        """Reconfigure monit after any settings, alert, test or service change (#791).
+
+        Used by :meth:`get_finalization_hooks` so one ``monit/service/reconfigure`` call
+        fires per apply, shared by the four ``monit.*`` managers. Hook errors propagate,
+        failing the apply.
+
+        Args:
+            env_name: Active environment name.
+        """
+        from .services.monit_settings import MonitSettingsService
+
+        service = MonitSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
     def _reconfigure_hostdiscovery(self, env_name: str) -> None:
         """Reconfigure host discovery after a settings change (#792).
 
@@ -823,6 +865,11 @@ class OPNsenseProvider(
             "tailscale.settings": [],
             "tailscale.auth": [],
             "tailscale.subnets": [],
+            # #791
+            "monit.settings": [],
+            "monit.alerts": [],
+            "monit.tests": [],
+            "monit.services": ["monit.tests"],
         }
 
     @override

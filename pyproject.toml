@@ -287,7 +287,7 @@ skips = [
 
 [tool.codespell]
 skip = "tmp,.venv,.git,*.lock,*.pyc,__pycache__"
-ignore-words-list = "applyable"
+ignore-words-list = "applyable,permisssion"  # permisssion: OPNsense monit wire enum spelling (#791)
 
 [tool.coverage.run]
 branch = true

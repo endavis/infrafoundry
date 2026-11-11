@@ -280,3 +280,44 @@ def test_tailscale_types_register_their_endpoints() -> None:
     )
     assert endpoints.TAILSCALE_RECONFIGURE in types["tailscale.subnets"]
     assert endpoints.TAILSCALE_SUBNET.add in types["tailscale.subnets"]
+
+
+def test_monit_types_register_their_endpoints() -> None:
+    types = endpoints.RESOURCE_TYPE_ENDPOINTS
+    assert types["monit.settings"] == (
+        endpoints.MONIT_SETTINGS_GET,
+        endpoints.MONIT_SETTINGS_SET,
+        endpoints.MONIT_RECONFIGURE,
+    )
+    for name, crud in (
+        ("alerts", endpoints.MONIT_ALERT),
+        ("tests", endpoints.MONIT_TEST),
+        ("services", endpoints.MONIT_SERVICE),
+    ):
+        assert types[f"monit.{name}"] == (
+            endpoints.MONIT_SETTINGS_GET,
+            crud.add,
+            crud.update,
+            crud.delete,
+            endpoints.MONIT_RECONFIGURE,
+        )
+    assert endpoints.MONIT_SERVICE.update.template == "monit/settings/setService/{uuid}"
+    assert endpoints.MONIT_TEST.delete.template == "monit/settings/delTest/{uuid}"
+    assert endpoints.MONIT_ALERT.add.template == "monit/settings/addAlert"
+    assert endpoints.MONIT_SERVICE.search.template == "monit/settings/searchService"
+    assert endpoints.MONIT_SERVICE.search.method == "GET"
+
+
+def test_monit_endpoints_are_stock_and_never_toggle_or_start() -> None:
+    monit = [e for e in endpoints.registered_endpoints() if e.template.startswith("monit/")]
+    assert monit
+    assert all(e.kind is EndpointKind.STOCK for e in monit)
+    forbidden = ("toggle", "start", "stop", "restart", "check", "status", "configtest")
+    for e in monit:
+        action = e.template.split("/")[2].lower()
+        assert not any(word in action for word in forbidden), e
+    assert {(e.method, e.template) for e in monit} >= {
+        ("GET", "monit/settings/get"),
+        ("POST", "monit/settings/set"),
+        ("POST", "monit/service/reconfigure"),
+    }
