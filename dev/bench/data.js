@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794330817131,
+  "lastUpdate": 1794393317819,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1030,6 +1030,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000026019468107006485",
             "extra": "mean: 94.71092833630685 usec\nrounds: 10940"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6acf0252e0d4d6c97e08717663d6d9529cbcb62e",
+          "message": "perf: configure sqlalchemy connection pooling for non-sqlite state backends (merges PR #1358, addresses #239)\n\nAddresses #239\n\nAdd build_engine_kwargs, which returns pool_size, max_overflow,\npool_recycle and pool_pre_ping for non-SQLite connection strings and\nnothing for SQLite. StateManager passes them to create_engine. Values\ncome from INFRAFOUNDRY_STATE_POOL_SIZE, INFRAFOUNDRY_STATE_MAX_OVERFLOW\nand INFRAFOUNDRY_STATE_POOL_RECYCLE; invalid values warn and fall back\nto the defaults (5, 10, 1800). Documented in the state management docs.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T10:34:32Z",
+          "tree_id": "b20bf11fe9c09623fd6ceebe5da5d1b062779af6",
+          "url": "https://github.com/endavis/infrafoundry/commit/6acf0252e0d4d6c97e08717663d6d9529cbcb62e"
+        },
+        "date": 1794393317119,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 62.81799096360311,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0015917598337671218",
+            "extra": "mean: 15.919006397059121 msec\nrounds: 68"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10523.481699659376,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00002795482593820693",
+            "extra": "mean: 95.02558454892053 usec\nrounds: 11106"
           }
         ]
       }
