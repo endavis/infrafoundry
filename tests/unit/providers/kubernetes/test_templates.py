@@ -1,6 +1,8 @@
 """Unit tests for Kubernetes template rendering."""
 
+import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -112,6 +114,39 @@ class TestSecretsTemplate:
         )
         assert '"app" = "myapp"' in content
         assert '"managed-by" = "infrafoundry"' in content
+
+    @staticmethod
+    def _render_secret(provider: KubernetesProvider, config: dict[str, Any]) -> str:
+        secrets = [
+            ResourceConfig(name="my-secret", type="secrets", provider="kubernetes", config=config)
+        ]
+        return provider.render_template(
+            "kubernetes/secrets.tf.j2", {"secrets": secrets, "dependency_refs": []}
+        )
+
+    def test_string_data_renders_plain_values(self, provider: KubernetesProvider) -> None:
+        """string_data values are plain strings; the provider does the encoding."""
+        content = self._render_secret(provider, {"string_data": {"k": "v"}})
+        assert '"k" = "v"' in content
+        assert "base64encode" not in content
+        assert len(re.findall(r"^\s*data = \{", content, re.MULTILINE)) == 1
+
+    def test_data_and_string_data_render_single_data_map(
+        self, provider: KubernetesProvider
+    ) -> None:
+        """Both keys merge into one data map (no redefined attribute)."""
+        content = self._render_secret(
+            provider, {"data": {"a": "YQ=="}, "string_data": {"b": "plain"}}
+        )
+        assert len(re.findall(r"^\s*data = \{", content, re.MULTILINE)) == 1
+        assert '"a" = "YQ=="' in content
+        assert '"b" = "plain"' in content
+
+    def test_string_data_overrides_data_on_same_key(self, provider: KubernetesProvider) -> None:
+        """string_data wins over data for a duplicate key, as in Kubernetes."""
+        content = self._render_secret(provider, {"data": {"k": "a"}, "string_data": {"k": "b"}})
+        assert content.count('"k" = "b"') == 1
+        assert '"k" = "a"' not in content
 
 
 class TestIngressTemplate:
@@ -269,6 +304,39 @@ class TestJobTemplate:
         )
         assert "backoff_limit = 5" in content
 
+    def test_job_uses_config_namespace(self, provider: KubernetesProvider) -> None:
+        """config.namespace is rendered rather than always using default."""
+        res = [
+            ResourceConfig(
+                name="batch-job",
+                type="jobs",
+                provider="kubernetes",
+                config={
+                    "namespace": "batch",
+                    "containers": [{"name": "task", "image": "app:latest"}],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/jobs.tf.j2", {"jobs": res, "dependency_refs": []}
+        )
+        assert 'namespace = "batch"' in content
+
+    def test_job_namespace_defaults_to_default(self, provider: KubernetesProvider) -> None:
+        """Without config.namespace the default namespace is used."""
+        res = [
+            ResourceConfig(
+                name="batch-job",
+                type="jobs",
+                provider="kubernetes",
+                config={"containers": [{"name": "task", "image": "app:latest"}]},
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/jobs.tf.j2", {"jobs": res, "dependency_refs": []}
+        )
+        assert 'namespace = "default"' in content
+
 
 class TestCronJobTemplate:
     """Tests for cronjobs.tf.j2 template."""
@@ -310,6 +378,43 @@ class TestCronJobTemplate:
             "kubernetes/cronjobs.tf.j2", {"cronjobs": cronjobs, "dependency_refs": []}
         )
         assert 'concurrency_policy = "Forbid"' in content
+
+    def test_cronjob_uses_config_namespace(self, provider: KubernetesProvider) -> None:
+        """config.namespace is rendered rather than always using default."""
+        res = [
+            ResourceConfig(
+                name="batch-cron",
+                type="cronjobs",
+                provider="kubernetes",
+                config={
+                    "namespace": "batch",
+                    "schedule": "0 * * * *",
+                    "containers": [{"name": "task", "image": "app:latest"}],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/cronjobs.tf.j2", {"cronjobs": res, "dependency_refs": []}
+        )
+        assert 'namespace = "batch"' in content
+
+    def test_cronjob_namespace_defaults_to_default(self, provider: KubernetesProvider) -> None:
+        """Without config.namespace the default namespace is used."""
+        res = [
+            ResourceConfig(
+                name="batch-cron",
+                type="cronjobs",
+                provider="kubernetes",
+                config={
+                    "schedule": "0 * * * *",
+                    "containers": [{"name": "task", "image": "app:latest"}],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/cronjobs.tf.j2", {"cronjobs": res, "dependency_refs": []}
+        )
+        assert 'namespace = "default"' in content
 
 
 class TestRBACTemplate:

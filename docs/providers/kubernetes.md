@@ -52,10 +52,10 @@ The `KUBECONFIG` environment variable overrides `kubeconfig_path`: when it is se
 
 The generated Terraform pins the `hashicorp/kubernetes` provider to `~> 2.23`. It adds `hashicorp/helm` (`~> 2.12`) and a `helm` provider block only when the environment has `helm_releases`.
 
-!!! warning "Naming rule"
+!!! note "Naming rule"
     `namespaces`, `configmaps`, `deployments` and `services` take the object name and the Terraform label from `config.name`. Every other type uses the top-level `name`.
 
-    Set `config.name` equal to `name` for those four types. The automatic `depends_on` references are built from the top-level `name`, so a namespace with `name: apps-ns` and `config.name: apps` is declared as `kubernetes_namespace.apps`, while the resources that depend on it point at `kubernetes_namespace.apps_ns`, which does not exist.
+    The automatic `depends_on` references use the same label source, so `name` and `config.name` may differ: a namespace with `name: apps-ns` and `config.name: apps` is declared as `kubernetes_namespace.apps`, and the resources that depend on it point at `kubernetes_namespace.apps`.
 
 ## Resource Reference
 
@@ -84,10 +84,10 @@ resources:
 
 `namespace` (default `default`), `labels`, `annotations`, `type` (default `Opaque`), `data`, `string_data`.
 
-`string_data` values are wrapped in `base64encode()`.
+`string_data` values are plain strings; the Terraform provider encodes them. You may set both `data` and `string_data`: they are merged into one `data` map, and `string_data` wins on a duplicate key.
 
-!!! warning "Use only one of `data` and `string_data`"
-    The template writes a `data = { ... }` block for each of them. Setting both produces two `data` attributes in one resource, which Terraform rejects.
+!!! note "Existing `string_data` secrets"
+    Earlier versions wrapped `string_data` values in `base64encode()`, so the stored value was base64 text. The next apply updates such a secret in place to the plain string you wrote. A consumer that decoded the value twice to work around this must be updated.
 
 ### PersistentVolumeClaims
 
@@ -163,12 +163,12 @@ The pod selector is always `app: <config.name>`, and the pod template carries th
 
 ### Jobs and CronJobs
 
-!!! warning "Known limitation: the namespace is always `default`"
-    The job and cronjob templates read the namespace from the resource itself, not from `config`, and the resource has no such field. A job or cronjob is created in the `default` namespace whatever `config.namespace` says. This page therefore does not list `namespace` for these two types.
+!!! note "Changing the namespace replaces the object"
+    A job or cronjob that sets `config.namespace` to something other than `default` is created in that namespace. For an existing one, the next apply replaces it, because `metadata.namespace` cannot change in place.
 
-`jobs`: `labels`, `annotations`, `backoff_limit`, `completions`, `parallelism`, `active_deadline_seconds`, `ttl_seconds_after_finished`, `restart_policy` (default `Never`), `service_account_name`, `containers`, `volumes` and `wait_for_completion`.
+`jobs`: `namespace` (default `default`), `labels`, `annotations`, `backoff_limit`, `completions`, `parallelism`, `active_deadline_seconds`, `ttl_seconds_after_finished`, `restart_policy` (default `Never`), `service_account_name`, `containers`, `volumes` and `wait_for_completion`.
 
-`cronjobs`: `labels`, `annotations`, `schedule`, `timezone` (rendered as `time_zone`), `concurrency_policy`, `suspend`, `starting_deadline_seconds`, `successful_jobs_history_limit`, `failed_jobs_history_limit`, `backoff_limit`, `ttl_seconds_after_finished`, `restart_policy` (default `OnFailure`), `service_account_name`, `containers` and `volumes`.
+`cronjobs`: `namespace` (default `default`), `labels`, `annotations`, `schedule`, `timezone` (rendered as `time_zone`), `concurrency_policy`, `suspend`, `starting_deadline_seconds`, `successful_jobs_history_limit`, `failed_jobs_history_limit`, `backoff_limit`, `ttl_seconds_after_finished`, `restart_policy` (default `OnFailure`), `service_account_name`, `containers` and `volumes`.
 
 Containers in both types have `name`, `image`, `command`, `args`, `env`, `resources` and `volume_mounts`.
 
@@ -381,7 +381,7 @@ See the example under [Service accounts, roles and bindings](#service-accounts-r
 
 ### A scheduled job with a persistent volume
 
-The cronjob lands in the `default` namespace (see the limitation above), so the claim is created there too.
+The cronjob and the claim both land in the `default` namespace because neither sets `namespace`.
 
 ```yaml
 resources:
