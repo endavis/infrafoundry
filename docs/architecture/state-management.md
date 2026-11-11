@@ -56,6 +56,10 @@ InfraFoundry manages three artifacts: Terraform state, the InfraFoundry state da
   - Custom location: set `INFRAFOUNDRY_STATE_HOME=/custom/path` to override default state directory.
   - Scope: global across environments.
   - Backend: set `INFRAFOUNDRY_STATE_BACKEND=postgresql` and `INFRAFOUNDRY_STATE_CONNECTION=<DSN>` for team/shared use.
+  - Connection pool (non-SQLite backends only; SQLite gets no pool arguments):
+    `INFRAFOUNDRY_STATE_POOL_SIZE` (default `5`), `INFRAFOUNDRY_STATE_MAX_OVERFLOW` (default `10`)
+    and `INFRAFOUNDRY_STATE_POOL_RECYCLE` in seconds (default `1800`). Connections are also
+    pre-pinged before use. A non-integer or negative value logs a warning and uses the default.
 - **Generated configs:**
   - Path: `generated/{env}/{terraform|ansible}/{provider}/`.
   - Git-ignored, reproducible from YAML; clean up safely between runs if needed.

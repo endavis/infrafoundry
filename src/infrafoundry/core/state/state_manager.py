@@ -22,6 +22,7 @@ from infrafoundry.core.state.models import (
     Resource,
     ResourceState,
 )
+from infrafoundry.core.state.pool_config import build_engine_kwargs
 from infrafoundry.core.state.prune import prune_environment as _prune_environment
 from infrafoundry.core.state.rename import count_environment_rows as _count_environment_rows
 from infrafoundry.core.state.rename import rename_environment as _rename_environment
@@ -53,7 +54,7 @@ class StateManager(BaseManager):
             connection_string = f"sqlite:///{state_dir / 'state.db'}"
 
         self._log_debug(f"Initializing StateManager with connection: {connection_string}")
-        self.engine = create_engine(connection_string)
+        self.engine = create_engine(connection_string, **build_engine_kwargs(connection_string))
         self.SessionLocal = sessionmaker(bind=self.engine)
 
         # Initialize repositories

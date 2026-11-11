@@ -516,6 +516,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_state_list_environments.py",
     "tests/unit/test_state_lock_context.py",
     "tests/unit/test_state_lock_repository.py",
+    "tests/unit/test_state_pool_config.py",
     "tests/unit/test_unified_event_bus.py",
     "tests/unit/test_validation.py",
     "tests/unit/test_validation_helpers.py",
