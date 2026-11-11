@@ -122,8 +122,8 @@ def test_passthrough_accepts_provider_and_action_fields() -> None:
         "v",
         method="dns01",
         dns_service="dns_cf",
-        dns_cf_token="tok",  # nosec B106
-        dns_hostingde_apiKey="k",  # nosec B106
+        dns_cf_token="tok",  # nosec B106  # fake fixture value
+        dns_hostingde_apiKey="k",  # nosec B106  # fake fixture value
     )
     assert cfg.extra_wires == {"dns_cf_token", "dns_hostingde_apiKey"}
     assert cfg.secret_wires == {"dns_cf_token", "dns_hostingde_apiKey"}

@@ -12,8 +12,8 @@ from infrafoundry.providers.opnsense.validators.openvpn_instances_validator impo
     OpenVpnInstanceValidator,
 )
 
-SECRET_USER = "secret://env_secrets/vpn/user"  # nosec B105
-SECRET_PW = "secret://env_secrets/vpn/pw"  # nosec B105
+SECRET_USER = "secret://env_secrets/vpn/user"  # nosec B105  # fake fixture value
+SECRET_PW = "secret://env_secrets/vpn/pw"  # nosec B105  # fake fixture value
 LITERAL = "literal-value-not-real"
 
 

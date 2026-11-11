@@ -85,7 +85,7 @@ class SopsSecretProvider(SecretProvider):
         # Encrypted — sops must be available
         self._ensure_sops_installed()
         try:
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # fixed sops argv, no shell
                 [self._sops_path, "--decrypt", str(file_path)],
                 capture_output=True,
                 check=True,
@@ -125,7 +125,7 @@ class SopsSecretProvider(SecretProvider):
             secure_write_yaml(temp_file, data)
 
             # Encrypt in place
-            subprocess.run(  # nosec B603
+            subprocess.run(  # nosec B603  # fixed sops argv, no shell
                 [self._sops_path, "--encrypt", "--in-place", str(temp_file)],
                 capture_output=True,
                 check=True,

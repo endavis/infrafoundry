@@ -166,7 +166,7 @@ class TestLiveInterfaceAssignment:
             macaddr="aa:bb:cc:dd:ee:ff",
             mtu=1500,
         )
-        with pytest.raises(Exception):  # frozen — any attribute write fails  # noqa: B017
+        with pytest.raises(Exception):  # noqa: B017  # frozen dataclass: any write raises
             live.identifier = "wan"  # type: ignore[misc]
 
     def test_diff_key_is_identifier(self) -> None:

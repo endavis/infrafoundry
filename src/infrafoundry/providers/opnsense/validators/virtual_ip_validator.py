@@ -401,7 +401,7 @@ class VirtualIPValidator(SpecializedValidator[OPNsenseValidationContext]):
         operators should not commit secrets to YAML.
         """
         password = vip.config.get("password")
-        if password is None or password == "":  # nosec B105
+        if password is None or password == "":  # nosec B105  # emptiness check, not a password literal
             self.report.add_check(
                 check_name=f"virtual_ip_{vip.name}_password",
                 passed=False,

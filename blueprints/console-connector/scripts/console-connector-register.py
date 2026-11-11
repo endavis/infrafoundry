@@ -28,8 +28,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-TOKEN_URL = "https://netapp-cloud-account.auth0.com/oauth/token"  # nosec B105
-TOKEN_AUDIENCE = "https://api.cloud.netapp.com"  # nosec B105
+TOKEN_URL = "https://netapp-cloud-account.auth0.com/oauth/token"  # nosec B105  # OAuth endpoint URL, not a secret
+TOKEN_AUDIENCE = "https://api.cloud.netapp.com"  # nosec B105  # OAuth endpoint URL, not a secret
 ACCOUNTS_URL = "https://api.bluexp.netapp.com/tenancy/account"
 AGENT_URL_TEMPLATE = "https://{ip}/occm/api/occm"
 TIMEOUT = 30
@@ -198,7 +198,7 @@ def _request(
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
     ctx = pinned_context(pin) if pin else None
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx) as resp:  # nosec B310
+        with urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx) as resp:  # nosec B310  # https endpoint from constants/package variables
             raw = resp.read().decode() or "{}"
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode(errors="replace")

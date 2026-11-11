@@ -18,7 +18,7 @@ from infrafoundry.providers.opnsense.services.openvpn_static_keys import (
     OpenVpnStaticKeyService,
 )
 
-MATERIAL = "FAKEKEYMATERIAL"  # nosec B105  # test fixture
+MATERIAL = "FAKEKEYMATERIAL"
 # Split so the detect-private-key hook does not flag these fake fixtures.
 BEGIN = "-----BEGIN OpenVPN Static" + " key V1-----"
 END = "-----END OpenVPN Static" + " key V1-----"

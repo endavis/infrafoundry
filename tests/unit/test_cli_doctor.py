@@ -1,5 +1,6 @@
 """Unit tests for the foundry doctor command (system-level checks only)."""
 
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,26 @@ class TestWelcomeMessage:
 
         assert result.exit_code == 0
         assert "Status" in result.output
+
+    def test_welcome_survives_unreadable_config_repo(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """ConfigManager failing shows 0 environments, via flag and via env var."""
+        runner = CliRunner()
+
+        def boom(*args: Any, **kwargs: Any) -> None:
+            raise RuntimeError("unreadable")
+
+        monkeypatch.setattr(sys.modules["infrafoundry.cli.main"], "ConfigManager", boom)
+
+        result = runner.invoke(cli, ["--config-dir", str(tmp_path)])
+        assert result.exit_code == 0
+        assert "Environments: 0 available" in result.output
+
+        monkeypatch.setenv("INFRAFOUNDRY_CONFIG_REPO", str(tmp_path))
+        result = runner.invoke(cli, [])
+        assert result.exit_code == 0
+        assert "Environments: 0 available" in result.output
 
     def test_welcome_not_shown_with_subcommand(self) -> None:
         """Test that welcome message is not shown when a subcommand is provided."""

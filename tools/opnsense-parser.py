@@ -23,7 +23,7 @@ class OPNsenseParser:
         """Initialize parser with config file path."""
         self.config_path = config_path
         # B314: input is a user-supplied local OPNsense config.xml export, not network-fetched.
-        self.tree = ET.parse(config_path)  # nosec B314
+        self.tree = ET.parse(config_path)  # nosec B314  # parses a local operator-supplied config.xml
         self.root = self.tree.getroot()
 
     def parse_interfaces(self) -> dict[str, Any]:

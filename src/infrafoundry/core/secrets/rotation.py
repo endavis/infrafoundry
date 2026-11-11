@@ -70,7 +70,7 @@ class SecretsRotator:
         key_file.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # fixed age-keygen argv, no shell
                 [self._age_keygen_path, "-o", str(key_file)],
                 capture_output=True,
                 text=True,
@@ -307,7 +307,7 @@ class SecretsRotator:
             Age public key
         """
         try:
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # fixed age-keygen argv, no shell
                 [self._age_keygen_path, "-y", str(key_file)],
                 capture_output=True,
                 text=True,

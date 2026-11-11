@@ -1,5 +1,6 @@
 """Envs command - List available environments with sync status."""
 
+import contextlib
 from typing import Any
 
 import click
@@ -110,12 +111,11 @@ def envs(ctx: click.Context, output_format: str) -> None:
 
             # Load details from filesystem if available
             if in_fs:
-                try:
+                # A missing or corrupt env config leaves description and providers empty.
+                with contextlib.suppress(Exception):
                     env_config = config_manager.load_environment(env_name)
                     entry["description"] = env_config.description or ""
                     entry["providers"] = env_config.providers
-                except Exception:  # nosec B110  # graceful degradation for missing/corrupt config
-                    pass
 
             env_data.append(entry)
 

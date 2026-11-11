@@ -12,8 +12,8 @@ from infrafoundry.providers.opnsense.validators.openvpn_static_keys_validator im
     OpenVpnStaticKeyValidator,
 )
 
-SECRET_KEY = "secret://env_secrets/vpn/key"  # nosec B105
-LITERAL = "literal-key-material-not-real"  # nosec B105
+SECRET_KEY = "secret://env_secrets/vpn/key"  # nosec B105  # fake fixture value
+LITERAL = "literal-key-material-not-real"
 
 
 def _key(name: str = "vpn-key", /, **overrides: Any) -> ResourceConfig:

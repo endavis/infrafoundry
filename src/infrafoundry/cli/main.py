@@ -1,5 +1,6 @@
 """Command-line interface for InfraFoundry."""
 
+import contextlib
 import os
 from pathlib import Path
 
@@ -200,18 +201,16 @@ def _show_welcome(ctx: click.Context) -> None:
 
     if config_dir:
         config_status = str(config_dir)
-        try:
+        # An unreadable config repo shows 0 environments.
+        with contextlib.suppress(Exception):
             config_manager = ConfigManager(base_dir=config_dir / "envs")
             env_count = len(config_manager.list_environments())
-        except Exception:  # nosec B110  # intentional silent fail for welcome message
-            pass
     elif config_repo := os.getenv("INFRAFOUNDRY_CONFIG_REPO"):
         config_status = config_repo
-        try:
+        # An unreadable config repo shows 0 environments.
+        with contextlib.suppress(Exception):
             config_manager = ConfigManager(base_dir=Path(config_repo) / "envs")
             env_count = len(config_manager.list_environments())
-        except Exception:  # nosec B110  # intentional silent fail for welcome message
-            pass
 
     # Display status
     console.print("[bold]Status:[/bold]")

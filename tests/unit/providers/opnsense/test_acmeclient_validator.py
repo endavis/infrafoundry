@@ -11,7 +11,7 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validators import AcmeClientValidator, build_xref_index
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
-SECRET = "secret://env_secrets/opnsense/acmeclient/validations/dns/dns_cf_token"  # nosec B105
+SECRET = "secret://env_secrets/opnsense/acmeclient/validations/dns/dns_cf_token"  # nosec B105  # fake fixture value
 LITERAL = "literal-value-not-real"
 
 

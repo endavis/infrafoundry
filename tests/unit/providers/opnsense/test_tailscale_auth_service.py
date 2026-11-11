@@ -21,8 +21,8 @@ from infrafoundry.providers.opnsense.services.tailscale_auth import (
     wants_key_update,
 )
 
-SENTINEL = "tskey-auth-SENTINEL-0001"  # nosec B105
-OTHER = "tskey-auth-OTHER-0002"  # nosec B105
+SENTINEL = "tskey-auth-SENTINEL-0001"
+OTHER = "tskey-auth-OTHER-0002"
 
 
 def _live(key: str = "", server: str = "https://controlplane.example.com") -> dict[str, Any]:

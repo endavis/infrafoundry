@@ -160,6 +160,6 @@ def create_jinja2_env(
     if undefined is None:
         undefined = jinja2.Undefined
 
-    env = jinja2.Environment(undefined=undefined)  # nosec B701
+    env = jinja2.Environment(undefined=undefined)  # nosec B701  # renders infrastructure config, not HTML
     env.filters.update(_FILTERS)
     return env

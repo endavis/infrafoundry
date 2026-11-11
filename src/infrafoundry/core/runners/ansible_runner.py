@@ -77,7 +77,7 @@ class AnsibleRunner(BaseRunner):
             return None
 
         try:
-            result = subprocess.run(  # nosec B603  # trusted command
+            result = subprocess.run(  # nosec B603  # ansible-playbook via tool_path, list argv, no shell
                 [self.tool_path, "--version"],
                 capture_output=True,
                 text=True,
@@ -110,7 +110,7 @@ class AnsibleRunner(BaseRunner):
             return {"valid": True, "message": "No playbook found (optional)"}
 
         try:
-            result = subprocess.run(  # nosec B603  # trusted command
+            result = subprocess.run(  # nosec B603  # ansible-playbook via tool_path, list argv, no shell
                 [self.tool_path, "--syntax-check", playbook.name],
                 cwd=ansible_dir,
                 capture_output=True,
@@ -158,7 +158,7 @@ class AnsibleRunner(BaseRunner):
 
         # Run command - nosec B603: trusted command with validated inputs
         try:
-            result = subprocess.run(cmd, cwd=ansible_dir, capture_output=False)  # nosec B603
+            result = subprocess.run(cmd, cwd=ansible_dir, capture_output=False)  # nosec B603  # ansible-playbook via tool_path, list argv, no shell
             return {"exit_code": result.returncode, "success": result.returncode == 0}
         except FileNotFoundError:
             return {"error": "ansible-playbook not found", "success": False}

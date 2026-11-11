@@ -38,7 +38,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 HAL_JSON = "application/vnd.netapp.v1.hal+json"
-DEFAULT_PASSWORD = "admin"  # nosec B105 - initial FEW password published in NetApp docs
+DEFAULT_PASSWORD = "admin"  # nosec B105  # vendor's documented factory default, changed during setup
 # Adding a cluster returns only after AIQUM has set up its agent link to the
 # cluster: 12 s when it works, 86 s when the cluster cannot reach AIQUM (#1167).
 CLUSTER_ADD_TIMEOUT = 180
@@ -222,7 +222,7 @@ class AIQUMClient:
             req.add_header("Content-Type", content_type)
 
         try:
-            with urlopen(  # nosec B310 - AIQUM URL constructed from package variables
+            with urlopen(  # nosec B310  # URL built from package variables
                 req, context=self._ssl_ctx, timeout=timeout or self._timeout
             ) as resp:
                 raw = resp.read()
@@ -468,7 +468,7 @@ def query_dns_a(server: str, name: str, timeout: float = DNS_QUERY_TIMEOUT) -> l
         OSError: If the server cannot be reached or does not answer in time
             (``TimeoutError`` is an ``OSError``), or the answer is malformed.
     """
-    query_id = random.randint(0, 0xFFFF)  # nosec B311 - transaction ID, not a secret
+    query_id = random.randint(0, 0xFFFF)  # nosec B311  # transaction ID, not a secret
     family = socket.AF_INET6 if ":" in server else socket.AF_INET
     with socket.socket(family, socket.SOCK_DGRAM) as sock:
         sock.settimeout(timeout)
@@ -504,7 +504,7 @@ def fetch_ontap_dns(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     req.add_header("Authorization", f"Basic {token}")
     req.add_header("Accept", "application/json")
     try:
-        with urlopen(  # nosec B310 - ONTAP URL constructed from package variables
+        with urlopen(  # nosec B310  # URL built from package variables
             req, context=make_ssl_context(), timeout=ONTAP_REST_TIMEOUT
         ) as resp:
             payload = json.loads(resp.read())

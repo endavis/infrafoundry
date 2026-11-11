@@ -1148,7 +1148,7 @@ class TestScriptHandlerJumphostReexec:
             "count": 3,
             "agents": [{"name": "a1"}],  # object/array — only in JSON blob
         }
-        proc = subprocess.run(  # nosec B603
+        proc = subprocess.run(  # nosec B603  # fixed test argv, no shell
             ["bash", "-c", remote_bash],
             input=json.dumps(pkg_vars),
             capture_output=True,
@@ -1185,7 +1185,7 @@ class TestScriptHandlerJumphostReexec:
         # no real binary either, so the suite stays hermetic (#1057).
         empty_bin = tmp_path / "empty-bin"
         empty_bin.mkdir()
-        proc = subprocess.run(  # nosec B603
+        proc = subprocess.run(  # nosec B603  # fixed test argv, no shell
             [bash_path, "-c", remote_bash],
             input="{}",
             capture_output=True,
@@ -1205,7 +1205,7 @@ class TestScriptHandlerJumphostReexec:
         INFRAFOUNDRY_WARNINGS_FILE to remote scripts so they can emit
         warnings the orchestrator can later scp back and summarize.
         """
-        warnings_path = "/tmp/infrafoundry-abcd/warnings.jsonl"  # nosec B108
+        warnings_path = "/tmp/infrafoundry-abcd/warnings.jsonl"  # nosec B108  # test path literal, not a temp file created here
         remote_bash = _build_remote_bash(str(tmp_path), "dump.sh", warnings_file=warnings_path)
 
         # Seed: `: > "<path>"` creates/truncates so scp-back always finds it.
@@ -1239,7 +1239,7 @@ class TestScriptHandlerJumphostReexec:
         remote_bash = _build_remote_bash(
             str(remote_dir), "emit.sh", warnings_file=str(warnings_path)
         )
-        proc = subprocess.run(  # nosec B603
+        proc = subprocess.run(  # nosec B603  # fixed test argv, no shell
             ["bash", "-c", remote_bash],
             input=json.dumps({}),  # no package vars
             capture_output=True,
@@ -1911,7 +1911,7 @@ class TestScriptHandlerJumphostLayout:
                 "INFRAFOUNDRY_PACKAGE_DIR": "/r/pkg",
             },
         )
-        proc = subprocess.run(  # nosec B603
+        proc = subprocess.run(  # nosec B603  # fixed test argv, no shell
             ["bash", "-c", remote_bash],
             input="{}",
             capture_output=True,
@@ -2004,7 +2004,7 @@ class TestScriptTimeoutProcessGroup:
             f"echo $! > {pid_file}\n"
             "wait\n",
         )
-        proc = subprocess.Popen(  # nosec B603
+        proc = subprocess.Popen(  # nosec B603  # fixed test argv, no shell
             [str(tmp_path / "envs" / "dev" / "t.sh")],
             stdout=subprocess.PIPE,
             text=True,
