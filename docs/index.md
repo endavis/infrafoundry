@@ -17,6 +17,8 @@ This index provides a structured overview of the available documentation.
 ## Usage
 - **[CLI Reference](usage/cli-reference.md)**: Comprehensive reference for the `infra` command-line interface.
 - **[Validation](usage/validation.md)**: Guide to running pre-flight checks and validating configurations.
+- **[Error Reference](reference/errors.md)**: The `IF-` error codes and how to resolve them.
+- **[Troubleshooting](guides/troubleshooting.md)**: Common errors by symptom, with fixes.
 
 ## Configuration
 - **[Overview](configuration/overview.md)**: High-level introduction to configuring InfraFoundry.
@@ -30,6 +32,15 @@ This index provides a structured overview of the available documentation.
 - **[Separate Config Repo](configuration/separate-config-repo.md)**: Best practices for maintaining configurations in a separate repository.
 - **[Notifications](configuration/notifications.md)**: Setting up and customizing system notifications.
 - **[Blueprints](configuration/blueprints.md)**: Using blueprints for reusable infrastructure patterns.
+- **[Dependency Ordering](configuration/dependency-ordering.md)**: How providers and resources are ordered, and what you control.
+
+## Providers
+- **[ESXi](providers/esxi.md)**: VMware ESXi hosts and virtual machines.
+- **[Kubernetes](providers/kubernetes.md)**: Namespaces, workloads, RBAC, Helm releases and manifests.
+- **[OCI](providers/oci.md)**: Oracle Cloud Infrastructure.
+- **[OPNsense](providers/opnsense.md)**: Firewall configuration through the direct API.
+- **[Proxmox](providers/proxmox.md)**: Proxmox VE virtual machines, containers and SDN.
+- **[Tailscale](providers/tailscale.md)**: Tailnet ACL, keys, routes and DNS.
 
 ## Architecture
 - **[Overview](architecture/overview.md)**: Conceptual overview of the system architecture.
@@ -55,6 +66,7 @@ This index provides a structured overview of the available documentation.
 - **[DHCP VM Integration](guides/dhcp-vm-integration.md)**: Integrating DHCP services with Virtual Machines.
 - **[Age Key Management](guides/age-key-management.md)**: Managing Age encryption keys for secrets.
 - **[SSH Authentication](guides/ssh-authentication.md)**: Setting up and managing SSH authentication.
+- **[Troubleshooting](guides/troubleshooting.md)**: Common errors by symptom, with fixes.
 
 ## Development
 - **[Implementing Providers](development/implementing-providers.md)**: Guide for creating new providers for InfraFoundry.

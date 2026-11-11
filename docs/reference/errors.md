@@ -373,6 +373,28 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 
 ---
 
+### IF-VALIDATION-005: Resource Filter Matched Nothing
+
+**Cause:** The `-r` resource filter did not match any available resources.
+
+**Solutions:**
+1. Check the spelling of the resource names passed to `-r`
+2. Run `foundry infra list --env <env>` to see available resources
+3. Verify the resources exist in your configuration
+4. A `-p` package that declares no resources is also refused
+
+---
+
+### IF-VALIDATION-006: Filtered Destroy Refused
+
+**Cause:** A filtered destroy selected Proxmox SDN zones or vnets, which would also destroy the VMs and containers that depend on them.
+
+**Solutions:**
+1. Remove the zone or vnet from the config and run `foundry infra apply`
+2. If the package has no Proxmox resources left, run `foundry infra apply --env <env> -P proxmox`
+
+---
+
 ## Package Errors (IF-PACKAGE)
 
 ### IF-PACKAGE-001: Package Not Found

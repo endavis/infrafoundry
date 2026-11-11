@@ -106,6 +106,7 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
       - **Terraform Cloud:** `organization` (required), `workspaces` (required), `hostname`, `token`
   - `iac_tool` (optional, `"terraform"` | `"opentofu"`, default: `"terraform"`): Select the IaC provisioning tool. Can also be set via the `INFRAFOUNDRY_IAC_TOOL` environment variable (env var takes precedence). See [OpenTofu Runner](../runners/opentofu.md) for details.
   - `runner_priorities` (optional, dict[str, int]): Override default runner execution priorities. See [Runner Execution Overview](../runners/overview.md) for details.
+  - `provider_order` (optional, list[str]): Override the order in which providers run. Providers earlier in the list run first; unlisted providers run last; destroy reverses the order. See [Dependency and Execution Ordering](dependency-ordering.md#provider-order).
   - `ssh.user`/`key_path`/`port` (optional, defaults to current user and port 22).
   - `provider_ssh.<provider>` overrides global SSH.
   - `provider_settings.<provider>` holds credentials/endpoints; fields vary by provider.

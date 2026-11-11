@@ -80,8 +80,8 @@ InfraFoundry separates code generation from execution: YAML configs are rendered
 ## Examples
 
 - **Review without applying:** `foundry infra plan --env dev --dry-run` (validate only).
-- **Full run:** `foundry infra apply --env prod` (generate + terraform + ansible + state tracking).
-- **Remove:** `foundry infra destroy --env prod` (tears down resources via Terraform/Ansible).
+- **Full run:** `foundry infra apply --env prod` (generate + run the IaC runners + state tracking). Only runners whose `is_iac_runner` property is true (Terraform, OpenTofu and the OPNsense direct runner) generate and run during plan and apply. `AnsibleRunner` inherits `BaseRunner.is_iac_runner = False`, so `infra apply` does not run `ansible-playbook` (`src/infrafoundry/core/orchestrator_workflows.py::_regenerate_iac_configs`, `src/infrafoundry/core/deployment_executor.py`).
+- **Remove:** `foundry infra destroy --env prod` (tears down resources through the IaC runners).
 
 ## Related Documentation
 
