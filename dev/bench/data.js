@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794408246733,
+  "lastUpdate": 1794409659535,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1334,6 +1334,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009899870891300869",
             "extra": "mean: 127.12382552111482 usec\nrounds: 8299"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e74f766247630e396bc6149d5d2ec3b1a84a3653",
+          "message": "fix: correct kubernetes job namespace, depends_on labels and secret data (merges PR #1368, addresses #1366)\n\n- jobs and cronjobs take their namespace from config.namespace (default\n  \"default\"); the templates read a namespace attribute ResourceConfig\n  does not have, so every job and cronjob landed in \"default\"\n- automatic depends_on references use the label each template declares:\n  config.name for namespaces, configmaps, deployments and services, the\n  top-level name for every other type; references no longer point at an\n  undeclared resource when name and config.name differ\n- a secret renders one data map: config.data first, then string_data as\n  plain values (string_data wins on a duplicate key); this removes the\n  duplicate data argument and the base64encode that double-encoded\n  string_data, since the provider's data field takes plain values\n\nMigration effects:\n- a job or cronjob that sets config.namespace to anything but \"default\"\n  is replaced on the next apply, moving into that namespace\n- a secret that uses string_data gets an in-place update on the next\n  apply: the stored value becomes the plain string instead of its\n  base64 text\n\nAddresses #1366\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T15:06:50Z",
+          "tree_id": "dbd088dc687ef512ad49d1cd37d80f87b51a33ea",
+          "url": "https://github.com/endavis/infrafoundry/commit/e74f766247630e396bc6149d5d2ec3b1a84a3653"
+        },
+        "date": 1794409658662,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 106.34744159339891,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0007771912695335941",
+            "extra": "mean: 9.403141110092026 msec\nrounds: 109"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15817.906200559513,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000003852432538906826",
+            "extra": "mean: 63.219492347516116 usec\nrounds: 16988"
           }
         ]
       }
