@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794393317819,
+  "lastUpdate": 1794393714174,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1068,6 +1068,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00002795482593820693",
             "extra": "mean: 95.02558454892053 usec\nrounds: 11106"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a3ea8bdba15ccb678eb748f4aca1363d7f42b168",
+          "message": "perf: make apply worker count configurable (merges PR #1359, addresses #240)\n\nDefault --max-workers to os.cpu_count() (4 when unknown) instead of a\nfixed 4, and read INFRAFOUNDRY_MAX_WORKERS. Precedence is flag, env var,\nCPU count, 4. Values below 1 are rejected. Orchestrator.apply and the\nrollback path use the same default.\n\ninfra destroy gets no --max-workers: it runs providers sequentially and\nhas no thread pool, so the option would be accepted and ignored.\n\nAddresses #240\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T10:41:06Z",
+          "tree_id": "a27fdae55fe57c6cffc28a0c701eb04f06066079",
+          "url": "https://github.com/endavis/infrafoundry/commit/a3ea8bdba15ccb678eb748f4aca1363d7f42b168"
+        },
+        "date": 1794393713760,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 85.29500793936447,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00019504988679526803",
+            "extra": "mean: 11.724015556817719 msec\nrounds: 88"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12717.498375714793,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008042250323773268",
+            "extra": "mean: 78.63181660864922 usec\nrounds: 13463"
           }
         ]
       }
