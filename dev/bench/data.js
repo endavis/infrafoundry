@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794409659535,
+  "lastUpdate": 1794410788340,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1372,6 +1372,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000003852432538906826",
             "extra": "mean: 63.219492347516116 usec\nrounds: 16988"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "65db0ca8b092d15d9a632205ed4ac1c5528208e4",
+          "message": "fix: resolve kubernetes validator references by the object name templates create (merges PR #1371, addresses #1370)\n\nKubernetesValidator built its known-name sets from the top-level resource\nname, but namespaces, configmaps, deployments and services create their\nKubernetes object under config.name. A config whose two names differed\ngot a false missing-reference warning (or error, for env_from configmap\nrefs).\n\nMove the name rule into providers/kubernetes/names.py\n(kubernetes_object_name: config.name for those four types, falling back\nto name; name for every other type). The validator's API and local\nreference checks and KubernetesProvider._terraform_label now share it,\nso labels, references and validation follow one rule.\n\nAddresses #1370\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T15:25:29Z",
+          "tree_id": "0ba3a6e150a1549c9752268a6bbb0621d03b619e",
+          "url": "https://github.com/endavis/infrafoundry/commit/65db0ca8b092d15d9a632205ed4ac1c5528208e4"
+        },
+        "date": 1794410787337,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 50.1731221650574,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0002757598611446161",
+            "extra": "mean: 19.93099007692291 msec\nrounds: 52"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7218.401815744228,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000021393967426235533",
+            "extra": "mean: 138.53482052202696 usec\nrounds: 8352"
           }
         ]
       }
