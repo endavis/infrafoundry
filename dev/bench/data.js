@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794394440084,
+  "lastUpdate": 1794395617718,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1144,6 +1144,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003692774128676077",
             "extra": "mean: 127.80730819358932 usec\nrounds: 8287"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "af4765f01b6f2aa72dba0f81a621caa3046011bb",
+          "message": "perf: memoize environment and resource loads per config manager (merges PR #1361, addresses #244)\n\nOne run loaded the full resource list twice and the environment settings\n(with SOPS decryption) three times. ConfigManager now memoizes\nload_environment and get_all_resources_all_providers per instance:\n\n- results are returned as deep copies, so callers cannot mutate the cache\n- the environment key includes INFRAFOUNDRY_IAC_TOOL, which is read per call\n- a resource cache hit replays the pending package events of that load\n- errors are not cached\n- hit/miss counts are logged at debug level and exposed by cache_stats();\n  clear_cache() forces a reload and cleanup() calls it\n\nThere is no file-change invalidation: config does not change mid-run and\neach run builds a new manager.\n\nAddresses #244\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T11:12:57Z",
+          "tree_id": "1e1907072beec65ace41cca902cd102c89f3c268",
+          "url": "https://github.com/endavis/infrafoundry/commit/af4765f01b6f2aa72dba0f81a621caa3046011bb"
+        },
+        "date": 1794395617278,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 101.63774338764208,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0010054055965557983",
+            "extra": "mean: 9.838864644859756 msec\nrounds: 107"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15952.781800607603,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006517876324813777",
+            "extra": "mean: 62.68499202828139 usec\nrounds: 16684"
           }
         ]
       }
