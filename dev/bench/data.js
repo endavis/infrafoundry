@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794393714174,
+  "lastUpdate": 1794394440084,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1106,6 +1106,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008042250323773268",
             "extra": "mean: 78.63181660864922 usec\nrounds: 13463"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8b185e326743af59ba071d965aaef8f0f21faa85",
+          "message": "perf: add composite indexes to the state database (merges PR #1360, addresses #242)\n\nAdd ix_resources_env_provider_name on resources (environment, provider,\nname), matching the resource lookup by name, and\nix_deployments_env_started_at on deployments (environment, started_at),\nmatching the per-environment history query ordered by start time.\n\nThere is no migration tool and create_all skips existing tables, so a\nnew ensure_indexes() step in StateManager.initialize() creates any named\nmodel index an existing SQLite or PostgreSQL database lacks. Existing\nsingle-column indexes are kept.\n\nAddresses #242\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T10:53:13Z",
+          "tree_id": "64826a7d2cf6277c1e931471aa7fe9fc094bd285",
+          "url": "https://github.com/endavis/infrafoundry/commit/8b185e326743af59ba071d965aaef8f0f21faa85"
+        },
+        "date": 1794394439168,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 57.14483764733281,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003690121356441562",
+            "extra": "mean: 17.4993934915252 msec\nrounds: 59"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7824.278706232536,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003692774128676077",
+            "extra": "mean: 127.80730819358932 usec\nrounds: 8287"
           }
         ]
       }
