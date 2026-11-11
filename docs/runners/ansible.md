@@ -11,7 +11,7 @@ tags:
 
 ## Overview
 
-The Ansible runner configures provisioned resources by generating inventory and playbooks from your YAML definitions, then running `ansible-playbook`.
+The Ansible runner configures provisioned resources by generating inventory and playbooks from your YAML definitions, then running `ansible-playbook`. `infra plan` and `infra apply` do not invoke it today; see the note under Quick Start.
 
 ## Audience and Prerequisites
 
@@ -43,14 +43,18 @@ The Ansible runner configures provisioned resources by generating inventory and 
    ```bash
    foundry infra apply --env dev
    ```
-   Ansible inventory/playbook is generated and executed after provisioning.
+   This provisions the resources through the IaC runners only. `infra plan` and `infra apply` do
+   not generate or run Ansible: `AnsibleRunner` inherits `BaseRunner.is_iac_runner = False`, and
+   only IaC runners take part in plan and apply (see
+   [Orchestrator Architecture](../architecture/orchestrator-architecture.md)).
 
 ## Configuration Details
 
 - **Per-resource fields:** `ansible_roles`, `ansible_tasks`, `ansible_vars`.
 - **Roles location:** `roles/` in the config repo (e.g., `roles/common`, `roles/webserver`).
 - **Generated files:** Inventory/playbook under `generated/{env}/ansible/{provider}/`.
-- **Execution order:** Runs after Terraform (see `runner_priorities`).
+- **Execution order:** `runner_priorities` orders runners, but `infra plan` and `infra apply` run
+  only the IaC runners. The Ansible runner is not among them today, so it does not run there.
 
 ## Validation and Checks
 

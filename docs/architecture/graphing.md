@@ -1,6 +1,6 @@
 ---
 title: "Visualizing Infrastructure Topology"
-description: "Render the resource dependency graph as Mermaid or DOT with foundry infra analyze graph"
+description: "Render the resource dependency graph as Mermaid with foundry infra analyze graph"
 audience:
   - contributors
 tags:
@@ -11,7 +11,7 @@ tags:
 
 ## Overview
 
-`foundry infra analyze graph` builds a dependency graph of resources to show creation/destruction order. Output is Mermaid (or DOT) so you can visualize relationships and debug dependencies.
+`foundry infra analyze graph` builds a dependency graph of resources to show creation/destruction order. Output is Mermaid so you can visualize relationships and debug dependencies.
 
 ## Audience and Prerequisites
 
@@ -20,7 +20,7 @@ tags:
 
 ## When to Use This
 
-- Understanding cross-provider dependencies before applying changes.
+- Understanding the dependencies within each provider before applying changes. The graph has no edges between resources of different providers (see [Dependency and Execution Ordering](../configuration/dependency-ordering.md)).
 - Reviewing sequencing for complex environments.
 - Debugging unexpected ordering or missing references.
 
@@ -30,14 +30,14 @@ tags:
 foundry infra analyze graph --env dev --format mermaid > graph.mmd
 ```
 
-Render with Mermaid Live Editor or embed in Markdown. Use DOT for alternative tooling (`--format dot`).
+Render with Mermaid Live Editor or embed in Markdown.
 
 ## Configuration Details
 
-- **Command:** `foundry infra analyze graph --env <env> [--format mermaid|dot]`.
+- **Command:** `foundry infra analyze graph --env <env> [--format mermaid]`.
 - **Nodes:** Provider-scoped resources (e.g., `proxmox:vm-01`, `opnsense:firewall-rule-100`).
 - **Edges:** `A --> B` means A depends on B (B created before A; A destroyed before B).
-- **Sources of dependencies:** Provider rules, cross-resource references, and future explicit `depends_on`.
+- **Sources of dependencies:** The type-level rules each provider declares in `get_dependencies()`, applied between resources of the same provider only. See [Dependency and Execution Ordering](../configuration/dependency-ordering.md).
 
 ## Validation and Checks
 
@@ -51,14 +51,14 @@ Render with Mermaid Live Editor or embed in Markdown. Use DOT for alternative to
   graph TD
       proxmox_vm_web_01["proxmox:vm-web-01"]
       proxmox_network_vlan_10["proxmox:network-vlan-10"]
-      opnsense_firewall_web["opnsense:firewall-web"]
+      proxmox_vm_db_01["proxmox:vm-db-01"]
 
       proxmox_vm_web_01 --> proxmox_network_vlan_10
-      opnsense_firewall_web --> proxmox_vm_web_01
+      proxmox_vm_db_01 --> proxmox_network_vlan_10
   ```
-- **Generate DOT:**
+- **Write Mermaid to a file:**
   ```bash
-  foundry infra analyze graph --env prod --format dot > graph.dot
+  foundry infra analyze graph --env prod --format mermaid > graph.mmd
   ```
 
 ## Related Documentation
@@ -67,12 +67,13 @@ Render with Mermaid Live Editor or embed in Markdown. Use DOT for alternative to
 - [Configuration Guide](../configuration/overview.md)
 - [Validation and Pre-Flight Checks](../usage/validation.md)
 - [Orchestrator Architecture](orchestrator-architecture.md)
+- [Dependency and Execution Ordering](../configuration/dependency-ordering.md)
 
 ## Troubleshooting
 
-- **Symptom:** Missing nodes or edges. **Fix:** Ensure resources declare correct references; rerun `foundry infra doctor --env <env>`.
+- **Symptom:** Missing nodes or edges. **Fix:** Check that the resources exist and that their types are ones the provider declares a dependency for; rerun `foundry infra doctor --env <env>`.
 - **Symptom:** Unexpected ordering. **Fix:** Check provider rules and references; verify resource names match between configs.
-- **Symptom:** Graph output unreadable. **Fix:** Switch format (`--format dot`) and render with DOT tools; simplify by filtering resources before generation (future enhancement).
+- **Symptom:** Graph output unreadable. **Fix:** Render the Mermaid output with the Mermaid Live Editor; `mermaid` is the only format.
 
 ---
 

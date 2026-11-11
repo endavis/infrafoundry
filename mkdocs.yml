@@ -132,6 +132,7 @@ nav:
     - Blueprints: configuration/blueprints.md
     - Infrastructure Packages: configuration/infrastructure-packages.md
     - Lifecycle Hooks: configuration/lifecycle-hooks.md
+    - Dependency Ordering: configuration/dependency-ordering.md
 
   - Architecture:
     - Overview: architecture/overview.md
@@ -203,6 +204,7 @@ nav:
     - ESXi: providers/esxi.md
     - OCI: providers/oci.md
     - Kubernetes: providers/kubernetes.md
+    - OPNsense: providers/opnsense.md
     - Proxmox: providers/proxmox.md
     - Tailscale: providers/tailscale.md
     - OPNsense Resource Coverage: development/opnsense-resource-coverage.md
@@ -215,6 +217,7 @@ nav:
     - Drift Detection: guides/drift-detection.md
     - Drift Remediation: guides/drift-remediation.md
     - CI/CD with Separate Config Repo: guides/ci-cd-with-separate-config-repo.md
+    - Troubleshooting: guides/troubleshooting.md
 
   - Development:
     - Overview: development/README.md

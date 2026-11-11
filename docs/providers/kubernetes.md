@@ -13,24 +13,24 @@ The Kubernetes provider manages Kubernetes resources including deployments, serv
 
 ## Supported Resources
 
-| Type | Description |
-|------|-------------|
-| `namespaces` | Kubernetes namespaces |
-| `configmaps` | ConfigMaps for configuration data |
-| `secrets` | Secrets for sensitive data |
-| `persistentvolumeclaims` | PVCs for persistent storage |
-| `serviceaccounts` | Service accounts for RBAC |
-| `roles` | Namespace-scoped RBAC roles |
-| `rolebindings` | Bindings between roles and subjects |
-| `clusterroles` | Cluster-scoped RBAC roles |
-| `clusterrolebindings` | Cluster-scoped role bindings |
-| `deployments` | Deployment workloads |
-| `services` | Service resources |
-| `ingresses` | Ingress resources |
-| `jobs` | One-time job workloads |
-| `cronjobs` | Scheduled job workloads |
-| `helm_releases` | Helm chart releases |
-| `manifests` | Custom Kubernetes manifests (CRDs) |
+| Type | Terraform resource | Description |
+|------|--------------------|-------------|
+| `namespaces` | `kubernetes_namespace` | Kubernetes namespaces |
+| `configmaps` | `kubernetes_config_map` | ConfigMaps for configuration data |
+| `secrets` | `kubernetes_secret` | Secrets for sensitive data |
+| `persistentvolumeclaims` | `kubernetes_persistent_volume_claim` | PVCs for persistent storage |
+| `serviceaccounts` | `kubernetes_service_account` | Service accounts for RBAC |
+| `roles` | `kubernetes_role` | Namespace-scoped RBAC roles |
+| `rolebindings` | `kubernetes_role_binding` | Bindings between roles and subjects |
+| `clusterroles` | `kubernetes_cluster_role` | Cluster-scoped RBAC roles |
+| `clusterrolebindings` | `kubernetes_cluster_role_binding` | Cluster-scoped role bindings |
+| `deployments` | `kubernetes_deployment` | Deployment workloads |
+| `services` | `kubernetes_service` | Service resources |
+| `ingresses` | `kubernetes_ingress_v1` | Ingress resources |
+| `jobs` | `kubernetes_job` | One-time job workloads |
+| `cronjobs` | `kubernetes_cron_job_v1` | Scheduled job workloads |
+| `helm_releases` | `helm_release` | Helm chart releases |
+| `manifests` | `kubernetes_manifest` | Custom Kubernetes manifests (CRDs) |
 
 ## Configuration
 
@@ -48,7 +48,133 @@ provider_settings:
 
 The `~` is automatically expanded using Terraform's `pathexpand()` function.
 
+The `KUBECONFIG` environment variable overrides `kubeconfig_path`: when it is set and not empty, the runner passes it to Terraform as `TF_VAR_kubeconfig_path`. Without either, the generated `variables.tf` defaults to `~/.kube/config`.
+
+The generated Terraform pins the `hashicorp/kubernetes` provider to `~> 2.23`. It adds `hashicorp/helm` (`~> 2.12`) and a `helm` provider block only when the environment has `helm_releases`.
+
+!!! warning "Naming rule"
+    `namespaces`, `configmaps`, `deployments` and `services` take the object name and the Terraform label from `config.name`. Every other type uses the top-level `name`.
+
+    Set `config.name` equal to `name` for those four types. The automatic `depends_on` references are built from the top-level `name`, so a namespace with `name: apps-ns` and `config.name: apps` is declared as `kubernetes_namespace.apps`, while the resources that depend on it point at `kubernetes_namespace.apps_ns`, which does not exist.
+
 ## Resource Reference
+
+Each type below lists the keys it reads from `config`, taken from its Terraform template. Keys marked "default" use the value shown when you omit them. Every type also accepts `config.depends_on`, a list of Terraform addresses that is merged after the automatic references (see [Dependencies](#dependencies)). Annotations and labels are string maps.
+
+### Namespaces
+
+`name`, `labels`, `annotations`.
+
+```yaml
+resources:
+  - provider: kubernetes
+    type: namespaces
+    name: apps
+    config:
+      name: apps
+      labels:
+        team: platform
+```
+
+### ConfigMaps
+
+`name`, `namespace` (default `default`), `data` (a map of key to string; required).
+
+### Secrets
+
+`namespace` (default `default`), `labels`, `annotations`, `type` (default `Opaque`), `data`, `string_data`.
+
+`string_data` values are wrapped in `base64encode()`.
+
+!!! warning "Use only one of `data` and `string_data`"
+    The template writes a `data = { ... }` block for each of them. Setting both produces two `data` attributes in one resource, which Terraform rejects.
+
+### PersistentVolumeClaims
+
+- Metadata: `namespace` (default `default`), `labels`, `annotations`.
+- Spec: `access_modes` (default `[ReadWriteOnce]`), `storage` (default `1Gi`), `limits.storage`, `storage_class_name`, `volume_name`.
+- Selector: `selector.match_labels`, and `selector.match_expressions` as a list of `key`, `operator` and `values`.
+- `wait_until_bound`.
+
+### Service accounts, roles and bindings
+
+All of these share `labels` and `annotations`, and use the top-level `name`.
+
+| Type | Keys |
+|------|------|
+| `serviceaccounts` | `namespace` (default `default`), `image_pull_secrets` (a list of `name`), `automount_service_account_token` |
+| `roles` | `namespace` (default `default`), `rules` |
+| `rolebindings` | `namespace` (default `default`), `role_ref.kind` (default `Role`), `role_ref.name`, `subjects` |
+| `clusterroles` | `rules`, `aggregation_rule.cluster_role_selectors` (a list of `match_labels`) |
+| `clusterrolebindings` | `role_ref.name` (the kind is always `ClusterRole`), `subjects` |
+
+A rule in `roles` has `api_groups`, `resources`, `verbs` and optional `resource_names`. A rule in `clusterroles` also accepts `non_resource_urls`. A subject has `kind`, `name` and optional `namespace` and `api_group`.
+
+```yaml
+resources:
+  - provider: kubernetes
+    type: serviceaccounts
+    name: reader
+    config:
+      namespace: apps
+  - provider: kubernetes
+    type: roles
+    name: pod-reader
+    config:
+      namespace: apps
+      rules:
+        - api_groups: [""]
+          resources: ["pods"]
+          verbs: ["get", "list", "watch"]
+  - provider: kubernetes
+    type: rolebindings
+    name: reader-binds-pod-reader
+    config:
+      namespace: apps
+      role_ref:
+        name: pod-reader
+      subjects:
+        - kind: ServiceAccount
+          name: reader
+          namespace: apps
+```
+
+### Deployments
+
+`name`, `namespace` (default `default`), `labels`, `replicas` (default `1`), and `containers`.
+
+A container has `name`, `image`, `ports` (a list of `containerPort`, `name`, `protocol`), `env` (a list of `name` and `value`) and `resources.limits` and `resources.requests` (string maps).
+
+The pod selector is always `app: <config.name>`, and the pod template carries that label plus your `labels`.
+
+### Services
+
+`name`, `namespace` (default `default`), `labels`, `type` (default `ClusterIP`), `selector` and `ports`.
+
+`selector` is the value of the `app` label to select, a plain string that defaults to `config.name`. A port has `port`, `targetPort` (default: `port`), `protocol`, `name` and `nodePort` (written only when `type` is `NodePort`).
+
+### Ingresses
+
+`namespace` (default `default`), `labels`, `annotations`, `ingress_class_name`, `default_backend`, `tls` and `rules`.
+
+- `default_backend.service` has `name` and `port.number` or `port.name`.
+- A `tls` entry has `hosts` and `secret_name`.
+- A rule has `host` and `paths`. A path has `path`, `path_type` (default `Prefix`) and `backend.service` with `name` and `port.number` or `port.name`.
+
+### Jobs and CronJobs
+
+!!! warning "Known limitation: the namespace is always `default`"
+    The job and cronjob templates read the namespace from the resource itself, not from `config`, and the resource has no such field. A job or cronjob is created in the `default` namespace whatever `config.namespace` says. This page therefore does not list `namespace` for these two types.
+
+`jobs`: `labels`, `annotations`, `backoff_limit`, `completions`, `parallelism`, `active_deadline_seconds`, `ttl_seconds_after_finished`, `restart_policy` (default `Never`), `service_account_name`, `containers`, `volumes` and `wait_for_completion`.
+
+`cronjobs`: `labels`, `annotations`, `schedule`, `timezone` (rendered as `time_zone`), `concurrency_policy`, `suspend`, `starting_deadline_seconds`, `successful_jobs_history_limit`, `failed_jobs_history_limit`, `backoff_limit`, `ttl_seconds_after_finished`, `restart_policy` (default `OnFailure`), `service_account_name`, `containers` and `volumes`.
+
+Containers in both types have `name`, `image`, `command`, `args`, `env`, `resources` and `volume_mounts`.
+
+- An `env` entry has `name` and either `value` or `value_from` with `secret_key_ref` or `config_map_key_ref` (each with `name` and `key`).
+- A `volume_mounts` entry has `name`, `mount_path`, `read_only` and `sub_path`.
+- A volume has `name` and one of `config_map` (`name`; for jobs also `items`), `secret.secret_name`, `persistent_volume_claim.claim_name` or `empty_dir`.
 
 ### Manifests (Custom Resources)
 
@@ -69,6 +195,8 @@ resources:
         spec:
           key: value
 ```
+
+Only `apiVersion`, `kind`, `metadata.name`, `metadata.namespace`, `metadata.labels`, `metadata.annotations` and `spec` of the manifest are rendered; any other top-level key of the manifest is dropped. `foundry infra doctor` checks that the CRD group of each custom `apiVersion` is installed in the cluster.
 
 #### Automatic Helm Dependencies
 
@@ -106,7 +234,7 @@ resources:
           hostname: my-router
           subnetRouter:
             advertiseRoutes:
-              - 172.21.0.0/16
+              - 198.51.100.0/24
 ```
 
 The generated Terraform will include:
@@ -141,6 +269,14 @@ resources:
           replicaCount: 2
 ```
 
+The keys `config` reads:
+
+`chart`, `repository`, `version`, `namespace` (default `default`), `create_namespace`, `timeout`, `max_history`, `values` (a mapping rendered as YAML), `set` (a list of `name`, `value`, `type`) and `set_sensitive` (a list of `name`, `value`).
+
+The booleans are `atomic`, `cleanup_on_fail`, `dependency_update`, `force_update`, `lint`, `recreate_pods`, `replace`, `reset_values`, `reuse_values`, `skip_crds`, `wait` and `wait_for_jobs`.
+
+`foundry infra doctor` reports a Helm release that has no `chart` or no `repository`.
+
 ## Dependencies
 
 Resources are created in dependency order:
@@ -155,6 +291,8 @@ The provider automatically generates Terraform `depends_on` blocks for all resou
 
 Manifests depend on both namespaces and helm_releases to ensure CRDs are available.
 
+The automatic references cover every resource of each depended-on type in the run, not only the ones in the same namespace (`KubernetesProvider._build_dependency_refs`). A type adds references only when at least one resource of that type is present. See [Dependency and Execution Ordering](../configuration/dependency-ordering.md) for how this fits the other ordering levels.
+
 Resources can also declare explicit `depends_on` in their configuration, which are merged with the auto-generated dependencies:
 
 ```yaml
@@ -168,3 +306,117 @@ resources:
       depends_on:
         - kubernetes_config_map.extra_config
 ```
+
+## Common Use Cases
+
+All names and hosts below are placeholders.
+
+### A web application
+
+A namespace, a configuration map, a secret, a deployment, a service and an ingress. Each of `namespaces`, `configmaps`, `deployments` and `services` repeats its name in `config.name` (see the naming rule above).
+
+```yaml
+resources:
+  - provider: kubernetes
+    type: namespaces
+    name: web
+    config:
+      name: web
+  - provider: kubernetes
+    type: configmaps
+    name: web-config
+    config:
+      name: web-config
+      namespace: web
+      data:
+        LOG_LEVEL: info
+  - provider: kubernetes
+    type: secrets
+    name: web-credentials
+    config:
+      namespace: web
+      data:
+        API_TOKEN: example-token
+  - provider: kubernetes
+    type: deployments
+    name: web
+    config:
+      name: web
+      namespace: web
+      replicas: 2
+      containers:
+        - name: web
+          image: registry.example.com/web:1.0.0
+          ports:
+            - containerPort: 8080
+  - provider: kubernetes
+    type: services
+    name: web
+    config:
+      name: web
+      namespace: web
+      ports:
+        - port: 80
+          targetPort: 8080
+  - provider: kubernetes
+    type: ingresses
+    name: web
+    config:
+      namespace: web
+      ingress_class_name: nginx
+      rules:
+        - host: app.example.com
+          paths:
+            - path: /
+              backend:
+                service:
+                  name: web
+                  port:
+                    number: 80
+```
+
+### A service account with a role and binding
+
+See the example under [Service accounts, roles and bindings](#service-accounts-roles-and-bindings).
+
+### A scheduled job with a persistent volume
+
+The cronjob lands in the `default` namespace (see the limitation above), so the claim is created there too.
+
+```yaml
+resources:
+  - provider: kubernetes
+    type: persistentvolumeclaims
+    name: backup-data
+    config:
+      storage: 5Gi
+  - provider: kubernetes
+    type: cronjobs
+    name: nightly-backup
+    config:
+      schedule: "0 2 * * *"
+      containers:
+        - name: backup
+          image: registry.example.com/backup:1.0.0
+          volume_mounts:
+            - name: data
+              mount_path: /data
+      volumes:
+        - name: data
+          persistent_volume_claim:
+            claim_name: backup-data
+```
+
+### A Helm operator and a custom resource
+
+See [Automatic Helm Dependencies](#automatic-helm-dependencies) for a Helm release and a manifest that uses the CRD it installs.
+
+## Ansible Playbook Generation
+
+`KubernetesProvider.generate_ansible` writes two files to `generated/<env>/ansible/kubernetes/`:
+
+- `playbook.yml` runs on `localhost`. For each `deployments` resource it runs `kubectl wait --for=condition=available --timeout=300s` and then `kubectl get deployments -o wide`, and shows the registered output with `debug`. With no deployments there are no tasks.
+- `inventory.yml` holds `localhost` with `ansible_connection: local` and the variable `kubeconfig` (default `~/.kube/config`).
+
+!!! warning "`infra plan` and `infra apply` do not generate or run these files"
+    The orchestrator calls `generate_<tool>` and runs a runner only when the runner's `is_iac_runner` property is true. `AnsibleRunner` inherits `BaseRunner.is_iac_runner = False`, so `foundry infra plan` and `foundry infra apply` neither write the playbook nor run it. See [Orchestrator Architecture](../architecture/orchestrator-architecture.md) and [Ansible Runner Guide](../runners/ansible.md).

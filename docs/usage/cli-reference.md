@@ -97,6 +97,70 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | Install blueprint requirements | `foundry deps sync --env <env>` |
 | Install shell completion | `foundry completion bash` |
 
+## Common Workflows
+
+Each sequence below uses only flags that the command's `--help` lists. Replace `<env>` with your environment name.
+
+### First deploy
+
+```bash
+foundry doctor                      # required tools are installed
+foundry state init                  # create the state database
+foundry secrets init                # create the age key
+foundry config create <env>         # scaffold the environment
+foundry infra doctor -e <env>       # validate against the provider APIs
+foundry infra plan -e <env>         # generate and review
+foundry infra apply -e <env>        # apply
+```
+
+### Change loop
+
+Edit the YAML, then plan, apply and check what is deployed:
+
+```bash
+foundry infra plan -e <env>
+foundry infra plan -e <env> -P opnsense     # one provider
+foundry infra plan -e <env> -r web-01       # one resource by name
+foundry infra plan -e <env> -p k3s-cluster  # one package
+foundry infra apply -e <env>
+foundry infra deployed -e <env>
+```
+
+`-P`, `-p` and `-r` are mutually exclusive in these commands, so use one of them per run.
+
+### Drift
+
+```bash
+foundry infra drift detect -e <env>
+foundry infra drift remediate -e <env> --dry-run
+foundry infra drift remediate -e <env> --auto-approve --max-add 5 --max-change 3 --max-destroy 0
+```
+
+`remediate` needs `drift_remediation` in the environment's `settings.yaml`. See [Drift Detection](../guides/drift-detection.md) and [Drift Remediation](../guides/drift-remediation.md).
+
+### Migrate existing infrastructure
+
+For OPNsense, write YAML from the live box and apply it without deleting anything the YAML does not yet describe:
+
+```bash
+foundry config migrate -e <env> -p opnsense -c interfaces.vlans --dry-run
+foundry config migrate -e <env> -p opnsense -c interfaces.vlans
+foundry infra plan -e <env> --add-only
+foundry infra apply -e <env> --add-only
+```
+
+See [OPNsense Provider](../providers/opnsense.md#migrating-an-existing-firewall).
+
+### Roll back
+
+```bash
+foundry infra history -e <env>
+foundry infra rollback list -e <env>
+foundry infra rollback to <deployment-id>
+```
+
+`rollback to` takes the deployment ID as an argument and asks for confirmation unless you pass `--auto-approve`.
+
 ## Global Options
 
 ```

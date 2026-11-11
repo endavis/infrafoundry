@@ -43,16 +43,19 @@ The Orchestrator is a thin coordinator that wires providers, runners, policy che
   - Dependency graph builder (ordering)
   - Provider credential mapping (credentials flow via `TF_VAR_*` env vars)
   - Providers (render Terraform/Ansible)
-  - Runners via DeploymentExecutor (Terraform/Ansible execution)
+  - Runners via DeploymentExecutor (IaC runner execution; Ansible is not run by plan or apply, see the note after the workflow outline)
   - StateManager (deployments/resources/events)
   - EventManager (BEFORE/AFTER/FAILED events across lifecycle)
   - NotificationManager (subscribed to events)
 - **Workflow outline:**
   1. Create deployment record; emit BEFORE event.
   2. Load/validate resources; check policies; group by provider.
-  3. Track resources in state; render Terraform/Ansible; credentials passed via `TF_VAR_*` env vars.
+  3. Track resources in state; render IaC configuration; credentials passed via `TF_VAR_*` env vars.
   4. Execute via runners; update state; emit AFTER or FAILED events.
 - **Provider registry:** Providers registered once; grouped resources dispatched per provider.
+
+!!! note "Ansible is not part of plan or apply"
+    Only runners whose `is_iac_runner` property is true generate configuration and run during plan, apply and destroy (`_regenerate_iac_configs` in `src/infrafoundry/core/orchestrator_workflows.py` and the runner loop in `src/infrafoundry/core/deployment_executor.py`). Terraform, OpenTofu and the OPNsense direct runner return true. `AnsibleRunner` inherits `BaseRunner.is_iac_runner = False` (`src/infrafoundry/core/runners/base_runner.py`), so `infra plan` and `infra apply` do not call `generate_ansible` or run `ansible-playbook`.
 
 ## Workflow Sequence Diagrams
 
@@ -105,7 +108,7 @@ sequenceDiagram
 
             Note over PlanOrchestrator,Runner: Credentials passed via TF_VAR_* env vars
 
-            loop for each runner (terraform, ansible, etc.)
+            loop for each IaC runner (is_iac_runner is true)
                 PlanOrchestrator->>Provider: generate_{tool}(resources)
                 Provider-->>PlanOrchestrator: config generated
 
@@ -171,7 +174,7 @@ sequenceDiagram
 
             Note over ApplyOrchestrator,Runner: Credentials passed via TF_VAR_* env vars
 
-            loop for each runner (terraform, ansible, etc.)
+            loop for each IaC runner (is_iac_runner is true)
                 ApplyOrchestrator->>Provider: generate_{tool}(resources)
                 Provider-->>ApplyOrchestrator: config generated
 
