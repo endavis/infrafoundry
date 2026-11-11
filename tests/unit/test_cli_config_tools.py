@@ -33,7 +33,7 @@ def temp_config_dir(tmp_path: Path) -> Path:
         "description": "Development environment",
         "providers": ["proxmox", "kubernetes"],
     }
-    with open(dev_dir / "settings.yaml", "w") as f:
+    with open(dev_dir / "settings.yaml", "w", encoding="utf-8") as f:
         yaml.safe_dump(settings, f)
 
     # Create a sample resource file
@@ -49,7 +49,7 @@ def temp_config_dir(tmp_path: Path) -> Path:
             }
         ]
     }
-    with open(resources_dir / "vms.yaml", "w") as f:
+    with open(resources_dir / "vms.yaml", "w", encoding="utf-8") as f:
         yaml.safe_dump(resource_config, f)
 
     return config_dir
@@ -81,7 +81,7 @@ class TestConfigCreate:
         assert (staging_dir / "resources").exists()
 
         # Verify settings content
-        with open(staging_dir / "settings.yaml") as f:
+        with open(staging_dir / "settings.yaml", encoding="utf-8") as f:
             settings = yaml.safe_load(f)
         assert settings["name"] == "staging"
 
@@ -106,7 +106,7 @@ class TestConfigCreate:
 
         assert result.exit_code == 0
 
-        with open(envs_dir / "prod" / "settings.yaml") as f:
+        with open(envs_dir / "prod" / "settings.yaml", encoding="utf-8") as f:
             settings = yaml.safe_load(f)
         assert settings["description"] == "Production environment"
 
@@ -138,7 +138,7 @@ class TestConfigCreate:
         assert (staging_dir / "resources" / "vms.yaml").exists()
 
         # Verify settings were updated
-        with open(staging_dir / "settings.yaml") as f:
+        with open(staging_dir / "settings.yaml", encoding="utf-8") as f:
             settings = yaml.safe_load(f)
         assert settings["name"] == "staging"
 
@@ -195,7 +195,7 @@ class TestConfigCreate:
         assert result.exit_code == 0
         assert "Environment 'dev' created" in result.output
 
-        with open(temp_config_dir / "envs" / "dev" / "settings.yaml") as f:
+        with open(temp_config_dir / "envs" / "dev" / "settings.yaml", encoding="utf-8") as f:
             settings = yaml.safe_load(f)
         assert settings["description"] == "Recreated dev"
 
@@ -289,7 +289,7 @@ class TestConfigCreate:
         mock_run.assert_not_called()
 
         # Verify settings were updated correctly
-        with open(temp_config_dir / "envs" / "staging" / "settings.yaml") as f:
+        with open(temp_config_dir / "envs" / "staging" / "settings.yaml", encoding="utf-8") as f:
             settings = yaml.safe_load(f)
         assert settings["name"] == "staging"
 

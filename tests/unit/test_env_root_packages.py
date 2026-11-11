@@ -47,7 +47,7 @@ def _create_package(
     package_dir.mkdir(parents=True, exist_ok=True)
 
     manifest_path = package_dir / "infrafoundry.yml"
-    with open(manifest_path, "w") as f:
+    with open(manifest_path, "w", encoding="utf-8") as f:
         yaml.dump(manifest, f)
 
     if resource_files:
@@ -57,7 +57,7 @@ def _create_package(
             if isinstance(content, str):
                 resource_path.write_text(content)
             else:
-                with open(resource_path, "w") as f:
+                with open(resource_path, "w", encoding="utf-8") as f:
                     yaml.dump(content, f)
 
     return package_dir
@@ -73,7 +73,7 @@ def _create_loose_resources(
     if isinstance(content, str):
         resource_path.write_text(content)
     else:
-        with open(resource_path, "w") as f:
+        with open(resource_path, "w", encoding="utf-8") as f:
             yaml.dump(content, f)
     return resource_path
 

@@ -69,7 +69,7 @@ class ProviderCentricLoader:
         if not resource_path.exists():
             return []
 
-        with open(resource_path) as f:
+        with open(resource_path, encoding="utf-8") as f:
             data = load_config_yaml(f)
 
         if not data:

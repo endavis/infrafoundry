@@ -82,7 +82,7 @@ class TestConfigManager:
         good_env.mkdir()
         import yaml
 
-        with open(good_env / "settings.yaml", "w") as f:
+        with open(good_env / "settings.yaml", "w", encoding="utf-8") as f:
             yaml.dump({"name": "good", "description": "Good env"}, f)
 
         # Now validate should pass
@@ -97,7 +97,7 @@ class TestConfigManager:
 
         import yaml
 
-        with open(empty_env / "settings.yaml", "w") as f:
+        with open(empty_env / "settings.yaml", "w", encoding="utf-8") as f:
             yaml.dump({"name": "empty", "description": "Empty environment"}, f)
 
         config = ConfigManager(envs_dir)
@@ -213,7 +213,7 @@ class TestConfigManager:
         # Create resource file with plural type key (vms instead of vm)
         resource_file = envs_dir / "vm.yaml"
         config_data = {"vms": [{"name": "vm-01", "cores": 4, "memory": 8192}]}  # Plural form
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -236,7 +236,7 @@ class TestConfigManager:
         # Create resource file with dict instead of list
         resource_file = envs_dir / "vm.yaml"
         config_data = {"vm": {"name": "vm-01"}}  # Dict instead of list
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -257,7 +257,7 @@ class TestConfigManager:
         # Create resource file as direct list (invalid format)
         resource_file = envs_dir / "vm.yaml"
         config_data = [{"name": "vm-01"}]  # Direct list, not dict
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -287,7 +287,7 @@ class TestConfigManager:
         # Create settings.yaml
         env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
-        with open(env_file, "w") as f:
+        with open(env_file, "w", encoding="utf-8") as f:
             yaml.dump(env_data, f)
 
         # Create resource file with missing provider field
@@ -301,7 +301,7 @@ class TestConfigManager:
                 }
             ]
         }
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -316,7 +316,7 @@ class TestConfigManager:
         # Create settings.yaml
         env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
-        with open(env_file, "w") as f:
+        with open(env_file, "w", encoding="utf-8") as f:
             yaml.dump(env_data, f)
 
         # Create resource file with missing type field
@@ -330,7 +330,7 @@ class TestConfigManager:
                 }
             ]
         }
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -345,7 +345,7 @@ class TestConfigManager:
         # Create settings.yaml
         env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
-        with open(env_file, "w") as f:
+        with open(env_file, "w", encoding="utf-8") as f:
             yaml.dump(env_data, f)
 
         # Create resource file with missing name field
@@ -359,7 +359,7 @@ class TestConfigManager:
                 }
             ]
         }
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -375,19 +375,19 @@ class TestConfigManager:
         # Create settings.yaml
         env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
-        with open(env_file, "w") as f:
+        with open(env_file, "w", encoding="utf-8") as f:
             yaml.dump(env_data, f)
 
         # First file
         file1 = envs_dir / "vm.yaml"
         config1 = {"vm": [{"name": "web-01", "config": {"cores": 2}}]}
-        with open(file1, "w") as f:
+        with open(file1, "w", encoding="utf-8") as f:
             yaml.dump(config1, f)
 
         # Second file with duplicate name
         file2 = envs_dir / "vm-services.yaml"
         config2 = {"vm": [{"name": "web-01", "config": {"cores": 4}}]}
-        with open(file2, "w") as f:
+        with open(file2, "w", encoding="utf-8") as f:
             yaml.dump(config2, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -416,13 +416,13 @@ class TestConfigManager:
         # Create settings.yaml in provider directory (should be skipped)
         wrong_env_file = envs_dir / "settings.yaml"
         wrong_env_data = {"invalid": "data"}
-        with open(wrong_env_file, "w") as f:
+        with open(wrong_env_file, "w", encoding="utf-8") as f:
             yaml.dump(wrong_env_data, f)
 
         # Create valid resource file
         vm_file = envs_dir / "vm.yaml"
         vm_data = {"vm": [{"name": "test-vm", "config": {"cores": 2}}]}
-        with open(vm_file, "w") as f:
+        with open(vm_file, "w", encoding="utf-8") as f:
             yaml.dump(vm_data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -467,7 +467,7 @@ class TestConfigManager:
         # Create YAML file without 'resources' key
         resource_file = envs_dir / "test.yaml"
         data = {"other_key": "value"}
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -483,7 +483,7 @@ class TestConfigManager:
         # Create YAML file with resources as dict instead of list
         resource_file = envs_dir / "test.yaml"
         data = {"resources": {"not": "a list"}}
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -508,7 +508,7 @@ class TestConfigManager:
                 },
             ]
         }
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -525,19 +525,19 @@ class TestConfigManager:
         # Create settings.yaml in main dir
         env_file = temp_dir / "envs" / "dev" / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
-        with open(env_file, "w") as f:
+        with open(env_file, "w", encoding="utf-8") as f:
             yaml.dump(env_data, f)
 
         # Create settings.yaml in provider directory (should be skipped)
         wrong_env_file = envs_dir / "settings.yaml"
         wrong_env_data = {"invalid": "data"}
-        with open(wrong_env_file, "w") as f:
+        with open(wrong_env_file, "w", encoding="utf-8") as f:
             yaml.dump(wrong_env_data, f)
 
         # Create valid resource file
         vm_file = envs_dir / "vm.yaml"
         vm_data = {"vm": [{"name": "test-vm", "config": {"cores": 2}}]}
-        with open(vm_file, "w") as f:
+        with open(vm_file, "w", encoding="utf-8") as f:
             yaml.dump(vm_data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -562,7 +562,7 @@ class TestConfigManager:
                 }
             ]
         }
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -585,7 +585,7 @@ class TestConfigManager:
                 }
             ]
         }
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -608,7 +608,7 @@ class TestConfigManager:
                 }
             ]
         }
-        with open(resource_file, "w") as f:
+        with open(resource_file, "w", encoding="utf-8") as f:
             yaml.dump(config_data, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -653,7 +653,7 @@ class TestConfigManager:
 
         env_file = envs_dir / "settings.yaml"
         env_data = {"name": "dev", "description": "Test"}
-        with open(env_file, "w") as f:
+        with open(env_file, "w", encoding="utf-8") as f:
             yaml.dump(env_data, f)
 
         # Create resources directory with empty file
@@ -665,7 +665,7 @@ class TestConfigManager:
 
         # Create file without resources key
         no_resources = resources_dir / "no_resources.yaml"
-        with open(no_resources, "w") as f:
+        with open(no_resources, "w", encoding="utf-8") as f:
             yaml.dump({"other": "data"}, f)
 
         config = ConfigManager(temp_dir / "envs")
@@ -783,14 +783,14 @@ provider_settings:
         # Create regular resource file
         vm_file = envs_dir / "vm.yaml"
         vm_data = {"vm": [{"name": "regular-vm", "cores": 2}]}
-        with open(vm_file, "w") as f:
+        with open(vm_file, "w", encoding="utf-8") as f:
             yaml.dump(vm_data, f)
 
         # Create package with resource
         pkg_dir = envs_dir / "my-pkg"
         pkg_dir.mkdir()
         manifest = {"name": "my-pkg", "variables": {"prefix": "pkg"}, "resources": ["vm.yaml"]}
-        with open(pkg_dir / "infrafoundry.yml", "w") as f:
+        with open(pkg_dir / "infrafoundry.yml", "w", encoding="utf-8") as f:
             yaml.dump(manifest, f)
         (pkg_dir / "vm.yaml").write_text("vm:\n  - name: {{ prefix }}-vm\n    cores: 4\n")
 
@@ -813,14 +813,14 @@ provider_settings:
         # Create regular resource
         vm_file = envs_dir / "vm.yaml"
         vm_data = {"vm": [{"name": "dup-vm", "cores": 2}]}
-        with open(vm_file, "w") as f:
+        with open(vm_file, "w", encoding="utf-8") as f:
             yaml.dump(vm_data, f)
 
         # Create package with same resource name
         pkg_dir = envs_dir / "my-pkg"
         pkg_dir.mkdir()
         manifest = {"name": "my-pkg", "resources": ["vm.yaml"]}
-        with open(pkg_dir / "infrafoundry.yml", "w") as f:
+        with open(pkg_dir / "infrafoundry.yml", "w", encoding="utf-8") as f:
             yaml.dump(manifest, f)
         (pkg_dir / "vm.yaml").write_text("vm:\n  - name: dup-vm\n    cores: 4\n")
 
@@ -840,7 +840,7 @@ provider_settings:
             "name": "my-pkg",
             "events": {"AFTER_APPLY": [{"type": "script", "script": "scripts/run.sh"}]},
         }
-        with open(pkg_dir / "infrafoundry.yml", "w") as f:
+        with open(pkg_dir / "infrafoundry.yml", "w", encoding="utf-8") as f:
             yaml.dump(manifest, f)
 
         loader = ProviderCentricLoader(temp_dir / "envs")

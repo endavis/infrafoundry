@@ -36,5 +36,5 @@ def create_sops_config(secrets_dir: Path, age_public_key: str) -> None:
     }
 
     config_file = secrets_dir / ".sops.yaml"
-    with open(config_file, "w") as f:
+    with open(config_file, "w", encoding="utf-8") as f:
         yaml.dump(sops_config, f)

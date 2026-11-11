@@ -118,9 +118,7 @@ extend-exclude = ["**/_version.py"]
 [tool.ruff.lint]
 # Enable preview mode but require rules to be listed by exact code so we can
 # opt into specific preview rules without pulling in every unstable preview
-# rule. (PLW1514, the UTF-8 file-I/O rule, is NOT enabled yet — enabling it
-# would flag 180+ existing call sites. Schedule a separate refactor to
-# encoding= every text-mode open/read_text/write_text call before opting in.)
+# rule. PLW1514 (explicit encoding on text-mode file I/O) is one such opt-in.
 preview = true
 explicit-preview-rules = true
 select = [
@@ -136,6 +134,7 @@ select = [
     "RUF",  # Ruff-specific rules
     "SIM",  # flake8-simplify
     "ASYNC", # flake8-async
+    "PLW1514",  # require explicit encoding on text-mode file I/O (preview rule)
 ]
 ignore = [
     "ANN401",  # Dynamically typed expressions (Any) - intentional in plugin interfaces

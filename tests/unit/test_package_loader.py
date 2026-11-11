@@ -34,7 +34,7 @@ def _create_package(
     package_dir.mkdir(parents=True, exist_ok=True)
 
     manifest_path = package_dir / "infrafoundry.yml"
-    with open(manifest_path, "w") as f:
+    with open(manifest_path, "w", encoding="utf-8") as f:
         yaml.dump(manifest, f)
 
     if resource_files:
@@ -44,7 +44,7 @@ def _create_package(
             if isinstance(content, str):
                 resource_path.write_text(content)
             else:
-                with open(resource_path, "w") as f:
+                with open(resource_path, "w", encoding="utf-8") as f:
                     yaml.dump(content, f)
 
     return package_dir
@@ -148,7 +148,7 @@ class TestParseManifest:
         pkg_dir = temp_dir / "pkg"
         pkg_dir.mkdir()
         manifest_path = pkg_dir / "infrafoundry.yml"
-        with open(manifest_path, "w") as f:
+        with open(manifest_path, "w", encoding="utf-8") as f:
             yaml.dump(manifest_data, f)
 
         manifest = loader._parse_manifest(manifest_path)
@@ -691,7 +691,7 @@ def _create_blueprint(base_dir: Any, name: Any, manifest_data: Any, extra_files:
     blueprint_dir.mkdir(parents=True, exist_ok=True)
 
     manifest_path = blueprint_dir / "blueprint.yaml"
-    with open(manifest_path, "w") as f:
+    with open(manifest_path, "w", encoding="utf-8") as f:
         yaml.dump(manifest_data, f)
 
     if extra_files:
@@ -701,7 +701,7 @@ def _create_blueprint(base_dir: Any, name: Any, manifest_data: Any, extra_files:
             if isinstance(content, str):
                 file_path.write_text(content)
             else:
-                with open(file_path, "w") as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     yaml.dump(content, f)
 
     return blueprint_dir
@@ -996,7 +996,7 @@ class TestBlueprintIntegration:
         inventory_path = pkg_dir / GENERATED_INVENTORY_FILENAME
         assert inventory_path.exists()
 
-        with open(inventory_path) as f:
+        with open(inventory_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert data["groups"]["servers"]["hosts"]["server-01"]["ansible_host"] == "172.21.0.1"
@@ -1033,7 +1033,7 @@ class TestBlueprintIntegration:
         inventory_path = pkg_dir / GENERATED_INVENTORY_FILENAME
         assert inventory_path.exists()
 
-        with open(inventory_path) as f:
+        with open(inventory_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert "package_group" in data["groups"]
@@ -1110,7 +1110,7 @@ class TestBlueprintIntegration:
 
         inventory_path = pkg_dir / GENERATED_INVENTORY_FILENAME
         assert inventory_path.exists()
-        with open(inventory_path) as f:
+        with open(inventory_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         hosts = data["groups"]["k3s_workers"]["hosts"]
         assert set(hosts.keys()) == {"worker-01", "worker-02"}
@@ -1144,7 +1144,7 @@ class TestBlueprintIntegration:
 
         inventory_path = pkg_dir / GENERATED_INVENTORY_FILENAME
         assert inventory_path.exists()
-        with open(inventory_path) as f:
+        with open(inventory_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         hosts = data["groups"]["cluster"]["hosts"]
         assert set(hosts.keys()) == {"n1", "n2"}
@@ -1186,7 +1186,7 @@ class TestBlueprintIntegration:
 
         inventory_path = pkg_dir / GENERATED_INVENTORY_FILENAME
         assert inventory_path.exists()
-        with open(inventory_path) as f:
+        with open(inventory_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
         assert data["groups"]["only"]["hosts"]["sole"]["ansible_host"] == "172.21.0.99"
 

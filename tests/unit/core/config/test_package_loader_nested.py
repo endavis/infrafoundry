@@ -807,7 +807,7 @@ class TestNestedFormatProviderCentricLoader:
 
     def _write_yaml(self, path: Path, content: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content)
+        path.write_text(content, encoding="utf-8")
 
     def test_provider_centric_loader_parses_nested_singleton(self, temp_dir: Path) -> None:
         """Top-level ``opnsense:`` in a flat-style provider file is parsed."""
@@ -887,7 +887,7 @@ class TestNestedFormatResourceCentricLoader:
 
     def _write_yaml(self, path: Path, content: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content)
+        path.write_text(content, encoding="utf-8")
 
     def test_resource_centric_loader_parses_nested(self, temp_dir: Path) -> None:
         """A resource-centric file with ``opnsense:`` at the top is nested."""

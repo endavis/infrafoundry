@@ -168,7 +168,7 @@ def load_pin(path: str) -> str:
     if not path:
         raise RegistrationError("--agent-cert <pem file> is required for registration")
     try:
-        pem = Path(path).read_text()
+        pem = Path(path).read_text(encoding="utf-8")
     except OSError as exc:
         raise RegistrationError(f"cannot read agent certificate pin {path}: {exc}") from None
     pinned_context(pem)

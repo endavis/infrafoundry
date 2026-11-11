@@ -35,7 +35,7 @@ class TestInventoryGeneratorGenerate:
         assert output_path == temp_dir / GENERATED_INVENTORY_FILENAME
         assert output_path.exists()
 
-        with open(output_path) as f:
+        with open(output_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert data["groups"]["webservers"]["hosts"]["web-01"]["ansible_host"] == "192.168.1.10"
@@ -55,7 +55,7 @@ class TestInventoryGeneratorGenerate:
 
         output_path = generator.generate(raw, variables, temp_dir)
 
-        with open(output_path) as f:
+        with open(output_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert data["groups"]["cluster"]["hosts"]["node-01"]["ansible_host"] == "172.21.0.1"
@@ -83,7 +83,7 @@ class TestInventoryGeneratorGenerate:
         raw = "groups:\n  new:\n    hosts:\n      h1: {}\n"
         generator.generate(raw, {}, temp_dir)
 
-        with open(existing) as f:
+        with open(existing, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert "new" in data["groups"]
@@ -124,7 +124,7 @@ class TestInventoryGeneratorGenerate:
 
         output_path = generator.generate(raw, variables, temp_dir)
 
-        with open(output_path) as f:
+        with open(output_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert data["groups"]["proxmox_hosts"]["hosts"]["node1"]["ansible_host"] == "172.20.10.1"
@@ -154,7 +154,7 @@ class TestInventoryGeneratorGenerate:
 
         output_path = generator.generate(raw, variables, temp_dir)
 
-        with open(output_path) as f:
+        with open(output_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         hosts = data["groups"]["k3s_workers"]["hosts"]
@@ -185,7 +185,7 @@ class TestInventoryGeneratorGenerate:
 
         output_path = generator.generate(raw, variables, temp_dir)
 
-        with open(output_path) as f:
+        with open(output_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert data["groups"]["server"]["hosts"]["host-01"]["ansible_host"] == "203.0.113.5"
@@ -205,7 +205,7 @@ class TestInventoryGeneratorGenerate:
 
         output_path = generator.generate(raw, variables, temp_dir)
 
-        with open(output_path) as f:
+        with open(output_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         hosts = data["groups"]["k3s_workers"]["hosts"]

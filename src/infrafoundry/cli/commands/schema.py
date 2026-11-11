@@ -62,7 +62,7 @@ def _write_schema(schema: dict[str, Any], output_path: Path) -> None:
         output_path: Path to write to
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(schema, f, indent=2)
         f.write("\n")
 

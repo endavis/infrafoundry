@@ -68,7 +68,7 @@ def test_empty_documents_return_none(loader_path: str, text: str) -> None:
 def test_accepts_file_handle(loader_path: str, tmp_path: Path) -> None:
     path = tmp_path / "config.yaml"
     path.write_text(DOC)
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         result: Any = load_config_yaml(f)
     assert result == yaml.safe_load(DOC)
 

@@ -100,7 +100,7 @@ class BlueprintManager:
 
     def _load_blueprint(self, path: Path) -> Blueprint:
         """Load blueprint definition from a directory."""
-        with open(path / "blueprint.yaml") as f:
+        with open(path / "blueprint.yaml", encoding="utf-8") as f:
             data = yaml.safe_load(f)
             # If files list is not explicit, assume all files in dir except blueprint.yaml
             if "files" not in data:

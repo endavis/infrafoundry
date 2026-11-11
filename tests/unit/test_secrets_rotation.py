@@ -26,12 +26,12 @@ def temp_secrets_dir(tmp_path: Path) -> Path:
 
     for filename, data in test_files.items():
         file_path = secrets_dir / filename
-        with open(file_path, "w") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             yaml.dump(data, f)
 
     # Create .sops.yaml
     sops_config = {"creation_rules": [{"path_regex": r".*\.yaml$", "age": "age1oldkey123"}]}
-    with open(secrets_dir / ".sops.yaml", "w") as f:
+    with open(secrets_dir / ".sops.yaml", "w", encoding="utf-8") as f:
         yaml.dump(sops_config, f)
 
     return secrets_dir
@@ -147,7 +147,7 @@ class TestSecretsRotator:
         # Modify original files
         for yaml_file in temp_secrets_dir.glob("*.yaml"):
             if yaml_file.name != ".sops.yaml":
-                with open(yaml_file, "w") as f:
+                with open(yaml_file, "w", encoding="utf-8") as f:
                     yaml.dump({"modified": "data"}, f)
 
         # Restore backup
@@ -155,7 +155,7 @@ class TestSecretsRotator:
 
         # Verify files were restored
         proxmox_file = temp_secrets_dir / "proxmox.yaml"
-        with open(proxmox_file) as f:
+        with open(proxmox_file, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
         assert "api_token" in data  # Original data restored
@@ -176,7 +176,7 @@ class TestSecretsRotator:
         rotator.update_sops_config(new_public_key)
 
         sops_config_path = temp_secrets_dir / ".sops.yaml"
-        with open(sops_config_path) as f:
+        with open(sops_config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
         assert config["creation_rules"][0]["age"] == new_public_key

@@ -71,7 +71,7 @@ class SopsSecretProvider(SecretProvider):
             raise SecretNotFoundError(f"Secret file not found: {file_path}")
 
         try:
-            raw = file_path.read_text()
+            raw = file_path.read_text(encoding="utf-8")
         except Exception as e:
             raise SecretError(f"Failed to read secret file {file_path}: {e}") from e
 
@@ -160,7 +160,7 @@ class SopsSecretProvider(SecretProvider):
         }
 
         try:
-            with open(config_path, "w") as f:
+            with open(config_path, "w", encoding="utf-8") as f:
                 yaml.dump(config, f)
         except Exception as e:
             raise SecretError(f"Failed to create .sops.yaml at {directory}: {e}") from e

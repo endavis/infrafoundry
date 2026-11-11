@@ -249,7 +249,7 @@ class DriftRemediator:
         history = []
         for history_file in history_files[: limit * 2]:  # Read extra in case filtering
             try:
-                with open(history_file) as f:
+                with open(history_file, encoding="utf-8") as f:
                     entry = yaml.safe_load(f)
                     if env_name is None or entry.get("env_name") == env_name:
                         history.append(entry)
@@ -273,7 +273,7 @@ class DriftRemediator:
         history_file = self.history_dir / f"remediation_{env_name}_{timestamp}.yaml"
 
         try:
-            with open(history_file, "w") as f:
+            with open(history_file, "w", encoding="utf-8") as f:
                 yaml.dump(results, f, default_flow_style=False)
         except Exception as e:
             # Don't fail remediation if history save fails, but log the issue

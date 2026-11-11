@@ -31,7 +31,7 @@ def _create_blueprint(base_dir: Any, name: Any, manifest_data: Any, extra_files:
     blueprint_dir.mkdir(parents=True, exist_ok=True)
 
     manifest_path = blueprint_dir / "blueprint.yaml"
-    with open(manifest_path, "w") as f:
+    with open(manifest_path, "w", encoding="utf-8") as f:
         yaml.dump(manifest_data, f)
 
     if extra_files:
@@ -41,7 +41,7 @@ def _create_blueprint(base_dir: Any, name: Any, manifest_data: Any, extra_files:
             if isinstance(content, str):
                 file_path.write_text(content)
             else:
-                with open(file_path, "w") as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     yaml.dump(content, f)
 
     return blueprint_dir

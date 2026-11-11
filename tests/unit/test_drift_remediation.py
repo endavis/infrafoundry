@@ -413,7 +413,7 @@ class TestHistory:
         assert len(history_files) == 1
 
         # Verify content
-        with open(history_files[0]) as f:
+        with open(history_files[0], encoding="utf-8") as f:
             history = yaml.safe_load(f)
             assert history["env_name"] == "dev"
             assert history["drift_detected"] is False
@@ -437,7 +437,7 @@ class TestHistory:
                 "auto_applied": False,
                 "timestamp": f"2025-01-01T00:00:0{i}",
             }
-            with open(history_file, "w") as f:
+            with open(history_file, "w", encoding="utf-8") as f:
                 yaml.dump(data, f)
 
         history = remediator.get_history(limit=10)
@@ -452,7 +452,7 @@ class TestHistory:
         for i, env in enumerate(["dev", "prod", "dev"]):
             history_file = temp_history_dir / f"remediation_{env}_20250101_00000{i}.yaml"
             data = {"env_name": env, "drift_detected": True}
-            with open(history_file, "w") as f:
+            with open(history_file, "w", encoding="utf-8") as f:
                 yaml.dump(data, f)
 
         history = remediator.get_history(env_name="dev")
@@ -468,7 +468,7 @@ class TestHistory:
         for i in range(15):
             history_file = temp_history_dir / f"remediation_dev_20250101_00000{i:02d}.yaml"
             data = {"env_name": "dev", "drift_detected": True}
-            with open(history_file, "w") as f:
+            with open(history_file, "w", encoding="utf-8") as f:
                 yaml.dump(data, f)
 
         history = remediator.get_history(limit=5)
@@ -481,12 +481,12 @@ class TestHistory:
         """Test that corrupted history files are skipped."""
         # Create a valid history file
         valid_file = temp_history_dir / "remediation_dev_20250101_000001.yaml"
-        with open(valid_file, "w") as f:
+        with open(valid_file, "w", encoding="utf-8") as f:
             yaml.dump({"env_name": "dev"}, f)
 
         # Create a corrupted file
         corrupted_file = temp_history_dir / "remediation_dev_20250101_000000.yaml"
-        with open(corrupted_file, "w") as f:
+        with open(corrupted_file, "w", encoding="utf-8") as f:
             f.write("invalid: yaml: content: [[[")
 
         history = remediator.get_history()

@@ -261,7 +261,7 @@ def _make_dump_env_script(tmp_path: Path, name: str) -> tuple[Path, Path]:
 def _parse_env_dump(path: Path) -> dict[str, str]:
     """Parse a file produced by ``env`` into a dict."""
     result: dict[str, str] = {}
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         if "=" in line:
             k, _, v = line.partition("=")
             result[k] = v
@@ -663,7 +663,7 @@ class TestPackageEventsIntegration:
             "name": "my-pkg",
             "events": {"AFTER_APPLY": [{"type": "webhook", "url": "https://example.com/hook"}]},
         }
-        with open(pkg_dir / "infrafoundry.yml", "w") as f:
+        with open(pkg_dir / "infrafoundry.yml", "w", encoding="utf-8") as f:
             yaml.dump(manifest, f)
 
         config_manager = ConfigManager(envs_dir)
@@ -1946,7 +1946,7 @@ class TestScriptHandlerJumphostLayout:
 def _pid_gone(pid: int) -> bool:
     """Return True if ``pid`` no longer exists or is only a zombie."""
     try:
-        stat_text = Path(f"/proc/{pid}/stat").read_text()
+        stat_text = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
     except (FileNotFoundError, ProcessLookupError):
         return True
     # State is the field after the ``)`` that closes the command name.

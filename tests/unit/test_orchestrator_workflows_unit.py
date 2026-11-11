@@ -40,7 +40,7 @@ from infrafoundry.core.types import ResourceOutcome
 @pytest.fixture
 def console() -> Console:
     """Stub console to avoid actual output."""
-    return Console(file=open(Path("/dev/null"), "w"))
+    return Console(file=open(Path("/dev/null"), "w", encoding="utf-8"))
 
 
 def _resource(name: str, provider: str = "proxmox", type_: str = "vm") -> ResourceConfig:

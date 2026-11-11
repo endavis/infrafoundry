@@ -122,7 +122,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -145,7 +145,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -171,7 +171,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -208,7 +208,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -233,7 +233,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -259,7 +259,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -282,7 +282,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -308,7 +308,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -318,7 +318,7 @@ class TestNotificationManager:
     def test_load_config_invalid_yaml(self, temp_dir: Path) -> None:
         """Test loading configuration with invalid YAML."""
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             f.write("invalid: yaml: content:\n  bad indentation")
 
         # Should not raise exception
@@ -328,7 +328,7 @@ class TestNotificationManager:
     def test_load_config_empty_file(self, temp_dir: Path) -> None:
         """Test loading configuration from empty file."""
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             f.write("")
 
         manager = NotificationManager(config_file)
@@ -340,7 +340,7 @@ class TestNotificationManager:
 
         config = {"some_other_key": "value"}
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -382,7 +382,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -415,7 +415,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -450,7 +450,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -489,7 +489,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(config, f)
 
         manager = NotificationManager(config_file)
@@ -595,7 +595,7 @@ class TestNotificationManager:
             ]
         }
         config_file = temp_dir / "notifications.yaml"
-        with open(config_file, "w") as f:
+        with open(config_file, "w", encoding="utf-8") as f:
             yaml.dump(file_config, f)
 
         # Create notifications_config with different channel

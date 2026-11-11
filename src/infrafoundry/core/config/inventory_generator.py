@@ -125,7 +125,7 @@ class InventoryGenerator:
         """
         try:
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(output_path, "w") as f:
+            with open(output_path, "w", encoding="utf-8") as f:
                 yaml.dump(inventory, f, default_flow_style=False, sort_keys=False)
         except OSError as e:
             raise InvalidConfigurationError(
