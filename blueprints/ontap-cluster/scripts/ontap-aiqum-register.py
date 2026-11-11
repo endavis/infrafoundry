@@ -117,8 +117,8 @@ def make_ssl_context(cfg: Config) -> ssl.SSLContext:
     """
     if cfg.tls_insecure:
         ctx = ssl.create_default_context()
-        ctx.check_hostname = False  # nosec B501 - explicit aiqum_tls_insecure opt-in
-        ctx.verify_mode = ssl.CERT_NONE  # nosec B501 - explicit aiqum_tls_insecure opt-in
+        ctx.check_hostname = False  # explicit aiqum_tls_insecure opt-in
+        ctx.verify_mode = ssl.CERT_NONE  # explicit aiqum_tls_insecure opt-in
         return ctx
     try:
         return ssl.create_default_context(cafile=cfg.ca_cert or None)
@@ -160,7 +160,7 @@ def _request(
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(  # nosec B310 - URL built from package variables
+        with urllib.request.urlopen(  # nosec B310  # https endpoint from constants/package variables
             req, context=make_ssl_context(cfg), timeout=timeout
         ) as resp:
             status, raw = resp.status, resp.read()

@@ -456,7 +456,7 @@ class TestMigrateTailscaleEmitsNested:
         from infrafoundry.providers.opnsense.components.tailscale_auth import TailscaleAuthManager
         from infrafoundry.providers.opnsense.services.tailscale_auth import TailscaleAuthService
 
-        sentinel = "tskey-auth-SENTINEL-0001"  # nosec B105
+        sentinel = "tskey-auth-SENTINEL-0001"
         yaml_text = self._migrate(
             tmp_path,
             "tailscale_auth",

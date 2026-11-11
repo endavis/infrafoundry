@@ -153,7 +153,7 @@ class TerraformRunner(BaseRunner):
                 msg = "Initializing Terraform..."
             self.console.print(f"[dim]{msg}[/dim]")
 
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
                 cmd,
                 cwd=working_dir,
                 capture_output=True,
@@ -246,7 +246,7 @@ class TerraformRunner(BaseRunner):
             return None
 
         try:
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "version", "-json"],
                 capture_output=True,
                 text=True,
@@ -267,7 +267,7 @@ class TerraformRunner(BaseRunner):
 
         try:
             env = self._prepare_environment(provider)
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "validate"],
                 cwd=tf_dir,
                 capture_output=True,
@@ -390,7 +390,7 @@ class TerraformRunner(BaseRunner):
 
         if command == "plan":
             # Plan: capture stdout/stderr for drift parsing
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
                 cmd,
                 cwd=tf_dir,
                 capture_output=True,
@@ -406,7 +406,7 @@ class TerraformRunner(BaseRunner):
 
         # Apply/Destroy: capture JSON stdout, stream progress to console
         stdout_lines: list[str] = []
-        process = subprocess.Popen(  # nosec B603
+        process = subprocess.Popen(  # nosec B603  # tool_path binary, runner-built list argv, no shell
             cmd,
             cwd=tf_dir,
             stdout=subprocess.PIPE,
@@ -944,7 +944,7 @@ class TerraformRunner(BaseRunner):
             return []
 
         try:
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "state", "list"],
                 cwd=working_dir,
                 capture_output=True,
@@ -970,7 +970,7 @@ class TerraformRunner(BaseRunner):
             True if the resource was successfully removed
         """
         try:
-            subprocess.run(  # nosec B603
+            subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "state", "rm", address],
                 cwd=working_dir,
                 capture_output=True,
@@ -996,7 +996,7 @@ class TerraformRunner(BaseRunner):
 
         try:
             # Run terraform show -json to get state
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "show", "-json"],
                 cwd=tf_dir,
                 capture_output=True,

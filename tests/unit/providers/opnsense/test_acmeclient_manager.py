@@ -221,7 +221,7 @@ def test_validation_stale_provider_warning_names_fields_only(make: Any, box: Fak
     manager = make(comp.AcmeClientValidationsManager)
     diff = manager.plan(
         "env",
-        [_res(V, "v", method="dns01", dns_service="dns_cf", dns_cf_token="tok")],  # nosec B106
+        [_res(V, "v", method="dns01", dns_service="dns_cf", dns_cf_token="tok")],  # nosec B106  # fake fixture value
     )
     (warning,) = diff.warnings
     assert "dns_aws_secret" in warning
@@ -243,14 +243,14 @@ def test_validation_fields_at_their_template_default_are_not_stale(make: Any, bo
     manager = make(comp.AcmeClientValidationsManager)
     diff = manager.plan(
         "env",
-        [_res(V, "v", method="dns01", dns_service="dns_cf", dns_cf_token="tok")],  # nosec B106
+        [_res(V, "v", method="dns01", dns_service="dns_cf", dns_cf_token="tok")],  # nosec B106  # fake fixture value
     )
     assert diff.warnings == []
 
     box.rows["validations"]["u1"]["dns_opnsense_port"] = "8443"
     diff = manager.plan(
         "env",
-        [_res(V, "v", method="dns01", dns_service="dns_cf", dns_cf_token="tok")],  # nosec B106
+        [_res(V, "v", method="dns01", dns_service="dns_cf", dns_cf_token="tok")],  # nosec B106  # fake fixture value
     )
     (warning,) = diff.warnings
     assert "dns_opnsense_port" in warning
@@ -262,10 +262,10 @@ def test_passthrough_key_missing_from_template_is_rejected(make: Any, box: FakeB
     with pytest.raises(InvalidConfigurationError, match="dns_nope_token"):
         manager.plan(
             "env",
-            [_res(V, "v", method="dns01", dns_service="dns_nope", dns_nope_token="x")],  # nosec B106
+            [_res(V, "v", method="dns01", dns_service="dns_nope", dns_nope_token="x")],  # nosec B106  # fake fixture value
         )
     # known keys pass
-    manager.plan("env", [_res(V, "v", method="dns01", dns_service="dns_cf", dns_cf_token="x")])  # nosec B106
+    manager.plan("env", [_res(V, "v", method="dns01", dns_service="dns_cf", dns_cf_token="x")])  # nosec B106  # fake fixture value
 
 
 def test_template_is_not_fetched_without_passthrough(make: Any, box: FakeBox) -> None:

@@ -10,7 +10,7 @@ from infrafoundry.providers.opnsense.validators import TailscaleValidator
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 URI = "secret://env_secrets/opnsense/tailscale/auth/pre_auth_key"
-SENTINEL = "tskey-auth-SENTINEL-0001"  # nosec B105
+SENTINEL = "tskey-auth-SENTINEL-0001"
 
 
 def _errors(*resources: ResourceConfig) -> list[str]:

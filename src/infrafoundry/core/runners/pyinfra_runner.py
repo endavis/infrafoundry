@@ -78,7 +78,7 @@ class PyInfraRunner(BaseRunner):
             return None
 
         try:
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "--version"],
                 capture_output=True,
                 text=True,
@@ -114,12 +114,12 @@ class PyInfraRunner(BaseRunner):
 
         # Basic syntax check using python -m py_compile
         try:
-            subprocess.run(  # nosec B603
+            subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
                 [sys.executable, "-m", "py_compile", str(deploy_file)],
                 check=True,
                 capture_output=True,
             )
-            subprocess.run(  # nosec B603
+            subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
                 [sys.executable, "-m", "py_compile", str(inventory_file)],
                 check=True,
                 capture_output=True,
@@ -171,7 +171,7 @@ class PyInfraRunner(BaseRunner):
         # Run command
         try:
             # pyinfra outputs to stderr mostly for progress
-            result = subprocess.run(cmd, cwd=pyinfra_dir, capture_output=False)  # nosec B603
+            result = subprocess.run(cmd, cwd=pyinfra_dir, capture_output=False)  # nosec B603  # tool_path binary, runner-built list argv, no shell
             return {"exit_code": result.returncode, "success": result.returncode == 0}
         except FileNotFoundError:
             return {"error": "pyinfra not found", "success": False}

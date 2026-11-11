@@ -21,8 +21,8 @@ from infrafoundry.providers.opnsense.services.tailscale_auth import REDACTED, Ta
 SERVICE_PATH = "infrafoundry.providers.opnsense.components.tailscale_auth.TailscaleAuthService"
 SECRETS_CM = "infrafoundry.providers.opnsense.components._secrets.ConfigManager"
 URI = "secret://env_secrets/opnsense/tailscale/auth/pre_auth_key"
-SENTINEL = "tskey-auth-SENTINEL-0001"  # nosec B105
-OTHER = "tskey-auth-OTHER-0002"  # nosec B105
+SENTINEL = "tskey-auth-SENTINEL-0001"
+OTHER = "tskey-auth-OTHER-0002"
 SERVER = "https://controlplane.example.com"
 
 

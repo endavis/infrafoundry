@@ -10,7 +10,7 @@ from ..api_client import OPNsenseClient
 from ._credentials import resolve_credentials
 
 
-class BaseService(ABC):  # noqa: B024
+class BaseService(ABC):  # noqa: B024  # ABC marks the base; no abstract methods by design
     """Base class for OPNsense service operations.
 
     Services provide low-level API operations for specific OPNsense components.

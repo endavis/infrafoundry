@@ -120,3 +120,25 @@ def test_envs_no_description(cli_runner: CliRunner, mock_config_manager: Mock) -
 
         assert result.exit_code == 0
         assert "test: No description" in result.output
+
+
+def test_envs_load_failure_leaves_empty_details(
+    cli_runner: CliRunner, mock_config_manager: Mock
+) -> None:
+    """An env whose config fails to load is still listed, with empty description/providers."""
+    mock_config_manager.list_environments.return_value = ["broken"]
+    mock_config_manager.load_environment.side_effect = ValueError("corrupt")
+
+    with (
+        patch(
+            "infrafoundry.cli.commands.config.envs.ConfigManager",
+            return_value=mock_config_manager,
+        ),
+        patch(_DB_MOCK, return_value=([], {}, True)),
+    ):
+        result = cli_runner.invoke(main, ["config", "envs", "--format", "json"])
+
+    assert result.exit_code == 0
+    assert '"name": "broken"' in result.output
+    assert '"description": ""' in result.output
+    assert '"providers": []' in result.output

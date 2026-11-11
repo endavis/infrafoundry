@@ -31,8 +31,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
-TOKEN_URL = "https://netapp-cloud-account.auth0.com/oauth/token"  # nosec B105
-TOKEN_AUDIENCE = "https://api.cloud.netapp.com"  # nosec B105
+TOKEN_URL = "https://netapp-cloud-account.auth0.com/oauth/token"  # nosec B105  # OAuth endpoint URL, not a secret
+TOKEN_AUDIENCE = "https://api.cloud.netapp.com"  # nosec B105  # OAuth endpoint URL, not a secret
 API_URL = "https://api.bluexp.netapp.com"
 ACCOUNTS_PATH = "/tenancy/account"
 WORKSPACES_PATH = "/tenancy/account/{account}/workspace"
@@ -191,7 +191,7 @@ def _request(
         headers["x-agent-id"] = agent_id
     req = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:  # nosec B310
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:  # nosec B310  # https endpoint from constants/package variables
             raw = resp.read().decode() or "{}"
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode(errors="replace")

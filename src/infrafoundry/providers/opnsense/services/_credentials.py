@@ -106,7 +106,7 @@ logger = logging.getLogger(__name__)
 # (fall back to ``provider_settings``).
 API_URL_ENV_VAR = "OPNSENSE_API_URL"
 API_KEY_ENV_VAR = "OPNSENSE_API_KEY"
-API_SECRET_ENV_VAR = "OPNSENSE_API_SECRET"  # nosec B105
+API_SECRET_ENV_VAR = "OPNSENSE_API_SECRET"  # nosec B105  # env var name, not a secret
 VERIFY_SSL_ENV_VAR = "OPNSENSE_VERIFY_SSL"
 PROXY_ENV_VAR = "OPNSENSE_PROXY"
 SSH_HOST_ENV_VAR = "OPNSENSE_SSH_HOST"

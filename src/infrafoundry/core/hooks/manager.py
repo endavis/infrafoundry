@@ -275,7 +275,7 @@ class HookManager(PathBasedManager):
         start_time = time.monotonic()
         hook_result: HookResult
         try:
-            result = subprocess.run(  # nosec B603  # user-controlled scripts
+            result = subprocess.run(  # nosec B603  # operator-configured hook script, list argv, no shell
                 [str(script_path)],
                 cwd=working_dir,
                 env=env,

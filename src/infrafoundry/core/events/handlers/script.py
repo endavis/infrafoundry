@@ -403,7 +403,7 @@ class ScriptHandler(BaseHandler):
         timeout = self.config.get("timeout", 300)
         start_time = time.monotonic()
         try:
-            process = subprocess.Popen(  # nosec B603  # user-controlled scripts
+            process = subprocess.Popen(  # nosec B603  # operator-configured event script, list argv, no shell
                 [str(script_path)],
                 cwd=working_dir,
                 env=env,
@@ -517,7 +517,7 @@ class ScriptHandler(BaseHandler):
         """
         timeout = self.config.get("timeout", 300)
         script_dir = script_path.parent
-        remote_dir = f"/tmp/infrafoundry-{uuid.uuid4().hex}"  # nosec B108
+        remote_dir = f"/tmp/infrafoundry-{uuid.uuid4().hex}"  # nosec B108  # remote path on the jumphost, uuid4 name, not a local temp file
 
         # Layout under remote_dir: blueprint/ (whole blueprint tree), src/
         # (script dir when the script is outside the blueprint), package/
@@ -592,7 +592,7 @@ class ScriptHandler(BaseHandler):
 
         # Step 1: mkdir remote tmp dir
         try:
-            mkdir_result = subprocess.run(  # nosec B603
+            mkdir_result = subprocess.run(  # nosec B603  # ssh/rsync/scp list argv to configured jumphost, no shell
                 mkdir_cmd,
                 capture_output=True,
                 text=True,
@@ -631,7 +631,7 @@ class ScriptHandler(BaseHandler):
         success = False
         try:
             try:
-                process = subprocess.Popen(  # nosec B603
+                process = subprocess.Popen(  # nosec B603  # ssh/rsync/scp list argv to configured jumphost, no shell
                     ssh_run_cmd,
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
@@ -765,7 +765,7 @@ class ScriptHandler(BaseHandler):
             f"{jumphost}:{remote_path}/",
         ]
         try:
-            rsync_result = subprocess.run(  # nosec B603
+            rsync_result = subprocess.run(  # nosec B603  # ssh/rsync/scp list argv to configured jumphost, no shell
                 rsync_cmd,
                 capture_output=True,
                 text=True,
@@ -815,7 +815,7 @@ class ScriptHandler(BaseHandler):
             "exit 0"
         )
         try:
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # ssh/rsync/scp list argv to configured jumphost, no shell
                 ["ssh", *ssh_opts, jumphost, remote_cmd],
                 capture_output=True,
                 text=True,
@@ -835,7 +835,7 @@ class ScriptHandler(BaseHandler):
             cleanup_cmd: The full ssh+rm-rf command list to run
         """
         try:
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # ssh/rsync/scp list argv to configured jumphost, no shell
                 cleanup_cmd,
                 capture_output=True,
                 timeout=30,
@@ -871,7 +871,7 @@ class ScriptHandler(BaseHandler):
             local_warnings_path: The orchestrator's local warnings file to
                 append the remote content to.
         """
-        with tempfile.NamedTemporaryFile(  # nosec B108  # managed lifecycle
+        with tempfile.NamedTemporaryFile(
             mode="wb",
             suffix=".jsonl",
             prefix="infrafoundry-remote-warnings-",
@@ -886,7 +886,7 @@ class ScriptHandler(BaseHandler):
                 str(staging_path),
             ]
             try:
-                result = subprocess.run(  # nosec B603
+                result = subprocess.run(  # nosec B603  # ssh/rsync/scp list argv to configured jumphost, no shell
                     scp_cmd,
                     capture_output=True,
                     timeout=60,
@@ -1074,7 +1074,7 @@ class ScriptHandler(BaseHandler):
             str(dest),
         ]
         try:
-            result = subprocess.run(  # nosec B603
+            result = subprocess.run(  # nosec B603  # ssh/rsync/scp list argv to configured jumphost, no shell
                 scp_cmd,
                 capture_output=True,
                 timeout=60,

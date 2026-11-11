@@ -1113,7 +1113,7 @@ class ApplyOrchestrator(HookExecutionMixin):
         # can append JSONL records. The file is read + rendered + unlinked
         # in the `finally` below so the summary prints on both the success
         # and failure paths.
-        warnings_tmp = tempfile.NamedTemporaryFile(  # noqa: SIM115 - managed lifecycle; nosec B108
+        warnings_tmp = tempfile.NamedTemporaryFile(  # noqa: SIM115  # closed at once; unlinked in the finally below
             mode="w",
             suffix=".jsonl",
             prefix=f"infrafoundry-warnings-{deployment_id}-",

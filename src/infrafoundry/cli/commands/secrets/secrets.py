@@ -1,6 +1,7 @@
 """Manage encrypted secrets commands."""
 
 import os
+import subprocess  # nosec B404  # runs age-keygen and sops with fixed argv
 from pathlib import Path
 
 import click
@@ -45,9 +46,7 @@ def secrets_init(ctx: click.Context, key_file: str | None) -> None:
     key_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Generate age key using subprocess with hardcoded command (not user input)
-    import subprocess  # nosec B404
-
-    result = subprocess.run(  # nosec B603 B607
+    result = subprocess.run(  # nosec B603 B607  # fixed age-keygen/sops argv, no shell
         ["age-keygen", "-o", str(key_path)],
         capture_output=True,
         text=True,
@@ -78,8 +77,6 @@ def secrets_init(ctx: click.Context, key_file: str | None) -> None:
 def secrets_encrypt(file: str) -> None:
     """Encrypt a file with SOPS."""
     try:
-        import subprocess  # nosec B404
-
         config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
         if config_repo and not Path(file).is_absolute():
             file_path = Path(config_repo) / file
@@ -91,7 +88,7 @@ def secrets_encrypt(file: str) -> None:
         if not file_path.exists():
             raise click.ClickException(f"File not found: {file_path}")
 
-        result = subprocess.run(  # nosec B603 B607
+        result = subprocess.run(  # nosec B603 B607  # fixed age-keygen/sops argv, no shell
             ["sops", "--encrypt", "--in-place", str(file_path)],
             capture_output=True,
             text=True,
@@ -117,8 +114,6 @@ def secrets_encrypt(file: str) -> None:
 def secrets_decrypt(file: str) -> None:
     """Decrypt and display a SOPS-encrypted file."""
     try:
-        import subprocess  # nosec B404
-
         config_repo = os.getenv("INFRAFOUNDRY_CONFIG_REPO")
         if config_repo and not Path(file).is_absolute():
             file_path = Path(config_repo) / file
@@ -128,7 +123,7 @@ def secrets_decrypt(file: str) -> None:
         if not file_path.exists():
             raise click.ClickException(f"File not found: {file_path}")
 
-        result = subprocess.run(  # nosec B603 B607
+        result = subprocess.run(  # nosec B603 B607  # fixed age-keygen/sops argv, no shell
             ["sops", "--decrypt", str(file_path)],
             capture_output=True,
             text=True,

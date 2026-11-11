@@ -92,11 +92,11 @@ def test_empty_secret_is_allowed_and_matches_an_empty_box(
 def test_apply_never_echoes_an_undeclared_live_secret(
     manager: MonitSettingsManager, box: FakeMonitBox
 ) -> None:
-    box.general["password"] = "masked-live-sentinel"  # nosec B105
+    box.general["password"] = "masked-live-sentinel"  # nosec B105  # fake fixture value
     manager.apply("env", [single("monit.settings", enabled=True)])
     _, _, body = box.writes()[0]
     assert "password" not in body["monit"]["general"]
-    assert box.general["password"] == "masked-live-sentinel"  # untouched on the box  # nosec B105
+    assert box.general["password"] == "masked-live-sentinel"  # untouched on the box
 
 
 def test_logs_carry_field_names_only(
