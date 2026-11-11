@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794395617718,
+  "lastUpdate": 1794398108368,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1182,6 +1182,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006517876324813777",
             "extra": "mean: 62.68499202828139 usec\nrounds: 16684"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "86571054d710ce2537cd45d8e0eb600fb154ccf0",
+          "message": "feat: manage opnsense monit settings, alerts, tests and services (merges PR #1362, addresses #791)\n\nAdd four direct-API resource types for OPNsense's core monit subsystem,\non the ADR-0016 nested paths opnsense.monit.settings (singleton) and\nopnsense.monit.alerts / tests / services (managed-set lists):\n\n- monit.settings: singleton over the general node; password,\n  httpd_password and mmonit_url accept secret:// URIs, are redacted in\n  plan output, and an undeclared secret is never echoed back on write\n- monit.alerts: identity is the recipient; events as a YAML list\n- monit.tests: identity is the wire name; type and action enums from the\n  live model (wire spelling Permisssion kept)\n- monit.services: identity is the wire name; tests[] and depends[]\n  resolve operator handles to UUIDs, depends in the same apply ordered\n  topologically; per-type path requirements; services delete before\n  tests and referenced rows are blocked from deletion\n- one monit_reconfigure finalization hook per apply, config migrate\n  extractors for all four, validator wiring and endpoint registry\n  entries (stock, camelCase actions)\n\nVerified live on a test firewall: export, zero-drift re-plan, destroy\nand rebuild of the stock set with one reconfigure, secret echo, and\n--add-only. Docs: coverage matrix rows and a Monit section, ADR-0014\nmonit.* section and seventh hook, ADR-0013 scope row.\n\nAddresses #791\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T11:54:26Z",
+          "tree_id": "43f406f176d6b0f06a756e6a2a425bfabb30c806",
+          "url": "https://github.com/endavis/infrafoundry/commit/86571054d710ce2537cd45d8e0eb600fb154ccf0"
+        },
+        "date": 1794398107729,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 59.918533681117154,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00026970155905480604",
+            "extra": "mean: 16.689326967210846 msec\nrounds: 61"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10478.369594757129,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000026470128645919955",
+            "extra": "mean: 95.43469439180231 usec\nrounds: 11145"
           }
         ]
       }
