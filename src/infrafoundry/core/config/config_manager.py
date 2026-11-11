@@ -1,5 +1,6 @@
 """Refactored configuration manager - coordinates between loaders."""
 
+import copy
 import os
 import warnings
 from pathlib import Path
@@ -80,8 +81,45 @@ class ConfigManager(PathBasedManager):
         self.resource_centric = ResourceCentricLoader(base_dir)
         self._package_loader = PackageLoader(base_dir, self._blueprint_resolver, secret_provider)
 
+        # Per-instance memoization of the two expensive loads. The environment
+        # key includes INFRAFOUNDRY_IAC_TOOL because that variable is read on
+        # every load and changes the result. There is no mtime invalidation.
+        self._env_cache: dict[tuple[str, str | None], EnvironmentConfig] = {}
+        self._resources_cache: dict[
+            str, tuple[list[ResourceConfig], dict[str, list[dict[str, Any]]]]
+        ] = {}
+        self._cache_counters: dict[str, int] = {
+            "environment_hits": 0,
+            "environment_misses": 0,
+            "resources_hits": 0,
+            "resources_misses": 0,
+        }
+
+    def clear_cache(self) -> None:
+        """Empty the environment and resource caches.
+
+        The hit and miss counters from ``cache_stats()`` are cumulative and are
+        not reset.
+        """
+        self._env_cache.clear()
+        self._resources_cache.clear()
+        self._log_debug("Config cache cleared")
+
+    def cache_stats(self) -> dict[str, int]:
+        """Return cumulative cache hit and miss counts.
+
+        Returns:
+            A new dict with ``environment_hits``, ``environment_misses``,
+            ``resources_hits`` and ``resources_misses``.
+        """
+        return dict(self._cache_counters)
+
     def load_environment(self, env_name: str) -> EnvironmentConfig:
         """Load environment configuration.
+
+        Results are memoized per instance (keyed on the environment name and
+        ``INFRAFOUNDRY_IAC_TOOL``) and returned as deep copies. Call
+        ``clear_cache()`` to force a reload.
 
         Args:
             env_name: Environment name (e.g., 'dev', 'prod')
@@ -92,6 +130,23 @@ class ConfigManager(PathBasedManager):
         Raises:
             FileNotFoundError: If environment config doesn't exist
         """
+        cache_key = (env_name, os.getenv("INFRAFOUNDRY_IAC_TOOL"))
+        cached = self._env_cache.get(cache_key)
+        if cached is not None:
+            self._cache_counters["environment_hits"] += 1
+            self._log_debug(
+                f"Config cache hit: load_environment({env_name}) "
+                f"hits={self._cache_counters['environment_hits']} "
+                f"misses={self._cache_counters['environment_misses']}"
+            )
+            return cached.model_copy(deep=True)
+        self._cache_counters["environment_misses"] += 1
+        self._log_debug(
+            f"Config cache miss: load_environment({env_name}) "
+            f"hits={self._cache_counters['environment_hits']} "
+            f"misses={self._cache_counters['environment_misses']}"
+        )
+
         settings_file = self.base_dir / env_name / "settings.yaml"
 
         if not settings_file.exists():
@@ -128,7 +183,8 @@ class ConfigManager(PathBasedManager):
         self._populate_secrets(env_name, env_config)
 
         self._log_debug(f"Loaded environment config: {env_name}")
-        return env_config
+        self._env_cache[cache_key] = env_config
+        return env_config.model_copy(deep=True)
 
     def _populate_secrets(self, env_name: str, env_config: EnvironmentConfig) -> None:
         """Decrypt the env's secrets file (if any) and attach to env_config.
@@ -227,6 +283,10 @@ class ConfigManager(PathBasedManager):
         Supports both provider-centric and resource-centric formats.
         Discovers providers dynamically from available resources.
 
+        Results are memoized per instance and returned as deep copies. A cache
+        hit replaces the provider-centric loader's pending package events with
+        the events stored for that load. Call ``clear_cache()`` to force a reload.
+
         Args:
             env_name: Environment name
 
@@ -237,6 +297,24 @@ class ConfigManager(PathBasedManager):
             DuplicateResourceNameError: If duplicate resource names are found; the
                 message names each location with its resource type
         """
+        cached_entry = self._resources_cache.get(env_name)
+        if cached_entry is not None:
+            cached_resources, cached_events = cached_entry
+            self._cache_counters["resources_hits"] += 1
+            self._log_debug(
+                f"Config cache hit: get_all_resources_all_providers({env_name}) "
+                f"hits={self._cache_counters['resources_hits']} "
+                f"misses={self._cache_counters['resources_misses']}"
+            )
+            self.provider_centric._pending_package_events = copy.deepcopy(cached_events)
+            return [r.model_copy(deep=True) for r in cached_resources]
+        self._cache_counters["resources_misses"] += 1
+        self._log_debug(
+            f"Config cache miss: get_all_resources_all_providers({env_name}) "
+            f"hits={self._cache_counters['resources_hits']} "
+            f"misses={self._cache_counters['resources_misses']}"
+        )
+
         all_resources = []
         resource_locations: dict[str, list[str]] = {}  # Track where each resource is defined
         loose_resource_files: list[str] = []  # Track loose resource files for deprecation
@@ -372,7 +450,11 @@ class ConfigManager(PathBasedManager):
                 + "\n\nEach resource name must be unique within its provider."
             )
 
-        return all_resources
+        self._resources_cache[env_name] = (
+            all_resources,
+            copy.deepcopy(self.provider_centric._pending_package_events),
+        )
+        return [r.model_copy(deep=True) for r in all_resources]
 
     def get_package_events(self) -> dict[str, list[dict[str, Any]]]:
         """Return accumulated package events from last resource load.
@@ -520,7 +602,8 @@ class ConfigManager(PathBasedManager):
     def cleanup(self) -> None:
         """Cleanup resources (required by BaseManager).
 
-        No cleanup needed for ConfigManager as it doesn't maintain
+        Only the in-memory caches need releasing; ConfigManager keeps no
         persistent connections or file handles.
         """
+        self.clear_cache()
         self._log_debug("ConfigManager cleanup complete")
