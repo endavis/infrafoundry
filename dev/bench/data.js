@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794398108368,
+  "lastUpdate": 1794399293796,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1220,6 +1220,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000026470128645919955",
             "extra": "mean: 95.43469439180231 usec\nrounds: 11145"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a1c2a8a6b9db273be9f2079290fff7b3f11eb1eb",
+          "message": "chore: audit nosec and noqa suppressions in project-owned code (merges PR #1363, addresses #595)\n\nReview every bandit nosec and ruff noqa in src/, blueprints/,\ntools/opnsense-parser.py, tests/unit/ and tests/helpers/:\n\n- remove stale suppressions, measured with bandit --ignore-nosec: a\n  B108 on a NamedTemporaryFile call, two blueprint B501 lines and ten\n  test B105 lines whose names do not trigger the check\n- replace try/except/pass (B110) with contextlib.suppress in config envs\n  and the CLI welcome screen, and hoist the subprocess import in the\n  secrets commands to one module-level import\n- give every remaining suppression a reason after the ID list\n  (# nosec <ID>  # <reason>, # noqa: <CODE>  # <reason>); this also\n  clears the 37 bandit \"Test in comment\" warnings from blueprint scripts\n- add tests/unit/test_suppression_reasons.py, which fails on a bare or\n  reasonless nosec/noqa in those project-owned paths, and two behaviour\n  tests for the B110 sites\n\nTemplate-shipped files are left unchanged; their findings are reported\nupstream.\n\nAddresses #595\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T12:14:03Z",
+          "tree_id": "a3dd85f4be522cd47f73c8ca38a0e50b209380d6",
+          "url": "https://github.com/endavis/infrafoundry/commit/a1c2a8a6b9db273be9f2079290fff7b3f11eb1eb"
+        },
+        "date": 1794399292878,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 55.40870229675563,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006323272513642094",
+            "extra": "mean: 18.047706561403324 msec\nrounds: 57"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9538.379446678002,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00003315083558531205",
+            "extra": "mean: 104.83961196870575 usec\nrounds: 10494"
           }
         ]
       }
