@@ -1,4 +1,5 @@
 import logging
+import os
 import traceback
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -24,6 +25,15 @@ logger = logging.getLogger(__name__)
 
 # Registry keys for mutually exclusive IaC runners
 _IAC_TOOL_KEYS = {tool.value for tool in IaCTool}
+
+
+def default_max_workers() -> int:
+    """Return the default parallel worker count: the CPU count, or 4 if unknown.
+
+    Returns:
+        Number of workers to use when none is configured explicitly.
+    """
+    return os.cpu_count() or 4
 
 
 class DeploymentExecutor:

@@ -13,7 +13,7 @@ from rich.console import Console
 from infrafoundry.core.audit import AuditLogger
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.dependencies import DependencyGraph
-from infrafoundry.core.deployment_executor import DeploymentExecutor
+from infrafoundry.core.deployment_executor import DeploymentExecutor, default_max_workers
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import Event, EventManager, EventType
 from infrafoundry.core.exceptions import ResourceFilterError
@@ -598,7 +598,7 @@ class Orchestrator:
         auto_approve: bool = False,
         resource_filter: list[str] | None = None,
         parallel: bool = False,
-        max_workers: int = 4,
+        max_workers: int | None = None,
         package_filter: str | None = None,
         lock_timeout: int = 0,
         lock_ttl: int = 600,
@@ -612,7 +612,8 @@ class Orchestrator:
             auto_approve: If True, skip confirmation prompts
             resource_filter: Optional list of resource names to target
             parallel: If True, apply resources in parallel where possible
-            max_workers: Maximum number of parallel workers (default: 4)
+            max_workers: Maximum number of parallel workers. ``None`` (default)
+                uses the CPU count, falling back to 4.
             package_filter: Optional package name to restrict event handlers
             lock_timeout: Seconds to wait for the environment lock before
                 failing. ``0`` (default) fails fast.
@@ -630,6 +631,8 @@ class Orchestrator:
         Returns:
             Dict with apply results per provider
         """
+        if max_workers is None:
+            max_workers = default_max_workers()
         locked_by = _build_lock_holder_id()
         with environment_lock(
             self.state_manager,

@@ -19,6 +19,7 @@ from rich.table import Table
 from infrafoundry.core import warnings as infra_warnings
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
+from infrafoundry.core.deployment_executor import default_max_workers
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventAbortedError, EventManager, EventType
 from infrafoundry.core.exceptions import ProviderFilterError, TerraformError
@@ -994,7 +995,7 @@ class RollbackOrchestrator:
                 resource_filter=None,
                 auto_approve=True,
                 parallel=False,
-                max_workers=4,
+                max_workers=default_max_workers(),
             )
             self.state_manager.update_deployment_status(
                 rollback_deployment_id, DeploymentStatus.COMPLETED

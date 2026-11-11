@@ -2,6 +2,7 @@
 
 import click
 
+from infrafoundry.core.deployment_executor import default_max_workers
 from infrafoundry.core.orchestrator import Orchestrator
 
 from ...decorators import with_orchestrator
@@ -43,9 +44,12 @@ from ...utils import console
 )
 @click.option(
     "--max-workers",
-    type=int,
-    default=4,
-    help="Maximum number of parallel workers (default: 4)",
+    type=click.IntRange(min=1),
+    envvar="INFRAFOUNDRY_MAX_WORKERS",
+    default=default_max_workers,
+    show_default="CPU count",
+    show_envvar=True,
+    help="Maximum number of parallel workers (only used with --parallel)",
 )
 @click.option(
     "--lock-timeout",

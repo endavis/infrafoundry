@@ -237,6 +237,11 @@ class TestPlanWithPackage:
 class TestApplyWithPackage:
     """Tests for apply --package."""
 
+    @pytest.fixture(autouse=True)
+    def _pin_max_workers(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("INFRAFOUNDRY_MAX_WORKERS", raising=False)
+        monkeypatch.setattr("infrafoundry.core.deployment_executor.os.cpu_count", lambda: 4)
+
     def test_apply_with_package_resolves_filter(
         self, cli_runner: CliRunner, mock_orchestrator: Mock
     ) -> None:

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrafoundry.core.config.models import IaCTool
-from infrafoundry.core.deployment_executor import DeploymentExecutor
+from infrafoundry.core.deployment_executor import DeploymentExecutor, default_max_workers
 from infrafoundry.core.events import EventAbortedError, EventType
 from infrafoundry.core.events.context import EventResult
 from infrafoundry.core.exceptions import ResourceFilterError, TerraformError
@@ -1427,3 +1427,15 @@ def test_apply_dispatches_provider_with_empty_resource_list(mode: str) -> None:
         )
 
     runner.apply.assert_called_once()
+
+
+class TestDefaultMaxWorkers:
+    """default_max_workers resolves the CPU count with a fallback of 4."""
+
+    def test_uses_cpu_count(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("infrafoundry.core.deployment_executor.os.cpu_count", lambda: 12)
+        assert default_max_workers() == 12
+
+    def test_falls_back_to_four_when_unknown(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("infrafoundry.core.deployment_executor.os.cpu_count", lambda: None)
+        assert default_max_workers() == 4
