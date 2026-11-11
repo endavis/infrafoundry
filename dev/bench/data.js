@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794399293796,
+  "lastUpdate": 1794399833856,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1258,6 +1258,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00003315083558531205",
             "extra": "mean: 104.83961196870575 usec\nrounds: 10494"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "119abf1dfa6aaf82163ffb26f78f9f846eaa6d31",
+          "message": "chore: enable ruff plw1514 and pass explicit utf-8 encoding to file i/o (merges PR #1364, addresses #687)\n\nAdd encoding=\"utf-8\" to all 191 text-mode open(), read_text() and\nwrite_text() calls ruff's PLW1514 flagged in src/, tests/,\ntools/opnsense-parser.py and one blueprint script, then enable the rule\nin the ruff select list with the same line the upstream template uses\nand drop the deferral note above preview = true.\n\nBinary-mode opens are unchanged, no call site reads a non-UTF-8 file, and\nno test assertion changed. Template-shipped tooling had no flagged sites.\n\nAddresses #687\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-11T12:23:09Z",
+          "tree_id": "e8e2b2cb0df645745f5bbd8474d2cf1339d3b76e",
+          "url": "https://github.com/endavis/infrafoundry/commit/119abf1dfa6aaf82163ffb26f78f9f846eaa6d31"
+        },
+        "date": 1794399833123,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 72.0168398341082,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004667266764426413",
+            "extra": "mean: 13.885641223684823 msec\nrounds: 76"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12686.372295623973,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005440836187337358",
+            "extra": "mean: 78.82474017768966 usec\nrounds: 13617"
           }
         ]
       }
