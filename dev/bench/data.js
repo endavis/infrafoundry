@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794490362628,
+  "lastUpdate": 1794490892099,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1486,6 +1486,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007700891948540381",
             "extra": "mean: 77.75928226864335 usec\nrounds: 13682"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7514e3ef4cff0d8c46977e2c65633d3686379091",
+          "message": "chore: synchronize with pyproject-template ef82475 (merges PR #1382, addresses #1376)\n\nSyncs the following template improvements (dbe9500...ef82475):\n- endavis/pyproject-template#1213 (keep a merged worktree while anything is mounted inside it)\n- endavis/pyproject-template#1215 (changelog rule depends on update_changelog_on_bump)\n- endavis/pyproject-template#1217 (reject closing keywords in commit messages)\n- endavis/pyproject-template#1219 (Codecov upload opt-in via CODECOV_ENABLED, OIDC auth)\n- endavis/pyproject-template#1222 (Dependabot rebases its own PRs)\n- endavis/pyproject-template#1223, #1232 (group dependabot updates and type stubs)\n- endavis/pyproject-template#1230 (doit issue types feat/fix; title prefix must match --type)\n- endavis/pyproject-template#1237 (document the heredoc mv-plus-pipe false positive)\n- endavis/pyproject-template#1239 (project rebuildable names for pr_merge worktree removal, ADR-9031)\n- endavis/pyproject-template#1243 (shared pre-commit hook cache; .envrc edited by the repo admin)\n- endavis/pyproject-template#1244 (own block reason for unresolvable write targets)\n- endavis/pyproject-template#1246, #1247 (nosec/noqa reason guards)\n- endavis/pyproject-template#1248 (number ADR headings in bodies; add new ADRs to index and nav)\n- endavis/pyproject-template#1250 (anchor bandit exclude_dirs entries)\n- endavis/pyproject-template#1252 (keep the checkout revision out of hook pathspec checks)\n- dev-dependency floor bumps\n\nKept local: Linux-only CI (ADR-0001), so ci.yml keeps ubuntu-latest and\ntest_ci_workflow.py takes only the Codecov tests; ANN401 stays ignored\nproject-wide, so tools/doit/github.py keeps no noqa; AGENTS.md keeps its\nown Breaking Changes section. Local --type=feature/bug mentions updated\nto feat/fix.\n\nBREAKING CHANGE: doit issue --type=feature and --type=bug now exit 1;\nuse --type=feat and --type=fix, with a title that starts with the same\ntype.\n\nAddresses #1376\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T13:40:42Z",
+          "tree_id": "63e82fdb287a396800a0a65843a751b11cbcfeb9",
+          "url": "https://github.com/endavis/infrafoundry/commit/7514e3ef4cff0d8c46977e2c65633d3686379091"
+        },
+        "date": 1794490891475,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 87.6302430007759,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0008930661383850029",
+            "extra": "mean: 11.411585381443546 msec\nrounds: 97"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14710.330152235825,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000003885966486753041",
+            "extra": "mean: 67.9794395945634 usec\nrounds: 15785"
           }
         ]
       }
