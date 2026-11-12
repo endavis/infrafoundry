@@ -144,7 +144,7 @@ class SecurityScanner(BaseManager):
     def get_version(self) -> str | None:
         """Get checkov version."""
         try:
-            result = subprocess.run(  # nosec B603  # using list args, not shell
+            result = subprocess.run(  # using list args, not shell
                 [self.checkov_path, "--version"],
                 capture_output=True,
                 text=True,
@@ -221,7 +221,7 @@ class SecurityScanner(BaseManager):
 
         self._log_debug(f"Running: {' '.join(cmd)}")
 
-        result = subprocess.run(  # nosec B603  # using list args, not shell
+        result = subprocess.run(  # using list args, not shell
             cmd,
             capture_output=True,
             text=True,

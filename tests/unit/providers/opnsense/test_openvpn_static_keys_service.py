@@ -105,7 +105,7 @@ class TestParser:
         assert static_key_configs_from_resources([other]) == []
 
     def test_require_key_rejects_non_pem_without_leaking_value(self) -> None:
-        secret = "not-a-pem-secret-value"  # nosec B105  # test fixture
+        secret = "not-a-pem-secret-value"  # test fixture
         with pytest.raises(ValueError, match="PEM") as exc:
             static_key_configs_from_resources([_res(key=secret)], require_key=True)
         assert secret not in str(exc.value)

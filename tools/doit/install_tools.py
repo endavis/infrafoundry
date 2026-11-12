@@ -600,7 +600,9 @@ def _install_hashicorp_zip(
     if shutil.which(binary_name):
         # B605: binary_name is a hardcoded tool name verified via shutil.which()
         # before invocation; no user input flows into the command string.
-        version_json = subprocess.getoutput(f"{binary_name} version -json")  # nosec B605
+        version_json = subprocess.getoutput(  # nosec B605  # hardcoded tool name
+            f"{binary_name} version -json"
+        )
         try:
             current = json.loads(version_json)["terraform_version"]
             if current == version:
@@ -668,10 +670,14 @@ def _install_ansible() -> None:
 
     if os.path.exists("pyproject.toml"):
         print("Installing InfraFoundry with Ansible...")
-        subprocess.run(f"uv pip install {system_flag} -e .", shell=True, check=True)  # nosec B602
+        subprocess.run(  # nosec B602  # fixed uv command; flag is "" or --system
+            f"uv pip install {system_flag} -e .", shell=True, check=True
+        )
     else:
         print("Installing Ansible directly...")
-        subprocess.run(f"uv pip install {system_flag} ansible", shell=True, check=True)  # nosec B602
+        subprocess.run(  # nosec B602  # fixed uv command; flag is "" or --system
+            f"uv pip install {system_flag} ansible", shell=True, check=True
+        )
 
 
 # ---------------------------------------------------------------------------

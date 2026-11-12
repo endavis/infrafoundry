@@ -15,7 +15,7 @@ from infrafoundry.providers.opnsense.components.openvpn_instances import OpenVpn
 from infrafoundry.providers.opnsense.services.openvpn_instances import OpenVpnInstanceService
 
 CRT = "-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----"
-SECRET_PW = "hunter2-not-real"  # nosec B105  # test fixture
+SECRET_PW = "hunter2-not-real"  # test fixture
 
 
 def _inst(name: str, **config: Any) -> ResourceConfig:

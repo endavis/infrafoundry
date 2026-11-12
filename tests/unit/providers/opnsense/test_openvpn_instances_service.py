@@ -21,7 +21,7 @@ from infrafoundry.providers.opnsense.services.openvpn_instances import (
     openvpn_instance_configs_from_resources,
 )
 
-SECRET_PW = "hunter2-not-real"  # nosec B105  # test fixture
+SECRET_PW = "hunter2-not-real"  # test fixture
 
 
 def _res(name: str = "vpn-a", **config: Any) -> ResourceConfig:
