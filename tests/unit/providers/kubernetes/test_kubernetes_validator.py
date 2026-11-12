@@ -262,6 +262,44 @@ class TestKubernetesValidatorReferences:
         assert validation_report.has_errors()
         assert any("missing-secret" in r.message for r in validation_report.results)
 
+    def test_secret_data_rejects_non_base64(
+        self, validator: KubernetesValidator, validation_report: ValidationReport
+    ) -> None:
+        """A plain-text data value fails, naming the secret and key."""
+        resources = [
+            ResourceConfig(
+                provider="kubernetes",
+                type="secrets",
+                name="db-creds",
+                config={"data": {"password": "not base64!"}},
+            ),
+        ]
+
+        validator.validate_references(resources)
+
+        assert validation_report.has_errors()
+        assert any(
+            "db-creds" in r.message and "password" in r.message and "base64" in r.message
+            for r in validation_report.results
+        )
+
+    def test_secret_data_accepts_base64_and_ignores_string_data(
+        self, validator: KubernetesValidator, validation_report: ValidationReport
+    ) -> None:
+        """Valid base64 data passes; string_data may hold any plain text."""
+        resources = [
+            ResourceConfig(
+                provider="kubernetes",
+                type="secrets",
+                name="db-creds",
+                config={"data": {"password": "dmFsdWU="}, "string_data": {"u": "not base64!"}},
+            ),
+        ]
+
+        validator.validate_references(resources)
+
+        assert not validation_report.has_errors()
+
     def test_validate_references_reports_success(
         self, validator: KubernetesValidator, validation_report: ValidationReport
     ) -> None:

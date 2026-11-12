@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from typing import cast
 
 from infrafoundry.core.config.models import EnvironmentConfig
@@ -138,6 +140,34 @@ class KubernetesValidator:
             ),
         )
 
+    def _validate_secret_data_encoding(self, resources: list[ResourceConfig]) -> None:
+        """Check that every ``data`` value of a secret is valid base64.
+
+        ``data`` takes base64 text, as in a Kubernetes Secret manifest. Plain values
+        belong in ``string_data``.
+
+        Args:
+            resources: List of resources to validate
+        """
+        for resource in resources:
+            if resource.type != "secrets":
+                continue
+            data = (resource.config or {}).get("data") or {}
+            for key, value in data.items():
+                try:
+                    base64.b64decode(str(value), validate=True)
+                except (binascii.Error, ValueError):
+                    self.report.add_check(
+                        check_name=f"kubernetes_secret_{resource.name}_data_{key}_base64",
+                        passed=False,
+                        message=(
+                            f"Secret '{resource.name}' key '{key}' in 'data' is not valid "
+                            f"base64; 'data' takes base64-encoded values, use 'string_data' "
+                            f"for plain values"
+                        ),
+                        level=ValidationLevel.ERROR,
+                    )
+
     def _validate_local_references(self, resources: list[ResourceConfig]) -> None:
         """Validate cross-resource references locally (no API calls).
 
@@ -174,6 +204,8 @@ class KubernetesValidator:
                     ),
                     level=ValidationLevel.INFO,
                 )
+
+        self._validate_secret_data_encoding(resources)
 
         # Validate deployment references to configmaps/secrets
         for resource in resources:

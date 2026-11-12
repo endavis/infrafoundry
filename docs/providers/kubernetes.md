@@ -84,10 +84,13 @@ resources:
 
 `namespace` (default `default`), `labels`, `annotations`, `type` (default `Opaque`), `data`, `string_data`.
 
-`string_data` values are plain strings; the Terraform provider encodes them. You may set both `data` and `string_data`: they are merged into one `data` map, and `string_data` wins on a duplicate key.
+`data` values are base64-encoded, as in a Kubernetes Secret manifest, and are rendered to the Terraform provider's `binary_data` argument. A `data` value that is not valid base64 fails validation. `string_data` values are plain strings, rendered to the provider's `data` argument, which encodes them. You may set both; `string_data` wins on a duplicate key.
 
 !!! note "Existing `string_data` secrets"
     Earlier versions wrapped `string_data` values in `base64encode()`, so the stored value was base64 text. The next apply updates such a secret in place to the plain string you wrote. A consumer that decoded the value twice to work around this must be updated.
+
+!!! note "Existing `data` secrets"
+    Earlier versions passed `data` values to the provider's `data` argument unchanged, which encodes them, so a base64 value was stored still base64-encoded. `data` now takes base64 and stores the decoded bytes. A secret that held plain text in `data` fails validation; move those values to `string_data`. A secret that held base64 text changes its stored value to the decoded content on the next apply, so a consumer that decoded it a second time must be updated.
 
 ### PersistentVolumeClaims
 
