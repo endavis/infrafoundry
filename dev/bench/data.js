@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794484663723,
+  "lastUpdate": 1794490362628,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1448,6 +1448,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006306503245892023",
             "extra": "mean: 60.163654620731954 usec\nrounds: 17876"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2f0bbcf807d3176edbbe77ab0c75224da314e291",
+          "message": "chore: remove dead nosec suppressions and add missing reasons (merges PR #1381, addresses #1380)\n\nThe template's new suppression guards (adopted in the #1376 sync) flag\nsuppressions in this repository's own code:\n\n- drop B603/B607 from nosec comments in src/ and project tests: both IDs\n  are in [tool.bandit] skips, so the suppressions were dead; the reason\n  text stays as a plain comment\n- drop nosec markers from project test files, which bandit excludes\n- give the three local nosec suppressions in tools/doit/install_tools.py\n  a reason\n- delete tools/pyproject_template/migrate_existing_project.py, which the\n  template no longer ships and nothing references\n\nTemplate-layer files are left to the sync, whose updated copies already\npass the guards. doit check and doit security pass.\n\nAddresses #1380\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T13:31:58Z",
+          "tree_id": "f5b2f38af78ab057e8bf7f41e6d17017dc94279a",
+          "url": "https://github.com/endavis/infrafoundry/commit/2f0bbcf807d3176edbbe77ab0c75224da314e291"
+        },
+        "date": 1794490362081,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 69.71780405475953,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0007114525353886219",
+            "extra": "mean: 14.343538405405809 msec\nrounds: 74"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12860.201005266388,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007700891948540381",
+            "extra": "mean: 77.75928226864335 usec\nrounds: 13682"
           }
         ]
       }
