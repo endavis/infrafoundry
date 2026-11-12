@@ -110,6 +110,23 @@ runs `terraform init`, then `terraform state rm` for each returned address that 
 right before `terraform destroy`. A failed init or `state rm` aborts the destroy. Other runners
 ignore the hook. Tailscale uses it for `device_tags` with `keep_tags_on_destroy: true` (#1349).
 
+### get_plan_notes()
+
+**Purpose:** Print extra lines after a provider's plan, such as a read-only preview from the
+provider's API.
+
+```python
+def get_plan_notes(self, resources: list[ResourceConfig]) -> list[str]:
+    """Return plain-text lines to print after this provider's plan."""
+    return []
+```
+
+`resources` is the provider's full resource list for the run, not the filtered one. The
+orchestrator calls the hook once per provider, after the IaC runners have planned, and only
+on a non-dry-run `infra plan`; `infra apply` does not call it. Lines are printed without
+markup. The hook must not fail the plan: return a skip line instead of raising. The default
+returns `[]`. Proxmox uses it for the SDN dry-run (#1374).
+
 ### validate_connectivity()
 
 **Purpose:** Validate connectivity to provider API and verify credentials.

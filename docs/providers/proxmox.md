@@ -222,6 +222,13 @@ A VM or container attaches by using the vnet as its bridge
 - **Doctor.** `infra doctor` accepts a vnet as a VM's bridge once it is in the
   cluster's running SDN config. A vnet declared in the validated resources but
   not applied yet is a warning, since the apply creates it first.
+- **Dry-run in plan.** On Proxmox VE 9.2 or later, `infra plan` calls the SDN dry-run
+  (`GET cluster/sdn/dry-run`) once per online node when the run manages a zone or vnet, and
+  prints the `interfaces-diff` and `frr-diff` the next SDN apply would push. Those diffs were
+  pending before the run, and the next SDN apply from any source also pushes them. What this
+  run stages is not in them; it is in the Terraform plan. Older clusters and runs without
+  credentials print one `SDN dry-run skipped` line. The check never fails the plan, and
+  `infra apply` does not re-run it.
 - **Filtered runs.** `infra plan`/`apply` with `-p` or `-r` that select a zone or
   vnet also target both appliers, so the change reaches the nodes.
 - **Removing a zone or vnet.** Delete it from the config and run `foundry infra apply`

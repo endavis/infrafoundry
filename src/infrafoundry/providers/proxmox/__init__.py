@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, override
+from typing import TYPE_CHECKING, Any, ClassVar, cast, override
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import SchemaValidationError
@@ -14,6 +14,7 @@ from infrafoundry.core.provider_mixins import (
     TerraformGeneratorMixin,
     sanitize_secret_ref_to_tf_var,
 )
+from infrafoundry.core.types import ProxmoxProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
 
 from .validator import ProxmoxValidator
@@ -29,6 +30,8 @@ from .validators.sdn_config_validator import sdn_id
 
 if TYPE_CHECKING:
     from infrafoundry.providers.plugin_type import ProviderMetadata
+
+    from .api_client import ProxmoxClient
 
 
 def _imports_disk(vm: ResourceConfig) -> bool:
@@ -626,6 +629,48 @@ class ProxmoxProvider(
             "sdn_zone": ["proxmox_sdn_zone_vxlan"],
             "sdn_vnet": ["proxmox_sdn_vnet"],
         }
+
+    @override
+    def get_plan_notes(self, resources: list[ResourceConfig]) -> list[str]:
+        """Show what the next SDN apply would change (Proxmox VE 9.2+ dry-run).
+
+        Only runs when the resources include ``sdn_zone`` or ``sdn_vnet``. It
+        never fails the plan: problems come back as a single skip line.
+
+        Args:
+            resources: The provider's full resource list for this run
+
+        Returns:
+            Console lines, or an empty list when no SDN objects are managed
+        """
+        if not any(r.type in ("sdn_zone", "sdn_vnet") for r in resources):
+            return []
+        from infrafoundry.core.exceptions import APIError
+
+        from .sdn_dry_run import format_sdn_dry_run_report, run_sdn_dry_run
+
+        try:
+            client = self._sdn_dry_run_client()
+            if client is None:
+                return ["SDN dry-run skipped: no Proxmox API credentials in the environment config"]
+            return format_sdn_dry_run_report(run_sdn_dry_run(client))
+        except APIError as exc:
+            return [f"SDN dry-run skipped: {exc.message}"]
+
+    def _sdn_dry_run_client(self) -> "ProxmoxClient | None":
+        """Build an API client from the environment settings, as the validator does."""
+        from infrafoundry.core.credential_override import resolve_settings
+
+        from .api_client import ProxmoxClient
+
+        env_config = self._load_environment_config()
+        if not env_config:
+            return None
+        settings = env_config.get_provider_settings("proxmox")
+        if not settings:
+            return None
+        settings = resolve_settings("proxmox", settings, self._PROXMOX_TFVARS_MAPPING)
+        return ProxmoxClient.from_provider_settings(cast(ProxmoxProviderSettings, settings))
 
     @override
     def get_dependencies(self) -> dict[str, list[str]]:

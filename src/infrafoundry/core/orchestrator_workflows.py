@@ -39,6 +39,7 @@ from infrafoundry.core.provider import (
     ProviderBase,
     ResourceConfig,
     group_by_package_variables,
+    provider_plan_notes,
     unsupported_resource_message,
     unsupported_resource_reason,
 )
@@ -796,6 +797,8 @@ class PlanOrchestrator(HookExecutionMixin):
                                 f"no generate_{tool_name} method[/dim]"
                             )
 
+                    self._print_plan_notes(provider, generate_resources)
+
                 # Execute resource-level after_plan hooks
                 for resource in provider_resources:
                     self._execute_resource_hooks(env_name, "after_plan", resource, provider_name)
@@ -857,6 +860,11 @@ class PlanOrchestrator(HookExecutionMixin):
             self.console.print(
                 f"\n[bold]{provider_name}[/bold]: {len(provider_resources)} resources"
             )
+
+    def _print_plan_notes(self, provider: object, resources: list[ResourceConfig]) -> None:
+        """Print a provider's optional plan notes (#1374)."""
+        for line in provider_plan_notes(provider, resources):
+            self.console.print(line, markup=False, highlight=False)
 
     def _print_plan_summary(
         self,

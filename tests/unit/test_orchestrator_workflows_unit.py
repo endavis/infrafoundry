@@ -2776,3 +2776,63 @@ def test_destroy_skips_forget_when_runner_lacks_method(console: Console) -> None
     )
 
     tf_runner.destroy.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Provider plan notes — issue #1374
+# ---------------------------------------------------------------------------
+
+
+def test_plan_prints_provider_plan_notes_after_runner_summary() -> None:
+    """Hook lines are printed verbatim, without markup, after the runner summary."""
+    orchestrator, console_mock, _ = _build_plan_orchestrator_with_runner(
+        runner=MagicMock(), runner_output="x"
+    )
+    provider = orchestrator._get_providers()["proxmox"]
+    provider.get_plan_notes = MagicMock(return_value=["note [a]", "second"])
+
+    orchestrator.plan(env_name="dev", dry_run=False, resource_filter=None, enforce_policies=False)
+
+    prints = _print_strings(console_mock)
+    assert prints.index("note [a]") > prints.index(
+        "  [dim]terraform: 21 to add, 0 to change, 0 to destroy[/dim]"
+    )
+    call = next(c for c in console_mock.print.call_args_list if c.args and c.args[0] == "note [a]")
+    assert call.kwargs == {"markup": False, "highlight": False}
+    assert "second" in prints
+
+
+def test_plan_mock_provider_prints_no_plan_notes() -> None:
+    """A MagicMock provider's auto-attribute hook adds no output."""
+    orchestrator, console_mock, _ = _build_plan_orchestrator_with_runner(
+        runner=MagicMock(), runner_output="x"
+    )
+
+    orchestrator.plan(env_name="dev", dry_run=False, resource_filter=None, enforce_policies=False)
+
+    assert not any("MagicMock" in p for p in _print_strings(console_mock))
+
+
+def test_plan_dry_run_skips_plan_notes() -> None:
+    """A dry run makes no provider calls, so the hook is not invoked."""
+    orchestrator, _, _ = _build_plan_orchestrator_with_runner(runner=MagicMock(), runner_output="x")
+    provider = orchestrator._get_providers()["proxmox"]
+    provider.get_plan_notes = MagicMock(return_value=["note"])
+
+    orchestrator.plan(env_name="dev", dry_run=True, resource_filter=None, enforce_policies=False)
+
+    provider.get_plan_notes.assert_not_called()
+
+
+def test_plan_notes_receive_full_resource_list_with_filter() -> None:
+    """With a resource filter the hook still gets the full provider resource list."""
+    orchestrator, _, _ = _build_plan_orchestrator_with_runner(runner=MagicMock(), runner_output="x")
+    provider = orchestrator._get_providers()["proxmox"]
+    provider.get_plan_notes = MagicMock(return_value=[])
+
+    orchestrator.plan(
+        env_name="dev", dry_run=False, resource_filter=["vm1"], enforce_policies=False
+    )
+
+    provider.get_plan_notes.assert_called_once()
+    assert [r.name for r in provider.get_plan_notes.call_args.args[0]] == ["vm1"]

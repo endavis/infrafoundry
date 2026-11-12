@@ -131,3 +131,39 @@ class TestStateAddressesKeptOnDestroy:
 
         assert provider.get_state_addresses_kept_on_destroy([]) == []
         assert provider.get_state_addresses_kept_on_destroy([res]) == []
+
+
+class TestProviderPlanNotes:
+    """provider_plan_notes guards the optional get_plan_notes hook (#1374)."""
+
+    def test_missing_hook_gives_empty(self) -> None:
+        from infrafoundry.core.provider import provider_plan_notes
+
+        assert provider_plan_notes(object(), []) == []
+
+    def test_non_callable_hook_gives_empty(self) -> None:
+        from types import SimpleNamespace
+
+        from infrafoundry.core.provider import provider_plan_notes
+
+        assert provider_plan_notes(SimpleNamespace(get_plan_notes="x"), []) == []
+
+    def test_non_list_return_gives_empty(self) -> None:
+        from types import SimpleNamespace
+
+        from infrafoundry.core.provider import provider_plan_notes
+
+        stub = SimpleNamespace(get_plan_notes=lambda _r: {"a": "b"})
+        assert provider_plan_notes(stub, []) == []
+
+    def test_keeps_only_strings(self) -> None:
+        from types import SimpleNamespace
+
+        from infrafoundry.core.provider import provider_plan_notes
+
+        stub = SimpleNamespace(get_plan_notes=lambda _r: ["a", 1, None, "b"])
+        assert provider_plan_notes(stub, []) == ["a", "b"]
+
+    def test_base_default_is_empty(self, tmp_path: Path) -> None:
+        provider = StubProviderImplementation("stub", tmp_path, tmp_path)
+        assert provider.get_plan_notes([]) == []

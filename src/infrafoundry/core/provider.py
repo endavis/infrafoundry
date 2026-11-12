@@ -180,6 +180,20 @@ class ProviderBase(ABC):
         """
         return []
 
+    def get_plan_notes(self, resources: list[ResourceConfig]) -> list[str]:
+        """Return extra lines to show after this provider's plan.
+
+        Optional hook (#1374). Called once per provider on a non-dry-run
+        ``infra plan``; implementations must not fail the plan.
+
+        Args:
+            resources: The provider's full resource list for this run
+
+        Returns:
+            Plain-text lines to print; empty by default
+        """
+        return []
+
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* environment variables for this provider.
 
@@ -266,6 +280,28 @@ def unsupported_resource_reason(provider: object, resource_type: str) -> str | N
         return None
     reason: object = table.get(resource_type)
     return reason if isinstance(reason, str) and reason else None
+
+
+def provider_plan_notes(provider: object, resources: list[ResourceConfig]) -> list[str]:
+    """Return a provider's plan notes, tolerating a missing or odd hook.
+
+    Guarded so a provider (or test double) without the optional
+    ``get_plan_notes`` hook, or one returning a non-list, yields no notes.
+
+    Args:
+        provider: Provider instance (any object)
+        resources: The provider's full resource list for this run
+
+    Returns:
+        The ``str`` items the hook returned
+    """
+    hook: object = getattr(provider, "get_plan_notes", None)
+    if not callable(hook):
+        return []
+    notes: object = hook(resources)
+    if not isinstance(notes, list):
+        return []
+    return [note for note in notes if isinstance(note, str)]
 
 
 def unsupported_resource_message(
