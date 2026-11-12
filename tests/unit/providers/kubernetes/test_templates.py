@@ -131,10 +131,10 @@ class TestSecretsTemplate:
         assert "base64encode" not in content
         assert len(re.findall(r"^\s*data = \{", content, re.MULTILINE)) == 1
 
-    def test_data_and_string_data_render_single_data_map(
+    def test_data_and_string_data_render_without_redefined_attribute(
         self, provider: KubernetesProvider
     ) -> None:
-        """Both keys merge into one data map (no redefined attribute)."""
+        """data goes to binary_data and string_data to data, each argument set once."""
         content = self._render_secret(
             provider, {"data": {"a": "YQ=="}, "string_data": {"b": "plain"}}
         )
@@ -147,6 +147,32 @@ class TestSecretsTemplate:
         content = self._render_secret(provider, {"data": {"k": "a"}, "string_data": {"k": "b"}})
         assert content.count('"k" = "b"') == 1
         assert '"k" = "a"' not in content
+
+    def test_data_renders_to_binary_data(self, provider: KubernetesProvider) -> None:
+        """data holds base64 text and goes to binary_data, not data."""
+        content = self._render_secret(provider, {"data": {"k": "dmFsdWU="}})
+        assert re.search(r'^\s*binary_data = \{\n\s*"k" = "dmFsdWU="', content, re.MULTILINE)
+        assert not re.search(r"^\s*data = \{", content, re.MULTILINE)
+
+    def test_string_data_renders_to_data_only(self, provider: KubernetesProvider) -> None:
+        """string_data goes to the provider's data argument; no binary_data block."""
+        content = self._render_secret(provider, {"string_data": {"k": "plain"}})
+        assert re.search(r'^\s*data = \{\n\s*"k" = "plain"', content, re.MULTILINE)
+        assert "binary_data" not in content
+
+    def test_data_and_string_data_render_separate_arguments(
+        self, provider: KubernetesProvider
+    ) -> None:
+        """Both fields together render binary_data and data with their own keys."""
+        content = self._render_secret(
+            provider, {"data": {"a": "YQ=="}, "string_data": {"b": "plain"}}
+        )
+        binary = content[content.index("binary_data = {") :].split("}")[0]
+        plain = content[content.index("  data = {") :].split("}")[0]
+        assert '"a" = "YQ=="' in binary
+        assert '"b" = "plain"' not in binary
+        assert '"b" = "plain"' in plain
+        assert '"a" = "YQ=="' not in plain
 
 
 class TestIngressTemplate:
