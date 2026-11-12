@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794490892099,
+  "lastUpdate": 1794503096630,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1524,6 +1524,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000003885966486753041",
             "extra": "mean: 67.9794395945634 usec\nrounds: 15785"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "678bb15da389d33a5906f0bc0c9ee429dd48a2d5",
+          "message": "feat: show the proxmox 9.2 sdn dry-run in infra plan (merges PR #1386, addresses #1374)\n\ninfra plan now calls GET /cluster/sdn/dry-run on each online node when\nthe run manages SDN zones or vnets, and prints each node's\ninterfaces-diff and frr-diff, or \"no pending SDN changes\".\n\n- New optional provider hook ProviderBase.get_plan_notes(resources),\n  default [], printed by PlanOrchestrator after a provider's runners\n  plan (not on --dry-run) through the guarded provider_plan_notes\n  helper, with console markup off.\n- New service module providers/proxmox/sdn_dry_run.py: version gate\n  (GET version, skip below 9.2), per-node dry-run, 404/501 on the first\n  call treated as \"endpoint not available\" when the version cannot be\n  parsed, offline nodes and per-node API errors reported without\n  stopping the rest.\n- At plan time this run has staged nothing, so every diff is labelled as\n  pending before the run and pushed by the next SDN apply.\n- The check never fails the plan: missing credentials or API errors\n  become a single skip line.\n\nThe optional apply-time dry-run is left out: before terraform apply it\nwould repeat the plan output, and showing it between staging and the\napplier needs a two-phase Terraform apply.\n\nAddresses #1374\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T17:03:49Z",
+          "tree_id": "f1097631a2d698b35e2a3d14deb4e1e00dd4f8e5",
+          "url": "https://github.com/endavis/infrafoundry/commit/678bb15da389d33a5906f0bc0c9ee429dd48a2d5"
+        },
+        "date": 1794503095929,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 61.08325338238258,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00043460005632259887",
+            "extra": "mean: 16.371099190476592 msec\nrounds: 63"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10901.164639088276,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000057275224894141106",
+            "extra": "mean: 91.73331777912084 usec\nrounds: 11851"
           }
         ]
       }
