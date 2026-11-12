@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794410788340,
+  "lastUpdate": 1794484663723,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1410,6 +1410,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000021393967426235533",
             "extra": "mean: 138.53482052202696 usec\nrounds: 8352"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "eda9a4d316e5bc59e0324d75af685f9b7197cae1",
+          "message": "chore: raise minimum python to 3.13 (merges PR #1375, addresses #1372)\n\nRaise the supported floor from 3.12 to 3.13 in all seven settings the\npython-version-bump skill names (requires-python, ruff target-version,\nmypy python_version, pyright pythonVersion, .python-version,\n.github/python-versions.json oldest, classifiers), regenerate uv.lock,\napply the ruff UP rewrites the new target reports, and update prose that\nstates the supported range. ADRs and historical records are unchanged.\n\npynetappfoundry, which the planned native ONTAP provider (#1373) will use,\nrequires Python 3.13.\n\nBREAKING CHANGE: Python 3.12 is no longer supported; 3.12 users stay on\nthe last release that supports it.\n\nAddresses #1372\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T11:56:54Z",
+          "tree_id": "770b31e0ca5f9c243a111abb8ede20de469e4a97",
+          "url": "https://github.com/endavis/infrafoundry/commit/eda9a4d316e5bc59e0324d75af685f9b7197cae1"
+        },
+        "date": 1794484663069,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 106.4845654107364,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005020374940307082",
+            "extra": "mean: 9.391032363636562 msec\nrounds: 110"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16621.33070711777,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006306503245892023",
+            "extra": "mean: 60.163654620731954 usec\nrounds: 17876"
           }
         ]
       }
