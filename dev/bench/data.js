@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794507859200,
+  "lastUpdate": 1794509242799,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1600,6 +1600,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006982763349954825",
             "extra": "mean: 92.61835775290679 usec\nrounds: 12176"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b05ee64ed2c1b1a2b9498502276c9929073abffd",
+          "message": "chore: reconcile error catalog, cli help examples and the runner test (merges PR #1388, addresses #1367)\n\n- Add IF-STATE-005 \"Package Move Rollback Failed\" to ERROR_CATALOG and\n  map PackageMoveRollbackError to it, matching docs/reference/errors.md.\n- Error suggestions now name real commands: config doctor (was config\n  validate), infra analyze ... (was a top-level analyze), config create\n  (was config new --env), infra drift detect (infra drift is a group),\n  state prune after state backup (was state reset).\n- config migrate help and the CLI reference use the registered\n  interfaces.vlans component key instead of vlans.\n- test_plan_orchestrator_runs_runners_in_priority_order now gives its\n  runners real is_iac_runner values and asserts the Ansible runner is\n  neither generated nor planned (approved on #1367). Ansible stays out\n  of infra plan/apply and runs through blueprint event scripts, as the\n  runner docs already state.\n- New guard tests: the IF-* codes in errors.md equal ERROR_CATALOG, and\n  every foundry command named in a suggestion resolves in the CLI.\n\nAddresses #1367\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T18:46:15Z",
+          "tree_id": "161e1831a537edf90ab16563821e2a61501eeca3",
+          "url": "https://github.com/endavis/infrafoundry/commit/b05ee64ed2c1b1a2b9498502276c9929073abffd"
+        },
+        "date": 1794509241943,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 97.4057919115745,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005610482308944776",
+            "extra": "mean: 10.266329962265544 msec\nrounds: 106"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16674.84595581242,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000028048074484856516",
+            "extra": "mean: 59.970569002553574 usec\nrounds: 16782"
           }
         ]
       }
