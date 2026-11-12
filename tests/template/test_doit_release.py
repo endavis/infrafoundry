@@ -902,7 +902,7 @@ class TestReleaseTagGhSearch:
         )
 
 
-class _ReachedCzBuild(Exception):  # noqa: N818 - sentinel, not a runtime error
+class _ReachedCzBuild(Exception):  # noqa: N818  # sentinel, not a runtime error
     """Sentinel raised from ``_build_cz_get_next_cmd`` to halt the task flow.
 
     Used by ``TestCreateReleasePrValidation`` to prove that control reached
@@ -1553,7 +1553,7 @@ class TestMajorVersion:
         assert _major_version(version) == major
 
 
-class _ReachedBranchCreation(Exception):  # noqa: N818 - sentinel, not a runtime error
+class _ReachedBranchCreation(Exception):  # noqa: N818  # sentinel, not a runtime error
     """Sentinel raised at ``git checkout -b`` to prove the flow got past the version checks."""
 
 

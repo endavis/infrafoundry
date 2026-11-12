@@ -16,6 +16,7 @@
 # export RUFF_CACHE_DIR="$(pwd)/tmp/.ruff_cache"
 # export MYPY_CACHE_DIR="$(pwd)/tmp/.mypy_cache"
 # export COVERAGE_FILE="$(pwd)/tmp/.coverage"
+# pre-commit shares one store (default ~/.cache/pre-commit). Opt in to a per-project one:
 # export PRE_COMMIT_HOME="$(pwd)/tmp/.pre-commit"
 
 # Custom environment variables for your workflow

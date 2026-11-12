@@ -35,7 +35,7 @@ If you are not sure what state you are in, run `/ghi-status` at any time (Claude
 
 ### 2. Pick an issue
 
-Every change starts from an issue. Either list the open backlog with `gh issue list` and pick one, or create a new issue with `doit issue --type=<type>` (types are `feature`, `bug`, `refactor`, `docs`, `chore`). The template enforces Issue → Branch → Commit → PR → Merge; there is no supported path that skips the issue.
+Every change starts from an issue. Either list the open backlog with `gh issue list` and pick one, or create a new issue with `doit issue --type=<type>` (types are `feat`, `fix`, `refactor`, `docs`, `chore`). The template enforces Issue → Branch → Commit → PR → Merge; there is no supported path that skips the issue.
 
 For the rest of this walkthrough assume you have picked issue number `42`.
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import os
 import shlex
-import subprocess  # nosec B404  # test invokes bash deliberately to verify shell-snippet behaviour
+import subprocess
 import sys
 from io import StringIO
 from pathlib import Path
@@ -253,7 +253,7 @@ def _write_fake_uv(tmp_path: Path) -> Path:
 def _run_bash(action: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
     """Run ``bash -c <action>`` with a deliberately minimal env. Used by the
     shell-level behavioural tests below."""
-    return subprocess.run(  # nosec B603 B607
+    return subprocess.run(
         ["bash", "-c", action],
         capture_output=True,
         text=True,
@@ -497,7 +497,7 @@ class TestNoUvCacheDefault:
             "print(repr(os.environ.get('UV_CACHE_DIR'))); "
             "print(hasattr(b, 'UV_CACHE_DIR'))"
         )
-        result = subprocess.run(  # nosec B603
+        result = subprocess.run(
             [sys.executable, "-c", code],
             env=env,
             capture_output=True,
@@ -518,7 +518,10 @@ class TestNoUvCacheDefault:
         assert self._imported_value(None).splitlines()[1] == "False"
 
     def test_envrc_leaves_uv_cache_unset(self) -> None:
-        """direnv must not point uv at a per-checkout cache; the other tool caches stay in tmp/."""
+        """direnv must not point uv or pre-commit at a per-checkout cache.
+
+        The other tool caches stay in tmp/.
+        """
         envrc = (Path(__file__).resolve().parents[2] / ".envrc").read_text(encoding="utf-8")
         exports = {
             line.split("=", 1)[0].split()[-1]: line
@@ -526,5 +529,6 @@ class TestNoUvCacheDefault:
             if line.strip().startswith("export ")
         }
         assert "UV_CACHE_DIR" not in exports
+        assert "PRE_COMMIT_HOME" not in exports
         for name in ("RUFF_CACHE_DIR", "MYPY_CACHE_DIR", "COVERAGE_FILE"):
             assert "/tmp/" in exports[name], name
