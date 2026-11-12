@@ -31,7 +31,7 @@ def load_yaml_with_sops(file_path: Path) -> dict[str, Any]:
         raw = f.read()
 
     if "sops:" in raw and "ENC[AES256_GCM," in raw:
-        result = subprocess.run(  # nosec B603 B607  # trusted sops command
+        result = subprocess.run(  # trusted sops command
             ["sops", "--decrypt", str(file_path)],
             capture_output=True,
             text=True,
@@ -68,7 +68,7 @@ def save_yaml_with_sops(
         yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
 
     if encrypt:
-        subprocess.run(  # nosec B603 B607  # trusted sops command
+        subprocess.run(  # trusted sops command
             ["sops", "--encrypt", "--in-place", str(file_path)],
             capture_output=True,
             text=True,

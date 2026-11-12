@@ -62,7 +62,7 @@ class PulumiRunner(BaseRunner):
 
         try:
             # Check if stack exists
-            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
+            result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "stack", "ls", "--json"],
                 cwd=working_dir,
                 capture_output=True,
@@ -76,14 +76,14 @@ class PulumiRunner(BaseRunner):
                 if not stack_exists:
                     # Create stack if it doesn't exist
                     self.console.print(f"[dim]Creating Pulumi stack: {stack}...[/dim]")
-                    subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
+                    subprocess.run(  # tool_path binary, runner-built list argv, no shell
                         [self.tool_path, "stack", "init", stack],
                         cwd=working_dir,
                         check=True,
                     )
                 else:
                     # Select existing stack
-                    subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
+                    subprocess.run(  # tool_path binary, runner-built list argv, no shell
                         [self.tool_path, "stack", "select", stack],
                         cwd=working_dir,
                         check=True,
@@ -112,7 +112,7 @@ class PulumiRunner(BaseRunner):
             return {"success": False, "error": "Pulumi directory does not exist"}
 
         try:
-            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
+            result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "preview", "--non-interactive"],
                 cwd=pulumi_dir,
                 capture_output=True,
@@ -152,7 +152,7 @@ class PulumiRunner(BaseRunner):
             if auto_approve:
                 cmd.append("--yes")
 
-            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
+            result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 cmd,
                 cwd=pulumi_dir,
                 capture_output=False,
@@ -184,7 +184,7 @@ class PulumiRunner(BaseRunner):
             if auto_approve:
                 cmd.append("--yes")
 
-            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
+            result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 cmd,
                 cwd=pulumi_dir,
                 capture_output=False,
@@ -200,7 +200,7 @@ class PulumiRunner(BaseRunner):
             return None
 
         try:
-            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
+            result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "version"],
                 capture_output=True,
                 text=True,
@@ -240,7 +240,7 @@ class PulumiRunner(BaseRunner):
             return {}
 
         try:
-            result = subprocess.run(  # nosec B603  # tool_path binary, runner-built list argv, no shell
+            result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "stack", "export"],
                 cwd=pulumi_dir,
                 capture_output=True,

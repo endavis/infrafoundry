@@ -115,7 +115,7 @@ def test_drift_returns_field_names_only() -> None:
 
 def test_only_declared_secrets_are_written_and_undeclared_live_ones_never_echoed() -> None:
     box = FakeMonitBox()
-    box.general["password"] = "live-pw-sentinel"  # nosec B105  # fake fixture value
+    box.general["password"] = "live-pw-sentinel"  # fake fixture value
     box.general["httpdPassword"] = "live-httpd-sentinel"
     box.general["mmonitUrl"] = "https://u:live-url-sentinel@mmonit.example.com"
     service = _service(box)

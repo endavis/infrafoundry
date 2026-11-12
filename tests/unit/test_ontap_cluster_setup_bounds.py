@@ -182,7 +182,7 @@ def test_deadline_kills_expect_and_socat(tmp_path: Path) -> None:
     env["PATH"] = f"{bindir}{os.pathsep}{env['PATH']}"
     start = time.monotonic()
     try:
-        proc = subprocess.run(  # nosec B603 B607  # fixed test argv, no shell
+        proc = subprocess.run(  # fixed test argv, no shell
             ["expect", "-f", str(script)],
             capture_output=True,
             text=True,
@@ -190,7 +190,9 @@ def test_deadline_kills_expect_and_socat(tmp_path: Path) -> None:
             timeout=30,
         )
     finally:
-        for log in Path("/tmp").glob(f"ontap-cluster-create-{vmid}-*.log"):  # nosec B108  # test path literal, not a temp file created here
+        for log in Path("/tmp").glob(
+            f"ontap-cluster-create-{vmid}-*.log"
+        ):  # test path literal, not a temp file created here
             log.unlink(missing_ok=True)
 
     assert time.monotonic() - start < 15

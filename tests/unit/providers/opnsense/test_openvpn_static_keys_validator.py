@@ -12,7 +12,7 @@ from infrafoundry.providers.opnsense.validators.openvpn_static_keys_validator im
     OpenVpnStaticKeyValidator,
 )
 
-SECRET_KEY = "secret://env_secrets/vpn/key"  # nosec B105  # fake fixture value
+SECRET_KEY = "secret://env_secrets/vpn/key"  # fake fixture value
 LITERAL = "literal-key-material-not-real"
 
 

@@ -7,7 +7,7 @@ from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
 
-SECRET = "s3cr3t-sentinel-not-real"  # nosec B105  # test fixture
+SECRET = "s3cr3t-sentinel-not-real"  # test fixture
 
 _SECTIONS = {"Alert": "alert", "Service": "service", "Test": "test"}
 #: Row fields the box returns as option dicts, so tests exercise ``flatten_option``.

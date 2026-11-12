@@ -127,6 +127,6 @@ def run_install(
 
 
 def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # nosec B603  # fixed argument list, no shell
+    return subprocess.run(  # fixed argument list, no shell
         args, capture_output=True, text=True, check=False, timeout=900
     )

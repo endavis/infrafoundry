@@ -51,7 +51,7 @@ class VaultwardenProvider(SecretProvider):
             env["BW_SESSION"] = self.session_key
 
         try:
-            result = subprocess.run(  # nosec B603  # fixed bw argv, no shell
+            result = subprocess.run(  # fixed bw argv, no shell
                 [self._bw_path, *args, "--nointeraction"],
                 input=input_data,
                 capture_output=True,
@@ -203,7 +203,7 @@ class VaultwardenProvider(SecretProvider):
             else:
                 item_data["fields"].append({"name": k, "value": str(v), "type": 0})
 
-        encoded_data = subprocess.run(  # nosec B603  # fixed bw argv, no shell
+        encoded_data = subprocess.run(  # fixed bw argv, no shell
             [self._bw_path, "encode"],
             input=json.dumps(item_data),
             text=True,
