@@ -34,30 +34,30 @@ dev = [
     "commitizen>=4.19.3",
     "coverage-badge>=1.1.0",
     "doit>=0.36.0",
-    "hypothesis>=6.170.11",
+    "hypothesis>=6.170.14",
     "mkdocs-material>=9.8.0",
     "mkdocstrings[python]>=1.0.8",
-    "mutmut>=3.8.0",
-    "mypy>=2.4.0",
+    "mutmut>=3.8.1",
+    "mypy>=2.4.1",
     "pre-commit>=4.7.0",
     "pymdown-extensions>=12.3",
     "pyproject-fmt>=2.30.3",
     "pyright>=1.1.414",
-    "pytest>=9.1.1",
-    "pytest-benchmark>=5.3.0",
+    "pytest>=9.2.0",
+    "pytest-benchmark>=5.3.1",
     "pytest-cov>=5.0",
     "pytest-xdist>=3.5",
     "pyyaml>=6.0",
     "radon>=6.0",
-    "ruff>=0.17.2",
+    "ruff>=0.17.3",
     "types-boto3>=1.43.67",
-    "types-PyYAML>=6.0.12.20260906",
+    "types-PyYAML>=6.0.12.20261030",
     "types-requests>=2.33.0.20260712",
     "vulture>=2.11",
 ]
 security = [
     "bandit>=1.7",
-    "cyclonedx-bom>=7.5.0",
+    "cyclonedx-bom>=7.6.0",
     "pip>=26.2.2",
     "pip-audit>=2.10.1",
     "pip-licenses>=4.0",
@@ -85,7 +85,7 @@ env_secrets = "infrafoundry.secrets.backends.env_secrets:register"
 file = "infrafoundry.secrets.backends.file:register"
 
 [build-system]
-requires = ["hatchling>=1.32.4", "hatch-vcs>=0.5.0"]
+requires = ["hatchling>=1.33.0", "hatch-vcs>=0.5.0"]
 build-backend = "hatchling.build"
 
 [tool.uv]
@@ -259,23 +259,25 @@ bump_map = { "feat" = "MINOR", "fix" = "PATCH", "refactor" = "PATCH", "perf" = "
 # BREAKING CHANGE in commit message triggers MAJOR bump
 change_type_order = ["BREAKING CHANGE", "feat", "fix", "refactor", "perf"]
 
+# Anchored `<name>/*`: bandit also substring-matches entries, so a bare `docs` skipped
+# tools/doit/docs.py. Guarded by tests/test_security_triage_skill.py (#1249).
 [tool.bandit]
 exclude_dirs = [
-    "tests",
-    "tmp",
-    ".venv",
-    "docs",
-    "examples",
-    ".git",
-    ".github",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    "site",
-    ".claude",
-    ".codex",
-    ".devcontainer",
-    ".vscode",
+    "tests/*",
+    "tmp/*",
+    ".venv/*",
+    "docs/*",
+    "examples/*",
+    ".git/*",
+    ".github/*",
+    ".pytest_cache/*",
+    ".mypy_cache/*",
+    ".ruff_cache/*",
+    "site/*",
+    ".claude/*",
+    ".codex/*",
+    ".devcontainer/*",
+    ".vscode/*",
 ]
 skips = [
     "B101",

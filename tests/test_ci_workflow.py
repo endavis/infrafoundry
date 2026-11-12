@@ -215,3 +215,43 @@ class TestLintJob:
         assert install.get("id") == "install"
         for step in _lint_check_steps():
             assert "steps.install.outcome == 'success'" in step.get("if", ""), step["name"]
+
+
+class TestCodecovOptIn:
+    """The Codecov upload is opt-in, OIDC-authenticated and uploads one file (#1218)."""
+
+    @staticmethod
+    def _step() -> dict[str, Any]:
+        steps: list[dict[str, Any]] = _load_workflow()["jobs"]["test"]["steps"]
+        return next(s for s in steps if s.get("name") == "Upload coverage to Codecov")
+
+    def test_gated_on_repository_variable(self) -> None:
+        condition = self._step()["if"]
+        assert "vars.CODECOV_ENABLED == 'true'" in condition
+        assert "needs.setup.outputs.newest" in condition
+
+    def test_authenticates_with_oidc_not_a_token(self) -> None:
+        step = self._step()
+        assert step["with"]["use_oidc"] is True
+        assert "CODECOV_TOKEN" not in yaml.safe_dump(step)
+
+    def test_uploads_only_the_produced_report(self) -> None:
+        with_ = self._step()["with"]
+        assert with_["disable_search"] is True
+        assert with_["files"] == "./tmp/coverage.xml"
+
+    def test_job_can_request_an_oidc_token(self) -> None:
+        perms = _load_workflow()["jobs"]["test"]["permissions"]
+        assert perms == {"contents": "read", "id-token": "write"}
+
+    def test_callers_grant_id_token(self) -> None:
+        """A called job cannot hold more than its caller grants."""
+        workflows = Path(__file__).parent.parent / ".github" / "workflows"
+        for name, job in (
+            ("release.yml", "test"),
+            ("testpypi.yml", "test"),
+            ("ci-full-matrix.yml", "dispatch"),
+        ):
+            data = yaml.safe_load((workflows / name).read_text(encoding="utf-8"))
+            granted = [data.get("permissions"), data["jobs"][job].get("permissions")]
+            assert any(p and p.get("id-token") == "write" for p in granted), name

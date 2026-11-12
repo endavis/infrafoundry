@@ -220,7 +220,7 @@ def _repo_has_version_tags() -> bool:
     (``0.1.0``) and drops the ``--prerelease`` flag, producing a
     production PR when a pre-release was requested (issue #448).
     """
-    result = subprocess.run(  # nosec B603 B607
+    result = subprocess.run(
         ["git", "tag", "--list", "v*"],
         capture_output=True,
         text=True,

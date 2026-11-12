@@ -512,7 +512,7 @@ Where `<agent-type>` is one of: `claude`, `copilot`, `codex`, `antigravity`, or 
 - **Releases:** Never run `doit release` without explicit command.
 - **PRs:** Use `doit pr` to create PRs and `doit pr_merge` to merge with proper commit format. Issues are not automatically closed. Outside `merge-pr`, ask the user if they would like the related issue closed — pass `--auto-close` to `doit pr_merge` to close linked issues in one step. The `implement-issue` skill commits with `git commit` (not `doit commit`, which is interactive) and opens the PR itself with `doit pr` — it never applies `ready-to-merge`, merges, or closes the issue; those steps remain the user's.
 - **The Merge Gate action:** is a manual action for the user to add to a PR. It requires the ready-to-merge label and should never be added by automation. Exception: the dependabot auto-merge workflow (`.github/workflows/dependabot-automerge.yml`) applies the `ready-to-merge` label to qualifying dependabot PRs only. AI agents may apply the label only when the human has set `ALLOW_AI_READY_TO_MERGE=1` in the shell that launched the AI CLI (see `docs/development/ai/command-blocking.md`).
-- **Issues:** Use `doit issue --type=<type>` to create issues (types: feature, bug, refactor, docs, chore). Labels are auto-applied. Manually close after PR merge with comment "Addressed in PR #XXX". Issues are not closed automatically when PRs are merged.
+- **Issues:** Use `doit issue --type=<type>` to create issues (types: feat, fix, refactor, docs, chore). Labels are auto-applied. Manually close after PR merge with comment "Addressed in PR #XXX". Issues are not closed automatically when PRs are merged.
 - **ADRs:** When implementing architectural decisions (typically `feat` or `refactor`, rarely `fix`), update related ADRs in `docs/decisions/` to add the issue link. Create new ADRs for significant decisions using `doit adr`. Every ADR must link to the documentation in `docs/` that describes the implementation. Docs and chore issues do not need ADRs. Issues with the `needs-adr` label require an ADR before the PR can be merged.
 
 ## Development Workflow
@@ -556,11 +556,11 @@ Each issue type requires specific sections. Use `--body-file` for complex bodies
 
 ```bash
 # Feature request (requires: Problem, Proposed Solution)
-doit issue --type=feature --title="feat: add caching" \
+doit issue --type=feat --title="feat: add caching" \
   --body="## Problem\nDescribe the problem\n\n## Proposed Solution\nDescribe the solution"
 
 # Bug report (requires: Bug Description, Steps to Reproduce, Expected vs Actual Behavior)
-doit issue --type=bug --title="bug: crash on empty config" \
+doit issue --type=fix --title="fix: crash on empty config" \
   --body="## Bug Description\nWhat happened\n\n## Steps to Reproduce\n1. Step one\n\n## Expected vs Actual Behavior\nExpected X, got Y"
 
 # Refactor (requires: Current Code Issue, Proposed Improvement)

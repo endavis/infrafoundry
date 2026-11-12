@@ -70,7 +70,7 @@ def resolve_ref(ref: str = REF) -> str:
         request.add_header("Authorization", f"token {token}")
 
     try:
-        with urllib.request.urlopen(request, timeout=15) as response:  # nosec B310
+        with urllib.request.urlopen(request, timeout=15) as response:  # nosec B310  # fixed GitHub https URL, no user-supplied scheme
             sha: str = response.read().decode("utf-8").strip()
     except Exception as e:
         print(f"  Warning: could not resolve {ref} to a commit ({e}).")
@@ -127,7 +127,7 @@ TEMPLATE_MODULES = [
 def download_file(url: str, dest: Path) -> None:
     """Download a file from a URL to a local path."""
     try:
-        with urllib.request.urlopen(url) as response:  # nosec B310
+        with urllib.request.urlopen(url) as response:  # nosec B310  # https GitHub URL supplied by this script's callers
             content = response.read().decode("utf-8")
             dest.write_text(content, encoding="utf-8")
     except Exception as e:
@@ -298,7 +298,7 @@ def run_sync(project_root: Path, *, assume_yes: bool = False) -> None:
     # Verify installation
     print("  Verifying installation...")
     try:
-        import subprocess  # nosec B404
+        import subprocess  # nosec B404  # subprocess is required to run git and gh
 
         result = subprocess.run(
             [sys.executable, str(pkg_dir / "manage.py"), "--dry-run", "check"],

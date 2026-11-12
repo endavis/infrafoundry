@@ -119,7 +119,7 @@ EOF
     ("doit check", "ALLOW", "doit check"),
     ("doit test", "ALLOW", "doit test"),
     ("doit pr", "ALLOW", "doit pr"),
-    ("doit issue --type=bug", "ALLOW", "doit issue"),
+    ("doit issue --type=fix", "ALLOW", "doit issue"),
     # === SHOULD BLOCK - Governance labels (no env var) ===
     ("gh pr edit 123 --add-label ready-to-merge", "BLOCK", "add ready-to-merge"),
     ("gh pr edit --add-label ready-to-merge", "BLOCK", "add ready-to-merge no PR"),
