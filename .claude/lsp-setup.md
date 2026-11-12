@@ -7,7 +7,7 @@ This file covers **installation only**. For what the `LSP` tool actually exposes
 ## Prerequisites
 
 - Claude Code 2.0.74 or later (LSP is enabled by default in 2.0.74+; older versions need `ENABLE_LSP_TOOL=1`)
-- Python 3.12+
+- Python 3.13+
 - This project installed with its development tools (`doit install_dev`, or `uv sync --all-extras --dev` on a fresh clone) — pyright comes in via the `dev` extra
 
 ## Install Steps

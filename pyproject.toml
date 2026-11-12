@@ -2,11 +2,10 @@
 name = "infrafoundry"
 description = "Infrastructure automation framework with pluggable providers (Proxmox, OPNsense, Kubernetes)"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dynamic = ["version"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
 ]
@@ -112,7 +111,7 @@ version-file = "src/infrafoundry/_version.py"
 [tool.ruff]
 cache-dir = "tmp/.ruff_cache"
 line-length = 100
-target-version = "py312"
+target-version = "py313"
 extend-exclude = ["**/_version.py"]
 
 [tool.ruff.lint]
@@ -169,7 +168,7 @@ line-ending = "lf"
 
 [tool.mypy]
 cache_dir = "tmp/.mypy_cache"
-python_version = "3.12"
+python_version = "3.13"
 # Strict type checking
 disallow_untyped_defs = true
 warn_return_any = true
@@ -554,7 +553,7 @@ exclude = [
 extraPaths = ["tests"]
 venvPath = "."
 venv = ".venv"
-pythonVersion = "3.12"
+pythonVersion = "3.13"
 typeCheckingMode = "basic"
 useLibraryCodeForTypes = true
 reportMissingImports = true

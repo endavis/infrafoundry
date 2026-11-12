@@ -38,7 +38,7 @@ For test automation and code quality CI, see [CI/CD Testing Guide](ci-cd-testing
    - Generates HTML/XML reports
 
 2. **Python Matrix**
-   - Tests on Python 3.12 (minimum)
+   - Tests on Python 3.13 (minimum)
    - Tests on Python 3.13 (latest)
 
 3. **Integration Tests**

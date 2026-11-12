@@ -38,7 +38,7 @@ This project adheres to the Contributor Covenant [Code of Conduct](CODE_OF_CONDU
 
 ### Prerequisites
 
-- Python 3.12 or higher
+- Python 3.13 or higher
 - [uv](https://github.com/astral-sh/uv) - Fast Python package installer
 - [direnv](https://direnv.net/) - Automatic environment management (recommended)
 
@@ -107,7 +107,7 @@ We welcome many types of contributions:
 
 ### Python Style
 
-- **Python version:** 3.12+ with modern type hints
+- **Python version:** 3.13+ with modern type hints
 - **Line length:** Max 100 characters
 - **Docstrings:** Google-style for all public APIs
 - **Type hints:** Required for all public functions/methods

@@ -49,7 +49,7 @@ body:
       label: Environment
       description: System information (Python version, OS, package version)
       placeholder: |
-        - Python: 3.12
+        - Python: 3.13
         - OS: Ubuntu 22.04
         - Package version: 1.2.3
       render: markdown
