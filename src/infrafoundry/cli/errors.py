@@ -99,7 +99,7 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
         title="Invalid Configuration",
         description="The configuration file contains invalid or malformed data.",
         suggestions=[
-            "Run 'foundry config validate --env <env>' to see validation errors",
+            "Run 'foundry config doctor' to see validation errors",
             "Check YAML syntax (indentation, colons, quotes)",
             "Ensure required fields are present",
         ],
@@ -111,7 +111,7 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
         description="A required configuration file or value is missing.",
         suggestions=[
             "Check that all required configuration files exist",
-            "Run 'foundry config new --env <env>' to create a new environment",
+            "Run 'foundry config create <env>' to create a new environment",
             "Verify the config directory structure matches expected layout",
         ],
     ),
@@ -224,9 +224,24 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
         title="State Inconsistency",
         description="The state database is inconsistent with actual resources.",
         suggestions=[
-            "Run 'foundry infra drift --env <env>' to detect drift",
-            "Consider running 'foundry state reset' (use with caution)",
+            "Run 'foundry infra drift detect --env <env>' to detect drift",
+            "Consider 'foundry state prune --env <env>' after 'foundry state backup' "
+            "(use with caution)",
             "Check for concurrent modifications to infrastructure",
+        ],
+    ),
+    "IF-STATE-005": ErrorInfo(
+        code="IF-STATE-005",
+        title="Package Move Rollback Failed",
+        description=(
+            "A package move between environments failed and the rollback also "
+            "encountered errors, potentially leaving state inconsistent."
+        ),
+        suggestions=[
+            "Check the error message for both the original failure and rollback errors",
+            "Run 'foundry config doctor --deep' to assess environment consistency",
+            "Manually verify package state in both source and destination environments",
+            "Run 'foundry infra deployed --env <env>' to check resource tracking",
         ],
     ),
     # Credential errors (IF-CREDENTIAL-XXX)
@@ -300,7 +315,7 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
         suggestions=[
             "Review the validation errors listed above",
             "Check resource configuration against schema",
-            "Run 'foundry config validate' for detailed validation",
+            "Run 'foundry config doctor --deep' for detailed validation",
         ],
     ),
     "IF-VALIDATION-002": ErrorInfo(
@@ -320,7 +335,7 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
         suggestions=[
             "Check that referenced resources exist",
             "Verify resource names match exactly (case-sensitive)",
-            "Review dependency graph with 'foundry analyze dependencies'",
+            "Review dependency graph with 'foundry infra analyze dependencies'",
         ],
     ),
     "IF-VALIDATION-004": ErrorInfo(
@@ -402,7 +417,7 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
         title="Circular Dependency Detected",
         description="Resources have circular dependencies that cannot be resolved.",
         suggestions=[
-            "Run 'foundry analyze graph --env <env>' to visualize dependencies",
+            "Run 'foundry infra analyze graph --env <env>' to visualize dependencies",
             "Break the circular dependency by restructuring resources",
             "Use explicit dependency ordering if needed",
         ],
@@ -576,6 +591,7 @@ _EXCEPTION_TO_CODE: dict[str, str] = {
     "DeploymentNotFoundError": "IF-STATE-002",
     "ResourceNotFoundError": "IF-STATE-003",
     "StateInconsistencyError": "IF-STATE-004",
+    "PackageMoveRollbackError": "IF-STATE-005",
     # Credential errors
     "MissingCredentialError": "IF-CREDENTIAL-001",
     "InvalidCredentialError": "IF-CREDENTIAL-002",

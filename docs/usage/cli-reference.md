@@ -289,7 +289,7 @@ The set of valid `--provider` and `--component` values is determined at runtime 
 
 ```bash
 # OPNsense direct-API components
-foundry config migrate --env prod --provider opnsense --component vlans
+foundry config migrate --env prod --provider opnsense --component interfaces.vlans
 foundry config migrate --env prod --provider opnsense --component interface_assignments
 foundry config migrate --env prod --provider opnsense --component nat_rules
 foundry config migrate --env prod --provider opnsense --component gateways

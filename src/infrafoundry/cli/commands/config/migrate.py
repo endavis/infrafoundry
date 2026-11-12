@@ -66,7 +66,7 @@ def migrate(
         foundry config migrate --env prod --provider opnsense --component kea_dhcp
 
         # Migrate VLANs (direct-API)
-        foundry config migrate --env prod --provider opnsense --component vlans
+        foundry config migrate --env prod --provider opnsense --component interfaces.vlans
 
         # Migrate ISC DHCP to Kea DHCP format
         foundry config migrate --env prod --provider opnsense --component isc_to_kea

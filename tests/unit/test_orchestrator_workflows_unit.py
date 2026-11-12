@@ -106,28 +106,47 @@ def test_plan_orchestrator_dry_run_skips_generation(console: Console) -> None:
 
 
 def test_plan_orchestrator_runs_runners_in_priority_order(console: Console) -> None:
-    """Runners are sorted by provided priorities when generating plans."""
+    """IaC runners are sorted by provided priorities; non-IaC runners are skipped (#1367)."""
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 2
     event_manager = MagicMock()
 
+    calls: list[str] = []
+
+    def _record(name: str) -> Any:
+        def _plan(*args: Any, **kwargs: Any) -> Any:
+            calls.append(name)
+            return MagicMock()
+
+        return _plan
+
     tf_runner = MagicMock()
     tf_runner.priority = 0
-    tf_runner.plan = MagicMock()  # Satisfy Plannable
+    tf_runner.is_iac_runner = True
+    tf_runner.plan = MagicMock(side_effect=_record("terraform"))
 
+    direct_runner = MagicMock()
+    direct_runner.priority = 50
+    direct_runner.is_iac_runner = True
+    direct_runner.plan = MagicMock(side_effect=_record("opnsense"))
+
+    # Ansible-like runner: not an IaC runner, so plan/apply never run it.
     ansible_runner = MagicMock()
-    ansible_runner.priority = 50
-    ansible_runner.plan = MagicMock()  # Satisfy Plannable
+    ansible_runner.priority = 100
+    ansible_runner.is_iac_runner = False
+    ansible_runner.plan = MagicMock()
 
     runner_registry = MagicMock()
-    runner_registry.list_runners.return_value = ["terraform", "ansible"]
+    runner_registry.list_runners.return_value = ["terraform", "opnsense", "ansible"]
     runner_registry.create_runner.side_effect = lambda name, console=None: {
         "terraform": tf_runner,
+        "opnsense": direct_runner,
         "ansible": ansible_runner,
     }[name]
 
     provider = MagicMock()
     provider.generate_terraform = MagicMock()
+    provider.generate_opnsense = MagicMock()
     provider.generate_ansible = MagicMock()
     providers: dict[str, ProviderBase] = {"proxmox": provider}
 
@@ -157,10 +176,12 @@ def test_plan_orchestrator_runs_runners_in_priority_order(console: Console) -> N
     orchestrator.plan(env_name="dev", dry_run=False, resource_filter=None, enforce_policies=False)
 
     provider.generate_terraform.assert_called_once()
-    provider.generate_ansible.assert_called_once()
-    # Ensure terraform plan happens before ansible
-    assert tf_runner.plan.called
-    assert ansible_runner.plan.called
+    provider.generate_opnsense.assert_called_once()
+    # Ansible is not an IaC runner: it neither generates nor plans.
+    provider.generate_ansible.assert_not_called()
+    ansible_runner.plan.assert_not_called()
+    # IaC runners plan in priority order.
+    assert calls == ["terraform", "opnsense"]
     assert tf_runner.plan.call_args_list[0][0][0] == provider
 
 
