@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import click
 import pytest
 
 from infrafoundry.cli.errors import (
@@ -484,3 +485,66 @@ def test_duplicate_resource_name_error_maps_to_invalid_configuration() -> None:
     from infrafoundry.core.exceptions import DuplicateResourceNameError
 
     assert get_error_code(DuplicateResourceNameError("x")) == "IF-CONFIG-002"
+
+
+def test_package_move_rollback_error_maps_to_state_005() -> None:
+    """PackageMoveRollbackError reports as IF-STATE-005 (#1367)."""
+    from infrafoundry.core.exceptions import PackageMoveRollbackError
+
+    exc = PackageMoveRollbackError(
+        "x", original_error=RuntimeError("a"), rollback_errors=[RuntimeError("b")]
+    )
+    assert get_error_code(exc) == "IF-STATE-005"
+    assert get_error_info("IF-STATE-005") is not None
+
+
+def _documented_codes() -> set[str]:
+    """Return every ``IF-*`` heading code in docs/reference/errors.md."""
+    import re
+    from pathlib import Path
+
+    doc = Path(__file__).resolve().parents[2] / "docs" / "reference" / "errors.md"
+    return set(re.findall(r"^### (IF-[A-Z]+-\d{3}):", doc.read_text(), flags=re.MULTILINE))
+
+
+def test_error_catalog_matches_reference_docs() -> None:
+    """Every documented code is in ERROR_CATALOG and vice versa (#1367)."""
+    documented = _documented_codes()
+    catalog = set(ERROR_CATALOG)
+    assert documented, "no codes parsed from docs/reference/errors.md"
+    assert documented - catalog == set(), "documented but missing from ERROR_CATALOG"
+    assert catalog - documented == set(), "in ERROR_CATALOG but undocumented"
+
+
+def _resolves(root: click.Command, words: list[str]) -> bool:
+    """Return True if the leading words walk down registered click commands."""
+    cmd: click.Command = root
+    for word in words:
+        if not isinstance(cmd, click.Group):
+            return True  # remaining words are arguments
+        sub = cmd.commands.get(word)
+        if sub is None:
+            return False
+        cmd = sub
+    return True
+
+
+def test_error_catalog_suggested_commands_exist() -> None:
+    """Every 'foundry ...' command in a suggestion resolves to a click command (#1367)."""
+    import re
+
+    from infrafoundry.cli.main import foundry
+
+    pattern = re.compile(r"'foundry ([^']*)'")
+    checked = 0
+    for code, info in ERROR_CATALOG.items():
+        for suggestion in info.suggestions:
+            for match in pattern.findall(suggestion):
+                words: list[str] = []
+                for word in match.split():
+                    if word.startswith(("-", "<")):
+                        break
+                    words.append(word)
+                assert _resolves(foundry, words), f"{code}: unknown command 'foundry {match}'"
+                checked += 1
+    assert checked > 0
