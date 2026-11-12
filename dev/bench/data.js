@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794503096630,
+  "lastUpdate": 1794507859200,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1562,6 +1562,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000057275224894141106",
             "extra": "mean: 91.73331777912084 usec\nrounds: 11851"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "46b6b607fa7379f35e512283fb2f713059d40529",
+          "message": "fix: render kubernetes secret data as base64 binary_data (merges PR #1387, addresses #1369)\n\nA secrets resource's config.data went straight into the provider's\nkubernetes_secret.data argument, which takes plain values and encodes\nthem itself, so base64 input (the Kubernetes manifest convention) was\nstored still encoded.\n\n- config.data now takes base64 and renders to binary_data;\n  config.string_data stays plain and renders to data. string_data still\n  wins on a duplicate key, and a key is never set on both arguments.\n- The Kubernetes validator rejects a config.data value that is not\n  strict base64, naming the secret and key.\n- docs/providers/kubernetes.md states the encoding of each field and\n  notes the effect on existing secrets: plain text in data now fails\n  validation (move it to string_data), and base64 text in data changes\n  its stored value to the decoded content on the next apply.\n\nAddresses #1369\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-12T18:23:10Z",
+          "tree_id": "45ddb34a4a6507f0e31db84617af646e33f3b8b8",
+          "url": "https://github.com/endavis/infrafoundry/commit/46b6b607fa7379f35e512283fb2f713059d40529"
+        },
+        "date": 1794507858781,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 59.530249165522356,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00015212253833017214",
+            "extra": "mean: 16.79818267213237 msec\nrounds: 61"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10796.995587719923,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006982763349954825",
+            "extra": "mean: 92.61835775290679 usec\nrounds: 12176"
           }
         ]
       }
