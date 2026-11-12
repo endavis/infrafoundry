@@ -7,7 +7,7 @@ name: Python Versions
 description: Read oldest and newest supported Python versions from .github/python-versions.json
 outputs:
   oldest:
-    description: Oldest supported Python version (e.g., "3.12")
+    description: Oldest supported Python version (e.g., "3.13")
     value: ${{ steps.read.outputs.oldest }}
   newest:
     description: Newest supported Python version (e.g., "3.14")

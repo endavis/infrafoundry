@@ -44,7 +44,7 @@ Only the **last 3 major Python versions** are actively supported. This means:
 - CI runs these versions on every PR (using bookend strategy - oldest + newest)
 - Documentation and examples target these versions
 
-**Current active versions:** Python 3.12, 3.13, 3.14
+**Current active versions:** Python 3.13, 3.14
 
 ### Passive Compatibility
 
@@ -81,7 +81,7 @@ Python versions are configured in `.github/python-versions.json`:
 
 ```json
 {
-  "oldest": "3.12",
+  "oldest": "3.13",
   "newest": "3.14"
 }
 ```
@@ -555,7 +555,7 @@ Using `tox`:
 ```ini
 # tox.ini
 [tox]
-envlist = py312,py313,py314
+envlist = py313,py314
 
 [testenv]
 deps =

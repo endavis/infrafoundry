@@ -27,7 +27,7 @@ from tools.doit.templates import (
 
 
 @pytest.fixture(autouse=True)
-def clear_cache() -> Generator[None, None, None]:
+def clear_cache() -> Generator[None]:
     """Clear template cache before each test."""
     clear_template_cache()
     yield

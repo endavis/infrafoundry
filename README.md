@@ -2,14 +2,14 @@
 
 [![CI](https://github.com/endavis/infrafoundry/actions/workflows/ci.yml/badge.svg)](https://github.com/endavis/infrafoundry/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/endavis/infrafoundry/branch/main/graph/badge.svg)](https://codecov.io/gh/endavis/infrafoundry)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 
 A pluggable infrastructure code generator and orchestration framework that turns YAML into Terraform/Ansible, with optional execution, state tracking, policies, and notifications.
 
 ## Audience and Prerequisites
 
 - **Audience:** Platform/infrastructure engineers and contributors building or operating InfraFoundry.
-- **Prereqs:** Python 3.12+, `uv`, Terraform ≥1.6 or OpenTofu ≥1.6, Ansible ≥2.15, SOPS + age, direnv (optional), and access to a config repo (`INFRAFOUNDRY_CONFIG_REPO` or `--config-dir`).
+- **Prereqs:** Python 3.13+, `uv`, Terraform ≥1.6 or OpenTofu ≥1.6, Ansible ≥2.15, SOPS + age, direnv (optional), and access to a config repo (`INFRAFOUNDRY_CONFIG_REPO` or `--config-dir`).
 
 ## When to Use This
 
@@ -57,7 +57,7 @@ For a comprehensive overview of all documentation, including getting started gui
 
 ### Prerequisites
 
-- Python 3.12+
+- Python 3.13+
 - [uv](https://github.com/astral-sh/uv) — Fast Python package installer
 - [direnv](https://direnv.net/) — Automatic environment variable loading (optional but recommended)
 

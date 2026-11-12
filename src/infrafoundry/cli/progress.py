@@ -117,7 +117,7 @@ def progress_spinner(
     status: str = "Working...",
     success_message: str | None = None,
     console: Console | None = None,
-) -> Generator[ProgressTracker, None, None]:
+) -> Generator[ProgressTracker]:
     """Context manager for progress spinner with elapsed time.
 
     Args:
@@ -147,7 +147,7 @@ def progress_spinner(
 def operation_status(
     operation: str,
     console: Console | None = None,
-) -> Generator[ProgressTracker, None, None]:
+) -> Generator[ProgressTracker]:
     """Context manager for tracking a named operation.
 
     Automatically formats start/end messages.

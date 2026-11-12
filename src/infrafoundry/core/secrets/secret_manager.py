@@ -269,7 +269,7 @@ class SecretManager(PathBasedManager):
     @contextmanager
     def temporary_export(
         self, filename: str, output_file: Path, fmt: str = "terraform"
-    ) -> Generator[Path, None, None]:
+    ) -> Generator[Path]:
         """Export secrets to a temporary file and clean up after use.
 
         Args:

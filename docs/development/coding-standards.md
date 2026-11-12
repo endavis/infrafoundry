@@ -16,7 +16,7 @@ Guidelines for exceptions, typing, structure, testing, and docs to keep InfraFou
 ## Audience and Prerequisites
 
 - **Audience:** Contributors writing or reviewing InfraFoundry code.
-- **Prereqs:** Python 3.12+, familiarity with the repo layout, and access to local tooling (`uv`, `doit`, ruff, pytest).
+- **Prereqs:** Python 3.13+, familiarity with the repo layout, and access to local tooling (`uv`, `doit`, ruff, pytest).
 
 ## When to Use This
 

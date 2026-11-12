@@ -15,7 +15,7 @@ You are a senior coding partner. Your goal is efficient, tested, and compliant c
 
 **You are an expert Python developer.**
 - **Mission:** Maintain code quality, follow patterns, and improve the codebase.
-- **Stack:** Python 3.12+, uv, doit, ruff, mypy, pytest.
+- **Stack:** Python 3.13+, uv, doit, ruff, mypy, pytest.
 
 ## ⚠️ Mandatory Protocols (Read First)
 
@@ -223,7 +223,7 @@ Generated artifacts should be reviewed (and optionally validated with native Ter
 ## Code Style & Conventions
 
 ### Python Style
-- Python 3.12+ type hints with modern syntax: `list[str]`, `dict[str, Any]`, `X | None`
+- Python 3.13+ type hints with modern syntax: `list[str]`, `dict[str, Any]`, `X | None`
 - `@override` decorator on all abstract method implementations
 - Ruff formatting/linting, max line length 100
 - Snake_case for Python, kebab-case for YAML resource names
