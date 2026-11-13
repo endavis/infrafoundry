@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794509242799,
+  "lastUpdate": 1794562437397,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1638,6 +1638,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000028048074484856516",
             "extra": "mean: 59.970569002553574 usec\nrounds: 16782"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0c43963e6de193f1fac5b8753e4b4f8ff32bed55",
+          "message": "chore(deps): bump cyclonedx-bom from 7.6.0 to 8.0.1 (merges PR #1385)\n\nBumps [cyclonedx-bom](https://github.com/CycloneDX/cyclonedx-python) from 7.6.0 to 8.0.1.\n- [Release notes](https://github.com/CycloneDX/cyclonedx-python/releases)\n- [Changelog](https://github.com/CycloneDX/cyclonedx-python/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/CycloneDX/cyclonedx-python/compare/v7.6.0...v8.0.1)\n\n---\nupdated-dependencies:\n- dependency-name: cyclonedx-bom\n  dependency-version: 8.0.1\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-11-13T09:33:06Z",
+          "tree_id": "4baa55a08ff7226d93c920b37ed9a629e42ea9bd",
+          "url": "https://github.com/endavis/infrafoundry/commit/0c43963e6de193f1fac5b8753e4b4f8ff32bed55"
+        },
+        "date": 1794562436805,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 75.05195031874273,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005614338205800325",
+            "extra": "mean: 13.324104113924271 msec\nrounds: 79"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13623.206143465271,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004425996757064141",
+            "extra": "mean: 73.40415974544115 usec\nrounds: 15556"
           }
         ]
       }
