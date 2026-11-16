@@ -50,7 +50,7 @@ class HelmValidator(SpecializedValidator[KubernetesHelmContext]):
                     level=ValidationLevel.ERROR,
                 )
 
-            if not has_repository:
+            if not has_repository and self._needs_repository(str(config.get("chart") or "")):
                 self.report.add_check(
                     check_name=f"kubernetes_helm_{name}_repository",
                     passed=False,
@@ -67,3 +67,24 @@ class HelmValidator(SpecializedValidator[KubernetesHelmContext]):
                         f"'{config['chart']}' from '{config['repository']}'"
                     ),
                 )
+            elif has_chart and not self._needs_repository(str(config["chart"])):
+                self.report.add_check(
+                    check_name=f"kubernetes_helm_{name}",
+                    passed=True,
+                    message=f"Helm release '{name}' has valid chart '{config['chart']}'",
+                )
+
+    @staticmethod
+    def _needs_repository(chart: str) -> bool:
+        """Whether a chart reference needs a ``repository``.
+
+        Only a bare chart name does. OCI references (``oci://...``) and chart paths
+        (anything containing ``/``) are self-contained.
+
+        Args:
+            chart: The release's ``chart`` value.
+
+        Returns:
+            True when ``chart`` is a bare name.
+        """
+        return "/" not in chart

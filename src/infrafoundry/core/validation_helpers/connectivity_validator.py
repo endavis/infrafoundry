@@ -49,9 +49,10 @@ class ConnectivityValidator:
         method: str = "GET",
         auth: tuple[str, str] | None = None,
         headers: dict[str, str] | None = None,
-        verify_ssl: bool = True,
+        verify_ssl: bool | str = True,
         timeout: int = 10,
         success_message: str | None = None,
+        cert: tuple[str, str] | None = None,
     ) -> bool:
         """Test API connectivity with standardized error handling.
 
@@ -60,9 +61,10 @@ class ConnectivityValidator:
             method: HTTP method (GET, POST, etc.)
             auth: Optional (username, password) tuple for basic auth
             headers: Optional HTTP headers
-            verify_ssl: Whether to verify SSL certificates
+            verify_ssl: Whether to verify SSL certificates, or a CA bundle path
             timeout: Request timeout in seconds
             success_message: Custom success message
+            cert: Optional (certificate, key) file paths for client-certificate auth
 
         Returns:
             True if API is reachable and returns 200, False otherwise
@@ -82,6 +84,7 @@ class ConnectivityValidator:
                 headers=headers,
                 verify=verify_ssl,
                 timeout=timeout,
+                cert=cert,
             )
 
             return self._handle_response(response, url, success_message)

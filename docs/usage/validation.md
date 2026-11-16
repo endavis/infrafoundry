@@ -105,7 +105,9 @@ Checks that need the network stay in `infra doctor`. Rollback and destroy do not
 | `host` | Host schema, `terraform_secrets` references | SSH reachability (a host created earlier in the same apply cannot be reached at plan time) |
 | `aws`, `esxi`, `tailscale` | All reference checks (none use the network) | Connectivity |
 
-Kubernetes resources are not validated yet, on plan or doctor (#1435).
+| `kubernetes` | Local cross-references (configmaps, secrets, namespaces, service accounts, service selectors), secret `data` base64, Helm `chart` and `repository` | Kubeconfig and API connectivity; namespaces and CRD groups in the cluster |
+
+A kubeconfig that does not exist yet (a cluster created in the same apply) gives a warning and skips the cluster checks.
 
 See [ADR-0023](../decisions/0023-infra-plan-runs-providers-offline-validation-live-checks-stay-in-infra-doctor.md) and [Implementing providers: validate_offline()](../development/implementing-providers.md#validate_offline).
 

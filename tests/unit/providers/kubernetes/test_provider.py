@@ -885,3 +885,63 @@ class TestGenerateTerraformDependsOn:
         assert "depends_on" in content
         assert "kubernetes_namespace.my_ns" in content
         assert "helm_release.my_operator" in content
+
+
+@pytest.fixture(autouse=True)
+def _isolate_kubeconfig(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Never read a real kubeconfig or reach a cluster."""
+    monkeypatch.delenv("KUBECONFIG", raising=False)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+
+
+def test_provider_validation_protocols(provider: KubernetesProvider) -> None:
+    """The provider opts into plan-time and filtered-reference validation."""
+    from infrafoundry.core.protocols import ValidatesOffline, ValidatesReferencesInContext
+
+    assert isinstance(provider, ValidatesOffline)
+    assert isinstance(provider, ValidatesReferencesInContext)
+
+
+def test_provider_validate_offline_delegates(provider: KubernetesProvider) -> None:
+    """validate_offline passes reference_resources through to the validator."""
+    from unittest.mock import patch
+
+    from infrafoundry.core.validation import ValidationReport
+    from tests.helpers.env import make_env_config
+
+    res = [ResourceConfig(provider="kubernetes", type="namespaces", name="a", config={})]
+    ref = [*res]
+    env = make_env_config()
+    report = ValidationReport()
+    with patch("infrafoundry.providers.kubernetes.KubernetesValidator") as cls:
+        provider.validate_offline(res, ref, env, report)
+        cls.assert_called_once_with(env, report)
+        cls.return_value.validate_offline.assert_called_once_with(res, ref)
+
+
+def test_provider_validate_references_in_context_delegates(provider: KubernetesProvider) -> None:
+    """validate_references_in_context passes reference_resources through."""
+    from unittest.mock import patch
+
+    from infrafoundry.core.validation import ValidationReport
+    from tests.helpers.env import make_env_config
+
+    res = [ResourceConfig(provider="kubernetes", type="namespaces", name="a", config={})]
+    ref = [*res]
+    with patch("infrafoundry.providers.kubernetes.KubernetesValidator") as cls:
+        provider.validate_references_in_context(res, ref, make_env_config(), ValidationReport())
+        cls.return_value.validate_references.assert_called_once_with(res, ref)
+
+
+def test_provider_validate_connectivity_delegates(provider: KubernetesProvider) -> None:
+    """validate_connectivity and validate_references delegate to the validator."""
+    from unittest.mock import patch
+
+    from infrafoundry.core.validation import ValidationReport
+    from tests.helpers.env import make_env_config
+
+    with patch("infrafoundry.providers.kubernetes.KubernetesValidator") as cls:
+        provider.validate_connectivity(make_env_config(), ValidationReport())
+        cls.return_value.validate_connectivity.assert_called_once_with()
+        provider.validate_references([], make_env_config(), ValidationReport())
+        cls.return_value.validate_references.assert_called_once_with([])

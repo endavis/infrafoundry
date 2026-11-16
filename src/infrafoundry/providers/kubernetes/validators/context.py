@@ -46,6 +46,10 @@ class KubernetesApiContext(ValidationContext):
         referenced_namespaces: Namespaces referenced by resources.
         config_namespaces: Namespaces defined in the configuration.
         manifests: Manifest resources to check for CRD requirements.
+        helm_releases_in_config: Whether the configuration defines Helm releases, which may
+            install CRDs before the manifests that use them are applied.
+        client_cert: ``(certificate, key)`` file paths for client-certificate auth.
+        ca_bundle: CA bundle file path used to verify the server certificate.
     """
 
     server_url: str
@@ -54,3 +58,13 @@ class KubernetesApiContext(ValidationContext):
     referenced_namespaces: set[str] = field(default_factory=set)
     config_namespaces: set[str] = field(default_factory=set)
     manifests: list[ResourceConfig] = field(default_factory=list)
+    helm_releases_in_config: bool = False
+    client_cert: tuple[str, str] | None = None
+    ca_bundle: str | None = None
+
+    @property
+    def verify(self) -> bool | str:
+        """Value for ``requests``' ``verify``: the CA bundle path when set, else the flag."""
+        if self.verify_ssl and self.ca_bundle:
+            return self.ca_bundle
+        return self.verify_ssl

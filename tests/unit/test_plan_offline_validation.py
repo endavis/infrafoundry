@@ -26,6 +26,8 @@ from infrafoundry.providers.aws import AWSProvider
 from infrafoundry.providers.esxi import EsxiProvider
 from infrafoundry.providers.host import HostProvider
 from infrafoundry.providers.host.validator import HostValidator
+from infrafoundry.providers.kubernetes import KubernetesProvider
+from infrafoundry.providers.kubernetes.validators import KubeconfigValidator
 from infrafoundry.providers.oci import OCIProvider
 from infrafoundry.providers.oci.validator import OCIValidator
 from infrafoundry.providers.opnsense import OPNsenseProvider
@@ -282,6 +284,7 @@ def test_clean_provider_prints_nothing() -> None:
         AWSProvider,
         EsxiProvider,
         TailscaleProvider,
+        KubernetesProvider,
     ],
 )
 def test_provider_implements_validates_offline(provider_cls: Any, tmp_path: Path) -> None:
@@ -407,3 +410,20 @@ def test_oci_offline_builds_no_client_and_flags_bad_secret_reference() -> None:
         OCIValidator(env, report).validate_offline([instance])
     create.assert_not_called()
     assert any("nope.missing" in r.message for r in report.results if not r.passed)
+
+
+def test_kubernetes_plan_pass_errors_on_missing_configmap_without_touching_cluster(
+    tmp_path: Path,
+) -> None:
+    provider = KubernetesProvider(tmp_path, tmp_path)
+    deployment = _res("web", "kubernetes", "deployments", env_from=[{"configmap": "missing"}])
+    h = _Harness({"kubernetes": provider}, {"kubernetes": [deployment]})
+
+    with (
+        patch.object(KubeconfigValidator, "validate") as probe,
+        pytest.raises(ConfigValidationError),
+    ):
+        h.plan()
+
+    probe.assert_not_called()
+    assert "missing" in h.text

@@ -37,14 +37,14 @@ class NamespaceValidator(SpecializedValidator[KubernetesApiContext]):
         """
         server_url = context.server_url
         headers = context.headers
-        verify_ssl = context.verify_ssl
+        verify_ssl = context.verify
         referenced_namespaces = context.referenced_namespaces
         config_namespaces = context.config_namespaces
         if not referenced_namespaces:
             return
 
         # Fetch existing namespaces from API
-        existing = self._fetch_namespaces(server_url, headers, verify_ssl)
+        existing = self._fetch_namespaces(server_url, headers, verify_ssl, context.client_cert)
         if existing is None:
             return  # API error already reported
 
@@ -78,7 +78,8 @@ class NamespaceValidator(SpecializedValidator[KubernetesApiContext]):
         self,
         server_url: str,
         headers: dict[str, str],
-        verify_ssl: bool,
+        verify_ssl: bool | str,
+        client_cert: tuple[str, str] | None = None,
     ) -> set[str] | None:
         """Fetch the list of existing namespaces from the cluster.
 
@@ -93,6 +94,7 @@ class NamespaceValidator(SpecializedValidator[KubernetesApiContext]):
             check_name="kubernetes_namespaces_list",
             error_message="Failed to list namespaces (status {status})",
             error_level=ValidationLevel.WARNING,
+            cert=client_cert,
         )
         if data is None:
             return None

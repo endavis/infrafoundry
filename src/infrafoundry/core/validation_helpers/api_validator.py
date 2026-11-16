@@ -91,7 +91,7 @@ class BaseAPIValidator:
         method: str = "GET",
         auth: tuple[str, str] | None = None,
         headers: dict[str, str] | None = None,
-        verify_ssl: bool = True,
+        verify_ssl: bool | str = True,
         timeout: int = 10,
         success_message: str | None = None,
         error_message: str | None = None,
@@ -108,7 +108,7 @@ class BaseAPIValidator:
             method: HTTP method to use.
             auth: Optional HTTP basic auth tuple.
             headers: Optional HTTP headers.
-            verify_ssl: Whether to verify SSL certificates.
+            verify_ssl: Whether to verify SSL certificates, or a CA bundle path.
             timeout: Request timeout in seconds.
             success_message: Optional message to emit when the request succeeds.
             error_message: Custom error message. Supports `{status}` and `{error}` placeholders.
@@ -169,7 +169,7 @@ class BaseAPIValidator:
         method: str = "GET",
         auth: tuple[str, str] | None = None,
         headers: dict[str, str] | None = None,
-        verify_ssl: bool = True,
+        verify_ssl: bool | str = True,
         timeout: int = 10,
         success_message: str | None = None,
         error_message: str | None = None,

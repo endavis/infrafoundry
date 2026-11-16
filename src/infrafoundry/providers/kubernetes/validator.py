@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import base64
 import binascii
-from typing import cast
+import os
+from typing import Any, cast
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
@@ -22,6 +23,9 @@ from infrafoundry.providers.kubernetes.validators.context import (
     KubeconfigContext,
     KubernetesApiContext,
     KubernetesHelmContext,
+)
+from infrafoundry.providers.kubernetes.validators.kubeconfig_validator import (
+    KubeConnectionInfo,
 )
 
 
@@ -53,45 +57,55 @@ class KubernetesValidator:
         self.crd_validator = CRDValidator(self.api_validator, report)
         self.helm_validator = HelmValidator(report)
 
+    def _kubeconfig_context(self) -> KubeconfigContext:
+        """Build the kubeconfig context in the order Terraform uses.
+
+        Order: first non-empty ``KUBECONFIG`` entry, then ``kubeconfig_path``, then the
+        default ``~/.kube/config`` (signalled by ``None``).
+
+        Returns:
+            The context to validate.
+        """
+        env_value = os.environ.get("KUBECONFIG", "")
+        env_path = next((p for p in env_value.split(os.pathsep) if p), None)
+        kubeconfig_path = env_path or self.provider_settings.get("kubeconfig_path")
+        return KubeconfigContext(
+            kubeconfig_path=kubeconfig_path,
+            context_override=self.provider_settings.get("context"),
+        )
+
     def validate_connectivity(self) -> None:
         """Validate Kubernetes connectivity prerequisites.
 
         Delegates to KubeconfigValidator which parses the kubeconfig,
-        extracts credentials, and tests API connectivity.
+        extracts credentials, and tests API connectivity. Temporary credential
+        files are removed before returning.
         """
-        kubeconfig_path = self.provider_settings.get("kubeconfig_path")
-        context_override = self.provider_settings.get("context")
-        self.kubeconfig_validator.validate(
-            KubeconfigContext(kubeconfig_path=kubeconfig_path, context_override=context_override)
-        )
+        try:
+            self.kubeconfig_validator.validate(self._kubeconfig_context())
+        finally:
+            self.kubeconfig_validator.cleanup()
 
-    def validate_references(self, resources: list[ResourceConfig]) -> None:
-        """Validate Kubernetes resource references.
+    def validate_offline(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
+        """Run the checks that need no kubeconfig, network or subprocess.
 
-        Always runs:
-        - Local cross-reference checks (configmaps, secrets, service accounts, selectors)
-        - Helm release validation
-
-        When connected:
-        - Namespace existence checks via API
-        - CRD existence checks via API
+        Covers local cross-references, secret ``data`` encoding, Helm releases and the
+        ``kubernetes_references`` summary.
 
         Args:
-            resources: List of resources to validate
+            resources: Resources to validate.
+            reference_resources: Resources names are resolved against; defaults to
+                ``resources``.
         """
-        # Local cross-reference checks always run
-        self._validate_local_references(resources)
+        self._validate_local_references(resources, reference_resources)
 
-        # Helm validation always runs (no API needed)
         helm_releases = [r for r in resources if r.type == "helm_releases"]
         self.helm_validator.validate(KubernetesHelmContext(helm_releases=helm_releases))
 
-        # API-based checks only when connected
-        if self.kubeconfig_validator.is_connected:
-            conn = self.kubeconfig_validator.connection_info
-            self._validate_api_references(resources, conn)
-
-        # Report success if we have resources
         if resources:
             self.report.add_check(
                 check_name="kubernetes_references",
@@ -99,25 +113,79 @@ class KubernetesValidator:
                 message=f"Validated references for {len(resources)} Kubernetes resources",
             )
 
+    def validate_references(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
+        """Validate Kubernetes resource references.
+
+        Always runs the offline checks. When a kubeconfig connects, also checks
+        namespaces and CRD groups against the cluster.
+
+        Args:
+            resources: List of resources to validate
+            reference_resources: Resources names are resolved against; defaults to
+                ``resources``.
+        """
+        self.validate_offline(resources, reference_resources)
+
+        probe: KubeconfigValidator | None = None
+        try:
+            conn, probe = self._ensure_connection()
+            if conn is not None:
+                self._validate_api_references(resources, conn, reference_resources)
+        finally:
+            if probe is not None:
+                probe.cleanup()
+
+    def _ensure_connection(self) -> tuple[KubeConnectionInfo | None, KubeconfigValidator | None]:
+        """Return connection info, probing the cluster when none is established yet.
+
+        The probe uses a scratch report: ``validate_connectivity`` already reported
+        these results into the real one.
+
+        Returns:
+            The connection info (None when not connected) and the probe validator to
+            clean up (None when an existing connection was reused).
+        """
+        if self.kubeconfig_validator.is_connected:
+            return self.kubeconfig_validator.connection_info, None
+        scratch = ValidationReport()
+        probe = KubeconfigValidator(
+            BaseAPIValidator("kubernetes", self.env_config, scratch), scratch
+        )
+        probe.validate(self._kubeconfig_context())
+        if probe.is_connected:
+            return probe.connection_info, probe
+        return None, probe
+
     def _validate_api_references(
         self,
         resources: list[ResourceConfig],
         conn: object,
+        reference_resources: list[ResourceConfig] | None = None,
     ) -> None:
         """Run API-based validation checks.
 
         Args:
             resources: All resources to validate
             conn: KubeConnectionInfo with server_url, headers, verify_ssl
+            reference_resources: Resources whose namespaces count as defined in config
         """
-        from infrafoundry.providers.kubernetes.validators.kubeconfig_validator import (
-            KubeConnectionInfo,
-        )
-
         info = cast(KubeConnectionInfo, conn)
+        known = reference_resources if reference_resources is not None else resources
 
-        # Collect namespace references and config-defined namespaces
-        config_namespaces = {kubernetes_object_name(r) for r in resources if r.type == "namespaces"}
+        # Namespaces created by the configuration, directly or by a Helm release
+        config_namespaces = {kubernetes_object_name(r) for r in known if r.type == "namespaces"}
+        helm_in_config = False
+        for r in known:
+            if r.type != "helm_releases":
+                continue
+            helm_in_config = True
+            config = r.config or {}
+            if config.get("create_namespace") and config.get("namespace"):
+                config_namespaces.add(str(config["namespace"]))
         referenced_namespaces: set[str] = set()
         for resource in resources:
             if resource.type == "namespaces":
@@ -137,6 +205,9 @@ class KubernetesValidator:
                 referenced_namespaces=referenced_namespaces,
                 config_namespaces=config_namespaces,
                 manifests=manifests,
+                helm_releases_in_config=helm_in_config,
+                client_cert=info.client_cert,
+                ca_bundle=info.ca_bundle,
             ),
         )
 
@@ -168,7 +239,11 @@ class KubernetesValidator:
                         level=ValidationLevel.ERROR,
                     )
 
-    def _validate_local_references(self, resources: list[ResourceConfig]) -> None:
+    def _validate_local_references(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
         """Validate cross-resource references locally (no API calls).
 
         Checks:
@@ -178,15 +253,16 @@ class KubernetesValidator:
 
         Args:
             resources: List of resources to validate
+            reference_resources: Resources names are resolved against; defaults to
+                ``resources``
         """
         # Collect resources by type
-        namespaces = {kubernetes_object_name(r) for r in resources if r.type == "namespaces"}
-        configmaps = {kubernetes_object_name(r) for r in resources if r.type == "configmaps"}
-        secrets = {kubernetes_object_name(r) for r in resources if r.type == "secrets"}
-        deployments = {kubernetes_object_name(r) for r in resources if r.type == "deployments"}
-        serviceaccounts = {
-            kubernetes_object_name(r) for r in resources if r.type == "serviceaccounts"
-        }
+        known = reference_resources if reference_resources is not None else resources
+        namespaces = {kubernetes_object_name(r) for r in known if r.type == "namespaces"}
+        configmaps = {kubernetes_object_name(r) for r in known if r.type == "configmaps"}
+        secrets = {kubernetes_object_name(r) for r in known if r.type == "secrets"}
+        deployments = {kubernetes_object_name(r) for r in known if r.type == "deployments"}
+        serviceaccounts = {kubernetes_object_name(r) for r in known if r.type == "serviceaccounts"}
 
         # Validate namespace references
         for resource in resources:
@@ -214,8 +290,10 @@ class KubernetesValidator:
 
             config = resource.config or {}
 
-            env_from = config.get("env_from", [])
+            env_from = config.get("env_from") or []
             for ref in env_from:
+                if not isinstance(ref, dict):
+                    continue
                 cm_ref = ref.get("configmap")
                 if cm_ref and cm_ref not in configmaps:
                     self.report.add_check(
@@ -257,10 +335,13 @@ class KubernetesValidator:
                 continue
 
             config = resource.config or {}
-            selector = config.get("selector", {})
+            selector: Any = config.get("selector")
 
             if selector:
-                app_label = selector.get("app") or selector.get("app.kubernetes.io/name")
+                if isinstance(selector, dict):
+                    app_label = selector.get("app") or selector.get("app.kubernetes.io/name")
+                else:
+                    app_label = str(selector)
                 if app_label and app_label not in deployments:
                     self.report.add_check(
                         check_name=f"kubernetes_ref_{resource.name}_selector",
