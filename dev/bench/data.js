@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794838689790,
+  "lastUpdate": 1794839986671,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2018,6 +2018,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005535335275751503",
             "extra": "mean: 89.07646769334796 usec\nrounds: 12273"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ac80ec2e803add157ddffefb2be0b937667d1016",
+          "message": "fix: resolve ansible-playbook in the host runner (merges PR #1415, addresses #1413)\n\nHostRunner built its playbook command from BaseRunner.tool_path, which\nlooks up tool_name on PATH, so apply searched for a host_ansible\nexecutable and failed. Resolve ansible-playbook through one lookup that\nboth tool_path and is_available use, keeping tool_name host_ansible.\n\nAddresses #1413\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T14:38:49Z",
+          "tree_id": "9d63cb826bab1041965f999d0ae93a4e1bda1b0b",
+          "url": "https://github.com/endavis/infrafoundry/commit/ac80ec2e803add157ddffefb2be0b937667d1016"
+        },
+        "date": 1794839986317,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.05571377262973,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006397691838290948",
+            "extra": "mean: 20.384985215686388 msec\nrounds: 51"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7823.440549209974,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000012078796393542601",
+            "extra": "mean: 127.82100071061214 usec\nrounds: 8444"
           }
         ]
       }
