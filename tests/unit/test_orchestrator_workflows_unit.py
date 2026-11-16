@@ -241,12 +241,16 @@ def test_plan_orchestrator_passes_managed_resources_to_runner(console: Console) 
     assert [r.name for r in managed["unbound.forwards"]] == ["f1"]
 
 
-def test_plan_orchestrator_dry_run_does_not_query_managed_set(console: Console) -> None:
-    """A dry run never reaches the runner, so it makes no managed-set query (#1256)."""
+def test_plan_orchestrator_dry_run_queries_managed_set_once(console: Console) -> None:
+    """A dry run never reaches the runner but queries the managed set once.
+
+    The query decides which resources are recorded as planned; already-managed
+    ones are skipped (#1417, #1256).
+    """
     runner, state_manager = _plan_with_runner(console, dry_run=True)
 
     runner.plan.assert_not_called()
-    state_manager.get_managed_resources.assert_not_called()
+    state_manager.get_managed_resources.assert_called_once_with("dev", "proxmox")
 
 
 def test_apply_orchestrator_uses_parallel_when_multiple_providers(console: Console) -> None:
@@ -3422,3 +3426,76 @@ def test_aborting_before_plan_handler_raises_and_marks_failed(
 
     update = cast("MagicMock", orchestrator.state_manager.update_deployment_status)
     assert DeploymentStatus.FAILED in [c.args[1] for c in update.call_args_list]
+
+
+# --- plan must not demote already-deployed resources to PLANNED (#1417) ---
+
+
+def _track_plan(
+    console: Console, tmp_path: Path, seed: list[str], resource: ResourceConfig
+) -> tuple[Any, MagicMock, int]:
+    """Seed rows (``active``/``deleted``), run ``_track_planned_resources``.
+
+    Returns ``(state_manager, event_manager, deployment_id)``.
+    """
+    from infrafoundry.core.state import ResourceState, StateManager
+
+    state_manager = StateManager(f"sqlite:///{tmp_path / 'state.db'}")
+    state_manager.initialize()
+    deployment_id = state_manager.create_deployment("dev", "apply")
+    for state in seed:
+        state_manager.track_resource(
+            deployment_id=deployment_id,
+            environment="dev",
+            provider="proxmox",
+            resource_type=resource.type,
+            name=resource.name,
+            state=ResourceState(state),
+        )
+    event_manager = MagicMock()
+    orchestrator = PlanOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        MagicMock(),
+        get_providers=dict,
+        load_resources=MagicMock(),
+        iter_provider_batches=MagicMock(),
+        validate_resources=MagicMock(),
+        has_policies=lambda: False,
+        check_policies=MagicMock(),
+        secret_manager_factory=MagicMock(),
+        get_current_user=lambda: "tester",
+        fail_on_missing_secrets=False,
+        get_runner_priorities=lambda _: {},
+    )
+    plan_id = state_manager.create_deployment("dev", "plan")
+    managed_rows = state_manager.get_managed_resources("dev", "proxmox")
+    orchestrator._track_planned_resources(plan_id, "dev", "proxmox", [resource], managed_rows)
+    return state_manager, event_manager, plan_id
+
+
+def _states(state_manager: Any) -> list[str]:
+    rows = sorted(state_manager.get_resources("dev", "proxmox"), key=lambda r: r.id)
+    return [row.state.value for row in rows]
+
+
+def test_plan_after_apply_keeps_resource_active(console: Console, tmp_path: Path) -> None:
+    state_manager, event_manager, _ = _track_plan(console, tmp_path, ["active"], _resource("vm1"))
+
+    assert _states(state_manager) == ["active"]
+    assert [r.name for r in state_manager.get_managed_resources("dev", "proxmox")] == ["vm1"]
+    event_manager.emit_event.assert_not_called()
+
+
+def test_plan_of_new_resource_records_planned(console: Console, tmp_path: Path) -> None:
+    state_manager, event_manager, _ = _track_plan(console, tmp_path, [], _resource("vm1"))
+
+    assert _states(state_manager) == ["planned"]
+    assert event_manager.emit_event.call_args[0][0] == EventType.RESOURCE_PLANNED
+
+
+def test_plan_of_destroyed_resource_records_planned(console: Console, tmp_path: Path) -> None:
+    state_manager, _, _ = _track_plan(console, tmp_path, ["active", "deleted"], _resource("vm1"))
+
+    assert _states(state_manager) == ["active", "deleted", "planned"]

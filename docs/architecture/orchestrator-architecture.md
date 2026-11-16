@@ -97,6 +97,8 @@ sequenceDiagram
     loop for each provider
         PlanOrchestrator->>PlanOrchestrator: validate_resources(provider_resources)
 
+        PlanOrchestrator->>StateManager: get_managed_resources(env, provider)
+        Note over PlanOrchestrator,StateManager: Only resources not yet managed get a PLANNED row (#1417)
         PlanOrchestrator->>StateManager: track_resource(deployment_id, env, provider, resource, PLANNED)
         StateManager-->>PlanOrchestrator: tracked_resource
 
