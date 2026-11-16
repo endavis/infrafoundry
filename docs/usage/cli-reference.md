@@ -83,6 +83,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | Backup state database | `foundry state backup` |
 | Remove a stale environment from state | `foundry state prune --env <env>` |
 | Rename an environment in state | `foundry state rename-env --env <old> --to-env <new>` |
+| Restore deployed resources hidden by stale planned rows | `foundry state reconcile --env <env>` |
 | Validate backend config | `foundry state backend validate --env <env>` |
 | Migrate backend | `foundry state backend migrate --env <env>` |
 | View audit trail | `foundry state audit list` |
@@ -728,6 +729,26 @@ foundry state rename-env --env old-env --to-env new-env             # backs up, 
 - Not renamed: `audit_entries` keeps the old name as history, and the free-form `extra_data` JSON on deployments and resources is left unchanged. Dependencies and deployment events link by id and need nothing.
 
 Procedure: rename the config repo directory and `settings.yaml` name first, run with `--dry-run`, run for real, then check that `foundry infra plan --env <new>` shows no changes and `foundry config doctor` is clean.
+
+### `state reconcile`
+
+Restore deployed resources that a stale `PLANNED` row hides. Before #1417, `infra plan` appended a `PLANNED` row for every resource, so a deployed resource's newest row became `planned` and `infra deployed` stopped showing it as `active`.
+
+```bash
+foundry state reconcile --env prod --dry-run   # list the affected resources
+foundry state reconcile --env prod             # confirm, then append active rows
+foundry state reconcile --env prod --yes       # skip the confirmation
+```
+
+**Options:** `-e/--env TEXT` (required), `--dry-run`, `--yes`
+
+- Selects each `(provider, resource_type, name)` whose newest non-`planned` row is `active` and that has `planned` rows newer than it. For each, one new `active` row is appended with the same `config`, `terraform_id` and `extra_data`.
+- Left untouched: resources that were only ever planned, whose newest non-`planned` row is `deleted`, `error`, `creating`, `updating` or `deleting`, or that have no newer `planned` row.
+- Nothing is deleted. The `resources` table is append-only, so the `planned` rows stay and `state resources --state PLANNED` still lists them. The managed set does not change.
+- All new rows point at one `reconcile` deployment (visible in `infra history`), written in one transaction. A `state_reconciled` entry is added to the audit trail.
+- No backup is taken, because no row is removed or changed.
+- Refuses an environment with an unexpired deployment lock; release it with `foundry infra unlock`.
+- Running it again finds nothing to do.
 
 ### `state backend`
 
