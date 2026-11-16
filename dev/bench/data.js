@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794850011476,
+  "lastUpdate": 1794851689856,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2474,6 +2474,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009505645430869017",
             "extra": "mean: 128.88223214474684 usec\nrounds: 8331"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a9b0f66d3ae0e0fbae1873ea1eee1d6994b8806f",
+          "message": "feat: wire kubernetes validation into infra doctor and infra plan (merges PR #1437, addresses #1435)\n\nKubernetesValidator was never called: KubernetesProvider inherited the\nno-op validate_references and validate_connectivity. The provider now\nimplements validate_connectivity, validate_references,\nvalidate_references_in_context and validate_offline (ADR-0023), so\ninfra doctor runs the local and cluster checks and infra plan/apply run\nthe offline ones.\n\nFixes the checks that would otherwise give false errors or crash once\nthey run: a string service selector, non-dict env_from entries, Helm\nrepository required for oci:// and path charts, the CRD check reading\ntop-level apiVersion instead of manifest.apiVersion, and namespaces\ncreated by a Helm release. A kubeconfig that does not exist yet (cluster\ncreated in the same apply) is now a warning.\n\nKubeconfig resolution follows KUBECONFIG, kubeconfig_path, then\n~/.kube/config, as Terraform does. Cluster checks support\nclient-certificate auth (data and file forms) and use inline\ncertificate-authority-data for TLS verification instead of disabling it;\ninline material goes to 0600 files in a private temp directory that is\nremoved after validation.\n\nAddresses #1435\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T17:53:51Z",
+          "tree_id": "d641227c5eefc558b875b089f962a142a20b695d",
+          "url": "https://github.com/endavis/infrafoundry/commit/a9b0f66d3ae0e0fbae1873ea1eee1d6994b8806f"
+        },
+        "date": 1794851689511,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 106.8529769948324,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00014188211007978223",
+            "extra": "mean: 9.358653620369994 msec\nrounds: 108"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15958.09960447916,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001696122934272291",
+            "extra": "mean: 62.66410316923435 usec\nrounds: 17670"
           }
         ]
       }
