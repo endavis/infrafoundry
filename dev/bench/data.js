@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794828563616,
+  "lastUpdate": 1794832171691,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1790,6 +1790,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009199044588542422",
             "extra": "mean: 126.08478077184796 usec\nrounds: 8498"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "323435b71fdb5060e0372891ea96497d08d4c36f",
+          "message": "feat: remove an instance's tailnet device when it is destroyed (merges PR #1402, addresses #1401)\n\nAfter `infra destroy` deletes an instance that has a `tailscale:` block,\ndelete its tailnet device through the Tailscale API, so a redeploy joins\nwith the bare hostname instead of `<hostname>-1`.\n\n- Runs after Terraform reports the delete (also for -r/-p/-P destroys),\n  so a failed or blocked destroy never logs a live node out.\n- Matches devices by hostname and one of the block's advertise_tags.\n- Uses the block's OAuth client (needs devices:core); auth-key mode,\n  a missing client_id_secret and `remove_on_destroy: false` skip with a\n  message. API errors only warn; secrets are never logged.\n- Not done on an apply that replaces the instance (old and new devices\n  cannot be told apart afterwards); documented.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T12:28:23Z",
+          "tree_id": "036ca4cdccccd6854516bb6ce72ec5a5aafd258e",
+          "url": "https://github.com/endavis/infrafoundry/commit/323435b71fdb5060e0372891ea96497d08d4c36f"
+        },
+        "date": 1794832171009,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 59.553824116531146,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004719672571851729",
+            "extra": "mean: 16.7915329508188 msec\nrounds: 61"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10879.987611961897,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005215880728758747",
+            "extra": "mean: 91.91186935732902 usec\nrounds: 11918"
           }
         ]
       }
