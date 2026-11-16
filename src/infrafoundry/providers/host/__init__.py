@@ -204,7 +204,7 @@ class HostProvider(
             playbooks: list[str] = []
             enrollment: str | None = None
             if ref is not None:
-                enrollment = str(self.ansible_dir / ENROLLMENT_PLAYBOOK)
+                enrollment = str((self.ansible_dir / ENROLLMENT_PLAYBOOK).resolve())
                 playbooks.append(enrollment)
             for playbook in (host.config.get("ansible") or {}).get("playbooks", []):
                 playbooks.append(str((self.repo_root / playbook).resolve()))
