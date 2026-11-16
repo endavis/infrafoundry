@@ -28,6 +28,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<OPNsense>/Kea` (DHCPv4 reservations) | `kea_reservation` | Supported (direct-API; #778, #802). Identity is the `(hw_address, subnet_uuid)` tuple — DHCPv4 uses MAC address as the client identity (distinct from DHCPv6's `duid`). Operator-facing schema accepts `subnet_ref: <managed kea.dhcp4.subnets name>` (preferred — what the framework's blueprints emit, added in #802) and the legacy `subnet: <CIDR>` literal form (still supported); both fields may be present and must agree. Resolution is a two-step lookup: `subnet_ref` → CIDR via the matching sibling `kea.dhcp4.subnets` resource list, then CIDR → live subnet UUID via `service.search_dhcpv4_subnets()` at plan/apply time. `KeaReservationValidator` flags missing / unknown-ref / wrong-version / disagree cases at plan time via the shared `_xref` resolver before any API call. Missing live subnet raises `ReferenceValidationError` at plan time (a behavioral upgrade over the legacy terraform path which would silently break the terraform graph dependency on a box-to-box cutover). Honors `--add-only`. The legacy terraform write path (`browningluke/opnsense_kea_reservation` + `kea_reservation.tf.j2`) was retired in #778 — no `kind: legacy` shim. The shared `kea_reconfigure` finalization hook coalesces across all four Kea managers (subnet/reservation × v4/v6) so a multi-component apply produces exactly one `kea/service/reconfigure` call. |
 | `<OPNsense>/Kea` (DHCPv6 subnets) | `kea_dhcp6_subnet` | Supported (direct-API; #758) |
 | `<OPNsense>/Kea` (DHCPv6 reservations) | `kea_dhcp6_reservation` | Supported (direct-API; #758, #802). Identity is the `(duid, subnet_uuid)` tuple. Operator-facing schema accepts `subnet_ref: <managed kea.dhcp6.subnets name>` (preferred, added in #802 for symmetry with DHCPv4) and the legacy `subnet: <CIDR>` literal form (still supported — DHCPv6 fixtures predating #802 use this form unchanged); both fields may be present and must agree. Resolution mirrors DHCPv4: `subnet_ref` → CIDR via sibling `kea.dhcp6.subnets`, then CIDR → live subnet UUID via `service.search_dhcpv6_subnets()`. Same `KeaReservationValidator` covers v4 and v6 in a single pass for wrong-version cross detection. |
+| `<OPNsense>/Kea` (DHCPv4 high availability) | `kea.dhcp4.ha`, `kea.dhcp4.ha_peers` | Supported (direct-API; #1392). `ha` is a singleton over the `dhcpv4.ha` section (`enabled`, `this_server_name`, `max_unacked_clients`); `ha_peers` is a managed-set list keyed by the peer `name` (`role`, `url`). Peers apply before the settings, both before the subnets, and one `kea/service/reconfigure` fires per apply through the shared `kea_reconfigure` hook. A `config migrate` extractor exists for each. See [Kea DHCPv4 high availability (#1392)](#kea-dhcpv4-high-availability-1392). |
 | `<OPNsense>/unboundplus/hosts/host` | `unbound_host_override` | Supported (direct-API; #776; config-migrate extractor added in #748). Identity is the natural-key tuple `(hostname, domain, rr)` — including `rr` lets an A and an AAAA record on the same `(hostname, domain)` coexist as distinct identities (a common dual-stack setup). Wire field names are OPNsense's own (`rr` / `mxprio` / `mx`); the operator-facing YAML field names are the same. YAML schema covers the base fields (`hostname`, `domain`, `enabled`, `server`, `description`) plus record-type-specific `rr` (`A` / `AAAA` / `MX`), `mxprio` (MX priority, preserved as a string to match `updatefreq`), and `mx` (MX target). The extended fields are emitted only when the live record carries a non-default value, so existing 5-field operator YAML round-trips unchanged. The extractor synthesizes the operator-facing `name` as `<hostname>-<dot-replaced-domain>` (lowercased; e.g., `web.example.com` → `web-example-com`); when `rr` is non-default, the record type is appended as a suffix (e.g., `web-example-com-aaaa`, `mail-example-com-mx`) so an A and an AAAA record on the same hostname don't collide on the same key. A synthesized name already used by another opnsense resource in the environment, or by an earlier host override in the same run, gets a `-2`, `-3` ... suffix (#1337). No system-internal filter is needed — host overrides are entirely operator-defined. The `unbound_reconfigure` finalization hook is shared across all three Unbound managers (#776), so a multi-unbound apply produces exactly one `unbound/service/reconfigure` call. The legacy terraform write path (`browningluke/opnsense` + `unbound_host_override.tf.j2`) was retired in #776 — no `kind: legacy` shim. |
 | `<dhcpd>` (legacy ISC) | — | **Retired (#782).** The `dhcp_static_maps` resource type was deleted in #782; the legacy terraform path referenced `opnsense_dhcpv4_static_map`, which never existed in `browningluke/opnsense`. New deployments use `kea_reservation` (DHCPv4) instead — Kea is OPNsense's modern DHCP daemon and `kea_reservation` direct-API supersedes `dhcp_static_maps` for every operational use case (MAC-bound static IP, hostname, description). |
 | `<interfaces>` | `interface_assignments` | Supported (direct-API; #711 read-only ship, #716 forked PHP controller, #717 ADR-0014 amendment, #720 production conversion). Write-path mechanism per [ADR-0014 §"Per-component decisions"](../decisions/0014-opnsense-direct-api-apply-mechanism.md#per-component-decisions): server-side-validated REST via the in-tree `AssignSettingsController.php` fork. Production conversion of `OPNsenseDirectRunner.apply()` completed in #720 (2026-05-03); logical-to-physical interface mapping is now applied automatically by `foundry infra apply`. |
@@ -878,6 +879,88 @@ opnsense:
 
 **Verified live** on a test firewall: `config migrate` output planned with no update; changing `verbose` went through `hostdiscovery/settings/set` (confirming the wire field name), `hostdiscovery/service/reconfigure` ran with the service still running, a re-plan showed no update, and restoring the value worked the same way. An empty `skip_nets` reads back as a single selected empty entry, which compares equal to `[]`.
 
+## Kea DHCPv4 high availability (#1392)
+
+Kea DHCPv4 high availability is managed through two direct-API types on the `kea/dhcpv4` controller: `kea.dhcp4.ha` (a singleton dict for the `dhcpv4.ha` section) and `kea.dhcp4.ha_peers` (a managed-set list for the peer grid, [ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). Kea is part of core OPNsense, so every endpoint is stock: the offline conformance test and the plan-time version check cover them. DHCPv6 HA is not covered.
+
+```yaml
+opnsense:
+  kea:
+    dhcp4:
+      ha:
+        enabled: true
+        this_server_name: ""
+        max_unacked_clients: 2
+      ha_peers:
+        - name: fw-a
+          config:
+            role: primary
+            url: http://192.0.2.1:8001/
+        - name: fw-b
+          config:
+            role: standby
+            url: http://192.0.2.2:8001/
+```
+
+### Settings (`kea.dhcp4.ha`)
+
+All keys are optional and only declared keys are compared and written. The write body is `{"dhcpv4": {"ha": {...}}}`: the live `ha` section flattened, read-only `%`-prefixed display values dropped and the declared fields overlaid. `general` and `lexpire` are never sent. Destroy is a no-op, so removing the block does not disable HA; declare `enabled: false`.
+
+| YAML key | Wire field | Type |
+| --- | --- | --- |
+| `enabled` | `enabled` | bool |
+| `this_server_name` | `this_server_name` | string; `""` lets each node use its own hostname |
+| `max_unacked_clients` | `max_unacked_clients` | integer, 0 or more |
+
+### Peers (`kea.dhcp4.ha_peers`)
+
+The identity is `name` (Kea requires peer names to be unique, and `this_server_name` refers to a peer by name). The box assigns `uuid`; it is not a YAML field. The type is a managed-set list: a peer on the box that InfraFoundry never applied is kept (see [How deletes work](#how-deletes-work-the-managed-set-1256)).
+
+| YAML key | Wire field | Rule |
+| --- | --- | --- |
+| `name` | `name` | required, unique within the type (defaults to the resource name) |
+| `role` | `role` | required: `primary` or `standby`; there is no silent default for HA |
+| `url` | `url` | required, `http(s)://host[:port]` |
+| `lock` | not sent | boolean safety annotation |
+
+The write envelope is `{"peer": {"name", "role", "url"}}`. Field comparison reads `getPeer/{uuid}` and flattens `role`, which is an option dict on `get`.
+
+### Validator rules
+
+`KeaHAValidator` is offline and checks the YAML only. Unknown keys are ERRORs (`uuid` carries a hint). With `enabled: true`:
+
+- The declared peers must be exactly one `primary` and one `standby` (ERROR otherwise, including when no peer is declared).
+- A non-empty `this_server_name` must equal a declared peer name.
+- An empty `this_server_name` is an INFO, not a warning: it is the recommended CARP setting.
+
+With `enabled` false or absent the per-row peer checks still run but the peer count is not enforced.
+
+### Order and disabling
+
+Dispatch order is `kea.dhcp4.ha_peers`, then `kea.dhcp4.ha`, then `kea.dhcp4.subnets` and `kea.dhcp4.reservations`. Peers come before the settings, so on enable the peers exist before `enabled` and `this_server_name` are written. The HA settings come before the subnets because of auto-collect: writing the Kea DHCPv4 settings (`kea/dhcpv4/set`) makes OPNsense re-run option-data auto-collect on every subnet with `auto_collect` on, which overwrites option data set explicitly on such a subnet (for example a DNS server replaced by the interface address). A subnet write itself does not trigger it. Applying the HA settings first lets the subnet write restore the explicit option data in the same apply, so one apply converges. The order is not declared in the provider's dependency table: a subnet dependency on `kea.dhcp4.ha` would force the subnet and reservation types to split their deletes.
+
+Peers do not split their deletes: nothing references a peer by UUID, so a removed peer is deleted in the forward pass, still before the settings write. A one-step disable (`enabled: false` and the peers removed in the same apply) was accepted by OPNsense in the live test. If a firmware version refuses it, disable in two applies: first `enabled: false`, then remove the peers.
+
+### CARP pair usage
+
+Configure the pair on the primary only. Leave `this_server_name` empty so each node uses its own hostname, and name the peers after the nodes' hostnames. An explicit `this_server_name` set on the primary would be synced to the backup by XMLRPC and name the wrong peer there. The backup receives the settings through XMLRPC sync. The hostname fallback was verified on a single firewall; the XMLRPC sync to the backup is expected from the OPNsense design and is **not verified** by InfraFoundry.
+
+### Migrate
+
+`foundry config migrate --provider opnsense --component kea.dhcp4.ha` writes every mapped field present on the box. `kea.dhcp4.ha_peers` writes one entry per live peer with `name`, `role` and `url`. The handle is a slug of the name, with `-2`, `-3` ... when a resource of the environment or an earlier row already uses it.
+
+### Verified and not verified
+
+- Read by a probe on a test firewall: the `dhcpv4.ha` section of `kea/dhcpv4/get`, `searchPeer` and the `getPeer` template (`name`, `role`, `url`). The 26.1.x OpenAPI specs list the peer actions.
+- Verified by live writes on a single test firewall:
+  - Peer add and delete through the `{"peer": ...}` envelope worked, and the `delPeer` reply was accepted.
+  - `set` with only `dhcpv4.ha` left `general` (enabled, interfaces) unchanged.
+  - With `this_server_name` empty, the read-only display value equals the firewall's hostname.
+  - Enabling HA and re-planning showed no changes.
+  - The one-step disable (`enabled: false` and the peers removed in one apply) was accepted and re-planned clean.
+  - Writing the HA settings re-runs option-data auto-collect on `auto_collect` subnets (see above), which is why the HA types dispatch first.
+- Not verified: XMLRPC sync of the settings to a backup node (only one test firewall was available), so the CARP-pair behaviour above remains an expectation.
+
 ## Outbound NAT mode (#1333)
 
 `opnsense.firewall.source_nat` is a singleton dict over the `snat_mode` field of the `filter.general` node of the firewall filter model. The name follows the wire controller (`firewall/source_nat`), because `firewall.nat` is a list.
@@ -912,9 +995,9 @@ opnsense:
 
 **Two kinds of type.**
 
-- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.static_keys`, `openvpn.instances`, `firewall.categories`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs`, `tailscale.subnets`, `monit.alerts`, `monit.tests` and `monit.services`.
+- **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp4.ha_peers`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.static_keys`, `openvpn.instances`, `firewall.categories`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs`, `tailscale.subnets`, `monit.alerts`, `monit.tests` and `monit.services`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
-- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `firewall.source_nat`, `acmeclient.settings`, `tailscale.settings`, `tailscale.auth`, `monit.settings`, `radvd`) are unaffected.
+- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `firewall.source_nat`, `kea.dhcp4.ha`, `acmeclient.settings`, `tailscale.settings`, `tailscale.auth`, `monit.settings`, `radvd`) are unaffected.
 
 **Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
 

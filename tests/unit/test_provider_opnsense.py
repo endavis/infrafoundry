@@ -25,6 +25,7 @@ _RETIRED_SYSTEM_TYPES = [
 #: Dependent types that do not split deletes yet, each with the reason (#1269).
 _DELETE_PHASE_EXEMPT: dict[str, str] = {
     "unbound.host_aliases": "OPNsense cascades a host override delete to its aliases",
+    "kea.dhcp4.ha": "a singleton: destroy is a no-op, so it never deletes anything (#1392)",
 }
 
 
@@ -615,6 +616,35 @@ class TestAcmeclientRegistration:
         managers = provider.get_direct_api_resource_types()
         for t in self.TYPES:
             assert callable(getattr(managers[t], "migrate", None))
+
+
+class TestKeaHATypes:
+    """The Kea DHCPv4 HA types are wired in order with the shared Kea hook (#1392)."""
+
+    @pytest.fixture
+    def provider(self, tmp_path: Path) -> OPNsenseProvider:
+        return OPNsenseProvider(config_dir=tmp_path, output_dir=tmp_path)
+
+    def test_dispatch_order(self, provider: OPNsenseProvider) -> None:
+        types = list(provider.get_direct_api_resource_types())
+        assert (
+            types.index("kea.dhcp4.ha_peers")
+            < types.index("kea.dhcp4.ha")
+            < types.index("kea.dhcp4.subnets")
+        )
+        assert "kea.dhcp4.ha" in provider.get_resource_types()
+        assert "kea.dhcp4.ha_peers" in provider.get_resource_types()
+
+    def test_dependencies(self, provider: OPNsenseProvider) -> None:
+        deps = provider.get_dependencies()
+        assert deps["kea.dhcp4.ha_peers"] == []
+        assert deps["kea.dhcp4.ha"] == ["kea.dhcp4.ha_peers"]
+
+    def test_shared_hook_and_no_split_delete(self, provider: OPNsenseProvider) -> None:
+        managers = provider.get_direct_api_resource_types()
+        for t in ("kea.dhcp4.ha", "kea.dhcp4.ha_peers"):
+            assert managers[t].FINALIZATION_HOOK == "kea_reconfigure"
+            assert not getattr(managers[t], "SPLIT_DELETE_PHASE", False)
 
 
 class TestMonitTypes:

@@ -24,6 +24,8 @@ EXPECTED_RESOURCE_TYPES = [
     "interfaces.assignments",
     "isc_to_kea",
     "kea_dhcp",
+    "kea.dhcp4.ha",
+    "kea.dhcp4.ha_peers",
     "firewall.nat",
     "routing.static",
     "unbound.forwards",

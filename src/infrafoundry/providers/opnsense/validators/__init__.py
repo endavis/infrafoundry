@@ -24,6 +24,7 @@ from infrafoundry.providers.opnsense.validators.interface_assignment_validator i
 from infrafoundry.providers.opnsense.validators.interfaces_settings_validator import (
     InterfacesSettingsValidator,
 )
+from infrafoundry.providers.opnsense.validators.kea_ha_validator import KeaHAValidator
 from infrafoundry.providers.opnsense.validators.kea_reservation_validator import (
     KeaReservationValidator,
 )
@@ -87,6 +88,7 @@ __all__ = [
     "HostDiscoveryValidator",
     "InterfaceAssignmentValidator",
     "InterfacesSettingsValidator",
+    "KeaHAValidator",
     "KeaReservationValidator",
     "MonitValidator",  # #791
     "NATRuleValidator",

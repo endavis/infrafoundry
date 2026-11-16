@@ -370,6 +370,17 @@ KEA_CRUD: dict[tuple[str, str], CrudEndpoints] = {
     for api_version in ("dhcpv4", "dhcpv6")
     for noun in ("Subnet", "Reservation")
 }
+# HA peer grid (#1392). The action names are in the 26.1.x OpenAPI specs; the read
+# shapes were probed, the write envelopes are verified by the #1392 live test.
+KEA_CRUD[("dhcpv4", "Peer")] = _crud(
+    "kea/dhcpv4",
+    search="searchPeer",
+    get="getPeer",
+    add="addPeer",
+    update="setPeer",
+    delete="delPeer",
+    search_method="GET",
+)
 KEA_DHCPV4_GET = Endpoint("GET", "kea/dhcpv4/get")
 KEA_DHCPV4_SET = Endpoint("POST", "kea/dhcpv4/set")
 KEA_DHCPV6_GET = Endpoint("GET", "kea/dhcpv6/get")
@@ -607,6 +618,8 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
         KEA_CRUD[("dhcpv4", "Subnet")].search,
         *_KEA_V4,
     ),
+    "kea.dhcp4.ha": _KEA_V4,
+    "kea.dhcp4.ha_peers": (*KEA_CRUD[("dhcpv4", "Peer")].all(), KEA_RECONFIGURE),
     "kea.dhcp6.subnets": (*KEA_CRUD[("dhcpv6", "Subnet")].all(), *_KEA_V6),
     "kea.dhcp6.reservations": (
         *KEA_CRUD[("dhcpv6", "Reservation")].all(),

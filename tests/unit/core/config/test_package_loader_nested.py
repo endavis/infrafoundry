@@ -44,6 +44,8 @@ class TestNestedFormatConstants:
         assert DOTTED_RESOURCE_SHAPES["unbound.host_overrides"] == "list"
         assert DOTTED_RESOURCE_SHAPES["kea.dhcp4.subnets"] == "list"
         assert DOTTED_RESOURCE_SHAPES["kea.dhcp6.reservations"] == "list"
+        assert DOTTED_RESOURCE_SHAPES["kea.dhcp4.ha_peers"] == "list"
+        assert DOTTED_RESOURCE_SHAPES["kea.dhcp4.ha"] == "dict"
         assert DOTTED_RESOURCE_SHAPES["trust.cas"] == "list"
         assert DOTTED_RESOURCE_SHAPES["trust.certs"] == "list"
         assert DOTTED_RESOURCE_SHAPES["openvpn.instances"] == "list"
@@ -240,6 +242,32 @@ class TestParseNestedList:
         for resource in resources:
             assert resource.type == "firewall.aliases"
             assert resource.provider == "opnsense"
+
+    def test_kea_dhcp4_ha_beside_subnets(self, temp_dir: Path) -> None:
+        """``subnets`` (list), ``ha`` (dict) and ``ha_peers`` (list) coexist (#1392)."""
+        loader = PackageLoader(temp_dir)
+        data = {
+            "opnsense": {
+                "kea": {
+                    "dhcp4": {
+                        "subnets": [{"name": "lan", "config": {"subnet": "192.0.2.0/24"}}],
+                        "ha": {"enabled": True},
+                        "ha_peers": [
+                            {
+                                "name": "fw-a",
+                                "config": {"role": "primary", "url": "http://192.0.2.1:8001/"},
+                            }
+                        ],
+                    }
+                }
+            }
+        }
+        resources = loader._parse_resources_from_data(data, "kea.yaml", "opnsense")
+        assert sorted((r.type, r.name) for r in resources) == [
+            ("kea.dhcp4.ha", "kea.dhcp4.ha"),
+            ("kea.dhcp4.ha_peers", "fw-a"),
+            ("kea.dhcp4.subnets", "lan"),
+        ]
 
     def test_kea_dhcp4_subnets_three_levels_deep(self, temp_dir: Path) -> None:
         """Three-level dotted path (kea.dhcp4.subnets) walks correctly."""

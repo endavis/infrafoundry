@@ -52,6 +52,7 @@ tags:
 **Amended:** 2026-11-10 (#1320) — `openvpn.instances` gains an optional `cert_ref` to a `trust.certs` resource, resolved to the live certificate `refid` and sent as the wire `cert`. The manager declares the tuple `SIBLING_RESOURCE_TYPE = ("trust.cas", "trust.certs")`; the runner already accepted a tuple (#790), so it is unchanged.
 **Amended:** 2026-11-09 (#1322) — `system.users` passwords verified live: a GUI login succeeds with the InfraFoundry-set password, fails with a wrong one, and a rotation with `update_password` replaces the old password
 **Amended:** 2026-11-11 (#791) — `monit.settings`, `monit.alerts`, `monit.tests` and `monit.services` per-component decision recorded (core, stock-kind direct-REST against `monit/settings/*`; one `settings/get` read serves all four types; secrets never echoed; services delete before tests and a still-referenced row is blocked, not deleted; new shared finalization hook `monit_reconfigure`).
+**Amended:** 2026-11-16 (#1392) — `kea.dhcp4.ha` and `kea.dhcp4.ha_peers` per-component decision recorded (stock direct-REST on `kea/dhcpv4/*`; the `dhcpv4.ha` singleton write omits `general`; peers are a managed-set list keyed by `name`; shared `kea_reconfigure` hook). The peer write envelope and the `delPeer` reply were verified by a live test.
 **Status:** Accepted
 
 ## Status
@@ -597,6 +598,17 @@ The dispatch order is settings, accounts, validations, actions, certs. Certs set
 - **Migrate:** each type has an extractor; the auth export writes only a `secret://` placeholder for the key.
 - **Verified on a test box** (plugin installed for the test and removed afterwards, Tailscale disabled throughout, throwaway key): subnet add, set (same uuid) and delete; an unmanaged subnet kept; the settings write inverting `enable_snat` and leaving subnets untouched; `authentication/get` echoes the stored key, so key changes are detected without the flag; one `service/reconfigure` per apply with the service still stopped; idempotent re-plans; migrate with only the key placeholder; no key text in any output. **Not verified:** a running tunnel and `use_exit_node` with real peers.
 
+### `kea.dhcp4.ha*` (#1392, 2026-11-16)
+
+**Mechanism:** Direct-REST against the core `kea/dhcpv4/*` controller. Two types: `kea.dhcp4.ha` (a singleton dict for the `dhcpv4.ha` section) and `kea.dhcp4.ha_peers` (a managed-set list, [ADR-0018](0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). Documented in [Kea DHCPv4 high availability (#1392)](../development/opnsense-resource-coverage.md#kea-dhcpv4-high-availability-1392). There is no resource-backed `kea_dhcp` component to extend, so the settings are a new type.
+
+- **Endpoints:** `kea/dhcpv4/{get,set}`, the peer CRUD `searchPeer`, `getPeer/{uuid}`, `addPeer`, `setPeer/{uuid}`, `delPeer/{uuid}`, and `kea/service/reconfigure`. All are `EndpointKind.STOCK` and listed in the 26.1.x specs.
+- **Settings write:** `{"dhcpv4": {"ha": {...}}}` only, built from the flattened live section with `%`-prefixed display values dropped; MVC `set` updates only the nodes posted, so `general` and `lexpire` are never echoed.
+- **Identity:** the peer `name`. `role` is required, with no silent default.
+- **Order:** peers, then the settings, then the subnets. Writing `kea/dhcpv4/set` re-runs option-data auto-collect on `auto_collect` subnets, so the subnet write must follow it to restore explicit option data. No split delete phase. A one-step disable deletes the peers while HA is still enabled; it was accepted in the live test.
+- **Reconfigure:** both managers share the `kea_reconfigure` hook, one `kea/service/reconfigure` per apply. `kea.dhcp4.ha_peers` destroy reconfigures directly.
+- **Verified** by reads and live writes on a single test firewall: the peer write envelope and `delPeer` reply, `general` left untouched by a `dhcpv4.ha`-only `set`, the one-step disable, and the auto-collect re-run. **Not verified:** XMLRPC sync to a backup node.
+
 ### `monit.*` (#791, 2026-11-11)
 
 **Mechanism:** Direct-REST against the core `monit/*` MVC controllers. Four types: `monit.settings` (a singleton dict) and `monit.alerts`, `monit.tests` and `monit.services` (managed-set lists, [ADR-0018](0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). Documented in [Monit (#791)](../development/opnsense-resource-coverage.md#monit-791). Monit ships with OPNsense, so every endpoint is `EndpointKind.STOCK`: the offline conformance test and the plan-time version check cover them, and there is no missing-plugin tolerance. Never registered: `toggle*`, `service/start|stop|restart|check` and `status/*`; the provider does not start or stop the service.
@@ -785,6 +797,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#790](https://github.com/endavis/infrafoundry/issues/790): feat: add the `acmeclient.*` direct-API resources for the OPNsense ACME client plugin.
 - Issue [#787](https://github.com/endavis/infrafoundry/issues/787): feat: add `tailscale.settings`, `tailscale.auth` and `tailscale.subnets` direct-API resources for the OPNsense Tailscale plugin.
 - Issue [#791](https://github.com/endavis/infrafoundry/issues/791): feat: add `monit.settings`, `monit.alerts`, `monit.tests` and `monit.services` direct-API resource types for core OPNsense monit.
+- Issue [#1392](https://github.com/endavis/infrafoundry/issues/1392): feat: support Kea DHCPv4 high availability on OPNsense.
 - Issue [#1091](https://github.com/endavis/infrafoundry/issues/1091): feat: add `unbound.settings` resource for OPNsense Unbound general and advanced settings.
 - Issue [#1254](https://github.com/endavis/infrafoundry/issues/1254): feat: manage Unbound advanced settings (private and insecure domains) on OPNsense.
 - Issue [#1244](https://github.com/endavis/infrafoundry/issues/1244): refactor: remove the unreachable implementation of the five retired OPNsense system types.
