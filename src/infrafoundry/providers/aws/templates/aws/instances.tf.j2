@@ -101,6 +101,7 @@ resource "aws_instance" "{{ n }}" {
 
   private_dns_name_options {
     hostname_type = "resource-name"
+    enable_resource_name_dns_aaaa_record = true
   }
 {% endif %}
 

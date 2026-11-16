@@ -161,7 +161,7 @@ ebs_volume:
 | `prevent_destroy` | No | Default `true`; see [Data volume protection](#data-volume-protection) |
 | `tags` | No | Extra tags |
 | `import_id` | No | Volume ID to adopt |
-| `attachment_import_id` | No | Attachment to adopt, `/dev/sdf:i-0123456789abcdef0:vol-0123456789abcdef0` |
+| `attachment_import_id` | No | Attachment to adopt, `<device>:<volume-id>:<instance-id>`, for example `/dev/sdf:vol-0123456789abcdef0:i-0123456789abcdef0` |
 
 ## IPv6-only instances
 
@@ -170,6 +170,7 @@ ebs_volume:
 - `ipv6_address_count` (default 1) and `associate_public_ip_address = false`
 - `metadata_options { http_protocol_ipv6 = "enabled" }`, so the instance metadata service is reachable over IPv6
 - `private_dns_name_options { hostname_type = "resource-name" }`, because IP-based hostnames need IPv4
+- `enable_resource_name_dns_aaaa_record = true` in the same block, so the resource name resolves to the instance's IPv6 address
 
 It conflicts with `associate_public_ip_address: true`. `ipv6_address_count` alone also works on a dual-stack subnet. The subnet must have an IPv6 CIDR.
 
