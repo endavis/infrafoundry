@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794825367208,
+  "lastUpdate": 1794827048500,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1714,6 +1714,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000051158935322863414",
             "extra": "mean: 69.96634184478835 usec\nrounds: 15861"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "13c8456b69b9465613f1d7b5d20ea02705065ced",
+          "message": "feat: add an aws provider for ec2 instances, security groups and ebs volumes (merges PR #1398, addresses #1397)\n\nAdd an `aws` provider generating hashicorp/aws (~> 6.0) Terraform for\nsecurity_group (with per-rule resources), instance and ebs_volume.\n\n- Credentials come from the standard AWS chain; provider settings accept\n  region and profile only and reject key material.\n- Instances: AMI by ID or SSM public parameter (ignore_changes on ami by\n  default), IPv6-only support, IMDSv2 required and encrypted gp3 root by\n  default, cloud-init and Tailscale join as on OCI.\n- EBS volumes are prevent_destroy by default and are forgotten from\n  state, not deleted, on infra destroy.\n- import_id on every type, plus per-rule and attachment import ids, to\n  adopt existing resources.\n- Config validation without network calls (no boto3).\n- ADR-0021 and docs/providers/aws.md.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T11:02:58Z",
+          "tree_id": "ec993a6e6ed17d0ec3f48eacb921a1e00aeb9bd4",
+          "url": "https://github.com/endavis/infrafoundry/commit/13c8456b69b9465613f1d7b5d20ea02705065ced"
+        },
+        "date": 1794827047625,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 61.55669410513246,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00047138847353393916",
+            "extra": "mean: 16.24518688888821 msec\nrounds: 63"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 11043.110055570727,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000720641210601081",
+            "extra": "mean: 90.55420030841287 usec\nrounds: 12321"
           }
         ]
       }
