@@ -1439,3 +1439,107 @@ class TestDefaultMaxWorkers:
     def test_falls_back_to_four_when_unknown(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr("infrafoundry.core.deployment_executor.os.cpu_count", lambda: None)
         assert default_max_workers() == 4
+
+
+def _failed_apply_executor(
+    apply_mock: MagicMock, ids: dict[str, int]
+) -> tuple[DeploymentExecutor, MagicMock, MagicMock, MagicMock]:
+    """Build an executor whose runner uses ``apply_mock`` and tracks ``ids``."""
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.apply = apply_mock
+    tf_runner.get_resource_ids = MagicMock(return_value={})
+    runner_registry.create_runner.return_value = tf_runner
+
+    state_manager = MagicMock()
+    state_manager.track_resource.side_effect = [
+        MagicMock(id=rid, terraform_id=None) for rid in ids.values()
+    ]
+    event_manager = MagicMock()
+    provider = MagicMock()
+    executor = DeploymentExecutor(
+        runner_registry=runner_registry,
+        state_manager=state_manager,
+        event_manager=event_manager,
+        providers={"proxmox": provider},
+    )
+    return executor, state_manager, event_manager, provider
+
+
+def _run_failed_apply(executor: DeploymentExecutor, provider: MagicMock, names: list[str]) -> None:
+    executor.apply_single_provider(
+        env_name="dev",
+        deployment_id=1,
+        provider_name="proxmox",
+        provider=provider,
+        resources=[_resource(n) for n in names],
+        auto_approve=True,
+    )
+
+
+def _emitted(event_manager: MagicMock, event_type: EventType) -> list[Any]:
+    return [c for c in event_manager.emit_event.call_args_list if c[0][0] == event_type]
+
+
+def test_failed_apply_raise_marks_rows_error() -> None:
+    """A raising runner leaves this run's rows ERROR, never ACTIVE (#1414)."""
+    executor, state_manager, event_manager, provider = _failed_apply_executor(
+        MagicMock(side_effect=RuntimeError("terraform crashed")), {"vm1": 11, "vm2": 12}
+    )
+
+    with pytest.raises(RuntimeError, match="terraform crashed"):
+        _run_failed_apply(executor, provider, ["vm1", "vm2"])
+
+    calls = state_manager.update_resource_state.call_args_list
+    assert sorted((c.kwargs["resource_id"], c.kwargs["state"]) for c in calls) == [
+        (11, ResourceState.ERROR),
+        (12, ResourceState.ERROR),
+    ]
+    failed = _emitted(event_manager, EventType.RESOURCE_FAILED)
+    assert sorted(c[0][2]["name"] for c in failed) == ["vm1", "vm2"]
+    assert _emitted(event_manager, EventType.RESOURCE_CREATED) == []
+    # RUNNER_FAILED is emitted before the rows are marked failed.
+    types = [c[0][0] for c in event_manager.emit_event.call_args_list]
+    assert types.index(EventType.RUNNER_FAILED) < types.index(EventType.RESOURCE_FAILED)
+
+
+def test_failed_apply_success_false_marks_rows_error() -> None:
+    """A success=False result raises TerraformError and never reaches the ACTIVE loop."""
+    executor, state_manager, event_manager, provider = _failed_apply_executor(
+        MagicMock(return_value={"success": False, "error": "boom", "resource_outcomes": []}),
+        {"vm1": 11},
+    )
+
+    with pytest.raises(TerraformError):
+        _run_failed_apply(executor, provider, ["vm1"])
+
+    states = [c.kwargs["state"] for c in state_manager.update_resource_state.call_args_list]
+    assert states == [ResourceState.ERROR]
+    assert len(_emitted(event_manager, EventType.RESOURCE_FAILED)) == 1
+    assert _emitted(event_manager, EventType.RESOURCE_CREATED) == []
+
+
+def test_failed_apply_marking_error_does_not_mask_runner_error() -> None:
+    """A state-DB failure while marking ERROR leaves the runner's exception intact."""
+    executor, state_manager, _event_manager, provider = _failed_apply_executor(
+        MagicMock(side_effect=RuntimeError("terraform crashed")), {"vm1": 11}
+    )
+    state_manager.update_resource_state.side_effect = RuntimeError("db down")
+
+    with pytest.raises(RuntimeError, match="terraform crashed"):
+        _run_failed_apply(executor, provider, ["vm1"])
+
+
+def test_successful_apply_never_marks_error() -> None:
+    """The success path sets ACTIVE only and emits no RESOURCE_FAILED."""
+    executor, state_manager, event_manager, provider = _failed_apply_executor(
+        MagicMock(return_value={"success": True, "resource_outcomes": []}), {"vm1": 11}
+    )
+
+    _run_failed_apply(executor, provider, ["vm1"])
+
+    states = [c.kwargs["state"] for c in state_manager.update_resource_state.call_args_list]
+    assert ResourceState.ERROR not in states
+    assert _emitted(event_manager, EventType.RESOURCE_FAILED) == []

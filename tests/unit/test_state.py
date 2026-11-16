@@ -532,3 +532,38 @@ class TestManagedResources:
         rows = state_manager.get_managed_resources("dev", "opnsense")
         assert len(rows) == 1
         assert rows[0].config == {"v": 2}
+
+
+class TestFailedApplyRows:
+    """A failed apply marks its row ERROR and leaves the prior ACTIVE row managed (#1414)."""
+
+    def test_error_row_keeps_prior_active_managed(self, state_manager: StateManager) -> None:
+        dep = state_manager.create_deployment("dev", "apply")
+        active = state_manager.track_resource(
+            deployment_id=dep,
+            environment="dev",
+            provider="proxmox",
+            resource_type="vm",
+            name="vps-01",
+            state=ResourceState.ACTIVE,
+            config={"v": 1},
+        )
+        creating = state_manager.track_resource(
+            deployment_id=dep,
+            environment="dev",
+            provider="proxmox",
+            resource_type="vm",
+            name="vps-01",
+            state=ResourceState.CREATING,
+            config={"v": 2},
+        )
+        state_manager.update_resource_state(resource_id=creating.id, state=ResourceState.ERROR)
+
+        managed = state_manager.get_managed_resources("dev", "proxmox")
+        assert [r.id for r in managed] == [active.id]
+        newest = max(
+            state_manager.get_resources(environment="dev", provider="proxmox"),
+            key=lambda r: r.id,
+        )
+        assert newest.id == creating.id
+        assert newest.state == ResourceState.ERROR

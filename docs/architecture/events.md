@@ -97,7 +97,7 @@ Categorized event types for different lifecycle phases and operations.
    - `RESOURCE_CREATED`
    - `RESOURCE_UPDATED`
    - `RESOURCE_DELETED`
-   - `RESOURCE_FAILED`
+   - `RESOURCE_FAILED` - Emitted per resource when an IaC apply fails; the resource's state row is set to `ERROR` (the previous `ACTIVE` row stays the managed record)
 
 3. **Runner Events** - Runner lifecycle within a workflow *(deprecated)*
    - `RUNNER_STARTING` - Emitted before a runner executes *(deprecated, use resource lifecycle events)*
