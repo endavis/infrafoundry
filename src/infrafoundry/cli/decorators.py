@@ -70,8 +70,8 @@ def with_orchestrator(
             except click.ClickException:
                 # Already a Click exception, re-raise as-is
                 raise
-            except KeyboardInterrupt as exc:
-                # User cancelled, convert to Click exception
+            except (KeyboardInterrupt, click.Abort) as exc:
+                # User cancelled (Ctrl-C, or a prompt hit end of input).
                 raise click.ClickException("Operation cancelled") from exc
             except (EnvironmentNotFoundError, ConfigurationError) as exc:
                 # Configuration errors - show helpful message with error codes
