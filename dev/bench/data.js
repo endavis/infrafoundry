@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794842422896,
+  "lastUpdate": 1794842722705,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2170,6 +2170,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005323562460690715",
             "extra": "mean: 71.03547863486746 usec\nrounds: 15937"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "eb6aa83b06749689c119dc5d7e575129eb6c8591",
+          "message": "fix: mark deleting resources as error when a destroy fails (merges PR #1422, addresses #1420)\n\nWhen a runner raised or reported failure during destroy, the rows recorded\nas DELETING were never updated. The destroy failure handler now marks this\nrun's rows ERROR and emits RESOURCE_FAILED per resource, best-effort so a\nstate error never masks the runner's exception. Mirrors the apply-side fix.\n\nAddresses #1420\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T15:24:07Z",
+          "tree_id": "bad36f903af8ee97ba74d9f33a561f11bb833704",
+          "url": "https://github.com/endavis/infrafoundry/commit/eb6aa83b06749689c119dc5d7e575129eb6c8591"
+        },
+        "date": 1794842722161,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 73.80739552523066,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00033126469189431013",
+            "extra": "mean: 13.548777773335132 msec\nrounds: 75"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12933.47063523226,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005692681446807226",
+            "extra": "mean: 77.31876680307954 usec\nrounds: 13688"
           }
         ]
       }
