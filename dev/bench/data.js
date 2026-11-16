@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794836363731,
+  "lastUpdate": 1794837559743,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1942,6 +1942,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008729005766457333",
             "extra": "mean: 127.93661555098883 usec\nrounds: 8321"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5cc33d947cb5a5e0c670bde37d8ad00f1e89ce9e",
+          "message": "feat: manage existing hosts through a host provider (merges PR #1410, addresses #1408)\n\n* feat: manage existing hosts through a host provider\n\nAdd a host provider and HostRunner for machines no provider creates.\nApply writes an Ansible inventory and runs per-host playbooks plus\nTailscale enrollment; hosts are recorded in state so deployed, -r and\n-P work. Destroy only forgets the host and runs cleanup hooks, never\ntouching the machine. Includes docs and ADR-0022.\n\nAddresses #1408\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: drop nosec markers for bandit ids already skipped in config\n\nB603 is in [tool.bandit] skips, so the security-triage guard rejects a\nnosec comment naming it.\n\nAddresses #1408\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T13:58:21Z",
+          "tree_id": "ab6a48fa38cedcfb4d6fa00e2c6b09603fd8c9ec",
+          "url": "https://github.com/endavis/infrafoundry/commit/5cc33d947cb5a5e0c670bde37d8ad00f1e89ce9e"
+        },
+        "date": 1794837559419,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 68.66064220801137,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004928871848262368",
+            "extra": "mean: 14.564384599993142 msec\nrounds: 75"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13086.310739525028,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006772631400436543",
+            "extra": "mean: 76.41573090417806 usec\nrounds: 13694"
           }
         ]
       }
