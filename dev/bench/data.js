@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794844431601,
+  "lastUpdate": 1794844832926,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2284,6 +2284,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000756672615333176",
             "extra": "mean: 93.21204613737136 usec\nrounds: 12116"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ca06b9ae4376c7f641e5abff43602d59e05379c5",
+          "message": "feat: add a state reconcile command for stale planned rows (merges PR #1428, addresses #1423)\n\nfeat: add state reconcile command to supersede stale planned rows\n\nPlans written before #1417 left PLANNED rows on top of ACTIVE rows, so\ninfra deployed showed deployed resources as planned. state reconcile\nappends one ACTIVE row (copying config, terraform_id and extra_data)\nfor each resource whose newest non-PLANNED row is ACTIVE and has newer\nPLANNED rows. The resources table stays append-only (ADR-0018); rows\nare written under one reconcile deployment in a single transaction and\na state_reconciled audit entry is logged. Supports --dry-run and --yes,\nrefuses while a lock is held.\n\nAddresses #1423\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T15:59:29Z",
+          "tree_id": "fe19c35926ba8bd2164c4e2d0085ac4fe0f6806a",
+          "url": "https://github.com/endavis/infrafoundry/commit/ca06b9ae4376c7f641e5abff43602d59e05379c5"
+        },
+        "date": 1794844831860,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 46.899269938497085,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0013336105534493842",
+            "extra": "mean: 21.3222935306111 msec\nrounds: 49"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7776.716899423814,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009189099842958331",
+            "extra": "mean: 128.58896793248206 usec\nrounds: 8295"
           }
         ]
       }
