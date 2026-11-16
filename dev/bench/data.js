@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794847891937,
+  "lastUpdate": 1794850011476,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2436,6 +2436,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000019978212213815355",
             "extra": "mean: 137.51285795925344 usec\nrounds: 8399"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cff4f4aaf86d28aebb63a480aa6225d6d118c015",
+          "message": "feat: run providers' offline validation as part of infra plan (merges PR #1436, addresses #1433)\n\ninfra plan, and so infra apply, now runs the network-free part of each\nprovider's validation before any change set is computed. Warnings are\nprinted and the plan continues; errors print the report, mark the\ndeployment failed and raise ConfigValidationError (IF-VALIDATION-007).\n\nProviders opt in through the new ValidatesOffline protocol. OPNsense,\nProxmox, OCI and host split their validate_references into an offline\npart (run on plan) and a live part (doctor only); AWS, ESXi and\nTailscale were already offline. infra doctor runs the same checks as\nbefore. The host SSH probe and OPNsense endpoint support stay out of\nthe plan pass. Kubernetes is left out: its validator was never wired\ninto doctor either (#1435).\n\nRecords the decision in ADR-0023.\n\nAddresses #1433\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T17:25:51Z",
+          "tree_id": "ede78daeb335bb2c1dc9bf31eb04390ca42e0f71",
+          "url": "https://github.com/endavis/infrafoundry/commit/cff4f4aaf86d28aebb63a480aa6225d6d118c015"
+        },
+        "date": 1794850010578,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 48.20572019075997,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0002513125145160559",
+            "extra": "mean: 20.744426098039693 msec\nrounds: 51"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7759.021421020285,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009505645430869017",
+            "extra": "mean: 128.88223214474684 usec\nrounds: 8331"
           }
         ]
       }
