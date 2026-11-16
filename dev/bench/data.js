@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794845521621,
+  "lastUpdate": 1794847070396,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2360,6 +2360,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008279438375227244",
             "extra": "mean: 126.06964865475047 usec\nrounds: 8439"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f95b9150dc22d74539b6538e13d0489f32f264d4",
+          "message": "feat: support kea dhcpv4 high availability on opnsense (merges PR #1431, addresses #1392)\n\nAdd two direct-API resource types on the kea/dhcpv4 controller:\nkea.dhcp4.ha (singleton: enabled, this_server_name, max_unacked_clients)\nand kea.dhcp4.ha_peers (managed set keyed by peer name: role, url). A new\nKeaHAValidator requires exactly one primary and one standby when HA is\nenabled and that a set this_server_name names a peer; an empty one (each\nnode falls back to its hostname, the CARP-safe choice) is reported as info.\n\nThe HA types dispatch before kea.dhcp4.subnets: saving the dhcpv4 settings\nmakes OPNsense re-run option-data auto-collect on auto_collect subnets,\nand the later subnet write restores explicitly configured options in the\nsame apply.\n\nAddresses #1392\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T16:36:52Z",
+          "tree_id": "0dd1702a9b8402c6d9ce1ac578ed74307bfbce37",
+          "url": "https://github.com/endavis/infrafoundry/commit/f95b9150dc22d74539b6538e13d0489f32f264d4"
+        },
+        "date": 1794847069505,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 99.02385615140064,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00033140229231715785",
+            "extra": "mean: 10.098576634614886 msec\nrounds: 104"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16221.413609787878,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000031247200664741793",
+            "extra": "mean: 61.64690846651043 usec\nrounds: 16890"
           }
         ]
       }
