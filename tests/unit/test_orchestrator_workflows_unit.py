@@ -33,7 +33,7 @@ from infrafoundry.core.orchestrator_workflows import (
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY, BaseRunner
 from infrafoundry.core.runners.terraform_runner import TerraformRunner
-from infrafoundry.core.state import DeploymentStatus
+from infrafoundry.core.state import DeploymentStatus, ResourceState
 from infrafoundry.core.types import ResourceOutcome
 
 
@@ -3499,3 +3499,105 @@ def test_plan_of_destroyed_resource_records_planned(console: Console, tmp_path: 
     state_manager, _, _ = _track_plan(console, tmp_path, ["active", "deleted"], _resource("vm1"))
 
     assert _states(state_manager) == ["active", "deleted", "planned"]
+
+
+def _failed_destroy_orchestrator(
+    console: Console, destroy: Any
+) -> tuple[DestroyOrchestrator, MagicMock, MagicMock]:
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 50
+    ids = iter([11, 12])
+    state_manager.track_resource.side_effect = lambda **kw: MagicMock(
+        id=next(ids), terraform_id=None
+    )
+    event_manager = MagicMock()
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.is_iac_runner = True
+    tf_runner.destroy = destroy
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
+
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    providers = cast("dict[str, ProviderBase]", {"proxmox": MagicMock()})
+    resources = [_resource("vm1"), _resource("vm2")]
+
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=lambda env: (resources, {"proxmox": resources}),
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"], 1)
+        ],
+        get_current_user=lambda: "tester",
+    )
+    orchestrator.runners = cast("dict[str, BaseRunner]", {"terraform": tf_runner})
+    return orchestrator, state_manager, event_manager
+
+
+def _run_failed_destroy(orchestrator: DestroyOrchestrator) -> None:
+    orchestrator.destroy(
+        env_name="dev",
+        resource_filter=None,
+        auto_approve=True,
+        confirm_callback=lambda: True,
+    )
+
+
+def _assert_rows_marked_error(state_manager: MagicMock, event_manager: MagicMock) -> None:
+    calls = state_manager.update_resource_state.call_args_list
+    error_ids = [c.kwargs["resource_id"] for c in calls if c.kwargs["state"] == ResourceState.ERROR]
+    assert sorted(error_ids) == [11, 12]
+    assert not any(c.kwargs["state"] == ResourceState.DELETED for c in calls)
+    failed = [
+        c for c in event_manager.emit_event.call_args_list if c[0][0] == EventType.RESOURCE_FAILED
+    ]
+    assert sorted(c[0][2]["name"] for c in failed) == ["vm1", "vm2"]
+    assert all(c.kwargs["resource_scoped"] is True for c in failed)
+    assert all(c.kwargs["target_resources"] == [c[0][2]["name"]] for c in failed)
+
+
+def test_destroy_marks_deleting_rows_error_when_runner_raises(console: Console) -> None:
+    """A runner that raises leaves no DELETING rows: they become ERROR (#1420)."""
+    orchestrator, state_manager, event_manager = _failed_destroy_orchestrator(
+        console, MagicMock(side_effect=RuntimeError("boom"))
+    )
+
+    with pytest.raises(RuntimeError, match="boom"):
+        _run_failed_destroy(orchestrator)
+
+    _assert_rows_marked_error(state_manager, event_manager)
+
+
+def test_destroy_marks_deleting_rows_error_when_runner_reports_failure(
+    console: Console,
+) -> None:
+    """A runner returning success=False leaves no DELETING rows (#1420)."""
+    from infrafoundry.core.exceptions import TerraformError
+
+    orchestrator, state_manager, event_manager = _failed_destroy_orchestrator(
+        console,
+        MagicMock(return_value={"success": False, "exit_code": 1, "error": "nope"}),
+    )
+
+    with pytest.raises(TerraformError):
+        _run_failed_destroy(orchestrator)
+
+    _assert_rows_marked_error(state_manager, event_manager)
+
+
+def test_destroy_state_failure_while_marking_does_not_mask_runner_error(
+    console: Console,
+) -> None:
+    """A state error while marking ERROR is swallowed; the runner's error propagates."""
+    orchestrator, state_manager, _ = _failed_destroy_orchestrator(
+        console, MagicMock(side_effect=RuntimeError("boom"))
+    )
+    state_manager.update_resource_state.side_effect = OSError("db locked")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        _run_failed_destroy(orchestrator)
