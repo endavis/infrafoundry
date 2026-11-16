@@ -61,7 +61,7 @@ class CRDValidator(SpecializedValidator[KubernetesApiContext]):
         """
         server_url = context.server_url
         headers = context.headers
-        verify_ssl = context.verify_ssl
+        verify_ssl = context.verify
         manifests = context.manifests
         if not manifests:
             return
@@ -72,7 +72,9 @@ class CRDValidator(SpecializedValidator[KubernetesApiContext]):
             return
 
         # Fetch installed CRDs
-        installed_groups = self._fetch_crd_groups(server_url, headers, verify_ssl)
+        installed_groups = self._fetch_crd_groups(
+            server_url, headers, verify_ssl, context.client_cert
+        )
         if installed_groups is None:
             return  # API error already reported
 
@@ -85,6 +87,17 @@ class CRDValidator(SpecializedValidator[KubernetesApiContext]):
                         f"CRD group '{group}' is installed "
                         f"(used by: {', '.join(sorted(resource_names))})"
                     ),
+                )
+            elif context.helm_releases_in_config:
+                self.report.add_check(
+                    check_name=f"kubernetes_crd_{group}",
+                    passed=True,
+                    message=(
+                        f"CRD group '{group}' not found in cluster; it may be installed by a "
+                        f"Helm release in this configuration "
+                        f"(required by: {', '.join(sorted(resource_names))})"
+                    ),
+                    level=ValidationLevel.WARNING,
                 )
             else:
                 self.report.add_check(
@@ -106,7 +119,12 @@ class CRDValidator(SpecializedValidator[KubernetesApiContext]):
         groups: dict[str, list[str]] = {}
         for manifest in manifests:
             config = manifest.config or {}
-            api_version = config.get("apiVersion", "")
+            body = config.get("manifest")
+            api_version = ""
+            if isinstance(body, dict):
+                api_version = str(body.get("apiVersion") or "")
+            if not api_version:
+                api_version = str(config.get("apiVersion") or "")
             group = self._parse_api_group(api_version)
             if group and group not in _STANDARD_API_GROUPS:
                 groups.setdefault(group, []).append(manifest.name)
@@ -129,7 +147,8 @@ class CRDValidator(SpecializedValidator[KubernetesApiContext]):
         self,
         server_url: str,
         headers: dict[str, str],
-        verify_ssl: bool,
+        verify_ssl: bool | str,
+        client_cert: tuple[str, str] | None = None,
     ) -> set[str] | None:
         """Fetch the set of API groups that have CRDs installed.
 
@@ -144,6 +163,7 @@ class CRDValidator(SpecializedValidator[KubernetesApiContext]):
             check_name="kubernetes_crds_list",
             error_message="Failed to list CRDs (status {status})",
             error_level=ValidationLevel.WARNING,
+            cert=client_cert,
         )
         if data is None:
             return None

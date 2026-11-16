@@ -35,6 +35,7 @@ Alternatives rejected:
 ## Related Issues
 
 - Issue #1433: run provider validation as part of infra plan
+- Issue #1435: wire Kubernetes validation into doctor and plan
 - Issue #1133: validate references against resources outside a filter
 
 ## Related Documentation

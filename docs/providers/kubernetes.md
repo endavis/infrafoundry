@@ -199,7 +199,7 @@ resources:
           key: value
 ```
 
-Only `apiVersion`, `kind`, `metadata.name`, `metadata.namespace`, `metadata.labels`, `metadata.annotations` and `spec` of the manifest are rendered; any other top-level key of the manifest is dropped. `foundry infra doctor` checks that the CRD group of each custom `apiVersion` is installed in the cluster.
+Only `apiVersion`, `kind`, `metadata.name`, `metadata.namespace`, `metadata.labels`, `metadata.annotations` and `spec` of the manifest are rendered; any other top-level key of the manifest is dropped. `foundry infra doctor` checks that the CRD group of each custom `apiVersion` (read from `manifest.apiVersion`) is installed in the cluster. A missing group is a warning when the configuration also defines Helm releases, which may install the CRD.
 
 #### Automatic Helm Dependencies
 
@@ -278,7 +278,11 @@ The keys `config` reads:
 
 The booleans are `atomic`, `cleanup_on_fail`, `dependency_update`, `force_update`, `lint`, `recreate_pods`, `replace`, `reset_values`, `reuse_values`, `skip_crds`, `wait` and `wait_for_jobs`.
 
-`foundry infra doctor` reports a Helm release that has no `chart` or no `repository`.
+`repository` is required only when `chart` is a bare chart name; `oci://` references and chart paths need none. `foundry infra plan`, `apply` and `doctor` report a Helm release that has no `chart`, or a bare chart name with no `repository`.
+
+### Validation
+
+`infra plan` and `infra apply` run the offline checks (cross-references, secret `data` encoding, Helm releases). `infra doctor` adds the cluster checks. It finds the kubeconfig in the same order as Terraform: `KUBECONFIG`, then `kubeconfig_path`, then `~/.kube/config`. The cluster checks authenticate with a bearer `token`, a `tokenFile` or a client certificate (`client-certificate-data` / `client-key-data`, or the file path forms). A missing kubeconfig gives a warning, not an error, because the cluster may be created in the same apply.
 
 ## Dependencies
 

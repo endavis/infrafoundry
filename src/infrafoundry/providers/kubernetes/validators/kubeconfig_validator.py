@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import os
+import shutil
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, override
@@ -22,14 +27,20 @@ class KubeConnectionInfo:
     headers: dict[str, str] = field(default_factory=dict)
     verify_ssl: bool = True
     connected: bool = False
+    client_cert: tuple[str, str] | None = None
+    ca_bundle: str | None = None
 
 
 class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
     """Validates kubeconfig file and establishes connection info.
 
-    Parses the kubeconfig to extract server URL, bearer token,
-    and CA certificate info. Tests API connectivity and stores
+    Parses the kubeconfig to extract server URL, bearer token or client
+    certificate, and CA certificate info. Tests API connectivity and stores
     connection state for other validators.
+
+    Inline certificate and key data is written to files in a private temporary
+    directory (mode 0700, files 0600). Call :meth:`cleanup` when the connection
+    is no longer needed; it removes the directory.
     """
 
     def __init__(self, api_validator: BaseAPIValidator, report: ValidationReport) -> None:
@@ -42,7 +53,8 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
         self.api_validator = api_validator
         self.report = report
         self._connection_info = KubeConnectionInfo()
-        self._ca_temp_file: Any = None
+        self._temp_dir: Path | None = None
+        self._client_cert: tuple[str, str] | None = None
 
     @property
     def is_connected(self) -> bool:
@@ -54,6 +66,42 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
         """Connection info extracted from kubeconfig."""
         return self._connection_info
 
+    def cleanup(self) -> None:
+        """Remove the temporary credential files and drop the connection.
+
+        Safe to call more than once. When files had been written, the connection is
+        marked as not connected, since its certificate paths no longer exist.
+        """
+        if self._temp_dir is None:
+            return
+        shutil.rmtree(self._temp_dir, ignore_errors=True)
+        self._temp_dir = None
+        self._client_cert = None
+        self._connection_info = KubeConnectionInfo(
+            server_url=self._connection_info.server_url,
+            headers=self._connection_info.headers,
+            verify_ssl=self._connection_info.verify_ssl,
+        )
+
+    def _write_secret_file(self, name: str, content: bytes) -> str:
+        """Write credential bytes to a 0600 file in the private temp directory.
+
+        Args:
+            name: File name inside the temporary directory.
+            content: Bytes to write.
+
+        Returns:
+            Path of the written file.
+        """
+        if self._temp_dir is None:
+            self._temp_dir = Path(tempfile.mkdtemp(prefix="infrafoundry-kube-"))
+            self._temp_dir.chmod(0o700)
+        path = self._temp_dir / name
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(content)
+        return str(path)
+
     @override
     def validate(self, context: KubeconfigContext) -> None:
         """Validate kubeconfig and test API connectivity.
@@ -61,6 +109,7 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
         Args:
             context: Kubeconfig path and optional context override.
         """
+        self.cleanup()
         kubeconfig_path = context.kubeconfig_path
         context_override = context.context_override
         resolved_path = self._resolve_kubeconfig_path(kubeconfig_path)
@@ -104,6 +153,8 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
             server_url=server_url.rstrip("/"),
             headers=headers,
             verify_ssl=verify_ssl,
+            client_cert=self._client_cert,
+            ca_bundle=self._resolve_ca_bundle(cluster_info) if verify_ssl else None,
         )
 
         # Test connectivity
@@ -124,7 +175,10 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
             self.report.add_check(
                 check_name="kubernetes_kubeconfig",
                 passed=False,
-                message="No kubeconfig_path specified and default ~/.kube/config not found",
+                message=(
+                    "No kubeconfig found (KUBECONFIG, kubeconfig_path, ~/.kube/config); "
+                    "cluster checks skipped"
+                ),
                 level=ValidationLevel.WARNING,
             )
             return None
@@ -134,8 +188,11 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
             self.report.add_check(
                 check_name="kubernetes_kubeconfig",
                 passed=False,
-                message=f"Kubeconfig not found at {path}",
-                level=ValidationLevel.ERROR,
+                message=(
+                    f"Kubeconfig not found at {path}; cluster checks skipped (the cluster "
+                    "may not exist yet, for example one created earlier in the same apply)"
+                ),
+                level=ValidationLevel.WARNING,
             )
             return None
 
@@ -287,12 +344,17 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
                     )
                 return headers
 
+            # Try client certificate
+            if self._resolve_client_cert(user_info, user_name):
+                return headers
+
             # No supported auth found
             self.report.add_check(
                 check_name="kubernetes_kubeconfig_auth",
                 passed=True,
                 message=(
-                    f"User '{user_name}' has no supported auth method (token or tokenFile expected)"
+                    f"User '{user_name}' has no supported auth method "
+                    "(token, tokenFile or client certificate expected)"
                 ),
                 level=ValidationLevel.WARNING,
             )
@@ -300,38 +362,104 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
 
         return headers
 
+    def _read_credential(
+        self, user_info: dict[str, Any], data_key: str, path_key: str, name: str
+    ) -> str | None:
+        """Resolve a certificate or key from inline base64 data or a file path.
+
+        Args:
+            user_info: The kubeconfig user entry.
+            data_key: Key holding base64 data (e.g. ``client-certificate-data``).
+            path_key: Key holding a file path (e.g. ``client-certificate``).
+            name: File name used when the data is written to the temp directory.
+
+        Returns:
+            Path of a readable file, or None when absent or unusable.
+        """
+        data = user_info.get(data_key)
+        if data:
+            try:
+                return self._write_secret_file(name, base64.b64decode(str(data), validate=True))
+            except (binascii.Error, ValueError, OSError):
+                return None
+        path = user_info.get(path_key)
+        if path and Path(str(path)).expanduser().is_file():
+            return str(Path(str(path)).expanduser())
+        return None
+
+    def _resolve_client_cert(self, user_info: dict[str, Any], user_name: str) -> bool:
+        """Resolve client-certificate auth for a user entry.
+
+        Args:
+            user_info: The kubeconfig user entry.
+            user_name: User name, used in messages (never the certificate contents).
+
+        Returns:
+            True when a usable certificate and key were found.
+        """
+        has_any = any(
+            user_info.get(k)
+            for k in (
+                "client-certificate-data",
+                "client-certificate",
+                "client-key-data",
+                "client-key",
+            )
+        )
+        if not has_any:
+            return False
+        cert = self._read_credential(
+            user_info, "client-certificate-data", "client-certificate", "client.crt"
+        )
+        key = self._read_credential(user_info, "client-key-data", "client-key", "client.key")
+        if cert and key:
+            self._client_cert = (cert, key)
+            return True
+        self.report.add_check(
+            check_name="kubernetes_kubeconfig_auth",
+            passed=False,
+            message=(
+                f"User '{user_name}' has an unusable client certificate or key "
+                "(missing, unreadable or not valid base64)"
+            ),
+            level=ValidationLevel.WARNING,
+        )
+        return True
+
+    def _resolve_ca_bundle(self, cluster_info: dict[str, Any]) -> str | None:
+        """Resolve the CA bundle file for verifying the server certificate.
+
+        Args:
+            cluster_info: The kubeconfig cluster entry.
+
+        Returns:
+            Path of a CA file (inline data is written to the temp directory), or None.
+        """
+        ca_path = cluster_info.get("certificate-authority")
+        if ca_path and Path(ca_path).expanduser().exists():
+            return str(Path(ca_path).expanduser())
+        ca_data = cluster_info.get("certificate-authority-data")
+        if ca_data:
+            try:
+                return self._write_secret_file(
+                    "ca.crt", base64.b64decode(str(ca_data), validate=True)
+                )
+            except (binascii.Error, ValueError, OSError):
+                return None
+        return None
+
     def _resolve_ca_cert(self, cluster_info: dict[str, Any]) -> bool:
         """Resolve CA certificate configuration.
 
         Returns:
-            True to verify SSL, False to skip verification.
+            True to verify SSL (against the CA bundle or the system store), False to
+            skip verification.
         """
         if cluster_info.get("insecure-skip-tls-verify"):
             return False
 
-        # Check for CA file path
-        ca_path = cluster_info.get("certificate-authority")
-        if ca_path and Path(ca_path).exists():
-            return True
-
-        # Check for inline CA data
-        ca_data = cluster_info.get("certificate-authority-data")
-        if ca_data:
-            # Inline CA data present but we can't easily use it with requests
-            # without writing to a temp file. Use verify=False with warning.
-            self.report.add_check(
-                check_name="kubernetes_kubeconfig_ca",
-                passed=True,
-                message=(
-                    "Using inline certificate-authority-data; "
-                    "SSL verification disabled for API checks"
-                ),
-                level=ValidationLevel.WARNING,
-            )
-            return False
-
         # No CA configured - skip verification
-        return False
+        return self._resolve_ca_bundle(cluster_info) is not None
 
     def _test_connectivity(self) -> None:
         """Test API connectivity using the extracted connection info."""
@@ -339,7 +467,7 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
         if not info.server_url:
             return
 
-        if not info.headers.get("Authorization"):
+        if not info.headers.get("Authorization") and not info.client_cert:
             self.report.add_check(
                 check_name="kubernetes_connectivity",
                 passed=True,
@@ -352,7 +480,8 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
         connected = self.api_validator.check_api_connectivity(
             url=url,
             headers=info.headers,
-            verify_ssl=info.verify_ssl,
+            verify_ssl=info.ca_bundle or info.verify_ssl,
+            cert=info.client_cert,
         )
 
         if connected:
@@ -361,11 +490,12 @@ class KubeconfigValidator(SpecializedValidator[KubeconfigContext]):
             version_data = self.api_validator.fetch_json(
                 url=f"{info.server_url}/version",
                 headers=info.headers,
-                verify_ssl=info.verify_ssl,
+                verify_ssl=info.ca_bundle or info.verify_ssl,
                 timeout=10,
                 check_name="kubernetes_version",
                 error_level=ValidationLevel.INFO,
                 optional=True,
+                cert=info.client_cert,
             )
             if version_data:
                 version = version_data.get("gitVersion", "unknown")

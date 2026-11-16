@@ -6,13 +6,16 @@ from typing import Any, ClassVar, override
 
 import yaml
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
 )
+from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.kubernetes.names import CONFIG_NAME_TYPES, kubernetes_object_name
+from infrafoundry.providers.kubernetes.validator import KubernetesValidator
 
 
 class KubernetesProvider(
@@ -41,6 +44,43 @@ class KubernetesProvider(
         """Validate Kubernetes configuration."""
         required_fields = ["name"]
         return all(field in config for field in required_fields)
+
+    @override
+    def validate_connectivity(
+        self, env_config: EnvironmentConfig, report: ValidationReport
+    ) -> None:
+        """Validate the kubeconfig and connectivity to the Kubernetes API."""
+        KubernetesValidator(env_config, report).validate_connectivity()
+
+    @override
+    def validate_references(
+        self,
+        resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Validate Kubernetes references, including cluster checks when connected."""
+        KubernetesValidator(env_config, report).validate_references(resources)
+
+    def validate_references_in_context(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Validate *resources*, resolving names against *reference_resources* (#1435)."""
+        KubernetesValidator(env_config, report).validate_references(resources, reference_resources)
+
+    def validate_offline(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Run the checks that need no kubeconfig or network (#1435)."""
+        KubernetesValidator(env_config, report).validate_offline(resources, reference_resources)
 
     _CREDENTIAL_ENV_MAPPING: ClassVar[dict[str, str]] = {
         "KUBECONFIG": "kubeconfig_path",
