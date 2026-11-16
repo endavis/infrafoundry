@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794832171691,
+  "lastUpdate": 1794834303508,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1828,6 +1828,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005215880728758747",
             "extra": "mean: 91.91186935732902 usec\nrounds: 11918"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b5bb0b5d4bbb7ebfe21e227eb8d0f38c6b738509",
+          "message": "fix: scope package event handlers to the operation's packages, resources and providers (merges PR #1406, addresses #1403)\n\nPackage-level handlers were filtered only by -p, so a resource-targeted\ndestroy (-r) or a provider-scoped apply (-P) ran handlers of unrelated\npackages.\n\n- Package loader tags package-level handlers with the package's resource\n  names and providers.\n- EventContext gains provider_filter; BaseHandler.matches_scope combines\n  package, resource and provider scoping, used by the event bus.\n- Plan, apply and destroy emit their workflow events through one helper\n  that passes target_resources, package_filter and provider_filter.\n- Whole-environment operations, environment-level and resource-owned\n  handlers are unchanged.\n\ntest_plan_orchestrator_dry_run_skips_generation now expects the new\nprovider_filter=None argument on BEFORE_PLAN/AFTER_PLAN (approved).\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T13:03:59Z",
+          "tree_id": "771692666d23457fc3b7cb2c38fd556dc6d6ac7a",
+          "url": "https://github.com/endavis/infrafoundry/commit/b5bb0b5d4bbb7ebfe21e227eb8d0f38c6b738509"
+        },
+        "date": 1794834302845,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.02993941274131,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00035139373392340136",
+            "extra": "mean: 20.395701320000654 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7747.452463215172,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009302394927012849",
+            "extra": "mean: 129.0746867758131 usec\nrounds: 8371"
           }
         ]
       }
