@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794835758735,
+  "lastUpdate": 1794836363731,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1904,6 +1904,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000015469339068210643",
             "extra": "mean: 60.50940700506261 usec\nrounds: 17673"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4b73f2537e0fcbaf673ffea36b582c2300970243",
+          "message": "fix: report an outputs-only terraform plan instead of an unparsable one (merges PR #1409, addresses #1404)\n\nextract_plan_summary now recognises \"Changes to Outputs:\" and returns\n\"Output changes only\"; parse_plan_for_drift treats it as no resource\nchanges. A Plan line still takes precedence.\n\nAddresses #1404\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T13:38:14Z",
+          "tree_id": "f3e53dc73eb3cbf544d8ec73f64f028b8222d2c7",
+          "url": "https://github.com/endavis/infrafoundry/commit/4b73f2537e0fcbaf673ffea36b582c2300970243"
+        },
+        "date": 1794836362813,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.57898387236805,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0001568342158468284",
+            "extra": "mean: 20.16983652941165 msec\nrounds: 51"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7816.370596433767,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008729005766457333",
+            "extra": "mean: 127.93661555098883 usec\nrounds: 8321"
           }
         ]
       }
