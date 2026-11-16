@@ -29,6 +29,7 @@ from infrafoundry.providers.opnsense.validators import (
     InterfacesSettingsValidator,
     KeaHAValidator,  # #1392
     KeaReservationValidator,
+    KeaSubnetAutoCollectValidator,  # #1432
     MonitValidator,  # #791
     NATRuleValidator,
     OpenVpnInstanceValidator,
@@ -119,6 +120,7 @@ class OPNsenseValidator:
         self.unbound_forward_validator = UnboundForwardValidator(report)
         self.kea_reservation_validator = KeaReservationValidator(report)
         self.kea_ha_validator = KeaHAValidator(report)  # #1392
+        self.kea_subnet_autocollect_validator = KeaSubnetAutoCollectValidator(report)  # #1432
         self.radvd_validator = RadvdValidator(report)
         self.cron_jobs_validator = CronJobsValidator(report)
         self.trust_validator = TrustValidator(report)
@@ -407,6 +409,9 @@ class OPNsenseValidator:
                 replace(context, resources=resource_refs["tailscale"])
             )
             self.kea_ha_validator.validate(replace(context, resources=resource_refs["kea_ha"]))
+            self.kea_subnet_autocollect_validator.validate(
+                replace(context, resources=resource_refs["kea_dhcp4_subnets"])
+            )
             self.monit_validator.validate(replace(context, resources=resource_refs["monit"]))
             self.system_firmware_validator.validate(
                 replace(context, resources=resource_refs["system_firmware"])

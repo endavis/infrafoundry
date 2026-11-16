@@ -218,6 +218,8 @@ foundry infra doctor --env <env> -P opnsense
 
 The check tests connectivity to the API (`validate_connectivity`), that referenced OPNsense resources exist, and the endpoint support described above (`validate_references`).
 
+`infra doctor` also warns when a `kea.dhcp4.subnets` entry sets `auto_collect: true` together with `routers`, `dns_servers` or `ntp_servers`. Saving the Kea DHCPv4 settings re-runs auto-collect and overwrites those values; set `auto_collect: false` to keep them. See [Kea DHCPv4 high availability](../development/opnsense-resource-coverage.md#kea-dhcpv4-high-availability-1392).
+
 ## Examples
 
 A plan that touches only OPNsense, without deleting anything the YAML omits:
