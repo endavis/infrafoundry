@@ -1,0 +1,60 @@
+# AWS security groups
+# Rules are separate resources (not inline blocks) so each can be imported.
+
+{% macro rule(kind, sg_tf, rule_tf, r) %}
+{% if r.get('import_id') %}
+import {
+  to = aws_vpc_security_group_{{ kind }}_rule.{{ rule_tf }}
+  id = {{ r.import_id | hcl_string }}
+}
+
+{% endif %}
+resource "aws_vpc_security_group_{{ kind }}_rule" "{{ rule_tf }}" {
+  security_group_id = aws_security_group.{{ sg_tf }}.id
+{% if r.get('description') %}
+  description       = {{ r.description | hcl_string }}
+{% endif %}
+  ip_protocol       = {{ r.ip_protocol | string | hcl_string }}
+{% if r.get('from_port') is not none %}
+  from_port         = {{ r.from_port }}
+{% endif %}
+{% if r.get('to_port') is not none %}
+  to_port           = {{ r.to_port }}
+{% endif %}
+{% if r.get('cidr_ipv4') %}
+  cidr_ipv4         = {{ r.cidr_ipv4 | hcl_string }}
+{% endif %}
+{% if r.get('cidr_ipv6') %}
+  cidr_ipv6         = {{ r.cidr_ipv6 | hcl_string }}
+{% endif %}
+}
+
+{% endmacro %}
+{% for sg in security_groups %}
+{% set n = sg.name | to_terraform_name %}
+resource "aws_security_group" "{{ n }}" {
+  name        = {{ sg.name | hcl_string }}
+  description = {{ sg.config.get('description', 'Managed by InfraFoundry') | hcl_string }}
+  vpc_id      = {{ sg.config.vpc_id | hcl_string }}
+
+  tags = {
+    Name = {{ sg.name | hcl_string }}
+{% for key, value in (sg.config.get('tags') or {}).items() %}
+    {{ key | hcl_string }} = {{ value | hcl_string }}
+{% endfor %}
+  }
+}
+
+{% for r in sg.config.get('ingress') or [] %}
+{{ rule('ingress', n, n ~ '_in_' ~ (r.name | to_terraform_name), r) }}
+{% endfor %}
+{# A Terraform-managed group has no default egress rule; allow all unless egress is set. #}
+{% if sg.config.get('egress') is none %}
+{{ rule('egress', n, n ~ '_out_allow_all_ipv4', {'ip_protocol': '-1', 'cidr_ipv4': '0.0.0.0/0', 'description': 'Allow all IPv4 egress'}) }}
+{{ rule('egress', n, n ~ '_out_allow_all_ipv6', {'ip_protocol': '-1', 'cidr_ipv6': '::/0', 'description': 'Allow all IPv6 egress'}) }}
+{% else %}
+{% for r in sg.config.egress %}
+{{ rule('egress', n, n ~ '_out_' ~ (r.name | to_terraform_name), r) }}
+{% endfor %}
+{% endif %}
+{% endfor %}

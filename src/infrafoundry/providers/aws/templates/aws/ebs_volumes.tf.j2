@@ -1,0 +1,53 @@
+# AWS EBS volumes and their attachments
+
+{% for volume in ebs_volumes %}
+{% set n = volume.name | to_terraform_name %}
+{% set c = volume.config %}
+resource "aws_ebs_volume" "{{ n }}" {
+  availability_zone = {{ c.availability_zone | hcl_string }}
+  size              = {{ c.size }}
+  type              = {{ c.get('type', 'gp3') | hcl_string }}
+  encrypted         = {{ c.get('encrypted', true) | lower }}
+{% if c.get('iops') %}
+  iops              = {{ c.iops }}
+{% endif %}
+{% if c.get('throughput') %}
+  throughput        = {{ c.throughput }}
+{% endif %}
+{% if c.get('kms_key_id') %}
+  kms_key_id        = {{ c.kms_key_id | hcl_string }}
+{% endif %}
+
+  tags = {
+    Name = {{ volume.name | hcl_string }}
+{% for key, value in (c.get('tags') or {}).items() %}
+    {{ key | hcl_string }} = {{ value | hcl_string }}
+{% endfor %}
+  }
+{% if c.get('prevent_destroy', true) %}
+
+  lifecycle {
+    prevent_destroy = true
+  }
+{% endif %}
+}
+
+{% if c.get('attachment_import_id') %}
+import {
+  to = aws_volume_attachment.{{ n }}_attachment
+  id = {{ c.attachment_import_id | hcl_string }}
+}
+
+{% endif %}
+resource "aws_volume_attachment" "{{ n }}_attachment" {
+  device_name = {{ c.get('device_name', '/dev/sdf') | hcl_string }}
+  volume_id   = aws_ebs_volume.{{ n }}.id
+{% if c.get('instance') %}
+  instance_id = aws_instance.{{ c.instance | to_terraform_name }}.id
+{% else %}
+  instance_id = {{ c.instance_id | hcl_string }}
+{% endif %}
+  stop_instance_before_detaching = true
+}
+
+{% endfor %}

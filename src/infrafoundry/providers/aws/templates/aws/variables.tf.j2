@@ -1,0 +1,25 @@
+variable "aws_region" {
+  description = "AWS region; null falls back to AWS_REGION or the shared config"
+  type        = string
+  default     = null
+}
+
+variable "aws_profile" {
+  description = "AWS shared-config profile; null falls back to AWS_PROFILE or the default chain"
+  type        = string
+  default     = null
+}
+
+{# Dynamic sensitive variables from resource ``terraform_secrets`` references.
+   Values are injected at apply time via TF_VAR_* env vars by the framework's
+   secrets-to-TF_VAR bridge; defaults stay empty so plan does not fail when a
+   secret is unset. #}
+{% for var in terraform_secret_vars | default([]) %}
+variable "{{ var.name }}" {
+  description = "Injected from secret reference '{{ var.source }}' via TF_VAR_{{ var.name }}."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+{% endfor %}

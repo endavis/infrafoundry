@@ -155,3 +155,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0018](0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md) | OPNsense direct-API deletes are limited to the managed set | Accepted |
 | [0019](0019-provider-sub-validators-share-one-validatecontext-contract.md) | Provider sub-validators share one validate(context) contract | Accepted |
 | [0020](0020-wrap-the-official-tailscale-terraform-provider-for-tailnet-control-plane-management.md) | Wrap the official Tailscale Terraform provider for tailnet control-plane management | Accepted |
+| [0021](0021-aws-provider-generates-hashicorpaws-terraform-with-credentials-from-the-standard-aws-chain.md) | AWS provider generates hashicorp/aws Terraform with credentials from the standard AWS chain | Accepted |
