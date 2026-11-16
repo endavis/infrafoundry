@@ -1078,6 +1078,11 @@ class TerraformRunner(BaseRunner):
 
             return ", ".join(parts) if parts else "No changes"
 
+        # An outputs-only plan has no ``Plan:`` line, only a ``Changes to Outputs:``
+        # block (#1404); it is neither unparsable nor "No changes".
+        if "Changes to Outputs:" in output:
+            return "Output changes only"
+
         if "No changes" in output or "no changes are needed" in output.lower():
             return "No changes"
 
@@ -1130,6 +1135,18 @@ class TerraformRunner(BaseRunner):
                 "to_change": to_change,
                 "to_destroy": to_destroy,
                 "summary": summary,
+                "raw_output": output,
+            }
+
+        # Outputs-only plan: no resource changes, but the plan is parsed (#1404).
+        if "Changes to Outputs:" in re.sub(r"\x1b\[[0-9;]*m", "", output):
+            return {
+                "has_changes": False,
+                "to_import": 0,
+                "to_add": 0,
+                "to_change": 0,
+                "to_destroy": 0,
+                "summary": self.extract_plan_summary(output),
                 "raw_output": output,
             }
 
