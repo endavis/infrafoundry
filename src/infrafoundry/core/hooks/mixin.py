@@ -5,7 +5,7 @@ execution logic used by PlanOrchestrator, ApplyOrchestrator, and
 DestroyOrchestrator.
 """
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from rich.console import Console
 
@@ -14,6 +14,8 @@ from infrafoundry.core.hooks.manager import HookExecutionError, HookManager
 if TYPE_CHECKING:
     from infrafoundry.core.config.models import EnvironmentConfig
     from infrafoundry.core.events.bus import UnifiedEventBus
+    from infrafoundry.core.events.context import EventResult
+    from infrafoundry.core.events.types import EventType
     from infrafoundry.core.provider import ResourceConfig
 
 
@@ -74,6 +76,42 @@ class HookExecutionMixin:
         except HookExecutionError as e:
             self.console.print(f"[red]Hook failed: {e}[/red]")
             raise
+
+    def _emit_workflow_event(
+        self,
+        event_type: "EventType",
+        env_name: str,
+        data: dict[str, Any],
+        *,
+        resource_filter: list[str] | None,
+        package_filter: str | None,
+        provider_filter: list[str] | None,
+    ) -> list["EventResult"]:
+        """Emit a workflow-level event with the operation's full scope.
+
+        This is the single scoping point for plan, apply and destroy events:
+        the ``-r``, ``-p`` and ``-P`` filters travel in the event context so a
+        package's handlers run only when the operation covers that package.
+
+        Args:
+            event_type: Workflow event to emit (e.g., BEFORE_APPLY).
+            env_name: Environment name.
+            data: Event-specific data.
+            resource_filter: Resource names from -r, or None.
+            package_filter: Package name from -p, or None.
+            provider_filter: Provider names from -P, or None.
+
+        Returns:
+            Results from the handlers that ran.
+        """
+        return self.event_manager.emit_event(
+            event_type,
+            env_name,
+            data,
+            target_resources=resource_filter,
+            package_filter=package_filter,
+            provider_filter=provider_filter,
+        )
 
     def _load_event_config(self, env_config: "EnvironmentConfig | None") -> None:
         """Register event handlers from environment configuration.

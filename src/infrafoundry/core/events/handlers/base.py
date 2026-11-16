@@ -22,6 +22,8 @@ class BaseHandler(ABC):
         self._name = config.get("name", self.__class__.__name__)
         self._package: str | None = config.get("_package")
         self._resource_owner: str | None = config.get("_resource_owner")
+        self._package_resources: list[str] | None = config.get("_package_resources")
+        self._package_providers: list[str] | None = config.get("_package_providers")
 
     @property
     def name(self) -> str:
@@ -88,6 +90,9 @@ class BaseHandler(ABC):
         - ``target_resources`` is None (no -r flag, all resources targeted).
         - For ``resources``: intersection between handler and target resources.
         - For ``requires``: ALL required resources must be in target resources.
+        - Without ``resources``/``requires``, a package-level handler tagged with
+          ``_package_resources`` needs an intersection with a non-None
+          ``target_resources``.
 
         Args:
             target_resources: Resource names from the -r CLI filter, or None.
@@ -115,11 +120,52 @@ class BaseHandler(ABC):
 
         # Check 'resources' — ANY intersection (filter semantics)
         handler_resources = self.config.get("resources")
-        if not handler_resources:
+        if handler_resources:
+            if target_resources is None:
+                return True
+            return bool(set(handler_resources) & set(target_resources))
+
+        # Package-level handler without its own filter: scope it to the
+        # resources of the package that declared it.
+        if self._package_resources is not None and target_resources is not None:
+            return bool(set(self._package_resources) & set(target_resources))
+        return True
+
+    def matches_providers(self, provider_filter: list[str] | None) -> bool:
+        """Check whether this handler should fire for the given provider filter.
+
+        A handler fires if no provider filter is set, it carries no
+        ``_package_providers`` (environment-level or older configs), or its
+        package's providers intersect the filter.
+
+        Args:
+            provider_filter: Provider names from the -P CLI flag, or None.
+
+        Returns:
+            True if this handler should execute, False to skip.
+        """
+        if provider_filter is None:
             return True
-        if target_resources is None:
+        if self._package_providers is None:
             return True
-        return bool(set(handler_resources) & set(target_resources))
+        return bool(set(self._package_providers) & set(provider_filter))
+
+    def matches_scope(self, context: EventContext) -> bool:
+        """Check whether this handler is in scope for the event's operation.
+
+        Combines the package (-p), resource (-r) and provider (-P) filters.
+
+        Args:
+            context: Event context carrying the operation's filters.
+
+        Returns:
+            True if this handler should execute, False to skip.
+        """
+        return (
+            self.matches_package(context.package_filter)
+            and self.matches_resources(context.target_resources)
+            and self.matches_providers(context.provider_filter)
+        )
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name})"

@@ -95,6 +95,7 @@ def test_plan_orchestrator_dry_run_skips_generation(console: Console) -> None:
         {"deployment_id": 1, "dry_run": True},
         target_resources=None,
         package_filter=None,
+        provider_filter=None,
     )
     event_manager.emit_event.assert_any_call(
         EventType.AFTER_PLAN,
@@ -102,6 +103,7 @@ def test_plan_orchestrator_dry_run_skips_generation(console: Console) -> None:
         {"deployment_id": 1, "results": result},
         target_resources=None,
         package_filter=None,
+        provider_filter=None,
     )
 
 
@@ -2975,3 +2977,118 @@ def test_plan_notes_receive_full_resource_list_with_filter() -> None:
 
     provider.get_plan_notes.assert_called_once()
     assert [r.name for r in provider.get_plan_notes.call_args.args[0]] == ["vm1"]
+
+
+def _emitted(event_manager: MagicMock, event_type: EventType) -> dict[str, Any]:
+    """Return the kwargs of the single emit_event call for event_type."""
+    calls = [c for c in event_manager.emit_event.call_args_list if c.args[0] == event_type]
+    assert len(calls) == 1
+    return dict(calls[0].kwargs)
+
+
+def test_apply_emits_workflow_events_with_full_scope(console: Console) -> None:
+    """Apply passes -r and -P scope into BEFORE_APPLY and AFTER_APPLY."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 104
+    event_manager = MagicMock()
+    orchestrator = ApplyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        lambda env: ([_resource("vm1")], {"proxmox": [_resource("vm1")]}),
+        apply_serial=MagicMock(return_value={"proxmox": {"success": True}}),
+        apply_parallel=MagicMock(),
+        get_current_user=lambda: "tester",
+        load_environment=lambda _: _make_env_config_with_events({}),
+    )
+
+    orchestrator.apply(
+        env_name="dev",
+        resource_filter=["vm1"],
+        auto_approve=True,
+        parallel=False,
+        max_workers=1,
+        provider_filter=["proxmox"],
+    )
+
+    for event_type in (EventType.BEFORE_APPLY, EventType.AFTER_APPLY):
+        kwargs = _emitted(event_manager, event_type)
+        assert kwargs["target_resources"] == ["vm1"]
+        assert kwargs["provider_filter"] == ["proxmox"]
+
+
+def test_destroy_emits_workflow_events_with_full_scope(console: Console) -> None:
+    """Destroy passes -r and -P scope into BEFORE_DESTROY and AFTER_DESTROY."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 105
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=lambda env: ([], {"proxmox": []}),
+        iter_provider_batches=lambda rbp, filt, rev, env: [ProviderResourceBatch("proxmox", [], 0)],
+        get_current_user=lambda: "tester",
+        load_environment=lambda _: _make_env_config_with_events({}),
+    )
+
+    orchestrator.destroy(
+        env_name="dev",
+        resource_filter=["node-a"],
+        auto_approve=True,
+        confirm_callback=lambda: True,
+        provider_filter=["proxmox"],
+    )
+
+    for event_type in (EventType.BEFORE_DESTROY, EventType.AFTER_DESTROY):
+        kwargs = _emitted(event_manager, event_type)
+        assert kwargs["target_resources"] == ["node-a"]
+        assert kwargs["provider_filter"] == ["proxmox"]
+
+
+def test_plan_emits_workflow_events_with_full_scope(console: Console) -> None:
+    """Plan passes -r and -P scope into BEFORE_PLAN and AFTER_PLAN."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 106
+    event_manager = MagicMock()
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
+    orchestrator = PlanOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=lambda env: ([_resource("vm1")], {"proxmox": [_resource("vm1")]}),
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"], 1)
+        ],
+        validate_resources=MagicMock(),
+        has_policies=lambda: False,
+        check_policies=MagicMock(),
+        secret_manager_factory=MagicMock(),
+        get_current_user=lambda: "tester",
+        fail_on_missing_secrets=False,
+        get_runner_priorities=lambda _: {},
+        load_environment=lambda _: _make_env_config_with_events({}),
+    )
+
+    orchestrator.plan(
+        env_name="dev",
+        dry_run=True,
+        resource_filter=["vm1"],
+        enforce_policies=False,
+        provider_filter=["proxmox"],
+    )
+
+    for event_type in (EventType.BEFORE_PLAN, EventType.AFTER_PLAN):
+        kwargs = _emitted(event_manager, event_type)
+        assert kwargs["target_resources"] == ["vm1"]
+        assert kwargs["provider_filter"] == ["proxmox"]

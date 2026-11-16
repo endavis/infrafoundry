@@ -535,3 +535,213 @@ def _make_handler_with_owner(
     if package is not None:
         config["_package"] = package
     return _StubHandler(config)
+
+
+def _make_scoped_handler(
+    package: str | None = "pkg-a",
+    package_resources: list[str] | None = None,
+    package_providers: list[str] | None = None,
+    **extra: Any,
+) -> _StubHandler:
+    """Create a handler tagged with package scope the way PackageLoader does."""
+    config: dict[str, Any] = {"name": "scoped-handler", **extra}
+    if package is not None:
+        config["_package"] = package
+    if package_resources is not None:
+        config["_package_resources"] = package_resources
+    if package_providers is not None:
+        config["_package_providers"] = package_providers
+    return _StubHandler(config)
+
+
+class TestPackageResourceScoping:
+    """Package-level handlers run only for operations covering their resources."""
+
+    def test_skipped_when_target_excludes_package_resources(self) -> None:
+        handler = _make_scoped_handler(package_resources=["pkg-a-vm"])
+        assert handler.matches_resources(["node-a"]) is False
+
+    def test_fires_when_target_includes_package_resource(self) -> None:
+        handler = _make_scoped_handler(package_resources=["pkg-a-vm"])
+        assert handler.matches_resources(["pkg-a-vm", "node-a"]) is True
+
+    def test_fires_for_whole_environment(self) -> None:
+        handler = _make_scoped_handler(package_resources=["pkg-a-vm"])
+        assert handler.matches_resources(None) is True
+
+    def test_untagged_handler_unaffected(self) -> None:
+        handler = _make_scoped_handler(package=None)
+        assert handler.matches_resources(["node-a"]) is True
+
+    def test_explicit_resources_keep_semantics(self) -> None:
+        handler = _make_scoped_handler(package_resources=["pkg-a-vm"], resources=["node-a"])
+        assert handler.matches_resources(["node-a"]) is True
+        assert handler.matches_resources(["other"]) is False
+
+    def test_explicit_requires_keep_semantics(self) -> None:
+        handler = _make_scoped_handler(package_resources=["pkg-a-vm"], requires=["node-a"])
+        assert handler.matches_resources(["node-a"]) is True
+        assert handler.matches_resources(["pkg-a-vm"]) is False
+
+
+class TestPackageProviderScoping:
+    """Package-level handlers run only for operations covering their providers."""
+
+    def test_skipped_when_provider_not_targeted(self) -> None:
+        handler = _make_scoped_handler(package_providers=["oci"])
+        assert handler.matches_providers(["aws"]) is False
+
+    def test_fires_when_provider_targeted(self) -> None:
+        handler = _make_scoped_handler(package_providers=["oci"])
+        assert handler.matches_providers(["oci"]) is True
+        assert handler.matches_providers(["aws", "oci"]) is True
+
+    def test_fires_without_provider_filter(self) -> None:
+        handler = _make_scoped_handler(package_providers=["oci"])
+        assert handler.matches_providers(None) is True
+
+    def test_handler_without_providers_always_fires(self) -> None:
+        handler = _make_scoped_handler(package=None)
+        assert handler.matches_providers(["aws"]) is True
+
+
+class TestMatchesScope:
+    """BaseHandler.matches_scope combines -p, -r and -P."""
+
+    def test_environment_handler_fires_under_every_filter(self) -> None:
+        handler = _make_scoped_handler(package=None)
+        ctx = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="prod",
+            target_resources=["node-a"],
+            package_filter="pkg-b",
+            provider_filter=["aws"],
+        )
+        assert handler.matches_scope(ctx) is True
+
+    def test_package_filter_selects_own_package_only(self) -> None:
+        pkg_a = _make_scoped_handler(package="pkg-a", package_resources=["pkg-a-vm"])
+        pkg_b = _make_scoped_handler(package="pkg-b", package_resources=["pkg-b-vm"])
+        ctx = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="prod",
+            target_resources=["pkg-a-vm"],
+            package_filter="pkg-a",
+        )
+        assert pkg_a.matches_scope(ctx) is True
+        assert pkg_b.matches_scope(ctx) is False
+
+    def test_all_filters_must_match(self) -> None:
+        handler = _make_scoped_handler(package_resources=["pkg-a-vm"], package_providers=["oci"])
+        ctx = EventContext(
+            event_type=EventType.AFTER_APPLY,
+            environment="prod",
+            target_resources=["pkg-a-vm"],
+            provider_filter=["aws"],
+        )
+        assert handler.matches_scope(ctx) is False
+
+
+class TestEventBusProviderScoping:
+    """UnifiedEventBus.emit honours provider_filter and package resource scope."""
+
+    @staticmethod
+    def _bus(**tags: Any) -> UnifiedEventBus:
+        bus = UnifiedEventBus()
+        bus.register_handler(
+            EventType.BEFORE_DESTROY,
+            {
+                "type": "python",
+                "module": "dummy",
+                "function": "handler",
+                "_package": "pkg-a",
+                **tags,
+            },
+        )
+        return bus
+
+    def test_provider_filter_skips_other_provider_package(self) -> None:
+        bus = self._bus(_package_providers=["oci"])
+        ctx = EventContext(
+            event_type=EventType.BEFORE_DESTROY, environment="prod", provider_filter=["aws"]
+        )
+        assert bus.emit(ctx, abort_on_failure=False) == []
+
+    def test_provider_filter_runs_matching_package(self) -> None:
+        bus = self._bus(_package_providers=["oci"])
+        ctx = EventContext(
+            event_type=EventType.BEFORE_DESTROY, environment="prod", provider_filter=["oci"]
+        )
+        assert len(bus.emit(ctx, abort_on_failure=False)) == 1
+
+    def test_resource_filter_skips_package_handler(self) -> None:
+        bus = self._bus(_package_resources=["pkg-a-vm"])
+        ctx = EventContext(
+            event_type=EventType.BEFORE_DESTROY, environment="prod", target_resources=["node-a"]
+        )
+        assert bus.emit(ctx, abort_on_failure=False) == []
+
+    def test_whole_environment_runs_package_handler(self) -> None:
+        bus = self._bus(_package_resources=["pkg-a-vm"], _package_providers=["oci"])
+        ctx = EventContext(event_type=EventType.BEFORE_DESTROY, environment="prod")
+        assert len(bus.emit(ctx, abort_on_failure=False)) == 1
+
+    def test_aggregate_emit_fires_each_package_for_its_own_group(self) -> None:
+        bus = UnifiedEventBus()
+        for pkg, res in (("pkg-a", "pkg-a-vm"), ("pkg-b", "pkg-b-vm")):
+            bus.register_handler(
+                EventType.BEFORE_DESTROY,
+                {
+                    "type": "python",
+                    "module": "dummy",
+                    "function": "handler",
+                    "name": f"{pkg}-handler",
+                    "_package": pkg,
+                    "_package_resources": [res],
+                },
+            )
+        ctx = EventContext(
+            event_type=EventType.BEFORE_DESTROY,
+            environment="prod",
+            target_resources=["pkg-a-vm"],
+        )
+        results = bus.emit(ctx, abort_on_failure=False)
+        assert [r.handler_name for r in results] == ["pkg-a-handler"]
+
+    def test_emit_event_passes_provider_filter_into_context(self) -> None:
+        bus = UnifiedEventBus()
+        seen: list[EventContext] = []
+        bus.emit = lambda context, **_kw: seen.append(context) or []  # type: ignore[method-assign,func-returns-value]
+        bus.emit_event(EventType.BEFORE_APPLY, "prod", provider_filter=["aws"])
+        assert seen[0].provider_filter == ["aws"]
+
+
+class TestPackageScopeTagging:
+    """PackageLoader tags package-level handlers with resources and providers."""
+
+    def _load(self, tmp_path: Path, resources: bool = True) -> dict[str, list[dict[str, Any]]]:
+        pkg_dir = tmp_path / "test-env" / "proxmox" / "pkg-a"
+        pkg_dir.mkdir(parents=True)
+        manifest = "name: pkg-a\n"
+        if resources:
+            manifest += "resources:\n  - vm.yaml\n"
+        manifest += (
+            "events:\n  after_apply:\n    - type: script\n      name: h\n"
+            "      script: scripts/h.sh\n"
+        )
+        (pkg_dir / "infrafoundry.yml").write_text(manifest)
+        if resources:
+            (pkg_dir / "vm.yaml").write_text("vm:\n  - name: node-a\n    cores: 2\n")
+        loader = PackageLoader(base_dir=tmp_path)
+        _res, events, _vars = loader.load_package(pkg_dir, "proxmox", "test-env")
+        return events
+
+    def test_tags_resources_and_providers(self, tmp_path: Path) -> None:
+        handler = self._load(tmp_path)["after_apply"][0]
+        assert handler["_package_resources"] == ["node-a"]
+        assert handler["_package_providers"] == ["proxmox"]
+
+    def test_package_without_resources_gets_manifest_provider(self, tmp_path: Path) -> None:
+        handler = self._load(tmp_path, resources=False)["after_apply"][0]
+        assert handler["_package_resources"] == []
+        assert handler["_package_providers"] == ["proxmox"]

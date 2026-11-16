@@ -242,16 +242,12 @@ class UnifiedEventBus(BaseManager):
                     f"resource_scoped emit but handler has no _resource_owner"
                 )
                 continue
-            if not handler.matches_package(context.package_filter):
+            if not handler.matches_scope(context):
                 self._log_debug(
-                    f"Skipping handler {handler.name}: "
-                    f"no package match for {context.package_filter}"
-                )
-                continue
-            if not handler.matches_resources(context.target_resources):
-                self._log_debug(
-                    f"Skipping handler {handler.name}: "
-                    f"no resource match for {context.target_resources}"
+                    f"Skipping handler {handler.name}: out of scope for "
+                    f"package={context.package_filter}, "
+                    f"resources={context.target_resources}, "
+                    f"providers={context.provider_filter}"
                 )
                 continue
             result = self._execute_handler(handler, context, results)

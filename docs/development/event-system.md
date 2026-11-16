@@ -392,6 +392,10 @@ the resources targeted by `-r`. If no `-r` filter is used, all handlers fire.
 Scripts receive the targeted resource names as a comma-separated list in the
 `INFRAFOUNDRY_TARGET_RESOURCES` environment variable when the `-r` filter is active.
 
+The event context also carries `provider_filter` (the `-P` providers). Package-level
+handlers are tagged with their package's resources and providers, and
+`BaseHandler.matches_scope` skips them when `-r` or `-P` excludes the package.
+
 ## Package Events
 
 Infrastructure packages can declare event handlers in their `infrafoundry.yml` manifest.
