@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794842722705,
+  "lastUpdate": 1794843726939,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2208,6 +2208,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005692681446807226",
             "extra": "mean: 77.31876680307954 usec\nrounds: 13688"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f5c84b9ec1abc1160367cb1f6e326f7f39aefd60",
+          "message": "feat: make the k3s-cluster tailscale oauth secret references configurable (merges PR #1426, addresses #1425)\n\nThe OCI nodes of the k3s-cluster blueprint read the Tailscale OAuth client\nfrom the hard-coded tailscale.oauth_client_id/secret keys. Add the\nts_oauth_client_id_secret and ts_oauth_client_secret_secret variables,\ndefaulting to those keys, and use them for the control plane and workers.\n\nAddresses #1425\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T15:40:54Z",
+          "tree_id": "9db87b09e2bebf6ff31c383d2f74a3a41cc1e604",
+          "url": "https://github.com/endavis/infrafoundry/commit/f5c84b9ec1abc1160367cb1f6e326f7f39aefd60"
+        },
+        "date": 1794843726146,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 72.49887256415191,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00032743134426614363",
+            "extra": "mean: 13.793317945946434 msec\nrounds: 74"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12704.713852190667,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006173821739284617",
+            "extra": "mean: 78.71094238203331 usec\nrounds: 13711"
           }
         ]
       }
