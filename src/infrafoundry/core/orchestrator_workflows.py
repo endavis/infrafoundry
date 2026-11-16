@@ -593,12 +593,13 @@ class PlanOrchestrator(HookExecutionMixin):
             dry_run=dry_run,
             metadata=plan_metadata,
         )
-        self.event_manager.emit_event(
+        self._emit_workflow_event(
             EventType.BEFORE_PLAN,
             env_name,
             {"deployment_id": deployment_id, "dry_run": dry_run},
-            target_resources=resource_filter,
+            resource_filter=resource_filter,
             package_filter=package_filter,
+            provider_filter=provider_filter,
         )
 
         results: dict[str, Any] = {}
@@ -810,23 +811,25 @@ class PlanOrchestrator(HookExecutionMixin):
             self._execute_env_hooks(env_name, "after_plan", env_config)
 
             self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
-            self.event_manager.emit_event(
+            self._emit_workflow_event(
                 EventType.AFTER_PLAN,
                 env_name,
                 {"deployment_id": deployment_id, "results": results},
-                target_resources=resource_filter,
+                resource_filter=resource_filter,
                 package_filter=package_filter,
+                provider_filter=provider_filter,
             )
         except Exception as exc:
             self.state_manager.update_deployment_status(
                 deployment_id, DeploymentStatus.FAILED, str(exc)
             )
-            self.event_manager.emit_event(
+            self._emit_workflow_event(
                 EventType.PLAN_FAILED,
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
-                target_resources=resource_filter,
+                resource_filter=resource_filter,
                 package_filter=package_filter,
+                provider_filter=provider_filter,
             )
             if not isinstance(exc, ProviderFilterError):  # the CLI renders that one cleanly
                 self.console.print(traceback.format_exc(), style="dim red")
@@ -1103,12 +1106,13 @@ class ApplyOrchestrator(HookExecutionMixin):
             dry_run=False,
             metadata=apply_metadata,
         )
-        self.event_manager.emit_event(
+        self._emit_workflow_event(
             EventType.BEFORE_APPLY,
             env_name,
             {"deployment_id": deployment_id, "auto_approve": auto_approve},
-            target_resources=resource_filter,
+            resource_filter=resource_filter,
             package_filter=package_filter,
+            provider_filter=provider_filter,
         )
 
         results: dict[str, Any] = {}
@@ -1195,23 +1199,25 @@ class ApplyOrchestrator(HookExecutionMixin):
             self._execute_env_hooks(env_name, "after_apply", env_config)
 
             self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
-            self.event_manager.emit_event(
+            self._emit_workflow_event(
                 EventType.AFTER_APPLY,
                 env_name,
                 {"deployment_id": deployment_id, "results": results},
-                target_resources=resource_filter,
+                resource_filter=resource_filter,
                 package_filter=package_filter,
+                provider_filter=provider_filter,
             )
         except Exception as exc:
             self.state_manager.update_deployment_status(
                 deployment_id, DeploymentStatus.FAILED, str(exc)
             )
-            self.event_manager.emit_event(
+            self._emit_workflow_event(
                 EventType.APPLY_FAILED,
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
-                target_resources=resource_filter,
+                resource_filter=resource_filter,
                 package_filter=package_filter,
+                provider_filter=provider_filter,
             )
             if not isinstance(exc, ProviderFilterError):  # the CLI renders that one cleanly
                 self.console.print(traceback.format_exc(), style="dim red")
@@ -1337,12 +1343,13 @@ class DestroyOrchestrator(HookExecutionMixin):
             dry_run=False,
             metadata=destroy_metadata,
         )
-        self.event_manager.emit_event(
+        self._emit_workflow_event(
             EventType.BEFORE_DESTROY,
             env_name,
             {"deployment_id": deployment_id, "auto_approve": auto_approve},
-            target_resources=resource_filter,
+            resource_filter=resource_filter,
             package_filter=package_filter,
+            provider_filter=provider_filter,
         )
 
         results: dict[str, Any] = {}
@@ -1602,23 +1609,25 @@ class DestroyOrchestrator(HookExecutionMixin):
             self._execute_env_hooks(env_name, "after_destroy", env_config)
 
             self.state_manager.update_deployment_status(deployment_id, DeploymentStatus.COMPLETED)
-            self.event_manager.emit_event(
+            self._emit_workflow_event(
                 EventType.AFTER_DESTROY,
                 env_name,
                 {"deployment_id": deployment_id, "results": results},
-                target_resources=resource_filter,
+                resource_filter=resource_filter,
                 package_filter=package_filter,
+                provider_filter=provider_filter,
             )
         except Exception as exc:
             self.state_manager.update_deployment_status(
                 deployment_id, DeploymentStatus.FAILED, str(exc)
             )
-            self.event_manager.emit_event(
+            self._emit_workflow_event(
                 EventType.DESTROY_FAILED,
                 env_name,
                 {"deployment_id": deployment_id, "error": str(exc)},
-                target_resources=resource_filter,
+                resource_filter=resource_filter,
                 package_filter=package_filter,
+                provider_filter=provider_filter,
             )
             if not isinstance(exc, ProviderFilterError):  # the CLI renders that one cleanly
                 self.console.print(traceback.format_exc(), style="dim red")

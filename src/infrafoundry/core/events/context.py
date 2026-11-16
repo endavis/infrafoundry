@@ -28,6 +28,7 @@ class EventContext:
         deployment_id: Deployment ID if in a deployment context
         plan_output: Plan output data if available
         target_resources: Resource names targeted by -r filter (None = all)
+        provider_filter: Provider names targeted by -P filter (None = all)
         previous_results: Results from previous handlers in chain
     """
 
@@ -43,6 +44,7 @@ class EventContext:
     previous_results: list["EventResult"] = field(default_factory=list)
     package_variables: dict[str, Any] = field(default_factory=dict)
     package_filter: str | None = None
+    provider_filter: list[str] | None = None
 
     def __repr__(self) -> str:
         parts = [f"EventContext({self.event_type.value}, env={self.environment}"]

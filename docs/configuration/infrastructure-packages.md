@@ -336,6 +336,15 @@ which ScriptHandler resolves as `envs/dev/proxmox/ontap-cluster/scripts/cluster-
 
 Non-script handlers (webhook, python) are passed through unchanged.
 
+### Scope
+
+A package's handlers run only when the operation's scope includes the package.
+With `-r node-a`, the handlers of `pkg-a` run only if `node-a` is one of `pkg-a`'s
+resources. With `-P aws`, they run only if `pkg-a` uses the `aws` provider. With
+`-p pkg-a`, only `pkg-a`'s handlers run. Whole-environment operations run every
+package's handlers, and environment-level events from `settings.yaml` are never
+scoped this way. A handler's own `resources` or `requires` filter keeps its meaning.
+
 ## Package Discovery
 
 Packages are discovered automatically during resource loading from two locations:

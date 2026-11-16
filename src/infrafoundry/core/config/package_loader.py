@@ -412,6 +412,11 @@ class PackageLoader:
             package_dir=package_dir,
             blueprint_dir=blueprint_dir,
         )
+        self._tag_handler_scope(
+            events,
+            resources=resources,
+            providers={effective_provider} | {r.provider for r in resources if r.provider},
+        )
 
         # Rewrite resource-level event script paths and tag them with the
         # same framework-internal keys as package-level handlers.
@@ -915,6 +920,32 @@ class PackageLoader:
                 handler_config["_package_dir"] = str(package_dir)
                 if blueprint_dir:
                     handler_config["_blueprint_dir"] = str(blueprint_dir)
+
+    def _tag_handler_scope(
+        self,
+        events: dict[str, list[dict[str, Any]]],
+        *,
+        resources: list[Any],
+        providers: set[str],
+    ) -> None:
+        """Tag package-level handlers with the resources and providers they cover.
+
+        Lets the event bus skip a package's handlers when an operation's
+        ``-r`` or ``-P`` scope does not include the package.
+
+        Args:
+            events: Package-level event handler configurations, mutated in place.
+            resources: Resources declared by the package.
+            providers: Providers the package uses.
+        """
+        if not events:
+            return
+        names = [r.name for r in resources]
+        provider_names = sorted(p for p in providers if p)
+        for handler_list in events.values():
+            for handler_config in handler_list:
+                handler_config["_package_resources"] = list(names)
+                handler_config["_package_providers"] = list(provider_names)
 
     def _rewrite_event_scripts(
         self,
