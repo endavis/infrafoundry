@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794562437397,
+  "lastUpdate": 1794825367208,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1676,6 +1676,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004425996757064141",
             "extra": "mean: 73.40415974544115 usec\nrounds: 15556"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6b69a9cf01fdcead5eb8182398221633cfeeb12f",
+          "message": "chore(deps): bump pymdown-extensions from 12.3 to 13.0 (merges PR #1396)\n\nBumps [pymdown-extensions](https://github.com/facelessuser/pymdown-extensions) from 12.3 to 13.0.\n- [Release notes](https://github.com/facelessuser/pymdown-extensions/releases)\n- [Commits](https://github.com/facelessuser/pymdown-extensions/compare/12.3...13.0)\n\n---\nupdated-dependencies:\n- dependency-name: pymdown-extensions\n  dependency-version: '13.0'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-11-16T10:35:13Z",
+          "tree_id": "e6f4121f05630341270abfdcf8bdda62c586745d",
+          "url": "https://github.com/endavis/infrafoundry/commit/6b69a9cf01fdcead5eb8182398221633cfeeb12f"
+        },
+        "date": 1794825366176,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 75.64868213474692,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005680998142802723",
+            "extra": "mean: 13.219000936708724 msec\nrounds: 79"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14292.586601402943,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000051158935322863414",
+            "extra": "mean: 69.96634184478835 usec\nrounds: 15861"
           }
         ]
       }
