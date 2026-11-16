@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794834303508,
+  "lastUpdate": 1794835758735,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1866,6 +1866,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009302394927012849",
             "extra": "mean: 129.0746867758131 usec\nrounds: 8371"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "550171d69441bec465dbb40fd84dec2c1e71f377",
+          "message": "fix: emit before_* events after package handlers are registered (merges PR #1407, addresses #1405)\n\nBEFORE_PLAN, BEFORE_APPLY and BEFORE_DESTROY fired before\n_load_resources registered package event handlers, so package\nbefore_* handlers never ran. Emit each event right after resources\nload, inside the try, so a load failure emits only the *_failed event.\n\nAddresses #1405\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T13:28:17Z",
+          "tree_id": "fb502c6ef6e476bdb7c9545408d15b57d1d85688",
+          "url": "https://github.com/endavis/infrafoundry/commit/550171d69441bec465dbb40fd84dec2c1e71f377"
+        },
+        "date": 1794835757818,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 105.15679141938956,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00015555215984948908",
+            "extra": "mean: 9.509609284404362 msec\nrounds: 109"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16526.355974969865,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000015469339068210643",
+            "extra": "mean: 60.50940700506261 usec\nrounds: 17673"
           }
         ]
       }
