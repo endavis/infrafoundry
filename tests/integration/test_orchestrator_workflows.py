@@ -2,13 +2,14 @@
 
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from unittest.mock import Mock, patch
 
 import pytest
 
 from infrafoundry.core.config import ConfigManager
-from infrafoundry.core.events import EventManager, EventType
+from infrafoundry.core.events import EventContext, EventManager, EventResult, EventType
+from infrafoundry.core.events.handlers.python import PythonHandler
 from infrafoundry.core.orchestrator import Orchestrator
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
@@ -659,6 +660,37 @@ class TestDestroyOrchestrator:
 
         assert EventType.BEFORE_DESTROY in events_received
         assert EventType.AFTER_DESTROY in events_received
+
+    def test_whole_env_destroy_runs_package_before_destroy_handler(
+        self, orchestrator: Orchestrator, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A whole-environment destroy runs a package before_destroy handler once (#1405)."""
+        runs: list[str] = []
+
+        def fake_execute(self: PythonHandler, context: EventContext) -> EventResult:
+            runs.append(str(context.event_type.value))
+            return EventResult()
+
+        monkeypatch.setattr(PythonHandler, "execute", fake_execute)
+        cast(Mock, orchestrator.config_manager).get_package_events.return_value = {
+            "before_destroy": [
+                {"type": "python", "module": "dummy", "function": "handler", "_package": "pkg"}
+            ]
+        }
+
+        with (
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.destroy"
+            ) as mock_destroy,
+            patch(
+                "infrafoundry.core.runners.terraform_runner.TerraformRunner.verify_destroyed",
+                return_value=[],
+            ),
+        ):
+            mock_destroy.return_value = {"success": True}
+            orchestrator.destroy(env_name="dev", auto_approve=True)
+
+        assert runs == ["before_destroy"]
 
     def test_destroy_tracks_resources_as_destroyed(self, orchestrator: Orchestrator) -> None:
         """Test that destroy marks resources as destroyed in state."""
