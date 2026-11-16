@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794843726939,
+  "lastUpdate": 1794844431601,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2246,6 +2246,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006173821739284617",
             "extra": "mean: 78.71094238203331 usec\nrounds: 13711"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a0a17ec2f3a9c0e0c9531e53031bb70529c5f93d",
+          "message": "refactor: share the failed-resource marking between apply and destroy (merges PR #1427, addresses #1424)\n\nExtract the duplicated _mark_resources_failed from DeploymentExecutor and\nDestroyOrchestrator into core.failed_resources.mark_resources_failed. The\nonly behavioural difference was the phase word in the warning log, now a\nparameter.\n\nAddresses #1424\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T15:52:54Z",
+          "tree_id": "770b5e791bfb22f408b581426ee6e1f7d4c91632",
+          "url": "https://github.com/endavis/infrafoundry/commit/a0a17ec2f3a9c0e0c9531e53031bb70529c5f93d"
+        },
+        "date": 1794844430564,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 58.271115862802425,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006649586424925137",
+            "extra": "mean: 17.161160983332973 msec\nrounds: 60"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10728.227106250288,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000756672615333176",
+            "extra": "mean: 93.21204613737136 usec\nrounds: 12116"
           }
         ]
       }
