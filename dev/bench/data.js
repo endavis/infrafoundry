@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794844832926,
+  "lastUpdate": 1794845521621,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2322,6 +2322,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009189099842958331",
             "extra": "mean: 128.58896793248206 usec\nrounds: 8295"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "436936262fea3f588267a6d4a2d3a7290c31e3f9",
+          "message": "fix: report an aborted confirmation prompt as a cancellation (merges PR #1430, addresses #1429)\n\nclick.confirm raises click.Abort at end of input. with_orchestrator only\nre-raised click.ClickException, so the Abort reached the generic handler\nand was reported as IF-GENERAL-001 Unknown Error with an empty message.\nTreat click.Abort like KeyboardInterrupt: \"Operation cancelled\", non-zero\nexit.\n\nAddresses #1429\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T16:10:52Z",
+          "tree_id": "6dfa6d9ef982c34f699765ba6633eafe3f0d6760",
+          "url": "https://github.com/endavis/infrafoundry/commit/436936262fea3f588267a6d4a2d3a7290c31e3f9"
+        },
+        "date": 1794845520960,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.51322350970776,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00041678656213757574",
+            "extra": "mean: 20.196624843137833 msec\nrounds: 51"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7932.123319694195,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008279438375227244",
+            "extra": "mean: 126.06964865475047 usec\nrounds: 8439"
           }
         ]
       }
