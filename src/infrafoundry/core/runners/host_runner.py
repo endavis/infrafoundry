@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import subprocess  # nosec B404  # required for running ansible-playbook
 from pathlib import Path
 from typing import Any, Protocol, cast, override
@@ -28,6 +29,9 @@ from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.types import ResourceOutcome
 
 logger = logging.getLogger(__name__)
+
+ANSIBLE_BINARY = "ansible-playbook"
+"""The executable the runner resolves and runs (``tool_name`` is only the registry key)."""
 
 AUTH_ENV_VAR = "INFRAFOUNDRY_TAILSCALE_AUTH_KEY"
 """Environment variable that carries the Tailscale auth secret to the enrollment run."""
@@ -70,12 +74,31 @@ class HostRunner(BaseRunner):
         """The runner provisions the host's configuration, so it auto-runs on plan/apply."""
         return True
 
+    @property
+    @override
+    def tool_path(self) -> str:
+        """Return the path of ``ansible-playbook``, the binary this runner executes.
+
+        ``tool_name`` is the registry key (``host_ansible``), not an executable.
+
+        Raises:
+            FileNotFoundError: If ``ansible-playbook`` is not on PATH.
+        """
+        path = shutil.which(ANSIBLE_BINARY)
+        if path is None:
+            raise FileNotFoundError(
+                f"{ANSIBLE_BINARY} not found on PATH. Please install {ANSIBLE_BINARY}."
+            )
+        return path
+
     @override
     def is_available(self) -> bool:
         """Return True if ``ansible-playbook`` is on PATH."""
-        import shutil
-
-        return shutil.which("ansible-playbook") is not None
+        try:
+            self.tool_path  # noqa: B018  # the lookup is the check
+        except FileNotFoundError:
+            return False
+        return True
 
     @override
     def initialize(self, working_dir: Path, **kwargs: Any) -> dict[str, Any]:
