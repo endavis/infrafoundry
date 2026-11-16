@@ -593,14 +593,6 @@ class PlanOrchestrator(HookExecutionMixin):
             dry_run=dry_run,
             metadata=plan_metadata,
         )
-        self._emit_workflow_event(
-            EventType.BEFORE_PLAN,
-            env_name,
-            {"deployment_id": deployment_id, "dry_run": dry_run},
-            resource_filter=resource_filter,
-            package_filter=package_filter,
-            provider_filter=provider_filter,
-        )
 
         results: dict[str, Any] = {}
         runner_priorities = self._get_runner_priorities(env_name)
@@ -612,6 +604,15 @@ class PlanOrchestrator(HookExecutionMixin):
         try:
             self._print_header("Planning", env_name, resource_filter, style="bold cyan")
             all_resources, resources_by_provider = self._load_resources(env_name)
+            # after `_load_resources` so package handlers are registered (#1405)
+            self._emit_workflow_event(
+                EventType.BEFORE_PLAN,
+                env_name,
+                {"deployment_id": deployment_id, "dry_run": dry_run},
+                resource_filter=resource_filter,
+                package_filter=package_filter,
+                provider_filter=provider_filter,
+            )
             if not dry_run and not add_only and not resource_filter:
                 resources_by_provider = _add_managed_only_providers(
                     resources_by_provider,
@@ -1106,14 +1107,6 @@ class ApplyOrchestrator(HookExecutionMixin):
             dry_run=False,
             metadata=apply_metadata,
         )
-        self._emit_workflow_event(
-            EventType.BEFORE_APPLY,
-            env_name,
-            {"deployment_id": deployment_id, "auto_approve": auto_approve},
-            resource_filter=resource_filter,
-            package_filter=package_filter,
-            provider_filter=provider_filter,
-        )
 
         results: dict[str, Any] = {}
 
@@ -1141,6 +1134,15 @@ class ApplyOrchestrator(HookExecutionMixin):
         try:
             self._print_header("Applying", env_name, resource_filter, "bold green")
             all_resources, resources_by_provider = self._load_resources(env_name)
+            # after `_load_resources` so package handlers are registered (#1405)
+            self._emit_workflow_event(
+                EventType.BEFORE_APPLY,
+                env_name,
+                {"deployment_id": deployment_id, "auto_approve": auto_approve},
+                resource_filter=resource_filter,
+                package_filter=package_filter,
+                provider_filter=provider_filter,
+            )
             if not add_only and not resource_filter:
                 resources_by_provider = _add_managed_only_providers(
                     resources_by_provider,
@@ -1343,20 +1345,22 @@ class DestroyOrchestrator(HookExecutionMixin):
             dry_run=False,
             metadata=destroy_metadata,
         )
-        self._emit_workflow_event(
-            EventType.BEFORE_DESTROY,
-            env_name,
-            {"deployment_id": deployment_id, "auto_approve": auto_approve},
-            resource_filter=resource_filter,
-            package_filter=package_filter,
-            provider_filter=provider_filter,
-        )
 
         results: dict[str, Any] = {}
 
         self._load_event_config(env_config)
 
         try:
+            _, resources_by_provider = self._load_resources(env_name)
+            # after `_load_resources` so package handlers are registered (#1405)
+            self._emit_workflow_event(
+                EventType.BEFORE_DESTROY,
+                env_name,
+                {"deployment_id": deployment_id, "auto_approve": auto_approve},
+                resource_filter=resource_filter,
+                package_filter=package_filter,
+                provider_filter=provider_filter,
+            )
             self._print_header("Destroying", env_name, resource_filter, "bold red")
 
             if not auto_approve:
@@ -1382,7 +1386,6 @@ class DestroyOrchestrator(HookExecutionMixin):
                     )
                     return {"success": False, "message": "User aborted"}
 
-            _, resources_by_provider = self._load_resources(env_name)
             # Unfiltered, so a filtered destroy still finds the DHCP reservation
             # that gives a destroyed VM its IP (#656).
             all_resources = [r for rs in resources_by_provider.values() for r in rs]

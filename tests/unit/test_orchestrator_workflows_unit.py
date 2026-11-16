@@ -3092,3 +3092,320 @@ def test_plan_emits_workflow_events_with_full_scope(console: Console) -> None:
         kwargs = _emitted(event_manager, event_type)
         assert kwargs["target_resources"] == ["vm1"]
         assert kwargs["provider_filter"] == ["proxmox"]
+
+
+# --- BEFORE_* events fire after package handlers are registered (#1405) ---
+
+
+def _before_handler_config(
+    event: str, package_resources: list[str] | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    handler: dict[str, Any] = {
+        "type": "python",
+        "module": "dummy",
+        "function": "handler",
+        "_package": "pkg",
+    }
+    if package_resources is not None:
+        handler["_package_resources"] = package_resources
+    return {event: [handler]}
+
+
+def _count_python_handler_runs(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Patch PythonHandler.execute and return the list of event names it ran for."""
+    runs: list[str] = []
+
+    def fake_execute(self: PythonHandler, context: EventContext) -> EventResult:
+        runs.append(str(context.event_type.value))
+        return EventResult()
+
+    monkeypatch.setattr(PythonHandler, "execute", fake_execute)
+    return runs
+
+
+def _make_plan_orchestrator(
+    console: Console,
+    bus: UnifiedEventBus,
+    load_resources: Any,
+    env_config: EnvironmentConfig | None = None,
+) -> PlanOrchestrator:
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 107
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
+    config = env_config or _make_env_config_with_events({})
+    orchestrator = PlanOrchestrator(
+        console,
+        state_manager,
+        bus,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"], 1)
+        ],
+        validate_resources=MagicMock(),
+        has_policies=lambda: False,
+        check_policies=MagicMock(),
+        secret_manager_factory=MagicMock(),
+        get_current_user=lambda: "tester",
+        fail_on_missing_secrets=False,
+        get_runner_priorities=lambda _: {},
+        load_environment=lambda _: config,
+    )
+    return orchestrator
+
+
+def _make_apply_orchestrator(
+    console: Console,
+    bus: UnifiedEventBus,
+    load_resources: Any,
+    env_config: EnvironmentConfig | None = None,
+) -> ApplyOrchestrator:
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 108
+    config = env_config or _make_env_config_with_events({})
+    orchestrator = ApplyOrchestrator(
+        console,
+        state_manager,
+        bus,
+        load_resources,
+        apply_serial=MagicMock(return_value={"proxmox": {"success": True}}),
+        apply_parallel=MagicMock(),
+        get_current_user=lambda: "tester",
+        load_environment=lambda _: config,
+    )
+    return orchestrator
+
+
+def _make_destroy_orchestrator(
+    console: Console,
+    bus: UnifiedEventBus,
+    load_resources: Any,
+    env_config: EnvironmentConfig | None = None,
+) -> DestroyOrchestrator:
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 109
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = []
+    providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
+    config = env_config or _make_env_config_with_events({})
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        bus,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda rbp, filt, rev, env: [ProviderResourceBatch("proxmox", [], 0)],
+        get_current_user=lambda: "tester",
+        load_environment=lambda _: config,
+    )
+    return orchestrator
+
+
+def _registering_loader(
+    bus: UnifiedEventBus, package_events: dict[str, Any], calls: list[str] | None = None
+) -> Any:
+    """Return a load_resources callback that registers package events like the real one."""
+
+    def load(env: str) -> Any:
+        if calls is not None:
+            calls.append(env)
+        bus.load_config(package_events)
+        return ([_resource("vm1")], {"proxmox": [_resource("vm1")]})
+
+    return load
+
+
+def _run_plan(orchestrator: PlanOrchestrator) -> None:
+    orchestrator.plan(env_name="dev", dry_run=True, resource_filter=None, enforce_policies=False)
+
+
+def _run_apply(orchestrator: ApplyOrchestrator) -> None:
+    orchestrator.apply(
+        env_name="dev", resource_filter=None, auto_approve=True, parallel=False, max_workers=1
+    )
+
+
+def _run_whole_destroy(orchestrator: DestroyOrchestrator, resource_filter: Any = None) -> None:
+    orchestrator.destroy(
+        env_name="dev",
+        resource_filter=resource_filter,
+        auto_approve=True,
+        confirm_callback=lambda: True,
+    )
+
+
+def test_whole_env_plan_runs_package_before_plan_once(
+    console: Console, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A whole-environment plan runs a package before_plan handler exactly once."""
+    runs = _count_python_handler_runs(monkeypatch)
+    bus = UnifiedEventBus()
+    loader = _registering_loader(bus, _before_handler_config("before_plan"))
+
+    _run_plan(_make_plan_orchestrator(console, bus, loader))
+
+    assert runs == ["before_plan"]
+
+
+def test_whole_env_apply_runs_package_before_apply_once(
+    console: Console, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A whole-environment apply runs a package before_apply handler exactly once."""
+    runs = _count_python_handler_runs(monkeypatch)
+    bus = UnifiedEventBus()
+    loader = _registering_loader(bus, _before_handler_config("before_apply"))
+
+    _run_apply(_make_apply_orchestrator(console, bus, loader))
+
+    assert runs == ["before_apply"]
+
+
+def test_whole_env_destroy_runs_package_before_destroy_once(
+    console: Console, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A whole-environment destroy runs a package before_destroy handler exactly once."""
+    runs = _count_python_handler_runs(monkeypatch)
+    bus = UnifiedEventBus()
+    loader = _registering_loader(bus, _before_handler_config("before_destroy"))
+
+    _run_whole_destroy(_make_destroy_orchestrator(console, bus, loader))
+
+    assert runs == ["before_destroy"]
+
+
+def test_filtered_destroy_loads_twice_but_runs_package_handler_once(
+    console: Console, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """destroy -r of a package resource loads twice yet registers the handler once."""
+    runs = _count_python_handler_runs(monkeypatch)
+    bus = UnifiedEventBus()
+    calls: list[str] = []
+    loader = _registering_loader(
+        bus, _before_handler_config("before_destroy", ["vm1"]), calls=calls
+    )
+
+    _run_whole_destroy(_make_destroy_orchestrator(console, bus, loader), ["vm1"])
+
+    assert len(calls) == 2
+    assert runs == ["before_destroy"]
+
+
+def test_filtered_destroy_of_other_resource_skips_package_handler(
+    console: Console, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """destroy -r of a resource outside the package keeps the #1403 scoping."""
+    runs = _count_python_handler_runs(monkeypatch)
+    bus = UnifiedEventBus()
+    other = _resource("other")
+
+    def load(env: str) -> Any:
+        bus.load_config(_before_handler_config("before_destroy", ["vm1"]))
+        return ([other], {"proxmox": [other]})
+
+    _run_whole_destroy(_make_destroy_orchestrator(console, bus, load), ["other"])
+
+    assert runs == []
+
+
+def test_plan_then_apply_on_same_bus_does_not_accumulate_handlers(
+    console: Console, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan then apply (as Orchestrator.apply does) runs each before_* handler once."""
+    runs = _count_python_handler_runs(monkeypatch)
+    bus = UnifiedEventBus()
+    events = {
+        **_before_handler_config("before_plan"),
+        **_before_handler_config("before_apply"),
+    }
+    loader = _registering_loader(bus, events)
+
+    _run_plan(_make_plan_orchestrator(console, bus, loader))
+    _run_apply(_make_apply_orchestrator(console, bus, loader))
+
+    assert sorted(runs) == ["before_apply", "before_plan"]
+
+
+def test_env_level_before_destroy_handler_runs_on_fresh_bus(
+    console: Console, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An env-config before_destroy handler runs on the first call of a fresh process."""
+    runs = _count_python_handler_runs(monkeypatch)
+    bus = UnifiedEventBus()
+    env_config = _make_env_config_with_events(
+        {
+            "before_destroy": [
+                {"type": "python", "module": "dummy", "function": "handler"},
+            ]
+        }
+    )
+
+    def loader(env: str) -> tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]:
+        return [_resource("vm1")], {"proxmox": [_resource("vm1")]}
+
+    _run_whole_destroy(_make_destroy_orchestrator(console, bus, loader, env_config))
+
+    assert runs == ["before_destroy"]
+
+
+@pytest.mark.parametrize(
+    ("builder", "runner", "before", "failed"),
+    [
+        (_make_plan_orchestrator, _run_plan, EventType.BEFORE_PLAN, EventType.PLAN_FAILED),
+        (_make_apply_orchestrator, _run_apply, EventType.BEFORE_APPLY, EventType.APPLY_FAILED),
+        (
+            _make_destroy_orchestrator,
+            _run_whole_destroy,
+            EventType.BEFORE_DESTROY,
+            EventType.DESTROY_FAILED,
+        ),
+    ],
+)
+def test_resource_load_failure_skips_before_event_and_marks_failed(
+    console: Console,
+    builder: Any,
+    runner: Any,
+    before: EventType,
+    failed: EventType,
+) -> None:
+    """A load failure marks the deployment FAILED and emits *_FAILED without BEFORE_*."""
+    event_manager = MagicMock()
+    event_manager.emit_event.return_value = []
+
+    def load(env: str) -> Any:
+        raise ValueError("bad yaml")
+
+    orchestrator = builder(console, event_manager, load)
+
+    with pytest.raises(ValueError, match="bad yaml"):
+        runner(orchestrator)
+
+    emitted = [c.args[0] for c in event_manager.emit_event.call_args_list]
+    assert before not in emitted
+    assert failed in emitted
+    update = cast("MagicMock", orchestrator.state_manager.update_deployment_status)
+    assert DeploymentStatus.FAILED in [c.args[1] for c in update.call_args_list]
+
+
+def test_aborting_before_plan_handler_raises_and_marks_failed(
+    console: Console, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An aborting BEFORE_PLAN handler raises EventAbortedError and fails the deployment."""
+
+    def fake_execute(self: PythonHandler, context: EventContext) -> EventResult:
+        return EventResult(success=False, abort=True, reason="no", handler_name="h")
+
+    monkeypatch.setattr(PythonHandler, "execute", fake_execute)
+    bus = UnifiedEventBus()
+    loader = _registering_loader(bus, _before_handler_config("before_plan"))
+    orchestrator = _make_plan_orchestrator(console, bus, loader)
+
+    with pytest.raises(EventAbortedError):
+        _run_plan(orchestrator)
+
+    update = cast("MagicMock", orchestrator.state_manager.update_deployment_status)
+    assert DeploymentStatus.FAILED in [c.args[1] for c in update.call_args_list]
