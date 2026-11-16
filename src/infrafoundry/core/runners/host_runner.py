@@ -61,7 +61,7 @@ class HostRunner(BaseRunner):
     @property
     @override
     def tool_name(self) -> str:
-        """Return the tool identifier; the provider's ``generate_host_ansible`` matches it."""
+        """Return the tool identifier (the registry key ``host`` selects ``generate_host``)."""
         return "host_ansible"
 
     @property
@@ -135,7 +135,18 @@ class HostRunner(BaseRunner):
         }
         if not self._supports(provider):
             return empty
-        runs = cast(_HostProvider, provider).get_host_runs(self._names(kwargs))
+        names = self._names(kwargs)
+        runs = cast(_HostProvider, provider).get_host_runs(names)
+        missing = sorted(set(names or []) - {r.name for r in runs})
+        if missing:
+            return ApplyResult(
+                success=False,
+                error=(
+                    "No generated run for host(s) "
+                    + ", ".join(missing)
+                    + "; the host provider did not generate them, so nothing was applied"
+                ),
+            )
         if not runs:
             return empty
         if not self.is_available():

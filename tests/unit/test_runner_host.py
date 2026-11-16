@@ -37,7 +37,7 @@ def provider(tmp_path: Path) -> HostProvider:
 
 
 def _generate(provider: HostProvider, *resources: ResourceConfig) -> None:
-    provider.generate_host_ansible(list(resources))
+    provider.generate_host(list(resources))
 
 
 def _ok() -> MagicMock:
@@ -222,3 +222,14 @@ def test_destroy_reports_delete_outcomes_and_never_runs_anything(
 def test_destroy_prefers_targets(runner: HostRunner, provider: HostProvider) -> None:
     result = runner.destroy(provider, resource_names=["a", "b"], target_resources=["b"])
     assert [o.resource_name for o in result["resource_outcomes"]] == ["b"]
+
+
+def test_apply_fails_when_host_was_never_generated(
+    runner: HostRunner, provider: HostProvider
+) -> None:
+    """A host with no generated run must fail apply, not report success (#1411)."""
+    with patch(PATCH_RUN) as run:
+        result = runner.apply(provider, resource_names=["vps-01"])
+    assert result["success"] is False
+    assert "vps-01" in result["error"]
+    run.assert_not_called()

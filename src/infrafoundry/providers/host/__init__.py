@@ -122,10 +122,10 @@ class HostProvider(
 
     @override
     def generate_ansible(self, resources: list[ResourceConfig]) -> None:
-        """Create the output directories; ``generate_host_ansible`` writes the files."""
+        """Create the output directories; ``generate_host`` writes the files."""
         self.ensure_directories()
 
-    def generate_host_ansible(self, resources: list[ResourceConfig]) -> None:
+    def generate_host(self, resources: list[ResourceConfig]) -> None:
         """Write the inventory, ``ansible.cfg`` and the Tailscale enrollment playbook.
 
         Args:
@@ -191,7 +191,7 @@ class HostProvider(
         return yaml.safe_dump(inventory, sort_keys=False)
 
     def get_host_runs(self, names: list[str] | None = None) -> list[HostRun]:
-        """Return what to run against each host, from the last ``generate_host_ansible``.
+        """Return what to run against each host, from the last ``generate_host``.
 
         Args:
             names: Restrict to these host names; ``None`` or empty means every host.

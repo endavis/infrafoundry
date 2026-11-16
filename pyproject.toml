@@ -456,6 +456,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_generate_mac.py",
     "tests/unit/test_hook_execution_mixin.py",
     "tests/unit/test_hooks.py",
+    "tests/unit/test_host_orchestrator_flow.py",
     "tests/unit/test_iac_tool_config.py",
     "tests/unit/test_import_blocks.py",
     "tests/unit/test_infra_testing.py",

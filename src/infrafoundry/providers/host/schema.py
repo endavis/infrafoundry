@@ -15,6 +15,7 @@ from infrafoundry.core.validation import ValidationLevel
 
 KNOWN_KEYS = frozenset(
     {
+        "name",
         "address",
         "ssh_user",
         "ssh_port",

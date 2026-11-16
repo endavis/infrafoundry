@@ -43,7 +43,7 @@ def _inventory(provider: HostProvider) -> dict[str, Any]:
 
 
 def test_inventory_addresses_groups_and_defaults(provider: HostProvider) -> None:
-    provider.generate_host_ansible(
+    provider.generate_host(
         [
             host("v4", address="192.0.2.10", groups=["web"], ssh_user="admin", ssh_port=2222),
             host("v6", address="2001:db8::10", groups=["web", "db"]),
@@ -65,27 +65,27 @@ def test_inventory_addresses_groups_and_defaults(provider: HostProvider) -> None
 
 
 def test_ansible_cfg_has_roles_path(provider: HostProvider, repo: Path) -> None:
-    provider.generate_host_ansible([host()])
+    provider.generate_host([host()])
     cfg = (provider.ansible_dir / "ansible.cfg").read_text()
     assert f"roles_path = {(repo / 'roles').resolve()}" in cfg
 
 
 def test_tailscale_playbook_only_with_a_tailscale_block(provider: HostProvider) -> None:
-    provider.generate_host_ansible([host()])
+    provider.generate_host([host()])
     assert not (provider.ansible_dir / "tailscale.yml").exists()
     assert not (provider.ansible_dir / "playbook.yml").exists()
 
-    provider.generate_host_ansible([host(tailscale=tailscale_block())])
+    provider.generate_host([host(tailscale=tailscale_block())])
     playbook = (provider.ansible_dir / "tailscale.yml").read_text()
     assert "--auth-key=file:" in playbook
     assert yaml.safe_load(playbook)[0]["hosts"] == "all"
 
-    provider.generate_host_ansible([host()])
+    provider.generate_host([host()])
     assert not (provider.ansible_dir / "tailscale.yml").exists()
 
 
 def test_no_secret_value_or_reference_in_generated_files(provider: HostProvider) -> None:
-    provider.generate_host_ansible([host(tailscale=tailscale_block())])
+    provider.generate_host([host(tailscale=tailscale_block())])
     for path in provider.ansible_dir.iterdir():
         text = path.read_text()
         assert AUTH_REF not in text
@@ -120,7 +120,7 @@ def test_invalid_hosts_are_rejected(provider: HostProvider, resource: Any, fragm
     if "address" in resource.config and resource.config["address"] is None:
         del resource.config["address"]
     with pytest.raises(SchemaValidationError, match=fragment):
-        provider.generate_host_ansible([resource])
+        provider.generate_host([resource])
 
 
 def test_escaping_symlink_playbook_is_rejected(provider: HostProvider, repo: Path) -> None:
@@ -128,16 +128,16 @@ def test_escaping_symlink_playbook_is_rejected(provider: HostProvider, repo: Pat
     outside.write_text("---\n")
     (repo / "playbooks" / "link.yml").symlink_to(outside)
     with pytest.raises(SchemaValidationError, match="outside the config repo"):
-        provider.generate_host_ansible([host(ansible={"playbooks": ["playbooks/link.yml"]})])
+        provider.generate_host([host(ansible={"playbooks": ["playbooks/link.yml"]})])
 
 
 def test_unknown_key_is_only_a_warning(provider: HostProvider) -> None:
-    provider.generate_host_ansible([host(colour="red")])
+    provider.generate_host([host(colour="red")])
     assert (provider.ansible_dir / "inventory.yml").exists()
 
 
 def test_get_host_runs_order_and_auth_ref(provider: HostProvider, repo: Path) -> None:
-    provider.generate_host_ansible(
+    provider.generate_host(
         [
             host("a", ansible={"playbooks": ["playbooks/base.yml"]}, tailscale=tailscale_block()),
             host("b"),
@@ -176,3 +176,12 @@ def test_resolve_tailscale_auth_without_environment(provider: HostProvider) -> N
         pytest.raises(ValueError, match=AUTH_REF),
     ):
         provider.resolve_tailscale_auth(AUTH_REF)
+
+
+def test_name_key_is_known_and_raises_no_warning(provider: HostProvider) -> None:
+    """The loader leaves ``name`` in the config dict; it must not read as unknown (#1411)."""
+    from infrafoundry.providers.host.schema import check_host
+
+    resource = host("vps-01")
+    resource.config["name"] = "vps-01"
+    assert check_host(resource, None) == []

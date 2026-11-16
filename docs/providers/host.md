@@ -50,6 +50,7 @@ host:
 
 | Field | Meaning |
 | :--- | :--- |
+| `name` | Host name; the inventory host and the resource name. |
 | `address` | Required. An IPv4 or IPv6 address or a DNS name. It must not start with `-`. |
 | `ssh_user` | Login user. Defaults to Ansible's default (the current user). |
 | `ssh_port` | SSH port, 1 to 65535. Default 22. |
