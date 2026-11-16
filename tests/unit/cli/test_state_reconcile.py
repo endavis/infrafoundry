@@ -97,6 +97,20 @@ def test_declined_confirmation_changes_nothing(manager: StateManager, config_dir
     assert len(_audit(manager)) == 1
 
 
+def test_prompt_at_end_of_input_is_a_cancellation(manager: StateManager, config_dir: Path) -> None:
+    """A prompt with no terminal stdin is a cancellation, not an unknown error (#1429)."""
+    _seed(manager)
+
+    result = _run(config_dir, "--env", "prod", input="")
+
+    assert result.exit_code != 0
+    assert "Operation cancelled" in result.output
+    assert "IF-GENERAL-001" not in result.output
+    assert "Unknown Error" not in result.output
+    assert _count(manager) == 3
+    assert _audit(manager) == []
+
+
 def test_active_lock_refuses(manager: StateManager, config_dir: Path) -> None:
     _seed(manager)
     manager.acquire_lock("prod", 3600, "someone")
