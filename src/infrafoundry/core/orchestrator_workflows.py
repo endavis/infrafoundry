@@ -646,8 +646,11 @@ class PlanOrchestrator(HookExecutionMixin):
                 self._print_provider_header(
                     provider_name, provider_resources, batch, resource_filter
                 )
+                # Rows InfraFoundry already applied: not re-recorded as planned (#1417),
+                # and direct-API runners delete only these (ADR-0018).
+                managed_rows = self.state_manager.get_managed_resources(env_name, provider_name)
                 self._track_planned_resources(
-                    deployment_id, env_name, provider_name, provider_resources
+                    deployment_id, env_name, provider_name, provider_resources, managed_rows
                 )
 
                 provider_results: dict[str, Any] = {"resources": len(provider_resources)}
@@ -683,12 +686,7 @@ class PlanOrchestrator(HookExecutionMixin):
                         self.console,
                     )
 
-                    # Rows InfraFoundry already applied: direct-API runners delete
-                    # only these (ADR-0018).
-                    managed = build_managed_resources(
-                        self.state_manager.get_managed_resources(env_name, provider_name),
-                        provider_name,
-                    )
+                    managed = build_managed_resources(managed_rows, provider_name)
 
                     for tool_name, runner in sorted_runners:
                         # Only IaC runners auto-run; config tools run as event handlers
@@ -925,8 +923,25 @@ class PlanOrchestrator(HookExecutionMixin):
         env_name: str,
         provider_name: str,
         resources: list[ResourceConfig],
+        managed_rows: list[Any],
     ) -> None:
+        """Record a PLANNED row for each resource that is not yet deployed.
+
+        The resource table is append-only and ``infra deployed`` shows the newest row per
+        resource, so a PLANNED row on an already-managed resource would hide its ACTIVE
+        state after a no-change plan (#1417). Managed resources are skipped.
+
+        Args:
+            deployment_id: Plan deployment the rows belong to.
+            env_name: Environment name.
+            provider_name: Provider name.
+            resources: Resources in scope for this provider.
+            managed_rows: Rows from ``StateManager.get_managed_resources``.
+        """
+        managed = {(row.resource_type, row.name) for row in managed_rows}
         for resource in resources:
+            if (resource.type, resource.name) in managed:
+                continue
             tracked_resource = self.state_manager.track_resource(
                 deployment_id=deployment_id,
                 environment=env_name,
