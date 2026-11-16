@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794842037972,
+  "lastUpdate": 1794842422896,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2132,6 +2132,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004036475374590509",
             "extra": "mean: 72.80684043473758 usec\nrounds: 14809"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9cf86153ff98c1c289ec5997d21d2afb4de9173d",
+          "message": "fix: plan records only resources that are not yet deployed (merges PR #1421, addresses #1417)\n\nfix: do not record already-deployed resources as planned\n\nPlanOrchestrator._track_planned_resources inserted a PLANNED row for every\nresource on every plan. The resource table is append-only and infra deployed\nshows the newest row per resource, so a no-change plan after an apply made a\ndeployed resource show as planned. Resources already managed (newest\nACTIVE/DELETED row is ACTIVE) are now skipped; only not-yet-deployed\nresources get a PLANNED row. The managed set is fetched once per provider\nand reused for the runner. Rows written by earlier plans are not rewritten.\n\nAddresses #1417\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T15:19:23Z",
+          "tree_id": "8f62318c58a9fcf1ff40202c166feb50d3d17b0b",
+          "url": "https://github.com/endavis/infrafoundry/commit/9cf86153ff98c1c289ec5997d21d2afb4de9173d"
+        },
+        "date": 1794842422166,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 77.11210519786876,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00033741901661633986",
+            "extra": "mean: 12.968132531643532 msec\nrounds: 79"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14077.472542138321,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005323562460690715",
+            "extra": "mean: 71.03547863486746 usec\nrounds: 15937"
           }
         ]
       }
