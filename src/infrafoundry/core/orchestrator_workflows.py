@@ -54,6 +54,7 @@ from infrafoundry.core.types import (
     ApplyDeploymentMetadata,
     DestroyDeploymentMetadata,
     PlanDeploymentMetadata,
+    ResourceEventData,
     ResourceOutcome,
     RollbackData,
     RollbackDeploymentMetadata,
@@ -1585,6 +1586,12 @@ class DestroyOrchestrator(HookExecutionMixin):
                             target_resources=resource_filter,
                             package_filter=package_filter,
                         )
+                        self._mark_resources_failed(
+                            env_name,
+                            provider_name,
+                            resource_ids,
+                            package_filter=package_filter,
+                        )
                         raise
 
                 # Fire resource lifecycle events for on_destroy handlers
@@ -1717,6 +1724,52 @@ class DestroyOrchestrator(HookExecutionMixin):
                 },
             )
         return resource_ids
+
+    def _mark_resources_failed(
+        self,
+        env_name: str,
+        provider_name: str,
+        resource_ids: dict[str, int],
+        *,
+        package_filter: str | None = None,
+    ) -> None:
+        """Mark this run's ``DELETING`` rows ``ERROR`` after a failed destroy.
+
+        Failures here are logged and swallowed so the runner's original
+        exception is the one that propagates.
+
+        Args:
+            env_name: Environment name.
+            provider_name: Provider name.
+            resource_ids: Resource name to state-row id for this run.
+            package_filter: Package filter forwarded to the emitted events.
+        """
+        try:
+            for name, db_id in resource_ids.items():
+                self.state_manager.update_resource_state(
+                    resource_id=db_id,
+                    state=ResourceState.ERROR,
+                )
+                failed_resource_event: ResourceEventData = {
+                    "resource_id": db_id,
+                    "provider": provider_name,
+                    "name": name,
+                    "terraform_id": None,
+                }
+                self.event_manager.emit_event(
+                    EventType.RESOURCE_FAILED,
+                    env_name,
+                    failed_resource_event,
+                    target_resources=[name],
+                    package_filter=package_filter,
+                    resource_scoped=True,
+                )
+        except Exception:
+            logger.warning(
+                "Could not mark resources ERROR after failed destroy for provider %s",
+                provider_name,
+                exc_info=True,
+            )
 
     def _finalize_destroyed_resources(
         self,

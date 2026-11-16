@@ -106,6 +106,7 @@ InfraFoundry tracks deployments and resources through well-defined state transit
 - **Creation:** `PLANNED` → `CREATING` → `ACTIVE`
 - **Update:** `ACTIVE` → `UPDATING` → `ACTIVE`
 - **Deletion:** `ACTIVE` → `DELETING` → `DELETED`
+- **Failed deletion:** `ACTIVE` → `DELETING` → `ERROR` (the runner failed or the resource remained in state)
 - **Error recovery:** Any state → `ERROR` → (manual intervention) → resumed state
 
 ### Querying State
