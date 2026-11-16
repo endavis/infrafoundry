@@ -400,6 +400,33 @@ class TestExtractPlanSummary:
         output = "Something terraform-shaped but not the canonical summary.\n"
         assert TerraformRunner.extract_plan_summary(output) == "Unable to parse plan output"
 
+    def test_summary_for_outputs_only_plan(self) -> None:
+        """An outputs-only plan is not reported as unparsable (#1404)."""
+        output = (
+            "Changes to Outputs:\n"
+            '  + example_output = "value"\n\n'
+            "You can apply this plan to save these new output values.\n"
+        )
+        assert TerraformRunner.extract_plan_summary(output) == "Output changes only"
+
+    def test_summary_for_ansi_coloured_outputs_only_plan(self) -> None:
+        """Colour escapes around the outputs header are stripped (#1404)."""
+        output = "\x1b[1mChanges to Outputs:\x1b[0m\n  + example_output = 1\n"
+        assert TerraformRunner.extract_plan_summary(output) == "Output changes only"
+
+    def test_plan_line_wins_over_outputs_block(self) -> None:
+        """A Plan line plus an outputs block keeps the resource summary (#1404)."""
+        output = "Plan: 2 to add, 0 to change, 0 to destroy.\n\nChanges to Outputs:\n  + a = 1\n"
+        assert TerraformRunner.extract_plan_summary(output) == "2 to add"
+
+    def test_drift_for_outputs_only_plan(self, runner: TerraformRunner) -> None:
+        """An outputs-only plan is parsed, with no resource changes (#1404)."""
+        output = "Changes to Outputs:\n  + example_output = 1\n"
+        drift = runner.parse_plan_for_drift({"success": True, "output": output})
+        assert drift["summary"] == "Output changes only"
+        assert drift["has_changes"] is False
+        assert drift.get("parsed", True) is True
+
     def test_parse_plan_for_drift_uses_helper_summary(self, runner: TerraformRunner) -> None:
         """``parse_plan_for_drift`` returns the same summary shape as the helper.
 
