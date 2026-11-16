@@ -138,6 +138,12 @@ class TestInstance:
         assert "associate_public_ip_address = false" in tf
         assert 'http_protocol_ipv6 = "enabled"' in tf
         assert 'hostname_type = "resource-name"' in tf
+        assert "enable_resource_name_dns_aaaa_record = true" in tf
+
+    def test_aaaa_record_only_when_ipv6_only(self, provider: AWSProvider) -> None:
+        tf = _generate(provider, instance())["instances.tf"]
+        assert "enable_resource_name_dns_aaaa_record" not in tf
+        assert "enable_resource_name_dns_a_record" not in tf
 
     def test_dual_stack_ipv6_count_alone(self, provider: AWSProvider) -> None:
         tf = _generate(provider, instance(ipv6_address_count=2))["instances.tf"]
@@ -228,7 +234,7 @@ class TestImportBlocks:
         assert "to = aws_volume_attachment" not in files["ebs_volumes.tf"]
 
     def test_rule_and_attachment_import_ids(self, provider: AWSProvider) -> None:
-        attachment = f"/dev/sdf:{INSTANCE}:{VOLUME}"
+        attachment = f"/dev/sdf:{VOLUME}:{INSTANCE}"
         files = _generate(
             provider,
             sg(ingress=[rule(import_id=RULE)]),
