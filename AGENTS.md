@@ -189,6 +189,7 @@ Key commands (`foundry` via `uv run foundry ...`):
 - `state backup` – backup state database
 - `state prune --env <name>` – delete a stale environment's rows from the state database
 - `state rename-env --env <old> --to-env <new>` – rename an environment in the state database and its generated directory
+- `state reconcile --env <name> [--dry-run]` – append an `ACTIVE` row over stale `PLANNED` rows of deployed resources
 - `state backend <validate|migrate>` – manage Terraform backend configuration
 - `state audit <list|export|verify>` – view and export audit trail
 

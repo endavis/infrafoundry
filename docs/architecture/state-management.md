@@ -136,6 +136,10 @@ It deletes the environment's resources, dependencies, deployments, events and lo
 
 After renaming an environment in the config repo, carry its history over with `foundry state rename-env --env old-env --to-env new-env`. It updates the `environment` column of resources, deployments and locks, and the `environment` key in each deployment's rollback snapshot, in one transaction (`StateManager.rename_environment`, [ADR-0007](../decisions/0007-repository-pattern-for-state.md)), then moves `generated/old-env` and records a `state_env_renamed` audit entry. Audit entries keep the old name. See the [CLI reference](../usage/cli-reference.md#state-rename-env) for the guards and options.
 
+### Reconciling Stale Planned Rows
+
+Plans written before #1417 left `PLANNED` rows over deployed resources, so `infra deployed` showed them as `planned`. `foundry state reconcile --env prod` appends a fresh `ACTIVE` row for each such resource under one `reconcile` deployment, in one transaction (`StateManager.reconcile_planned`, [ADR-0007](../decisions/0007-repository-pattern-for-state.md)). It appends rather than deletes, keeping the `resources` table append-only ([ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)), and records a `state_reconciled` audit entry. See the [CLI reference](../usage/cli-reference.md#state-reconcile) for the selection rule and options.
+
 ## Backend Configuration
 
 InfraFoundry supports multiple Terraform backend types for state storage and locking. Configure backends per-environment in `settings.yaml` to enable team collaboration and state locking.

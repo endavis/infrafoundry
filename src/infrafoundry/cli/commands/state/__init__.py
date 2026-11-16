@@ -5,6 +5,7 @@ from .backend import _backend as backend
 from .init import init
 from .list import list_resources as list_cmd
 from .prune import prune
+from .reconcile import reconcile
 from .rename_env import rename_env
 from .resources import resources
 from .state import state
@@ -15,6 +16,7 @@ state.add_command(init)
 state.add_command(list_cmd, name="list")
 state.add_command(resources)
 state.add_command(prune)
+state.add_command(reconcile)
 state.add_command(rename_env)
 state.add_command(backend)
 

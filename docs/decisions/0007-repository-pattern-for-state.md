@@ -34,6 +34,7 @@ We will use the **Repository Pattern** to abstract data access logic.
 ## Related Issues
 - [#1175](https://github.com/endavis/infrafoundry/issues/1175): `state prune` deletes an environment's rows through `StateManager` in one transaction.
 - [#1203](https://github.com/endavis/infrafoundry/issues/1203): `state rename-env` renames an environment's rows through `StateManager` in one transaction.
+- [#1423](https://github.com/endavis/infrafoundry/issues/1423): `state reconcile` appends `ACTIVE` rows over stale `PLANNED` rows through `StateManager` in one transaction.
 
 ## Alternatives Considered
 - **Active Record Pattern:** Rejected because it couples business logic tightly to the database schema.

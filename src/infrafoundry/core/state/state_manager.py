@@ -25,6 +25,8 @@ from infrafoundry.core.state.models import (
 )
 from infrafoundry.core.state.pool_config import build_engine_kwargs
 from infrafoundry.core.state.prune import prune_environment as _prune_environment
+from infrafoundry.core.state.reconcile import ReconcileCandidate
+from infrafoundry.core.state.reconcile import reconcile_planned as _reconcile_planned
 from infrafoundry.core.state.rename import count_environment_rows as _count_environment_rows
 from infrafoundry.core.state.rename import rename_environment as _rename_environment
 from infrafoundry.core.state.resource_repository import ResourceRepository
@@ -231,6 +233,21 @@ class StateManager(BaseManager):
             StateError: If another environment's resources reference its deployments
         """
         return _prune_environment(self.SessionLocal, environment, dry_run=dry_run)
+
+    def reconcile_planned(
+        self, environment: str, *, user: str | None = None, dry_run: bool = False
+    ) -> tuple[list[ReconcileCandidate], int | None]:
+        """Append ``ACTIVE`` rows over stale ``PLANNED`` rows of deployed resources.
+
+        Args:
+            environment: Environment name
+            user: User recorded on the ``reconcile`` deployment
+            dry_run: Report the candidates without writing
+
+        Returns:
+            The candidates and the ``reconcile`` deployment id (``None`` if nothing was written)
+        """
+        return _reconcile_planned(self.SessionLocal, environment, user=user, dry_run=dry_run)
 
     def count_environment_rows(self, environment: str) -> dict[str, int]:
         """Count the rows a rename of an environment would touch.
