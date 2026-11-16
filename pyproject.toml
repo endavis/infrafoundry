@@ -503,6 +503,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_rocky9_blueprint.py",
     "tests/unit/test_runner_ansible.py",
     "tests/unit/test_runner_host.py",
+    "tests/unit/test_runner_host_enrollment_path.py",
     "tests/unit/test_runner_host_path_lookup.py",
     "tests/unit/test_runner_interfaces.py",
     "tests/unit/test_runner_opentofu.py",
