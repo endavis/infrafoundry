@@ -239,6 +239,31 @@ On a filtered run the validation workflow calls it instead of `validate_referenc
 
 ---
 
+### validate_offline()
+
+**Purpose:** Run the part of your validation that needs no network on `infra plan` and `infra apply` (#1433).
+
+```python
+def validate_offline(
+    self,
+    resources: list[ResourceConfig],            # resources to check
+    reference_resources: list[ResourceConfig],  # all of this provider's resources
+    env_config: EnvironmentConfig,
+    report: ValidationReport,
+) -> None:
+    ...
+```
+
+Optional, through the `ValidatesOffline` protocol (`core/protocols.py`); `ProviderBase` does not change. The contract:
+
+- Make no network or subprocess calls. A check that logs in to a host or reads an API belongs in `validate_references`, which only `infra doctor` runs.
+- Check a subset of `validate_references`, and have `validate_references` call the same code so doctor runs every check it ran before.
+- An ERROR stops the plan with `ConfigValidationError`; a WARNING is printed and the plan continues. Raise nothing for a finding: add it to `report`.
+
+See [Validation during plan and apply](../usage/validation.md#validation-during-plan-and-apply) and [ADR-0023](../decisions/0023-infra-plan-runs-providers-offline-validation-live-checks-stay-in-infra-doctor.md).
+
+---
+
 ### generate_pyinfra()
 
 **Purpose:** Generate PyInfra deployment scripts and inventory.

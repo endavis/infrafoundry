@@ -84,8 +84,11 @@ class HostValidator:
             level=ValidationLevel.WARNING,
         )
 
-    def validate_references(self, resources: list[ResourceConfig]) -> None:
-        """Check each host's schema, secret references and SSH reachability.
+    def validate_offline(self, resources: list[ResourceConfig]) -> None:
+        """Check each host's schema and secret references (#1433).
+
+        The SSH probe is not run: a host created earlier in the same apply cannot
+        be reached at plan time.
 
         Args:
             resources: Resources to validate; only ``host`` resources are checked.
@@ -99,6 +102,15 @@ class HostValidator:
                 level=finding.level,
             )
         validate_terraform_secrets_references("host", hosts, self.env_config, self.report)
+
+    def validate_references(self, resources: list[ResourceConfig]) -> None:
+        """Check each host's schema, secret references and SSH reachability.
+
+        Args:
+            resources: Resources to validate; only ``host`` resources are checked.
+        """
+        self.validate_offline(resources)
+        hosts = [r for r in resources if r.type == "host"]
         for host in hosts:
             if is_valid_address(host.config.get("address")):
                 self._probe(host)

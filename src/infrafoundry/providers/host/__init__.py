@@ -100,6 +100,16 @@ class HostProvider(
         """Run schema, secret-reference and SSH reachability checks."""
         HostValidator(env_config, report, repo_root=self.repo_root).validate_references(resources)
 
+    def validate_offline(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Run schema and secret-reference checks; the SSH probe stays doctor-only (#1433)."""
+        HostValidator(env_config, report, repo_root=self.repo_root).validate_offline(resources)
+
     def _validate_resources(self, resources: list[ResourceConfig]) -> None:
         """Raise when any host fails its schema checks.
 

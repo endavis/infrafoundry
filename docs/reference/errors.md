@@ -395,6 +395,16 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 
 ---
 
+### IF-VALIDATION-007: Configuration Validation Failed
+
+**Cause:** Provider validation that needs no network found errors in the configuration while planning, so no change set was computed.
+
+**Solutions:**
+1. Fix the errors listed above in the resource YAML
+2. Run `foundry infra doctor --env <env> --verbose` for the full report, including live API checks
+
+---
+
 ## Package Errors (IF-PACKAGE)
 
 ### IF-PACKAGE-001: Package Not Found

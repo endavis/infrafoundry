@@ -419,6 +419,8 @@ foundry infra plan --env dev --verbose
 
 **`-v/--verbose`:** Print the full captured terraform plan diff for each provider in addition to the per-provider summary line. Without `--verbose`, `infra plan` always prints a single summary line per terraform-emitting provider (e.g. `terraform: 21 to add, 0 to change, 0 to destroy` or `terraform: No changes`) so the operator can confirm what would change without re-running with extra flags. The opnsense direct-API runner's existing per-component diff lines are unaffected by this flag.
 
+**Validation:** before any file is generated, each provider's offline validation runs. Warnings are printed; errors stop the plan with [IF-VALIDATION-007](../reference/errors.md#if-validation-007-configuration-validation-failed). Live checks stay in `infra doctor`. See [Validation during plan and apply](validation.md#validation-during-plan-and-apply).
+
 Note: `--resource`, `--package`, and `--provider` are mutually exclusive.
 
 ### `infra apply`
@@ -437,6 +439,8 @@ foundry infra apply --env dev --add-only
 ```
 
 **Options:** `-e/--env TEXT` (required), `--auto-approve`, `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `-P/--provider TEXT` (repeatable), `--parallel`, `--max-workers INTEGER` (default: CPU count; env `INFRAFOUNDRY_MAX_WORKERS`), `--lock-timeout INTEGER` (default: 0), `--lock-ttl INTEGER` (default: 600), `--add-only`
+
+**Validation:** apply plans first, so it runs the same offline provider validation as `infra plan` and stops on errors before it changes anything ([IF-VALIDATION-007](../reference/errors.md#if-validation-007-configuration-validation-failed); see [Validation during plan and apply](validation.md#validation-during-plan-and-apply)).
 
 **`--max-workers`:** Only matters with `--parallel`. Precedence: the flag, then `INFRAFOUNDRY_MAX_WORKERS`, then `os.cpu_count()`, then 4. Must be at least 1.
 

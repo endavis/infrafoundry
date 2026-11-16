@@ -90,6 +90,17 @@ class AWSProvider(
         """Validate AWS resource configuration and cross-references."""
         AWSValidator(env_config, report).validate_references(resources)
 
+    def validate_offline(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Run AWS validation, which is already offline (#1433)."""
+        # validate_references of this provider makes no network call, so it is the offline part.
+        AWSValidator(env_config, report).validate_references(resources)
+
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""

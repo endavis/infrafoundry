@@ -22,7 +22,11 @@ from infrafoundry.core.config.models import EnvironmentConfig, IaCTool
 from infrafoundry.core.deployment_executor import default_max_workers
 from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventAbortedError, EventManager, EventType
-from infrafoundry.core.exceptions import ProviderFilterError, TerraformError
+from infrafoundry.core.exceptions import (
+    ConfigValidationError,
+    ProviderFilterError,
+    TerraformError,
+)
 from infrafoundry.core.failed_resources import mark_resources_failed
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
 from infrafoundry.core.known_hosts import forget_on_jumphost, hosts_to_forget
@@ -33,6 +37,7 @@ from infrafoundry.core.protocols import (
     DispatchesManagedSet,
     ForgetsKeptOnDestroy,
     Plannable,
+    ValidatesOffline,
     ValidatesReferencesInContext,
     VerifiesDestroy,
 )
@@ -386,6 +391,72 @@ class ValidationOrchestrator:
         self._print_overall_summary(results)
         return results
 
+    def validate_offline(
+        self,
+        env_config: EnvironmentConfig,
+        batches: list[ProviderResourceBatch],
+        resources_by_provider: dict[str, list[ResourceConfig]],
+    ) -> dict[str, ValidationReport]:
+        """Run each provider's network-free validation for ``infra plan`` (#1433).
+
+        Providers without ``validate_offline`` and batches without resources are
+        skipped. A provider that raises adds a warning and the pass continues.
+        Findings are printed; a clean provider prints nothing.
+
+        Args:
+            env_config: Environment configuration.
+            batches: Provider batches in scope.
+            resources_by_provider: All resources per provider, for reference lookups.
+
+        Returns:
+            Report per validated provider name.
+        """
+        providers = self._get_providers()
+        reports: dict[str, ValidationReport] = {}
+        for batch in batches:
+            provider = providers.get(batch.name)
+            if not batch.resources or provider is None:
+                continue
+            if isinstance(provider, ValidatesOffline):
+                report = self._run_offline_validation(
+                    provider, batch, resources_by_provider, env_config
+                )
+                reports[batch.name] = report
+                self._print_offline_findings(batch.name, report)
+        return reports
+
+    def _run_offline_validation(
+        self,
+        provider: ValidatesOffline,
+        batch: ProviderResourceBatch,
+        resources_by_provider: dict[str, list[ResourceConfig]],
+        env_config: EnvironmentConfig,
+    ) -> ValidationReport:
+        """Run one provider's offline validation; a crash becomes a warning."""
+        report = ValidationReport()
+        try:
+            provider.validate_offline(
+                batch.resources,
+                resources_by_provider.get(batch.name, batch.resources),
+                env_config,
+                report,
+            )
+        except Exception as exc:
+            report.add_check(
+                f"{batch.name}_offline_validation",
+                False,
+                f"Offline validation of {batch.name} crashed: {type(exc).__name__}: {exc}",
+                ValidationLevel.WARNING,
+            )
+        return report
+
+    def _print_offline_findings(self, name: str, report: ValidationReport) -> None:
+        """Print a provider's findings; a clean report prints nothing."""
+        summary = report.get_summary()
+        if summary["errors"] or summary["warnings"]:
+            self.console.print(f"[bold]Config validation: {name}[/bold]")
+            self._print_detailed_report(report, verbose=False)
+
     def _run_validation_checks(
         self,
         provider: ProviderBase,
@@ -506,6 +577,17 @@ class PlanOrchestrator(HookExecutionMixin):
         find_managed_only_providers: (
             Callable[[str, dict[str, list[ResourceConfig]]], list[str]] | None
         ) = None,
+        validate_offline: (
+            Callable[
+                [
+                    EnvironmentConfig,
+                    list[ProviderResourceBatch],
+                    dict[str, list[ResourceConfig]],
+                ],
+                dict[str, ValidationReport],
+            ]
+            | None
+        ) = None,
     ) -> None:
         self.console = console
         self.state_manager = state_manager
@@ -514,6 +596,7 @@ class PlanOrchestrator(HookExecutionMixin):
         self._get_providers = get_providers
         self._load_resources = load_resources
         self._iter_provider_batches = iter_provider_batches
+        self._validate_offline = validate_offline
         self._validate_resources = validate_resources
         self._has_policies = has_policies
         self._check_policies = check_policies
@@ -626,14 +709,27 @@ class PlanOrchestrator(HookExecutionMixin):
             if self._has_policies():
                 self._check_policies(env_name, all_resources, enforce_policies)
 
+            # Computed once: a second call would repeat the "not found" warning.
+            batches = self._iter_provider_batches(
+                resources_by_provider, resource_filter, False, env_name
+            )
+            if self._validate_offline and env_config:
+                offline_reports = self._validate_offline(env_config, batches, resources_by_provider)
+                offline_errors = sum(r.get_summary()["errors"] for r in offline_reports.values())
+                if offline_errors:
+                    self.console.print(
+                        f"[red]✗ Configuration validation failed: {offline_errors} errors[/red]"
+                    )
+                    raise ConfigValidationError(
+                        f"Configuration validation failed with {offline_errors} errors"
+                    )
+
             # Execute environment-level before_plan hooks
             self._execute_env_hooks(env_name, "before_plan", env_config)
 
             providers = self._get_providers()
             # Use forward order for plan (same as apply)
-            for batch in self._iter_provider_batches(
-                resources_by_provider, resource_filter, False, env_name
-            ):
+            for batch in batches:
                 provider_name = batch.name
                 provider_resources = batch.resources
                 provider = providers.get(provider_name)
@@ -831,7 +927,9 @@ class PlanOrchestrator(HookExecutionMixin):
                 package_filter=package_filter,
                 provider_filter=provider_filter,
             )
-            if not isinstance(exc, ProviderFilterError):  # the CLI renders that one cleanly
+            if not isinstance(
+                exc, (ProviderFilterError, ConfigValidationError)
+            ):  # the CLI renders these cleanly
                 self.console.print(traceback.format_exc(), style="dim red")
             raise
 

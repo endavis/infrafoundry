@@ -220,6 +220,8 @@ The check tests connectivity to the API (`validate_connectivity`), that referenc
 
 `infra doctor` also warns when a `kea.dhcp4.subnets` entry sets `auto_collect: true` together with `routers`, `dns_servers` or `ntp_servers`. Saving the Kea DHCPv4 settings re-runs auto-collect and overwrites those values; set `auto_collect: false` to keep them. See [Kea DHCPv4 high availability](../development/opnsense-resource-coverage.md#kea-dhcpv4-high-availability-1392).
 
+That warning also appears on `infra plan` and `infra apply`, which run the OPNsense checks that need no API access. The checks that compare against the live box (aliases, interfaces, gateways, Unbound overrides) remain doctor-only. See [Validation during plan and apply](../usage/validation.md#validation-during-plan-and-apply).
+
 ## Examples
 
 A plan that touches only OPNsense, without deleting anything the YAML omits:

@@ -372,6 +372,19 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
             "'foundry infra apply --env <env> -P proxmox'",
         ],
     ),
+    "IF-VALIDATION-007": ErrorInfo(
+        code="IF-VALIDATION-007",
+        title="Configuration Validation Failed",
+        description=(
+            "Provider validation that needs no network found errors in the configuration "
+            "while planning, so no change set was computed."
+        ),
+        suggestions=[
+            "Fix the errors listed above in the resource YAML",
+            "Run 'foundry infra doctor --env <env> --verbose' for the full report, "
+            "including live API checks",
+        ],
+    ),
     # Package errors (IF-PACKAGE-XXX)
     "IF-PACKAGE-001": ErrorInfo(
         code="IF-PACKAGE-001",
@@ -611,6 +624,7 @@ _EXCEPTION_TO_CODE: dict[str, str] = {
     "SchemaValidationError": "IF-VALIDATION-004",
     "ResourceFilterError": "IF-VALIDATION-005",
     "FilteredDestroyRefusedError": "IF-VALIDATION-006",
+    "ConfigValidationError": "IF-VALIDATION-007",
     # Package errors
     "PackageNotFoundError": "IF-PACKAGE-001",
     "MissingRequirementsError": "IF-PACKAGE-002",

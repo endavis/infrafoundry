@@ -485,6 +485,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_package_loader.py",
     "tests/unit/test_package_loader_multi_provider.py",
     "tests/unit/test_package_mover.py",
+    "tests/unit/test_plan_offline_validation.py",
     "tests/unit/test_policy.py",
     "tests/unit/test_policy_checker.py",
     "tests/unit/test_provider.py",

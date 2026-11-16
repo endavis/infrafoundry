@@ -344,6 +344,34 @@ class ValidatesReferencesInContext(Protocol):
 
 
 @runtime_checkable
+class ValidatesOffline(Protocol):
+    """Protocol for providers that validate configuration without the network.
+
+    ``infra plan`` and ``infra apply`` call ``validate_offline`` on every
+    provider that implements it, before any runner work (#1433). It must make
+    no network or subprocess calls, and it checks a subset of what
+    ``validate_references`` checks. Live checks stay in ``infra doctor``.
+    """
+
+    def validate_offline(
+        self,
+        resources: list["ResourceConfig"],
+        reference_resources: list["ResourceConfig"],
+        env_config: "EnvironmentConfig",
+        report: "ValidationReport",
+    ) -> None:
+        """Validate *resources* offline, resolving names against *reference_resources*.
+
+        Args:
+            resources: Resources to validate
+            reference_resources: All of the provider's resources in the environment
+            env_config: Environment configuration
+            report: ValidationReport to add results to
+        """
+        ...
+
+
+@runtime_checkable
 class DriftDetectable(Protocol):
     """Protocol for runners that can detect configuration drift.
 

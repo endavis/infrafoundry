@@ -83,6 +83,17 @@ class EsxiProvider(
         validator = EsxiValidator(env_config, report)
         validator.validate_references(resources)
 
+    def validate_offline(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Run ESXi validation, which is already offline (#1433)."""
+        # validate_references of this provider makes no network call, so it is the offline part.
+        EsxiValidator(env_config, report).validate_references(resources)
+
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for ESXi resources."""
