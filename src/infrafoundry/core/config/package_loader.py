@@ -73,6 +73,8 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     "syslog.settings": "dict",  # #804
     "kea.dhcp4.subnets": "list",
     "kea.dhcp4.reservations": "list",
+    "kea.dhcp4.ha": "dict",  # #1392
+    "kea.dhcp4.ha_peers": "list",  # #1392
     "kea.dhcp6.subnets": "list",
     "kea.dhcp6.reservations": "list",
     # #807 trust store (CAs and certificates, list)

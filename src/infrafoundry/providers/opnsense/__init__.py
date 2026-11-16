@@ -159,6 +159,8 @@ class OPNsenseProvider(
         from .components.interfaces_settings import InterfacesSettingsManager
         from .components.isc_to_kea_migration import ISCToKeaMigrationManager
         from .components.kea_dhcp import KeaDHCPManager
+        from .components.kea_dhcp4_ha import KeaDHCPv4HAManager  # #1392
+        from .components.kea_dhcp4_ha_peers import KeaDHCPv4HAPeerManager  # #1392
         from .components.monit import (
             MonitAlertsManager,
             MonitServicesManager,
@@ -197,6 +199,9 @@ class OPNsenseProvider(
             ("unbound.forwards", UnboundForwardManager),
             ("unbound.settings", UnboundSettingsManager),
             ("kea_dhcp", KeaDHCPManager),
+            # #1392
+            ("kea.dhcp4.ha", KeaDHCPv4HAManager),
+            ("kea.dhcp4.ha_peers", KeaDHCPv4HAPeerManager),
             ("isc_to_kea", ISCToKeaMigrationManager),
             ("cron.jobs", CronJobsManager),
             ("hostdiscovery", HostDiscoveryManager),
@@ -307,6 +312,8 @@ class OPNsenseProvider(
         from .components.hostdiscovery import HostDiscoveryManager
         from .components.interface_assignment import InterfaceAssignmentManager
         from .components.interfaces_settings import InterfacesSettingsManager
+        from .components.kea_dhcp4_ha import KeaDHCPv4HAManager  # #1392
+        from .components.kea_dhcp4_ha_peers import KeaDHCPv4HAPeerManager  # #1392
         from .components.kea_dhcp4_reservation import KeaDHCPv4ReservationManager
         from .components.kea_dhcp4_subnet import KeaDHCPv4SubnetManager
         from .components.kea_dhcp6_reservation import KeaDHCPv6ReservationManager
@@ -395,6 +402,16 @@ class OPNsenseProvider(
             "unbound.forwards": UnboundForwardManager,
             "unbound.advanced": UnboundAdvancedManager,
             "unbound.settings": UnboundSettingsManager,
+            # #1392: HA before the subnets. Writing ``kea/dhcpv4/set`` makes OPNsense
+            # re-run option-data auto-collect on every ``auto_collect`` subnet, overwriting
+            # explicit option data; the subnet write that follows restores it in the same
+            # apply. Peers go before the settings, so on enable the peers exist before
+            # ``enabled`` / ``this_server_name`` are written. Nothing references a peer by
+            # uuid, so no split delete phase. The order is not encoded in
+            # ``get_dependencies``: a subnet dependency on ``kea.dhcp4.ha`` would force
+            # subnets and reservations to split their deletes.
+            "kea.dhcp4.ha_peers": KeaDHCPv4HAPeerManager,
+            "kea.dhcp4.ha": KeaDHCPv4HAManager,
             "kea.dhcp4.subnets": KeaDHCPv4SubnetManager,
             "kea.dhcp4.reservations": KeaDHCPv4ReservationManager,
             "kea.dhcp6.subnets": KeaDHCPv6SubnetManager,
@@ -444,7 +461,8 @@ class OPNsenseProvider(
 
         - ``kea_reconfigure`` — shared by :class:`KeaDHCPv4SubnetManager`,
           :class:`KeaDHCPv4ReservationManager`, :class:`KeaDHCPv6SubnetManager`,
-          and :class:`KeaDHCPv6ReservationManager` so a single
+          :class:`KeaDHCPv6ReservationManager` and the DHCPv4 HA managers
+          :class:`KeaDHCPv4HAManager` and :class:`KeaDHCPv4HAPeerManager` (#1392) so a single
           ``kea/service/reconfigure`` call fires per apply when any Kea
           component changed state. Renamed from the original
           ``kea_dhcp6_reconfigure`` (#758) to drop the v6-specific suffix
@@ -820,6 +838,8 @@ class OPNsenseProvider(
             "firewall.aliases": [],
             "kea.dhcp4.subnets": ["interfaces.vlans"],
             "kea.dhcp4.reservations": ["kea.dhcp4.subnets"],
+            "kea.dhcp4.ha_peers": [],
+            "kea.dhcp4.ha": ["kea.dhcp4.ha_peers"],
             "kea.dhcp6.subnets": ["interfaces.vlans"],
             "kea.dhcp6.reservations": ["kea.dhcp6.subnets"],
             "unbound.host_overrides": [],

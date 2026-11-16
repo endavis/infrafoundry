@@ -1214,6 +1214,7 @@ class TestDottedTypeRegistrySanity:
         "acmeclient.actions",
         "acmeclient.certs",
         "tailscale.subnets",
+        "kea.dhcp4.ha_peers",
     )
 
     def test_each_phase_1_dotted_type_registered_as_list(self) -> None:
@@ -1225,3 +1226,68 @@ class TestDottedTypeRegistrySanity:
             assert DOTTED_RESOURCE_SHAPES[dotted] == "list", (
                 f"{dotted!r} declared as {DOTTED_RESOURCE_SHAPES[dotted]!r}, expected 'list'."
             )
+
+
+class TestMigrateKeaHAEmitsNested:
+    """Migrate emits the Kea DHCPv4 HA types at their nested paths (#1392)."""
+
+    PATH = "infrafoundry.providers.opnsense.components.{module}.{service}"
+
+    def _migrate(
+        self, tmp_path: Path, module: str, manager: type, service: type, responses: list[Any]
+    ) -> str:
+        client = MagicMock()
+        client.request.side_effect = responses
+        with patch(self.PATH.format(module=module, service=service.__name__)) as svc_cls:
+            svc_cls.from_environment.return_value = service(client)
+            return str(manager(tmp_path).migrate("test-env"))
+
+    def test_settings_emit_nested(self, tmp_path: Path) -> None:
+        from infrafoundry.providers.opnsense.components.kea_dhcp4_ha import KeaDHCPv4HAManager
+        from infrafoundry.providers.opnsense.services.kea_dhcp4_ha import KeaHASettingsService
+
+        response = {
+            "dhcpv4": {
+                "ha": {
+                    "enabled": "1",
+                    "this_server_name": "",
+                    "%this_server_name": "fw-a",
+                    "max_unacked_clients": "2",
+                }
+            }
+        }
+        yaml_text = self._migrate(
+            tmp_path, "kea_dhcp4_ha", KeaDHCPv4HAManager, KeaHASettingsService, [response]
+        )
+        leaf = _assert_nested_path_present(yaml_text, "kea.dhcp4.ha", expected_shape="dict")
+        assert leaf == {"enabled": True, "this_server_name": "", "max_unacked_clients": 2}
+        _assert_no_flat_resources_key(yaml_text)
+        parsed = _round_trip(yaml_text, "kea_dhcp4_ha.yaml")
+        assert {(r.name, r.type) for r in parsed} == {("kea.dhcp4.ha", "kea.dhcp4.ha")}
+
+    def test_peers_emit_nested(self, tmp_path: Path) -> None:
+        from infrafoundry.providers.opnsense.components.kea_dhcp4_ha_peers import (
+            KeaDHCPv4HAPeerManager,
+        )
+        from infrafoundry.providers.opnsense.services.kea_dhcp4_ha import KeaHAPeerService
+
+        responses: list[Any] = [
+            {"rows": [{"uuid": "u1", "name": "fw-a"}]},
+            {"peer": {"name": "fw-a", "role": "primary", "url": "http://192.0.2.1:8001/"}},
+        ]
+        with patch(
+            "infrafoundry.providers.opnsense.components.kea_dhcp4_ha_peers.env_provider_resources",
+            return_value=[],
+        ):
+            yaml_text = self._migrate(
+                tmp_path, "kea_dhcp4_ha_peers", KeaDHCPv4HAPeerManager, KeaHAPeerService, responses
+            )
+        leaf = _assert_nested_path_present(yaml_text, "kea.dhcp4.ha_peers", expected_shape="list")
+        assert [e["name"] for e in leaf] == ["fw-a"]
+        assert leaf[0]["config"] == {
+            "name": "fw-a",
+            "role": "primary",
+            "url": "http://192.0.2.1:8001/",
+        }
+        parsed = _round_trip(yaml_text, "kea_dhcp4_ha_peers.yaml")
+        assert {(r.name, r.type) for r in parsed} == {("fw-a", "kea.dhcp4.ha_peers")}

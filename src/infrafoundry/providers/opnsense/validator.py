@@ -27,6 +27,7 @@ from infrafoundry.providers.opnsense.validators import (
     HostDiscoveryValidator,
     InterfaceAssignmentValidator,
     InterfacesSettingsValidator,
+    KeaHAValidator,  # #1392
     KeaReservationValidator,
     MonitValidator,  # #791
     NATRuleValidator,
@@ -117,6 +118,7 @@ class OPNsenseValidator:
         self.unbound_host_alias_validator = UnboundHostAliasValidator(report)
         self.unbound_forward_validator = UnboundForwardValidator(report)
         self.kea_reservation_validator = KeaReservationValidator(report)
+        self.kea_ha_validator = KeaHAValidator(report)  # #1392
         self.radvd_validator = RadvdValidator(report)
         self.cron_jobs_validator = CronJobsValidator(report)
         self.trust_validator = TrustValidator(report)
@@ -404,6 +406,7 @@ class OPNsenseValidator:
             self.tailscale_validator.validate(
                 replace(context, resources=resource_refs["tailscale"])
             )
+            self.kea_ha_validator.validate(replace(context, resources=resource_refs["kea_ha"]))
             self.monit_validator.validate(replace(context, resources=resource_refs["monit"]))
             self.system_firmware_validator.validate(
                 replace(context, resources=resource_refs["system_firmware"])
@@ -467,6 +470,7 @@ class OPNsenseValidator:
         firewall_categories = [r for r in resources if r.type == "firewall.categories"]
         acmeclient = [r for r in resources if r.type.startswith("acmeclient.")]
         tailscale = [r for r in resources if r.type.startswith("tailscale.")]
+        kea_ha = [r for r in resources if r.type in ("kea.dhcp4.ha", "kea.dhcp4.ha_peers")]
         monit = [r for r in resources if r.type.startswith("monit.")]
         system_firmware = [r for r in resources if r.type == "system.firmware"]
         system_tuning = [r for r in resources if r.type == "system.tuning"]
@@ -527,6 +531,7 @@ class OPNsenseValidator:
             "firewall_categories": firewall_categories,
             "acmeclient": acmeclient,
             "tailscale": tailscale,
+            "kea_ha": kea_ha,
             "monit": monit,
             "system_firmware": system_firmware,
             "system_tuning": system_tuning,

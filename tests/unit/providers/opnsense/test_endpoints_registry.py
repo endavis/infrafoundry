@@ -282,6 +282,24 @@ def test_tailscale_types_register_their_endpoints() -> None:
     assert endpoints.TAILSCALE_SUBNET.add in types["tailscale.subnets"]
 
 
+def test_kea_ha_types_register_their_endpoints() -> None:
+    types = endpoints.RESOURCE_TYPE_ENDPOINTS
+    peer = endpoints.KEA_CRUD[("dhcpv4", "Peer")]
+    assert types["kea.dhcp4.ha"] == (
+        endpoints.KEA_DHCPV4_GET,
+        endpoints.KEA_DHCPV4_SET,
+        endpoints.KEA_RECONFIGURE,
+    )
+    assert types["kea.dhcp4.ha_peers"] == (*peer.all(), endpoints.KEA_RECONFIGURE)
+    assert {e.template for e in peer.all()} == {
+        "kea/dhcpv4/searchPeer",
+        "kea/dhcpv4/getPeer/{uuid}",
+        "kea/dhcpv4/addPeer",
+        "kea/dhcpv4/setPeer/{uuid}",
+        "kea/dhcpv4/delPeer/{uuid}",
+    }
+
+
 def test_monit_types_register_their_endpoints() -> None:
     types = endpoints.RESOURCE_TYPE_ENDPOINTS
     assert types["monit.settings"] == (
