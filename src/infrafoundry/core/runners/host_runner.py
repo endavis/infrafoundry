@@ -189,7 +189,7 @@ class HostRunner(BaseRunner):
         ]
         self.console.print(f"  [dim]host_ansible: {run.name}: {Path(playbook).name}[/dim]")
         try:
-            result = subprocess.run(  # nosec B603  # list argv, no shell
+            result = subprocess.run(  # list argv, no shell
                 argv, cwd=ansible_dir, env=env, capture_output=False, check=False
             )
         except FileNotFoundError:

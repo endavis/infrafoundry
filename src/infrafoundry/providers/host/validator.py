@@ -23,7 +23,7 @@ SshProbe = Callable[[list[str]], int]
 
 def _run_ssh(argv: list[str]) -> int:
     """Run an ssh command and return its exit code."""
-    result = subprocess.run(  # nosec B603  # list argv, no shell
+    result = subprocess.run(  # list argv, no shell
         argv, capture_output=True, timeout=SSH_TIMEOUT_SECONDS, check=False
     )
     return result.returncode
