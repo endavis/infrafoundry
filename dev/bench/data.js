@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794827048500,
+  "lastUpdate": 1794828563616,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1752,6 +1752,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000720641210601081",
             "extra": "mean: 90.55420030841287 usec\nrounds: 12321"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "67a4c43ab10b9fdc6b9b15deeb9874af47def78a",
+          "message": "fix: render the dns aaaa record setting for ipv6-only aws instances (merges PR #1400, addresses #1399)\n\nAn ipv6_only instance rendered private_dns_name_options with only\nhostname_type, so the AWS provider sent\nenable_resource_name_dns_aaaa_record = false, which EC2 rejects on a\nsubnet without an IPv4 CIDR. Render it as true for ipv6_only.\n\nAlso correct the documented attachment_import_id order to\n<device>:<volume-id>:<instance-id>.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T11:27:41Z",
+          "tree_id": "f542494aec60ad89e626574dd8c7e6b2c06356fd",
+          "url": "https://github.com/endavis/infrafoundry/commit/67a4c43ab10b9fdc6b9b15deeb9874af47def78a"
+        },
+        "date": 1794828563003,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.33343494442258,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003881167523144444",
+            "extra": "mean: 20.270228520000018 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7931.171342634229,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009199044588542422",
+            "extra": "mean: 126.08478077184796 usec\nrounds: 8498"
           }
         ]
       }
