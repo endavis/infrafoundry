@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794837559743,
+  "lastUpdate": 1794838689790,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -1980,6 +1980,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006772631400436543",
             "extra": "mean: 76.41573090417806 usec\nrounds: 13694"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a4f8ef1c09abe005c9322ceb46c146c94be3de63",
+          "message": "fix: generate host inventory through the orchestrator and accept the name key (merges PR #1412, addresses #1411)\n\nThe plan step calls generate_<tool_name> on a provider, but HostProvider\ndefined generate_host_ansible, so no inventory was written and apply\nrecorded hosts without running any playbook. Rename it to generate_host,\nfail HostRunner.apply when a requested host has no generated run, and\naccept name as a known host key so doctor stops warning about it.\n\nAddresses #1411\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T14:17:19Z",
+          "tree_id": "f258d39f106eb6a4f7105710696ad8ed3fc30668",
+          "url": "https://github.com/endavis/infrafoundry/commit/a4f8ef1c09abe005c9322ceb46c146c94be3de63"
+        },
+        "date": 1794838689314,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 58.21298516769044,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0007073227797264725",
+            "extra": "mean: 17.17829788524611 msec\nrounds: 61"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 11226.309550605112,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005535335275751503",
+            "extra": "mean: 89.07646769334796 usec\nrounds: 12273"
           }
         ]
       }
