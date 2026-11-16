@@ -95,6 +95,16 @@ class ProxmoxProvider(
         validator = ProxmoxValidator(env_config, report)
         validator.validate_references(resources)
 
+    def validate_offline(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Run the checks that need no Proxmox API client (#1433)."""
+        ProxmoxValidator(env_config, report).validate_offline(resources)
+
     @override
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* env vars for Proxmox provider."""

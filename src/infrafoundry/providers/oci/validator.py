@@ -121,6 +121,14 @@ class OCIValidator:
         self._validate_local_references(resources)
         self._validate_api_references(resources)
 
+    def validate_offline(self, resources: list[ResourceConfig]) -> None:
+        """Run the local cross-reference checks, which need no OCI API (#1433).
+
+        Args:
+            resources: List of resources to validate
+        """
+        self._validate_local_references(resources)
+
     def _validate_local_references(self, resources: list[ResourceConfig]) -> None:
         """Validate cross-references between resources in the configuration.
 

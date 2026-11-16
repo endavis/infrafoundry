@@ -72,6 +72,16 @@ class OCIProvider(
         validator = OCIValidator(env_config, report)
         validator.validate_references(resources)
 
+    def validate_offline(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Run the checks that need no OCI API call (#1433)."""
+        OCIValidator(env_config, report).validate_offline(resources)
+
     @override
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* env vars for OCI provider."""

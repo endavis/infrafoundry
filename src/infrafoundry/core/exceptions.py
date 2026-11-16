@@ -142,6 +142,10 @@ class ReferenceValidationError(ValidationError):
     """Resource reference validation failed."""
 
 
+class ConfigValidationError(ValidationError):
+    """Plan-time provider validation found errors in the configuration."""
+
+
 class SchemaValidationError(ValidationError):
     """Data does not match expected schema."""
 

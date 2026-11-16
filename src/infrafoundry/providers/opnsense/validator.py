@@ -54,6 +54,7 @@ from infrafoundry.providers.opnsense.validators import (
     VLANValidator,
     build_xref_index,
 )
+from infrafoundry.providers.opnsense.validators._xref import XRefIndex
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -285,23 +286,10 @@ class OPNsenseValidator:
         api_key = credentials["api_key"]
         api_secret = credentials["api_secret"]
 
-        # Collect resources by type
-        resource_refs = self._collect_resource_references(resources)
-        # Name lookups resolve against the whole environment; only the
-        # resources in scope are checked.
-        reference_list = reference_resources if reference_resources is not None else resources
-        reference_refs = (
-            resource_refs
-            if reference_resources is None
-            else self._collect_resource_references(reference_list)
+        # Collect resources by type and build the shared context (#1433).
+        resource_refs, reference_refs, xref_index = self._collect_refs(
+            resources, reference_resources
         )
-
-        # Build the dotted-type cross-reference index once (#793). The
-        # nested-dict shape gives O(1) lookup per resolver call inside
-        # each per-resource validator. Validators that haven't adopted
-        # the resolver yet ignore this argument; that's fine — the
-        # parameter is optional and additive.
-        xref_index = build_xref_index(reference_list)
 
         # Validate against live API
         try:
@@ -319,114 +307,192 @@ class OPNsenseValidator:
                 api_url, api_key, api_secret
             )
 
-            # Validate using specialized validators. Each validator reads the
-            # fields it needs from one context; the resource-list validators
-            # get their own slice through ``replace``.
-            context = OPNsenseValidationContext(
-                resources=resources,
-                firewall_rules=resource_refs["firewall_rules"],
-                vlans=resource_refs["vlans"],
-                assignments=resource_refs["interface_assignments"],
-                nat_rules=resource_refs["nat_rules"],
-                gateways=resource_refs["gateways"],
-                static_routes=resource_refs["static_routes"],
-                virtual_ips=resource_refs["virtual_ips"],
-                host_aliases=resource_refs["unbound_host_aliases"],
-                dhcp4_reservations=resource_refs["kea_dhcp4_reservations"],
-                dhcp6_reservations=resource_refs["kea_dhcp6_reservations"],
-                alias_names=reference_refs["alias_names"],
-                interface_assignment_names=reference_refs["interface_assignment_names"],
-                gateway_names=reference_refs["gateway_names"],
-                vlan_names=reference_refs["vlan_names"],
-                managed_host_override_names=reference_refs["unbound_host_override_names"],
-                dhcp4_subnet_names=reference_refs["kea_dhcp4_subnet_names"],
-                dhcp6_subnet_names=reference_refs["kea_dhcp6_subnet_names"],
+            context = self._build_context(
+                resources,
+                resource_refs,
+                reference_refs,
+                xref_index,
                 existing_interfaces=existing_interfaces,
                 existing_aliases=existing_aliases,
                 existing_gateways=existing_gateways,
                 existing_host_override_names=existing_unbound_host_overrides,
-                managed_gateways=reference_refs["gateways"],
-                index=xref_index,
             )
-            run_validators(
-                (
-                    self.firewall_rule_validator,
-                    self.vlan_validator,
-                    self.interface_assignment_validator,
-                    self.nat_rule_validator,
-                    self.gateway_validator,
-                    self.static_route_validator,
-                    self.virtual_ip_validator,
-                ),
-                context,
-            )
-            self.unbound_validator.validate(
-                replace(context, resources=resource_refs["unbound_host_overrides"])
-            )
-            run_validators(
-                (self.unbound_host_alias_validator, self.unbound_forward_validator),
-                replace(context, forwards=resource_refs["unbound_forwards"]),
-            )
-            self.unbound_advanced_validator.validate(
-                replace(context, resources=resource_refs["unbound_advanced"])
-            )
-            self.unbound_settings_validator.validate(
-                replace(context, resources=resource_refs["unbound_settings"])
-            )
-            self.interfaces_settings_validator.validate(
-                replace(context, resources=resource_refs["interfaces_settings"])
-            )
-            # #804
-            self.syslog_settings_validator.validate(
-                replace(context, resources=resource_refs["syslog_settings"])
-            )
-            self.hostdiscovery_validator.validate(
-                replace(context, resources=resource_refs["hostdiscovery"])
-            )
-            # #1333
-            self.source_nat_validator.validate(
-                replace(context, resources=resource_refs["source_nat"])
-            )
-            self.kea_reservation_validator.validate(context)
-            self.radvd_validator.validate(replace(context, resources=resource_refs["radvd"]))
-            self.cron_jobs_validator.validate(
-                replace(context, resources=resource_refs["cron_jobs"])
-            )
-            self.trust_validator.validate(replace(context, resources=resource_refs["trust"]))
-            self.openvpn_instance_validator.validate(
-                replace(context, resources=resource_refs["openvpn_instances"])
-            )
-            self.openvpn_static_key_validator.validate(
-                replace(context, resources=resource_refs["openvpn_static_keys"])
-            )
-            self.firewall_category_validator.validate(
-                replace(context, resources=resource_refs["firewall_categories"])
-            )
-            self.acmeclient_validator.validate(
-                replace(context, resources=resource_refs["acmeclient"])
-            )
-            self.tailscale_validator.validate(
-                replace(context, resources=resource_refs["tailscale"])
-            )
-            self.kea_ha_validator.validate(replace(context, resources=resource_refs["kea_ha"]))
-            self.kea_subnet_autocollect_validator.validate(
-                replace(context, resources=resource_refs["kea_dhcp4_subnets"])
-            )
-            self.monit_validator.validate(replace(context, resources=resource_refs["monit"]))
-            self.system_firmware_validator.validate(
-                replace(context, resources=resource_refs["system_firmware"])
-            )
-            self.system_tuning_validator.validate(
-                replace(context, resources=resource_refs["system_tuning"])
-            )
-            self.system_user_validator.validate(
-                replace(context, resources=resource_refs["system_users"])
-            )
-            self.system_group_validator.validate(
-                replace(context, resources=resource_refs["system_groups"])
-            )
-            self.resource_name_validator.validate(context)
+            self._run_live_validators(context, resource_refs)
+            self._run_offline_validators(context, resource_refs)
 
+        except Exception as exc:
+            check_name = "opnsense_validation"
+            if isinstance(exc, ReferenceValidationError):
+                check_name = "opnsense_reference_validation"
+            self.api_validator.handle_validation_exception(
+                check_name=check_name,
+                error=exc,
+                warning_level=ValidationLevel.ERROR,
+            )
+
+    @staticmethod
+    def _build_context(
+        resources: list[ResourceConfig],
+        resource_refs: dict[str, Any],
+        reference_refs: dict[str, Any],
+        xref_index: XRefIndex,
+        existing_interfaces: dict[str, Any] | None = None,
+        existing_aliases: dict[str, Any] | None = None,
+        existing_gateways: set[str] | None = None,
+        existing_host_override_names: set[str] | None = None,
+    ) -> OPNsenseValidationContext:
+        """Build the validation context; the ``existing_*`` fields stay empty offline."""
+        return OPNsenseValidationContext(
+            resources=resources,
+            firewall_rules=resource_refs["firewall_rules"],
+            vlans=resource_refs["vlans"],
+            assignments=resource_refs["interface_assignments"],
+            nat_rules=resource_refs["nat_rules"],
+            gateways=resource_refs["gateways"],
+            static_routes=resource_refs["static_routes"],
+            virtual_ips=resource_refs["virtual_ips"],
+            host_aliases=resource_refs["unbound_host_aliases"],
+            dhcp4_reservations=resource_refs["kea_dhcp4_reservations"],
+            dhcp6_reservations=resource_refs["kea_dhcp6_reservations"],
+            alias_names=reference_refs["alias_names"],
+            interface_assignment_names=reference_refs["interface_assignment_names"],
+            gateway_names=reference_refs["gateway_names"],
+            vlan_names=reference_refs["vlan_names"],
+            managed_host_override_names=reference_refs["unbound_host_override_names"],
+            dhcp4_subnet_names=reference_refs["kea_dhcp4_subnet_names"],
+            dhcp6_subnet_names=reference_refs["kea_dhcp6_subnet_names"],
+            existing_interfaces=existing_interfaces or {},
+            existing_aliases=existing_aliases or {},
+            existing_gateways=existing_gateways or set(),
+            existing_host_override_names=existing_host_override_names or set(),
+            managed_gateways=reference_refs["gateways"],
+            index=xref_index,
+        )
+
+    def _collect_refs(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None,
+    ) -> tuple[dict[str, Any], dict[str, Any], XRefIndex]:
+        """Collect references for *resources* and the names they resolve against."""
+        resource_refs = self._collect_resource_references(resources)
+        # Name lookups resolve against the whole environment; only the
+        # resources in scope are checked.
+        reference_list = reference_resources if reference_resources is not None else resources
+        reference_refs = (
+            resource_refs
+            if reference_resources is None
+            else self._collect_resource_references(reference_list)
+        )
+
+        # Build the dotted-type cross-reference index once (#793). The
+        # nested-dict shape gives O(1) lookup per resolver call inside
+        # each per-resource validator. Validators that haven't adopted
+        # the resolver yet ignore this argument; that's fine — the
+        # parameter is optional and additive.
+        xref_index = build_xref_index(reference_list)
+
+        return resource_refs, reference_refs, xref_index
+
+    def _run_live_validators(
+        self, context: OPNsenseValidationContext, resource_refs: dict[str, Any]
+    ) -> None:
+        """Run the validators that read live ``existing_*`` state (doctor only)."""
+        run_validators(
+            (
+                self.firewall_rule_validator,
+                self.vlan_validator,
+                self.interface_assignment_validator,
+                self.nat_rule_validator,
+                self.gateway_validator,
+                self.static_route_validator,
+                self.virtual_ip_validator,
+            ),
+            context,
+        )
+        self.unbound_host_alias_validator.validate(
+            replace(context, forwards=resource_refs["unbound_forwards"])
+        )
+        self.hostdiscovery_validator.validate(
+            replace(context, resources=resource_refs["hostdiscovery"])
+        )
+        self.radvd_validator.validate(replace(context, resources=resource_refs["radvd"]))
+
+    def _run_offline_validators(
+        self, context: OPNsenseValidationContext, resource_refs: dict[str, Any]
+    ) -> None:
+        """Run the validators that need no live state; also used on ``infra plan``."""
+        self.unbound_validator.validate(
+            replace(context, resources=resource_refs["unbound_host_overrides"])
+        )
+        self.unbound_forward_validator.validate(
+            replace(context, forwards=resource_refs["unbound_forwards"])
+        )
+        self.unbound_advanced_validator.validate(
+            replace(context, resources=resource_refs["unbound_advanced"])
+        )
+        self.unbound_settings_validator.validate(
+            replace(context, resources=resource_refs["unbound_settings"])
+        )
+        self.interfaces_settings_validator.validate(
+            replace(context, resources=resource_refs["interfaces_settings"])
+        )
+        # #804
+        self.syslog_settings_validator.validate(
+            replace(context, resources=resource_refs["syslog_settings"])
+        )
+        # #1333
+        self.source_nat_validator.validate(replace(context, resources=resource_refs["source_nat"]))
+        self.kea_reservation_validator.validate(context)
+        self.cron_jobs_validator.validate(replace(context, resources=resource_refs["cron_jobs"]))
+        self.trust_validator.validate(replace(context, resources=resource_refs["trust"]))
+        self.openvpn_instance_validator.validate(
+            replace(context, resources=resource_refs["openvpn_instances"])
+        )
+        self.openvpn_static_key_validator.validate(
+            replace(context, resources=resource_refs["openvpn_static_keys"])
+        )
+        self.firewall_category_validator.validate(
+            replace(context, resources=resource_refs["firewall_categories"])
+        )
+        self.acmeclient_validator.validate(replace(context, resources=resource_refs["acmeclient"]))
+        self.tailscale_validator.validate(replace(context, resources=resource_refs["tailscale"]))
+        self.kea_ha_validator.validate(replace(context, resources=resource_refs["kea_ha"]))
+        self.kea_subnet_autocollect_validator.validate(
+            replace(context, resources=resource_refs["kea_dhcp4_subnets"])
+        )
+        self.monit_validator.validate(replace(context, resources=resource_refs["monit"]))
+        self.system_firmware_validator.validate(
+            replace(context, resources=resource_refs["system_firmware"])
+        )
+        self.system_tuning_validator.validate(
+            replace(context, resources=resource_refs["system_tuning"])
+        )
+        self.system_user_validator.validate(
+            replace(context, resources=resource_refs["system_users"])
+        )
+        self.system_group_validator.validate(
+            replace(context, resources=resource_refs["system_groups"])
+        )
+        self.resource_name_validator.validate(context)
+
+    def validate_offline(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
+        """Run the checks that need no credentials or network (#1433).
+
+        Args:
+            resources: Resources to validate
+            reference_resources: Resources that references may resolve to.
+        """
+        resource_refs, reference_refs, xref_index = self._collect_refs(
+            resources, reference_resources
+        )
+        try:
+            context = self._build_context(resources, resource_refs, reference_refs, xref_index)
+            self._run_offline_validators(context, resource_refs)
         except Exception as exc:
             check_name = "opnsense_validation"
             if isinstance(exc, ReferenceValidationError):

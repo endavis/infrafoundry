@@ -162,6 +162,7 @@ class Orchestrator:
             hook_manager=self.hook_manager,
             load_environment=self.config_manager.load_environment,
             find_managed_only_providers=self._find_managed_only_providers,
+            validate_offline=self.validation_orchestrator.validate_offline,
         )
         self.apply_orchestrator = ApplyOrchestrator(
             console=self.console,
@@ -579,6 +580,8 @@ class Orchestrator:
             MissingRequirementsError: If a blueprint in scope has unmet
                 requirements. Checked before any provider work; ``apply``
                 inherits the check through this call.
+            ConfigValidationError: If a provider's offline validation finds
+                errors; ``apply`` inherits this too.
         """
         self.requirements_manager.ensure(env_name, package_filter, provider_filter)
         return self.plan_orchestrator.plan(

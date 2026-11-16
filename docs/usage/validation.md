@@ -11,7 +11,7 @@ tags:
 
 ## Overview
 
-InfraFoundry provides a three-tier validation system to catch configuration, reference, and connectivity issues **before** `foundry infra plan` or `foundry infra apply`, keeping deployments safe and predictable.
+InfraFoundry provides a three-tier validation system to catch configuration, reference, and connectivity issues before an apply, keeping deployments safe and predictable. `foundry infra doctor` runs all of it. `foundry infra plan` and `foundry infra apply` run the part of each provider's validation that needs no network, described in [Validation during plan and apply](#validation-during-plan-and-apply).
 
 ## Audience and Prerequisites
 
@@ -84,6 +84,30 @@ Jumphost preflight: 9 OK, 1 SKIP
 **Targets** are the package's VMs that have a DHCP reservation whose `hostname` is the VM name; the reservation gives the IP. A VM counts as deployed when its newest state-DB row, ignoring the `planned` rows `infra plan` adds for resources not yet deployed, is `active` or `updating`; `deleted` or no row means not deployed, and anything in between is `SKIP`. Target SSH runs as the package's `ssh_user`, else the user in `jumphost`, with the blueprint scripts' options (`StrictHostKeyChecking=no`, `UserKnownHostsFile=/dev/null`). Leftover `known_hosts` entries on the jumphost therefore can't break an apply and aren't checked.
 
 Any `FAIL` makes doctor exit 1, so `foundry infra doctor --env prod -p k3s-cluster && foundry infra apply --env prod -p k3s-cluster` stops before the apply.
+
+## Validation during plan and apply
+
+`foundry infra plan`, and so `foundry infra apply`, runs each provider's offline validation (`validate_offline`) first, as one pass over every provider in scope. It runs after the provider and resource filters and the policy check, and before any `before_plan` hook, state write or runner call.
+
+- **Warnings** are printed under `Config validation: <provider>` and the plan continues.
+- **Errors** print the report and stop the plan with [IF-VALIDATION-007](../reference/errors.md#if-validation-007-configuration-validation-failed). The deployment is marked failed and no change set is computed. `apply` stops before it changes anything.
+- `-P`, `-r` and `-p` are honoured: only the selected resources are checked, and references still resolve against all of the provider's resources.
+- `--dry-run` runs the check too, so a dry run shows the errors a real plan would hit.
+- A validator that crashes adds a warning naming the provider, and the plan continues.
+
+Checks that need the network stay in `infra doctor`. Rollback and destroy do not run this pass.
+
+| Provider | Checked on plan and apply | Doctor only |
+| :--- | :--- | :--- |
+| `opnsense` | Every validator that does not read live state (Unbound, Kea, interface and syslog settings, source NAT, cron, trust, OpenVPN, categories, ACME, Tailscale, Monit, system, resource names) | Aliases, interfaces, gateways and Unbound overrides read from the API; firewall rule, VLAN, assignment, NAT, gateway, route, virtual IP, host alias, host discovery and radvd checks that use them; endpoint support (the runner's plan checks it) |
+| `proxmox` | Tailscale schema, `terraform_secrets` references | Nodes, storage, bridges, templates and VMIDs from the cluster |
+| `oci` | Local cross-references, Tailscale schema, `terraform_secrets` references | OCI API checks |
+| `host` | Host schema, `terraform_secrets` references | SSH reachability (a host created earlier in the same apply cannot be reached at plan time) |
+| `aws`, `esxi`, `tailscale` | All reference checks (none use the network) | Connectivity |
+
+Kubernetes resources are not validated yet, on plan or doctor (#1435).
+
+See [ADR-0023](../decisions/0023-infra-plan-runs-providers-offline-validation-live-checks-stay-in-infra-doctor.md) and [Implementing providers: validate_offline()](../development/implementing-providers.md#validate_offline).
 
 ## Additional Validation Commands
 

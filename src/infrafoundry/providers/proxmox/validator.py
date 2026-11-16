@@ -120,22 +120,15 @@ class ProxmoxValidator:
                 message=f"Proxmox API connectivity failed: {exc.message}",
             )
 
-    def validate_references(self, resources: list[ResourceConfig]) -> None:
-        """Validate that referenced Proxmox resources exist.
+    def validate_offline(self, resources: list[ResourceConfig]) -> None:
+        """Validate tailscale schema and ``terraform_secrets`` references (no network).
 
-        Checks:
-        - Target nodes exist and are online
-        - VM templates exist (by VMID or name)
-        - Network bridges are available
-        - Storage pools exist and are active
-        - VMIDs are not already in use
-        - MAC addresses are not duplicated
-        - ``terraform_secrets`` references resolve in env secrets
+        Runs on ``infra plan`` as well as in ``validate_references`` (#1433).
 
         Args:
             resources: List of resources to validate
         """
-        # Local: validate tailscale schema (issue #212) and terraform_secrets
+        # Validate tailscale schema (issue #212) and terraform_secrets
         # references against env secrets. Tailscale validation must run first
         # because process_tailscale_config auto-populates terraform_secrets
         # from the tailscale.auth.* references. Done before live API checks
@@ -156,6 +149,25 @@ class ProxmoxValidator:
                 )
 
         validate_terraform_secrets_references("proxmox", resources, self.env_config, self.report)
+
+    def validate_references(self, resources: list[ResourceConfig]) -> None:
+        """Validate that referenced Proxmox resources exist.
+
+        Checks:
+        - Target nodes exist and are online
+        - VM templates exist (by VMID or name)
+        - Network bridges are available
+        - Storage pools exist and are active
+        - VMIDs are not already in use
+        - MAC addresses are not duplicated
+        - ``terraform_secrets`` references resolve in env secrets
+
+        Args:
+            resources: List of resources to validate
+        """
+        # Local checks first, so misconfigurations surface even when the cluster is
+        # unreachable.
+        self.validate_offline(resources)
 
         default_node = self.provider_settings.get("node")
 

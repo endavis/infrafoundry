@@ -924,6 +924,19 @@ class OPNsenseProvider(
         validator.validate_references(resources, reference_resources)
         validator.validate_endpoint_support(resources)
 
+    def validate_offline(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Run the validation that needs no credentials or network (#1433).
+
+        Endpoint support is not checked here: the direct runner's plan already does.
+        """
+        OPNsenseValidator(env_config, report).validate_offline(resources, reference_resources)
+
     def reset_kea_dhcpv4(self, env_name: str) -> None:
         """Reset (delete) all Kea DHCPv4 configuration.
 
