@@ -1,0 +1,24 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+    # Required by the Tailscale cloud-init module
+    # (tailscale/tailscale/cloudinit). Declared unconditionally so consumers
+    # that enable the optional ``tailscale:`` resource block don't need any
+    # extra wiring. Unused when no instance declares ``tailscale:``.
+    cloudinit = {
+      source  = "hashicorp/cloudinit"
+      version = "~> 2.0"
+    }
+  }
+}
+
+# No credential arguments: the AWS provider resolves credentials from its own
+# chain (environment, shared config, SSO, instance role). Region and profile
+# fall back to the same chain when the variables are null.
+provider "aws" {
+  region  = var.aws_region
+  profile = var.aws_profile
+}

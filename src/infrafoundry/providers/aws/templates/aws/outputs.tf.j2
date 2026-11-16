@@ -1,0 +1,61 @@
+# Outputs for AWS resources
+
+{% if resources_by_type.get('security_group') %}
+output "security_group_ids" {
+  description = "IDs of created security groups"
+  value = {
+    {% for sg in resources_by_type['security_group'] %}
+    {{ sg.name | hcl_string }} = aws_security_group.{{ sg.name | to_terraform_name }}.id
+    {% endfor %}
+  }
+}
+{% endif %}
+
+{% if resources_by_type.get('instance') %}
+output "instance_ids" {
+  description = "IDs of created instances"
+  value = {
+    {% for instance in resources_by_type['instance'] %}
+    {{ instance.name | hcl_string }} = aws_instance.{{ instance.name | to_terraform_name }}.id
+    {% endfor %}
+  }
+}
+
+output "instance_private_ips" {
+  description = "Private IPv4 addresses of created instances"
+  value = {
+    {% for instance in resources_by_type['instance'] %}
+    {{ instance.name | hcl_string }} = aws_instance.{{ instance.name | to_terraform_name }}.private_ip
+    {% endfor %}
+  }
+}
+
+output "instance_public_ips" {
+  description = "Public IPv4 addresses of created instances"
+  value = {
+    {% for instance in resources_by_type['instance'] %}
+    {{ instance.name | hcl_string }} = aws_instance.{{ instance.name | to_terraform_name }}.public_ip
+    {% endfor %}
+  }
+}
+
+output "instance_ipv6_addresses" {
+  description = "IPv6 addresses of created instances"
+  value = {
+    {% for instance in resources_by_type['instance'] %}
+    {{ instance.name | hcl_string }} = aws_instance.{{ instance.name | to_terraform_name }}.ipv6_addresses
+    {% endfor %}
+  }
+}
+{% endif %}
+
+{% if resources_by_type.get('ebs_volume') %}
+output "ebs_volume_ids" {
+  description = "IDs of created EBS volumes"
+  value = {
+    {% for volume in resources_by_type['ebs_volume'] %}
+    {{ volume.name | hcl_string }} = aws_ebs_volume.{{ volume.name | to_terraform_name }}.id
+    {% endfor %}
+  }
+}
+{% endif %}

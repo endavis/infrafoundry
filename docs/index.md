@@ -35,6 +35,7 @@ This index provides a structured overview of the available documentation.
 - **[Dependency Ordering](configuration/dependency-ordering.md)**: How providers and resources are ordered, and what you control.
 
 ## Providers
+- **[AWS](providers/aws.md)**: EC2 instances, security groups and EBS volumes.
 - **[ESXi](providers/esxi.md)**: VMware ESXi hosts and virtual machines.
 - **[Kubernetes](providers/kubernetes.md)**: Namespaces, workloads, RBAC, Helm releases and manifests.
 - **[OCI](providers/oci.md)**: Oracle Cloud Infrastructure.

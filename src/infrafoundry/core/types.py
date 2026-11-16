@@ -33,6 +33,16 @@ class OCIProviderSettings(TypedDict, total=False):
     compartment_ocid: str
 
 
+class AWSProviderSettings(TypedDict, total=False):
+    """Provider settings expected by the AWS provider.
+
+    Credentials are deliberately absent: the AWS provider resolves them itself.
+    """
+
+    region: str
+    profile: str
+
+
 class OPNsenseProviderSettings(TypedDict, total=False):
     """Provider settings expected by the OPNsense provider."""
 
@@ -212,6 +222,7 @@ class RollbackData(TypedDict):
 
 
 __all__ = [
+    "AWSProviderSettings",
     "ApplyDeploymentMetadata",
     "DeploymentEventData",
     "DeploymentMetadata",
