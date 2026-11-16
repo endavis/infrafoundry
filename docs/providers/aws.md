@@ -179,7 +179,7 @@ It conflicts with `associate_public_ip_address: true`. `ipv6_address_count` alon
 An instance takes one of:
 
 - `cloud_init_snippets`: snippet names merged into a `#cloud-config` document, rendered as `user_data`.
-- `tailscale:` block: renders the Tailscale cloud-init module and passes its output as `user_data_base64`. The auth secret becomes a sensitive Terraform variable filled from the environment's secrets.
+- `tailscale:` block: renders the Tailscale cloud-init module and passes its output as `user_data_base64`. The auth secret becomes a sensitive Terraform variable filled from the environment's secrets. With OAuth auth, destroying the instance also removes its tailnet device; see [Removing the tailnet device on destroy](tailscale.md#removing-the-tailnet-device-on-destroy).
 - `user_data`: a raw string.
 
 `user_data_replace_on_change: true` replaces the instance when its user data changes; by default it does not.

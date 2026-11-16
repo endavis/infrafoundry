@@ -1,6 +1,6 @@
 """Shared helpers for the Tailscale cloud-init Terraform module integration.
 
-Phase 2 of issue #212. Consumed by both the OCI and Proxmox providers to:
+Phase 2 of issue #212. Consumed by the AWS, OCI and Proxmox providers to:
 
 1. Validate the optional ``tailscale:`` resource config block.
 2. Normalize it into a ``tailscale_module_config`` dict that the provider
@@ -24,16 +24,31 @@ Exactly one of these auth modes must be set on every ``tailscale:`` block:
   passed as the module's ``auth_key``. Tailscale requires ``advertise_tags``
   for OAuth-generated keys. ``oauth.client_id_secret`` is optional and unused.
 
+After ``foundry infra destroy`` deletes an instance, :func:`plan_tailnet_cleanup`
+and :func:`remove_tailnet_devices` remove its tailnet device through the
+Tailscale API (OAuth mode only; see issue #1401).
+
 Both point into the env's decrypted ``secrets:`` dict via dotted paths, the
 same way Phase 1 declares ``terraform_secrets:`` entries.
 """
 
 from __future__ import annotations
 
+import copy
+import logging
+from collections.abc import Iterable
+from dataclasses import dataclass, field
 from typing import Any
+
+import requests
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_mixins import sanitize_secret_ref_to_tf_var
+
+logger = logging.getLogger(__name__)
+
+#: Base URL of the Tailscale HTTP API.
+TAILSCALE_API_BASE = "https://api.tailscale.com/api/v2"
 
 #: Pinned version of the ``tailscale/tailscale/cloudinit`` module.
 TAILSCALE_MODULE_VERSION = "0.0.11"
@@ -57,8 +72,9 @@ def _validate_auth_block(resource_name: str, auth: Any) -> dict[str, Any]:
     - ``mode``: ``"auth_key"`` or ``"oauth"``
     - ``secret_refs``: list of dotted secret paths that must be resolvable
     - for ``auth_key``: ``auth_key_ref``
-    - for ``oauth``: ``client_secret_ref`` (``client_id_secret`` is optional
-      and unused, but must be a non-empty string when present)
+    - for ``oauth``: ``client_secret_ref`` and ``client_id_ref`` (``None``
+      when ``client_id_secret`` is absent; it is optional for the module but
+      needed for tailnet cleanup, and must be a non-empty string when present)
     """
     if not isinstance(auth, dict):
         raise TailscaleSchemaError(
@@ -116,6 +132,7 @@ def _validate_auth_block(resource_name: str, auth: Any) -> dict[str, Any]:
         )
     return {
         "mode": "oauth",
+        "client_id_ref": oauth.get("client_id_secret"),
         "client_secret_ref": client_secret,
         "secret_refs": [client_secret],
     }
@@ -295,6 +312,10 @@ def process_tailscale_config(
         resource.name, "accept_routes", tailscale.get("accept_routes"), False
     )
 
+    remove_on_destroy = _validate_bool(
+        resource.name, "remove_on_destroy", tailscale.get("remove_on_destroy"), True
+    )
+
     advertise_tags = _validate_tags(resource.name, tailscale.get("advertise_tags"))
     if auth_info["mode"] == "oauth" and not advertise_tags:
         raise TailscaleSchemaError(
@@ -313,6 +334,7 @@ def process_tailscale_config(
         "enable_ssh": enable_ssh,
         "accept_dns": accept_dns,
         "accept_routes": accept_routes,
+        "remove_on_destroy": remove_on_destroy,
         "advertise_tags": advertise_tags,
         "advertise_routes": advertise_routes,
         "track": track,
@@ -355,3 +377,222 @@ def instances_require_cloudinit_provider(
     module depends on it).
     """
     return any((r.config or {}).get("tailscale") is not None for r in resources)
+
+
+@dataclass(frozen=True)
+class TailnetDeviceCleanup:
+    """One tailnet device to remove after its instance was destroyed."""
+
+    resource_name: str
+    hostname: str
+    tags: tuple[str, ...]
+    client_id_ref: str
+    client_secret_ref: str
+
+
+@dataclass
+class TailnetCleanupReport:
+    """Outcome of :func:`remove_tailnet_devices` as human-readable messages."""
+
+    removed: list[str] = field(default_factory=list)
+    skipped: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+def plan_tailnet_cleanup(
+    resources: list[ResourceConfig],
+) -> tuple[list[TailnetDeviceCleanup], list[str]]:
+    """Work out which destroyed resources need their tailnet device removed.
+
+    Resources without a ``tailscale:`` block are ignored. The input resources
+    are not mutated.
+
+    Args:
+        resources: Resources whose destroy outcome was a delete.
+
+    Returns:
+        A tuple of cleanup targets and skip/warning messages explaining every
+        resource with a ``tailscale:`` block that is not a target.
+    """
+    targets: list[TailnetDeviceCleanup] = []
+    messages: list[str] = []
+    for resource in resources:
+        raw = (resource.config or {}).get("tailscale")
+        if raw is None:
+            continue
+        try:
+            module_config = process_tailscale_config(copy.deepcopy(resource), base64_encode=False)
+            if module_config is None or not isinstance(raw, dict):
+                continue
+            auth_info = _validate_auth_block(resource.name, raw["auth"])
+        except TailscaleSchemaError as exc:
+            messages.append(f"Tailnet cleanup skipped for '{resource.name}': {exc}")
+            continue
+        if not module_config["remove_on_destroy"]:
+            messages.append(
+                f"Tailnet cleanup skipped for '{resource.name}': remove_on_destroy is false."
+            )
+            continue
+        if auth_info["mode"] != "oauth":
+            messages.append(
+                f"Tailnet cleanup skipped for '{resource.name}': an auth key cannot call "
+                f"the Tailscale API; remove the device by hand."
+            )
+            continue
+        if not auth_info["client_id_ref"]:
+            messages.append(
+                f"Tailnet cleanup skipped for '{resource.name}': "
+                f"auth.oauth.client_id_secret is required to call the Tailscale API."
+            )
+            continue
+        targets.append(
+            TailnetDeviceCleanup(
+                resource_name=resource.name,
+                hostname=module_config["hostname"],
+                tags=tuple(module_config["advertise_tags"]),
+                client_id_ref=auth_info["client_id_ref"],
+                client_secret_ref=auth_info["client_secret_ref"],
+            )
+        )
+    return targets, messages
+
+
+def device_matches(device: dict[str, Any], hostname: str, tags: Iterable[str]) -> bool:
+    """Return True if a tailnet device has this hostname and shares a tag.
+
+    Both comparisons are case-insensitive. A device with no tags never matches.
+    """
+    device_host = device.get("hostname")
+    if not isinstance(device_host, str) or device_host.casefold() != hostname.casefold():
+        return False
+    device_tags = device.get("tags")
+    if not isinstance(device_tags, list):
+        return False
+    wanted = {t.casefold() for t in tags}
+    return any(isinstance(t, str) and t.casefold() in wanted for t in device_tags)
+
+
+def _fetch_devices(
+    http: requests.Session, api_base: str, token_creds: tuple[str, str], timeout: float
+) -> tuple[str, list[dict[str, Any]]]:
+    """Get an OAuth token and the tailnet device list.
+
+    Returns:
+        The access token and the devices.
+
+    Raises:
+        RuntimeError: On a non-2xx response; the message carries the status only.
+        requests.RequestException: On a network error.
+        ValueError: On an unparsable body.
+        KeyError: On a missing field.
+        TypeError: On an unexpected shape.
+    """
+    client_id, client_secret = token_creds
+    resp = http.post(
+        f"{api_base}/oauth/token",
+        data={"client_id": client_id, "client_secret": client_secret},
+        timeout=timeout,
+    )
+    if not 200 <= resp.status_code < 300:
+        raise RuntimeError(f"token request failed with HTTP {resp.status_code}")
+    token = resp.json()["access_token"]
+    if not isinstance(token, str):
+        raise TypeError("access_token is not a string")
+    resp = http.get(
+        f"{api_base}/tailnet/-/devices",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=timeout,
+    )
+    if not 200 <= resp.status_code < 300:
+        raise RuntimeError(f"device list request failed with HTTP {resp.status_code}")
+    devices = resp.json()["devices"]
+    if not isinstance(devices, list):
+        raise TypeError("devices is not a list")
+    return token, [d for d in devices if isinstance(d, dict)]
+
+
+def remove_tailnet_devices(
+    cleanups: list[TailnetDeviceCleanup],
+    secrets: dict[str, Any] | None,
+    *,
+    session: requests.Session | None = None,
+    api_base: str = TAILSCALE_API_BASE,
+    timeout: float = 30.0,
+) -> TailnetCleanupReport:
+    """Delete the tailnet devices of destroyed instances through the Tailscale API.
+
+    Never raises on network or parse errors; they become warnings. Messages
+    carry only status codes, secret ref paths, hostnames and device ids, never
+    credentials or response bodies.
+
+    Args:
+        cleanups: Targets from :func:`plan_tailnet_cleanup`.
+        secrets: The environment's decrypted ``secrets`` mapping.
+        session: HTTP session, injectable for tests.
+        api_base: Tailscale API base URL.
+        timeout: Per-request timeout in seconds.
+
+    Returns:
+        A report of removed, skipped and warned items.
+    """
+    from infrafoundry.core.secrets import SecretManager
+
+    report = TailnetCleanupReport()
+    if not cleanups:
+        return report
+    http = session or requests.Session()
+    flat = SecretManager.flatten_dict(secrets or {})
+
+    groups: dict[tuple[str, str], list[TailnetDeviceCleanup]] = {}
+    for cleanup in cleanups:
+        groups.setdefault((cleanup.client_id_ref, cleanup.client_secret_ref), []).append(cleanup)
+
+    for (id_ref, secret_ref), members in groups.items():
+        missing = [ref for ref in (id_ref, secret_ref) if not flat.get(ref)]
+        if missing:
+            report.warnings.append(
+                "Tailnet cleanup skipped: secret not found: " + ", ".join(missing)
+            )
+            continue
+        try:
+            token, devices = _fetch_devices(
+                http, api_base, (str(flat[id_ref]), str(flat[secret_ref])), timeout
+            )
+        except requests.RequestException as exc:
+            report.warnings.append(
+                f"Tailnet cleanup failed for {', '.join(m.hostname for m in members)}: "
+                f"{type(exc).__name__}"
+            )
+            continue
+        except (RuntimeError, ValueError, KeyError, TypeError) as exc:
+            report.warnings.append(
+                f"Tailnet cleanup failed for {', '.join(m.hostname for m in members)}: "
+                f"{type(exc).__name__}: {exc}"
+            )
+            continue
+        for member in members:
+            matches = [d for d in devices if device_matches(d, member.hostname, member.tags)]
+            if not matches:
+                report.skipped.append(f"No tailnet device found for '{member.hostname}'.")
+                continue
+            for device in matches:
+                device_id = str(device.get("id", ""))
+                label = f"'{member.hostname}' (device {device_id})"
+                try:
+                    resp = http.delete(
+                        f"{api_base}/device/{device_id}",
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=timeout,
+                    )
+                except requests.RequestException as exc:
+                    report.warnings.append(
+                        f"Could not remove tailnet device {label}: {type(exc).__name__}"
+                    )
+                    continue
+                if 200 <= resp.status_code < 300:
+                    report.removed.append(f"Removed tailnet device {label}.")
+                else:
+                    report.warnings.append(
+                        f"Could not remove tailnet device {label}: HTTP {resp.status_code}"
+                    )
+    return report

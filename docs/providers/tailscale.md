@@ -238,6 +238,46 @@ dns_search_paths:
 
 Each of these, and `acl`, may appear at most once per environment.
 
+## Instance `tailscale:` block
+
+AWS, OCI and Proxmox instances can join the tailnet at first boot through a `tailscale:` block, which renders the Tailscale cloud-init module.
+
+```yaml
+resources:
+  - name: node-a
+    type: instance
+    tailscale:
+      auth:
+        oauth:
+          client_id_secret: tailscale.oauth_client_id
+          client_secret_secret: tailscale.oauth_client_secret
+      hostname: node-a
+      advertise_tags: [tag:example]
+      remove_on_destroy: true
+```
+
+| Field | Meaning |
+| :--- | :--- |
+| `auth.auth_key_secret` | Secret path of a static auth key. Exactly one of this or `auth.oauth` is required. |
+| `auth.oauth.client_secret_secret` | Secret path of an OAuth client secret, passed to the module as its auth key. Requires `advertise_tags`. |
+| `auth.oauth.client_id_secret` | Secret path of the OAuth client id. Optional for joining; required for removal on destroy. |
+| `hostname` | Tailnet hostname. Defaults to the resource name. |
+| `advertise_tags`, `advertise_routes` | Tags and subnet routes the node advertises. |
+| `accept_dns`, `accept_routes`, `enable_ssh` | Client settings passed to the module. |
+| `track`, `additional_parts` | Tailscale release track and extra cloud-init parts. |
+| `remove_on_destroy` | Remove the tailnet device when the instance is destroyed. Default `true`. |
+
+### Removing the tailnet device on destroy
+
+After `foundry infra destroy` deletes an instance, InfraFoundry removes its device from the tailnet through the Tailscale API. This also applies to resource (`-r`), package (`-p`) and provider (`-P`) destroys, and only to instances the destroy actually deleted.
+
+- The OAuth client needs the `devices:core` scope, and both `client_id_secret` and `client_secret_secret` set.
+- A device is removed when its hostname matches the block's `hostname` and it carries at least one of the block's `advertise_tags` (both case-insensitive). Collision copies such as `node-a-1` keep the hostname `node-a` and are removed too.
+- `auth_key_secret` mode cannot call the API, a block without `client_id_secret` has no client id, and `remove_on_destroy: false` opts out. Each is skipped with a log line.
+- API failures only print a warning; the destroy still succeeds. Remove the device by hand in the admin console.
+- An instance already gone outside InfraFoundry is not cleaned up.
+- An apply that replaces an instance does not remove the old device: the old and new devices share a hostname and tags, so cleanup could delete the replacement that just joined.
+
 ## Running It
 
 ```bash
