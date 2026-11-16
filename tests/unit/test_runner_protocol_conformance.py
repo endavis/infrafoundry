@@ -27,6 +27,7 @@ from infrafoundry.core.protocols import (
 )
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners.ansible_runner import AnsibleRunner
+from infrafoundry.core.runners.host_runner import HostRunner
 from infrafoundry.core.runners.opentofu_runner import OpenTofuRunner
 from infrafoundry.core.runners.opnsense_direct_runner import OPNsenseDirectRunner
 from infrafoundry.core.runners.pulumi_runner import PulumiRunner
@@ -40,8 +41,9 @@ PlanCapable = (
     | PyInfraRunner
     | PulumiRunner
     | OPNsenseDirectRunner
+    | HostRunner
 )
-DestroyCapable = TerraformRunner | OpenTofuRunner | PulumiRunner | OPNsenseDirectRunner
+DestroyCapable = TerraformRunner | OpenTofuRunner | PulumiRunner | OPNsenseDirectRunner | HostRunner
 
 
 def _as_plannable(runner: PlanCapable) -> Plannable:
@@ -81,8 +83,15 @@ ALL_RUNNERS = [
     PyInfraRunner,
     PulumiRunner,
     OPNsenseDirectRunner,
+    HostRunner,
 ]
-DESTROY_RUNNERS = [TerraformRunner, OpenTofuRunner, PulumiRunner, OPNsenseDirectRunner]
+DESTROY_RUNNERS = [
+    TerraformRunner,
+    OpenTofuRunner,
+    PulumiRunner,
+    OPNsenseDirectRunner,
+    HostRunner,
+]
 
 
 @pytest.mark.parametrize("cls", ALL_RUNNERS)

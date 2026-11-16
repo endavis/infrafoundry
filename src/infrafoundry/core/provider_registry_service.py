@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners import (
     AnsibleRunner,
+    HostRunner,
     OpenTofuRunner,
     OPNsenseDirectRunner,
     PulumiRunner,
@@ -67,6 +68,7 @@ class ProviderRegistryService:
         terraform planning of dependents (see ADR-0014 §4).
         """
         self.runner_registry.register(OPNsenseDirectRunner)
+        self.runner_registry.register(HostRunner)
         self.runner_registry.register(TerraformRunner)
         self.runner_registry.register(OpenTofuRunner)
         self.runner_registry.register(AnsibleRunner)
