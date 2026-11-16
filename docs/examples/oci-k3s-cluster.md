@@ -196,6 +196,8 @@ foundry infra destroy --env oci-k3s
 foundry infra apply --env oci-k3s
 ```
 
+Instances with a `tailscale:` OAuth block are also cleaned up generically on destroy; see [Removing the tailnet device on destroy](../providers/tailscale.md#removing-the-tailnet-device-on-destroy).
+
 Get your API key from: https://login.tailscale.com/admin/settings/keys
 Required scopes: `devices:read`, `devices:write`
 

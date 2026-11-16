@@ -2057,6 +2057,124 @@ def test_known_hosts_failure_does_not_fail_the_destroy(console: Console) -> None
     status.assert_called_with(30, DeploymentStatus.COMPLETED)
 
 
+def _tailnet_destroy(
+    console: Console, outcomes: list[ResourceOutcome], names: tuple[str, ...] = ("node-a",)
+) -> DestroyOrchestrator:
+    """A destroy of AWS instances that carry a ``tailscale:`` OAuth block."""
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 31
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.destroy = MagicMock(return_value={"success": True, "resource_outcomes": outcomes})
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["terraform"]
+    tailscale = {
+        "auth": {
+            "oauth": {
+                "client_id_secret": "tailscale.oauth_client_id",
+                "client_secret_secret": "tailscale.oauth_client_secret",
+            }
+        },
+        "advertise_tags": ["tag:example"],
+    }
+    instances = [
+        ResourceConfig(name=n, provider="aws", type="instance", config={"tailscale": tailscale})
+        for n in names
+    ]
+    providers: dict[str, ProviderBase] = {"aws": MagicMock()}
+    env_config = EnvironmentConfig(
+        name="dev", secrets={"tailscale": {"oauth_client_id": "x", "oauth_client_secret": "y"}}
+    )
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        MagicMock(),
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=lambda env: (instances, {"aws": instances}),
+        iter_provider_batches=lambda resources_by_provider, filt, reverse, env_name: [
+            ProviderResourceBatch("aws", resources_by_provider["aws"], 1)
+        ],
+        get_current_user=lambda: "tester",
+        load_environment=lambda env: env_config,
+    )
+    orchestrator.runners = {"terraform": tf_runner}
+    return orchestrator
+
+
+def test_destroy_removes_tailnet_device_of_deleted_instance(console: Console) -> None:
+    deleted = ResourceOutcome(
+        address="aws_instance.node_a", action="delete", resource_name="node-a"
+    )
+    orchestrator = _tailnet_destroy(console, [deleted], names=("node-a", "node-b"))
+
+    with patch("infrafoundry.core.orchestrator_workflows.remove_tailnet_devices") as remove:
+        remove.return_value = MagicMock(removed=[], skipped=[], warnings=[])
+        _destroy(orchestrator)
+
+    remove.assert_called_once()
+    targets, secrets = remove.call_args.args
+    assert [t.resource_name for t in targets] == ["node-a"]
+    assert secrets == {"tailscale": {"oauth_client_id": "x", "oauth_client_secret": "y"}}
+
+
+def test_destroy_without_deletions_skips_tailnet_cleanup(console: Console) -> None:
+    orchestrator = _tailnet_destroy(console, [])
+
+    with patch("infrafoundry.core.orchestrator_workflows.remove_tailnet_devices") as remove:
+        _destroy(orchestrator)
+
+    remove.assert_not_called()
+
+
+def test_tailnet_cleanup_failure_does_not_fail_the_destroy(console: Console) -> None:
+    deleted = ResourceOutcome(
+        address="aws_instance.node_a", action="delete", resource_name="node-a"
+    )
+    orchestrator = _tailnet_destroy(console, [deleted])
+
+    with patch(
+        "infrafoundry.core.orchestrator_workflows.remove_tailnet_devices",
+        side_effect=RuntimeError("boom"),
+    ):
+        _destroy(orchestrator)
+
+    status = cast(MagicMock, orchestrator.state_manager).update_deployment_status
+    status.assert_called_with(31, DeploymentStatus.COMPLETED)
+
+
+def test_tailnet_cleanup_warnings_are_printed() -> None:
+    from io import StringIO
+
+    buf = StringIO()
+    orchestrator = _tailnet_destroy(Console(file=buf, width=200), [])
+    deleted = [
+        ResourceConfig(
+            name="node-a",
+            provider="aws",
+            type="instance",
+            config={
+                "tailscale": {
+                    "auth": {
+                        "oauth": {
+                            "client_id_secret": "a.b",
+                            "client_secret_secret": "a.c",
+                        }
+                    },
+                    "advertise_tags": ["tag:example"],
+                }
+            },
+        )
+    ]
+    with patch("infrafoundry.core.orchestrator_workflows.remove_tailnet_devices") as remove:
+        remove.return_value = MagicMock(removed=[], skipped=[], warnings=["HTTP 401 for node-a"])
+        orchestrator._remove_tailnet_devices(deleted, EnvironmentConfig(name="dev", secrets={}))
+
+    assert "HTTP 401 for node-a" in buf.getvalue()
+
+
 def _sdn_destroy_setup(
     console: Console, provider_names: list[str] | None = None
 ) -> tuple[DestroyOrchestrator, MagicMock, MagicMock, MagicMock]:

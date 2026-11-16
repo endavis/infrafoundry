@@ -49,6 +49,7 @@ from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY, BaseRunner
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
+from infrafoundry.core.tailscale import plan_tailnet_cleanup, remove_tailnet_devices
 from infrafoundry.core.types import (
     ApplyDeploymentMetadata,
     DestroyDeploymentMetadata,
@@ -1592,6 +1593,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                 results[provider_name] = provider_results
 
             self._forget_destroyed_hosts(destroyed_resources, all_resources)
+            self._remove_tailnet_devices(destroyed_resources, env_config)
 
             # Aggregate RESOURCE_DELETED for group handlers (requires: [...])
             self._emit_aggregate_destroy_events(env_name, destroyed_resources, package_filter)
@@ -1731,6 +1733,47 @@ class DestroyOrchestrator(HookExecutionMixin):
                 )
             else:
                 self.console.print(f"Removed {', '.join(hosts)} from known_hosts on {jumphost}")
+
+    def _remove_tailnet_devices(
+        self, destroyed: list[ResourceConfig], env_config: EnvironmentConfig | None
+    ) -> None:
+        """Remove the tailnet devices of destroyed instances (#1401).
+
+        A failure is reported as a warning; the destroy has already succeeded.
+
+        Args:
+            destroyed: Resources the destroy removed.
+            env_config: The environment config, whose decrypted secrets hold the
+                Tailscale OAuth credentials.
+        """
+        try:
+            targets, messages = plan_tailnet_cleanup(destroyed)
+            if not targets and not messages:
+                return
+            for message in messages:
+                self.console.print(f"[dim]{message}[/dim]")
+            if not targets:
+                return
+            if env_config is None:
+                logger.warning("Tailnet cleanup skipped: no environment config loaded")
+                self.console.print(
+                    "[yellow]Warning: tailnet cleanup skipped: no environment config "
+                    "loaded[/yellow]"
+                )
+                return
+            report = remove_tailnet_devices(targets, env_config.secrets)
+            for line in report.removed:
+                self.console.print(line)
+            for line in report.skipped:
+                self.console.print(f"[dim]{line}[/dim]")
+            for line in report.warnings:
+                logger.warning("%s", line)
+                self.console.print(f"[yellow]Warning: {line}[/yellow]")
+        except Exception as exc:
+            logger.warning("Tailnet cleanup failed: %s", type(exc).__name__)
+            self.console.print(
+                f"[yellow]Warning: tailnet cleanup failed: {type(exc).__name__}[/yellow]"
+            )
 
     def _fire_destroy_lifecycle_events(
         self,
