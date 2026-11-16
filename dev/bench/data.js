@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794841324704,
+  "lastUpdate": 1794842037972,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2094,6 +2094,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004159976943522421",
             "extra": "mean: 70.21234283727381 usec\nrounds: 15818"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ce94c7cf001fad21a78cc35279118a2e4fe78939",
+          "message": "fix: mark resources error when an apply fails (merges PR #1419, addresses #1414)\n\nDeploymentExecutor.apply_single_provider tracks each resource as CREATING\nbefore the runner runs, and the failure handler re-raised without touching\nthose rows, so infra deployed showed them as creating until the next\nsuccessful apply. Mark the run's rows ERROR and emit RESOURCE_FAILED per\nresource before re-raising. The previous ACTIVE row stays the managed record\nbecause the resource table is append-only. A runner that returns\nsuccess: False takes the same path through raise_on_runner_failure.\n\nAddresses #1414\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T15:12:50Z",
+          "tree_id": "91a4afb0d4d009a978a4fbdb9c98fa158d8218b8",
+          "url": "https://github.com/endavis/infrafoundry/commit/ce94c7cf001fad21a78cc35279118a2e4fe78939"
+        },
+        "date": 1794842036919,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 74.459103423018,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004053166120696684",
+            "extra": "mean: 13.430191259741436 msec\nrounds: 77"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13734.973170500065,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004036475374590509",
+            "extra": "mean: 72.80684043473758 usec\nrounds: 14809"
           }
         ]
       }
