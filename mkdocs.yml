@@ -170,6 +170,7 @@ nav:
     - ADR-0019 Provider Validator Contract: decisions/0019-provider-sub-validators-share-one-validatecontext-contract.md
     - ADR-0020 Tailscale Provider: decisions/0020-wrap-the-official-tailscale-terraform-provider-for-tailnet-control-plane-management.md
     - ADR-0021 AWS Provider: decisions/0021-aws-provider-generates-hashicorpaws-terraform-with-credentials-from-the-standard-aws-chain.md
+    - ADR-0022 Existing hosts are configured through a host provider and runner that never create or delete the machine: decisions/0022-existing-hosts-are-configured-through-a-host-provider-and-runner-that-never-create-or-delete-the-machine.md
     - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
     - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
     - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md
@@ -205,6 +206,7 @@ nav:
   - Providers:
     - AWS: providers/aws.md
     - ESXi: providers/esxi.md
+    - Host: providers/host.md
     - OCI: providers/oci.md
     - Kubernetes: providers/kubernetes.md
     - OPNsense: providers/opnsense.md

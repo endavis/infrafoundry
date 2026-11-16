@@ -240,7 +240,7 @@ Each of these, and `acl`, may appear at most once per environment.
 
 ## Instance `tailscale:` block
 
-AWS, OCI and Proxmox instances can join the tailnet at first boot through a `tailscale:` block, which renders the Tailscale cloud-init module.
+AWS, OCI and Proxmox instances can join the tailnet at first boot through a `tailscale:` block, which renders the Tailscale cloud-init module. [Host resources](host.md) take the same block and enroll through Ansible at apply instead.
 
 ```yaml
 resources:
@@ -269,7 +269,7 @@ resources:
 
 ### Removing the tailnet device on destroy
 
-After `foundry infra destroy` deletes an instance, InfraFoundry removes its device from the tailnet through the Tailscale API. This also applies to resource (`-r`), package (`-p`) and provider (`-P`) destroys, and only to instances the destroy actually deleted.
+After `foundry infra destroy` deletes an instance, InfraFoundry removes its device from the tailnet through the Tailscale API. It applies to `host` resources as well. This also applies to resource (`-r`), package (`-p`) and provider (`-P`) destroys, and only to instances the destroy actually deleted.
 
 - The OAuth client needs the `devices:core` scope, and both `client_id_secret` and `client_secret_secret` set.
 - A device is removed when its hostname matches the block's `hostname` and it carries at least one of the block's `advertise_tags` (both case-insensitive). Collision copies such as `node-a-1` keep the hostname `node-a` and are removed too.
@@ -292,4 +292,5 @@ The Terraform provider is pinned to `~> 0.29.3` (at least 0.29.3, below 0.30.0).
 ## Related
 
 - [ADR-0020](../decisions/0020-wrap-the-official-tailscale-terraform-provider-for-tailnet-control-plane-management.md)
+- [Host Provider](host.md)
 - [OPNsense Resource Coverage: Tailscale](../development/opnsense-resource-coverage.md#tailscale-787)

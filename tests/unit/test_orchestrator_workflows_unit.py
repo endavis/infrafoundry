@@ -2122,6 +2122,19 @@ def test_destroy_removes_tailnet_device_of_deleted_instance(console: Console) ->
     assert secrets == {"tailscale": {"oauth_client_id": "x", "oauth_client_secret": "y"}}
 
 
+def test_destroy_of_a_host_reaches_tailnet_cleanup(console: Console) -> None:
+    deleted = ResourceOutcome(address="host.vps-01", action="delete", resource_name="vps-01")
+    orchestrator = _tailnet_destroy(console, [deleted], names=("vps-01",))
+
+    with patch("infrafoundry.core.orchestrator_workflows.remove_tailnet_devices") as remove:
+        remove.return_value = MagicMock(removed=[], skipped=[], warnings=[])
+        _destroy(orchestrator)
+
+    remove.assert_called_once()
+    targets, _ = remove.call_args.args
+    assert [t.resource_name for t in targets] == ["vps-01"]
+
+
 def test_destroy_without_deletions_skips_tailnet_cleanup(console: Console) -> None:
     orchestrator = _tailnet_destroy(console, [])
 

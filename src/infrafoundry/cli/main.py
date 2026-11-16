@@ -174,6 +174,18 @@ def _get_orchestrator(
     except ImportError:
         pass
 
+    try:
+        from infrafoundry.providers.host import HostProvider
+
+        orchestrator.register_provider(
+            HostProvider(
+                config_dir=config_manager.base_dir,
+                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+            )
+        )
+    except ImportError:
+        pass
+
     return orchestrator
 
 

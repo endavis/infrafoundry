@@ -360,6 +360,14 @@ class TestProviderTerraformResourceTypes:
         assert "ovf_deployment" in mapping
         assert "terraform_data" in mapping["ovf_deployment"]
 
+    def test_host_mapping(self, tmp_path: Path) -> None:
+        """Host provider maps ``host`` to the pseudo prefix of its ``host.<name>`` outcomes."""
+        from infrafoundry.providers.host import HostProvider
+
+        provider = HostProvider(config_dir=tmp_path, output_dir=tmp_path)
+
+        assert provider.get_terraform_resource_types() == {"host": ["host"]}
+
     def test_oci_mapping(self, tmp_path: Path) -> None:
         """OCI provider returns correct terraform type mapping."""
         from infrafoundry.providers.oci import OCIProvider
@@ -422,6 +430,27 @@ class TestTypeAwareEventFiring:
             config={"name": name},
             events=events,
         )
+
+    def test_host_outcome_triggers_on_create(self) -> None:
+        """A ``host.<name>`` create outcome fires the host's on_create handlers."""
+        from infrafoundry.providers.host import HostProvider
+
+        executor = self._make_executor()
+        provider = HostProvider(config_dir=Path("."), output_dir=Path("."))
+        resource = ResourceConfig(
+            name="vps-01",
+            type="host",
+            provider="host",
+            config={"address": "192.0.2.10"},
+            events={"on_create": [{"type": "script", "script": "setup.sh"}]},
+        )
+        outcome = ResourceOutcome(address="host.vps-01", action="create", resource_name="vps-01")
+
+        executor._fire_resource_lifecycle_events(
+            "prod", "host", provider, [resource], [outcome], None
+        )
+
+        assert executor.event_manager.emit_event.called
 
     def test_cloud_init_file_does_not_trigger_vm_on_create(self) -> None:
         """proxmox_virtual_environment_file outcome does NOT trigger on_create for vm."""
