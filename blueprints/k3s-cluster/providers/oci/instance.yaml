@@ -12,7 +12,8 @@
 # in secrets.tailscale.oauth_client_secret; it is passed to the module as the
 # node auth key. ts_tags must be non-empty (Tailscale requires tags for
 # OAuth-generated keys). The client ID (secrets.tailscale.oauth_client_id) is
-# optional and unused.
+# optional and unused. Override the secret key paths with
+# ts_oauth_client_id_secret / ts_oauth_client_secret_secret.
 instance:
   # --- Control plane (public subnet) ---
   - name: "{{ control_name }}"
@@ -39,8 +40,8 @@ instance:
       advertise_tags: {{ ts_tags | tojson }}
       auth:
         oauth:
-          client_id_secret: "tailscale.oauth_client_id"
-          client_secret_secret: "tailscale.oauth_client_secret"
+          client_id_secret: "{{ ts_oauth_client_id_secret }}"
+          client_secret_secret: "{{ ts_oauth_client_secret_secret }}"
 
   # --- Worker nodes (private subnet, one per item in workers:) ---
 {% for worker in workers %}
@@ -68,6 +69,6 @@ instance:
       advertise_tags: {{ ts_tags | tojson }}
       auth:
         oauth:
-          client_id_secret: "tailscale.oauth_client_id"
-          client_secret_secret: "tailscale.oauth_client_secret"
+          client_id_secret: "{{ ts_oauth_client_id_secret }}"
+          client_secret_secret: "{{ ts_oauth_client_secret_secret }}"
 {% endfor %}

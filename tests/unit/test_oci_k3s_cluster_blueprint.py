@@ -377,6 +377,41 @@ def test_oci_k3s_cluster_blueprint_with_zero_workers(tmp_path: Path) -> None:
     assert events["on_create"][0]["requires"] == ["k3s-solo-control"]
 
 
+def test_oci_k3s_cluster_blueprint_overrides_tailscale_secret_keys(tmp_path: Path) -> None:
+    """ts_oauth_client_*_secret variables change the secret keys on every node."""
+    envs = tmp_path / "envs"
+    pkg = envs / "test" / "k3s-ts"
+    pkg.mkdir(parents=True)
+    (pkg / "infrafoundry.yml").write_text(
+        textwrap.dedent(
+            """\
+            name: k3s-ts
+            description: "k3s with custom Tailscale secret keys"
+            blueprint: k3s-cluster
+            provider: oci
+            variables:
+              cluster_name: k3s-ts
+              control_name: k3s-ts-control
+              image: "ocid1.image.oc1.iad.tttttttt"
+              ssh_public_key: "ssh-rsa AAAA-ts"
+              tailnet: "example.ts.net"
+              ts_tags: ["tag:example"]
+              ts_oauth_client_id_secret: "tailscale.custom_id"
+              ts_oauth_client_secret_secret: "tailscale.custom_secret"
+            """
+        )
+    )
+    loader = PackageLoader(envs, blueprint_resolver=BlueprintResolver(envs))
+    resources, _events, _variables = loader.load_package(pkg, provider="oci", env_name="test")
+
+    instances = [r for r in resources if r.type == "instance"]
+    assert len(instances) == 3
+    for inst in instances:
+        oauth = inst.config["tailscale"]["auth"]["oauth"]
+        assert oauth["client_id_secret"] == "tailscale.custom_id"
+        assert oauth["client_secret_secret"] == "tailscale.custom_secret"
+
+
 def test_k3s_install_declares_the_kubeconfig_as_an_output(loader: PackageLoader) -> None:
     """With a jumphost, the framework copies the kubeconfig back to the operator (#672).
 

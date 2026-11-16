@@ -84,6 +84,12 @@ The OAuth client secret (`secrets.tailscale.oauth_client_secret`) is passed to t
 Tailscale cloud-init module as the node auth key. `ts_tags` must be non-empty, because
 Tailscale requires tags for OAuth-generated keys. The OAuth client ID is optional and unused.
 
+The secret keys are read from `secrets.tailscale.*` by default. To use other keys, set
+`ts_oauth_client_id_secret` (default `tailscale.oauth_client_id`) and
+`ts_oauth_client_secret_secret` (default `tailscale.oauth_client_secret`), for example
+`ts_oauth_client_secret_secret: "tailscale.k3s_oauth_client_secret"`. Both control-plane and
+worker nodes use the values.
+
 ## Directory Layout
 
 ```

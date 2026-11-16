@@ -160,6 +160,10 @@ providers:
         default: ""
       - name: ts_tags
         default: []
+      - name: ts_oauth_client_id_secret
+        default: "tailscale.oauth_client_id"
+      - name: ts_oauth_client_secret_secret
+        default: "tailscale.oauth_client_secret"
       - name: extra_freeform_tags
         default: {}
 
