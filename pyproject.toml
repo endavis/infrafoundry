@@ -452,6 +452,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_event_double_fire.py",
     "tests/unit/test_events.py",
     "tests/unit/test_execution_planner.py",
+    "tests/unit/test_failed_resources.py",
     "tests/unit/test_filters.py",
     "tests/unit/test_generate_mac.py",
     "tests/unit/test_hook_execution_mixin.py",
