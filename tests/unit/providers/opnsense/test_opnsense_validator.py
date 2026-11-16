@@ -327,6 +327,28 @@ class TestValidateReferences:
 
         assert validator.kea_ha_validator.validate.call_args.args[0].resources == [ha, peer]
 
+    def test_dispatches_kea_subnet_autocollect(self, validator: OPNsenseValidator) -> None:
+        """The auto-collect validator receives only ``kea.dhcp4.subnets`` (#1432)."""
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "api_url": "https://opnsense.example.com",
+                "api_key": "key",
+                "api_secret": "secret",
+            }
+        )
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
+        validator.kea_subnet_autocollect_validator = MagicMock()
+        v4 = ResourceConfig(name="s4", type="kea.dhcp4.subnets", provider="opnsense", config={})
+        v6 = ResourceConfig(name="s6", type="kea.dhcp6.subnets", provider="opnsense", config={})
+        ha = ResourceConfig(
+            name="kea.dhcp4.ha", type="kea.dhcp4.ha", provider="opnsense", config={}
+        )
+
+        validator.validate_references([v4, v6, ha])
+
+        call = validator.kea_subnet_autocollect_validator.validate.call_args
+        assert call.args[0].resources == [v4]
+
     def test_dispatches_monit(self, validator: OPNsenseValidator) -> None:
         """The monit validator receives only the ``monit.*`` slice (#791)."""
         validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
