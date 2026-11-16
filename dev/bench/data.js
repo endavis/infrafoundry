@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794847070396,
+  "lastUpdate": 1794847891937,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2398,6 +2398,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000031247200664741793",
             "extra": "mean: 61.64690846651043 usec\nrounds: 16890"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "acb8536e755b1430da34449e30565b31dc7df063",
+          "message": "feat: warn when a kea subnet combines auto_collect with explicit options (merges PR #1434, addresses #1432)\n\nOPNsense re-runs Kea option-data auto-collect whenever the Kea DHCPv4\nsettings are saved, overwriting routers, DNS and NTP servers set\nexplicitly on a subnet with auto-collect on. Add a KeaSubnetAutoCollectValidator\nthat warns (never errors) on a kea.dhcp4.subnets entry with\nauto_collect: true and any of routers, dns_servers or ntp_servers set,\nnaming the subnet and keys and suggesting auto_collect: false.\n\nThe warning runs under infra doctor with the other OPNsense validators;\nrunning provider validation on infra plan is tracked in #1433.\n\nAddresses #1432\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T16:50:20Z",
+          "tree_id": "4cf1362e5b9b027d7d47c801cbda0619f63344a7",
+          "url": "https://github.com/endavis/infrafoundry/commit/acb8536e755b1430da34449e30565b31dc7df063"
+        },
+        "date": 1794847891275,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 35.1479460325181,
+            "unit": "iter/sec",
+            "range": "stddev: 0.003521491413783786",
+            "extra": "mean: 28.45116465909053 msec\nrounds: 44"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7272.04724591144,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000019978212213815355",
+            "extra": "mean: 137.51285795925344 usec\nrounds: 8399"
           }
         ]
       }
