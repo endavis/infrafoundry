@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794839986671,
+  "lastUpdate": 1794841324704,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2056,6 +2056,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000012078796393542601",
             "extra": "mean: 127.82100071061214 usec\nrounds: 8444"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "215e9b28dc19cf7df8eb9d3894f4a6083a6f125f",
+          "message": "fix: resolve the host enrollment playbook path (merges PR #1418, addresses #1416)\n\nget_host_runs built the enrollment playbook path from the relative\nansible_dir, and the runner starts ansible-playbook with that directory as\nits cwd, so the path was resolved twice and the playbook was not found.\nResolve it to an absolute path, as user playbooks already are.\n\nAddresses #1416\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-16T15:01:06Z",
+          "tree_id": "cb9e70c46bcf77e5cf180d91a84d72a867943a85",
+          "url": "https://github.com/endavis/infrafoundry/commit/215e9b28dc19cf7df8eb9d3894f4a6083a6f125f"
+        },
+        "date": 1794841323985,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 78.42040238043873,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00033936398660125623",
+            "extra": "mean: 12.751783587499688 msec\nrounds: 80"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14242.510071450391,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004159976943522421",
+            "extra": "mean: 70.21234283727381 usec\nrounds: 15818"
           }
         ]
       }
