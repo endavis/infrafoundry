@@ -82,8 +82,9 @@ def _live(
             "uuid": uuid,
             "interface": interface,
             "mode": mode,
-            "address": address,
-            "network": "24",
+            "address": f"{address}/24",
+            "subnet": address,
+            "subnet_bits": "24",
             "vhid": vhid,
         },
     )

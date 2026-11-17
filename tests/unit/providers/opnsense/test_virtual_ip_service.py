@@ -25,6 +25,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.services.virtual_ip import (
     Diff,
@@ -100,8 +101,9 @@ def _live(
         "uuid": uuid,
         "interface": interface,
         "mode": mode,
-        "address": address,
-        "network": "24",
+        "address": f"{address}/24",
+        "subnet": address,
+        "subnet_bits": "24",
         "vhid": vhid,
         "descr": "",
     }
@@ -212,7 +214,7 @@ class TestPayloadProxyArp:
         # Required core fields still present.
         assert inner["interface"] == "lan"
         assert inner["address"] == "192.0.2.10"
-        assert inner["network"] == "24"
+        assert inner["network"] == "192.0.2.10/24"
 
 
 # ---------------------------------------------------------------------------
@@ -819,8 +821,9 @@ class TestExportToYaml:
                         "uuid": "u1",
                         "interface": "lan",
                         "mode": "ipalias",
-                        "address": "192.0.2.10",
-                        "network": "24",
+                        "address": "192.0.2.10/24",
+                        "subnet": "192.0.2.10",
+                        "subnet_bits": "24",
                         "vhid": "",
                     },
                 ]
@@ -830,7 +833,7 @@ class TestExportToYaml:
                     "interface": {"lan": {"value": "LAN", "selected": 1}},
                     "mode": {"ipalias": {"value": "IP Alias", "selected": 1}},
                     "address": "192.0.2.10",
-                    "network": "24",
+                    "network": "192.0.2.10/24",
                     "descr": "lan vip",
                     "gateway": "",
                     "noexpand": "0",
@@ -856,8 +859,9 @@ class TestExportToYaml:
                         "uuid": "u1",
                         "interface": "lan",
                         "mode": "carp",
-                        "address": "192.0.2.1",
-                        "network": "24",
+                        "address": "192.0.2.1/24",
+                        "subnet": "192.0.2.1",
+                        "subnet_bits": "24",
                         "vhid": "1",
                     },
                 ]
@@ -867,7 +871,7 @@ class TestExportToYaml:
                     "interface": {"lan": {"value": "LAN", "selected": 1}},
                     "mode": {"carp": {"value": "CARP", "selected": 1}},
                     "address": "192.0.2.1",
-                    "network": "24",
+                    "network": "192.0.2.1/24",
                     "vhid": "1",
                     "advbase": "1",
                     "advskew": "0",
@@ -899,7 +903,7 @@ class TestLiveToExportConfig:
                 "interface": {"lan": {"value": "LAN", "selected": 1}},
                 "mode": {"ipalias": {"value": "IP Alias", "selected": 1}},
                 "address": "192.0.2.10",
-                "network": "24",
+                "network": "192.0.2.10/24",
                 "descr": "lan",
                 "gateway": "my-gw",
                 "noexpand": "1",
@@ -919,7 +923,7 @@ class TestLiveToExportConfig:
                 "interface": {"lan": {"value": "LAN", "selected": 1}},
                 "mode": {"carp": {"value": "CARP", "selected": 1}},
                 "address": "192.0.2.1",
-                "network": "24",
+                "network": "192.0.2.1/24",
                 "vhid": "5",
                 "advbase": "1",
                 "advskew": "0",
@@ -941,7 +945,7 @@ class TestLiveToExportConfig:
                 "interface": {"lan": {"value": "LAN", "selected": 1}},
                 "mode": {"proxyarp": {"value": "Proxy ARP", "selected": 1}},
                 "address": "192.0.2.10",
-                "network": "24",
+                "network": "192.0.2.10/24",
             }
         }
         cfg = _live_to_export_config(get_response)
@@ -960,3 +964,153 @@ class TestLiveToExportConfig:
     def test_non_dict_envelope_yields_defaults(self) -> None:
         cfg = _live_to_export_config(None)  # type: ignore[arg-type]
         assert cfg["mode"] == "ipalias"
+
+
+# ---------------------------------------------------------------------------
+# Wire format: combined ``network`` (#1465)
+# ---------------------------------------------------------------------------
+
+_VIP_REJECTED: dict[str, Any] = {
+    "result": "failed",
+    "validations": {"vip.network": ["A valid network address is required."]},
+}
+
+
+def _searchitem_row(
+    address: str = "192.0.2.254",
+    bits: str = "24",
+    *,
+    mode: str = "carp",
+    vhid: str = "1",
+    descr: str = "",
+) -> dict[str, Any]:
+    return {
+        "uuid": "u1",
+        "interface": "lan",
+        "mode": mode,
+        "address": f"{address}/{bits}",
+        "subnet": address,
+        "subnet_bits": bits,
+        "vhid": vhid,
+        "descr": descr,
+        "advbase": "1",
+        "advskew": "0",
+        "peer": "",
+        "peer6": "",
+        "nosync": "0",
+    }
+
+
+class TestCombinedNetworkPayload:
+    def test_carp_ipv4_network_is_combined(self) -> None:
+        v = _vip("vip", mode="carp", address="192.0.2.254", network="24", password="x", vhid="1")
+        inner = v.to_payload()["vip"]
+        assert inner["network"] == "192.0.2.254/24"
+        assert inner["address"] == "192.0.2.254"
+
+    def test_ipv6_network_is_combined(self) -> None:
+        v = _vip("vip", address="2001:db8::1", network="64")
+        assert v.to_payload()["vip"]["network"] == "2001:db8::1/64"
+
+
+class TestLiveRowParsing:
+    def test_search_row_yields_bare_address(self) -> None:
+        live = _row_to_live(_searchitem_row())
+        assert live.address == "192.0.2.254"
+        assert live.diff_key == ("lan", "carp", "192.0.2.254", "1")
+
+    def test_combined_address_without_subnet_is_stripped(self) -> None:
+        row = {"uuid": "u1", "interface": "lan", "mode": "ipalias", "address": "192.0.2.5/24"}
+        assert _row_to_live(row).address == "192.0.2.5"
+
+    def test_combined_network_is_stripped(self) -> None:
+        row = {"uuid": "u1", "interface": "lan", "mode": "ipalias", "network": "2001:db8::1/64"}
+        assert _row_to_live(row).address == "2001:db8::1"
+
+    def test_search_row_matches_desired_in_diff(self) -> None:
+        v = _vip("vip", mode="carp", address="192.0.2.254", password="x", vhid="1")
+        diff = compute_diff([v], [_row_to_live(_searchitem_row())])
+        assert diff.adds == []
+        assert diff.deletes == []
+        assert diff.is_empty
+
+    def test_no_spurious_update_for_ipv6(self) -> None:
+        row = _searchitem_row("2001:db8::1", "64", mode="ipalias", vhid="")
+        row["gateway"] = ""
+        row["noexpand"] = "0"
+        row["nobind"] = "0"
+        v = _vip("vip", address="2001:db8::1", network="64")
+        assert compute_diff([v], [_row_to_live(row)]).is_empty
+
+    def test_update_when_bits_differ(self) -> None:
+        v = _vip("vip", mode="carp", address="192.0.2.254", network="25", password="x", vhid="1")
+        diff = compute_diff([v], [_row_to_live(_searchitem_row(bits="24"))])
+        assert len(diff.updates) == 1
+        assert diff.adds == []
+
+
+class TestExportBareAddress:
+    def test_export_splits_combined_network(self) -> None:
+        cfg = _live_to_export_config(
+            {
+                "vip": {
+                    "interface": {"lan": {"value": "LAN", "selected": 1}},
+                    "mode": {"proxyarp": {"value": "Proxy ARP", "selected": 1}},
+                    "network": "192.0.2.10/24",
+                }
+            }
+        )
+        assert cfg["address"] == "192.0.2.10"
+        assert cfg["network"] == "24"
+
+    def test_export_prefers_subnet_fields(self) -> None:
+        cfg = _live_to_export_config(
+            {
+                "vip": {
+                    "interface": {"lan": {"value": "LAN", "selected": 1}},
+                    "mode": {"proxyarp": {"value": "Proxy ARP", "selected": 1}},
+                    "address": "192.0.2.10/24",
+                    "subnet": "192.0.2.10",
+                    "subnet_bits": "24",
+                }
+            }
+        )
+        assert cfg["address"] == "192.0.2.10"
+        assert cfg["network"] == "24"
+
+
+class TestRejectedWrites:
+    def test_add_raises(self) -> None:
+        client = MagicMock()
+        client.request.return_value = _VIP_REJECTED
+        with pytest.raises(APIError, match=r"vip\.network"):
+            VirtualIPService(client).add(_vip("vip"))
+
+    def test_update_raises(self) -> None:
+        client = MagicMock()
+        client.request.return_value = _VIP_REJECTED
+        with pytest.raises(APIError, match=r"vip\.network"):
+            VirtualIPService(client).update("u1", _vip("vip"))
+
+    def test_delete_raises(self) -> None:
+        client = MagicMock()
+        client.request.return_value = _VIP_REJECTED
+        with pytest.raises(APIError, match=r"vip\.network"):
+            VirtualIPService(client).delete("u1")
+
+    def test_error_does_not_leak_password(self) -> None:
+        client = MagicMock()
+        client.request.return_value = _VIP_REJECTED
+        v = _vip("vip", mode="carp", password="hunter2", vhid="1")
+        with pytest.raises(APIError) as exc:
+            VirtualIPService(client).add(v)
+        assert "hunter2" not in str(exc.value)
+
+    def test_apply_diff_stops_without_count_or_reconfigure(self) -> None:
+        client = MagicMock()
+        client.request.return_value = _VIP_REJECTED
+        svc = VirtualIPService(client)
+        with pytest.raises(APIError):
+            svc.apply_diff(Diff(adds=[_vip("vip")]))
+        endpoints_called = [c.args[1] for c in client.request.call_args_list]
+        assert "interfaces/vip_settings/reconfigure" not in endpoints_called
