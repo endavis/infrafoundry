@@ -22,6 +22,7 @@ from infrafoundry.core.exceptions import (
     ResourceFilterError,
 )
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.provider_instances import INSTANCE_SEPARATOR, normalize_instance_providers
 from infrafoundry.core.secrets.provider import SecretProvider
 from infrafoundry.core.secrets.secret_manager import (
     DEFAULT_SECRETS_FILENAME,
@@ -275,7 +276,26 @@ class ConfigManager(PathBasedManager):
         # Load from resource-centric structure
         all_resources.extend(self.resource_centric.get_resources_for_provider(env_name, provider))
 
+        self._normalize_instances(env_name, all_resources)
         return all_resources
+
+    def _normalize_instances(self, env_name: str, resources: list[ResourceConfig]) -> None:
+        """Rewrite firewall-stamped resources onto their final provider ids (#1450).
+
+        The environment settings are read only when a resource names a firewall, so
+        an environment without ``firewalls:`` never pays for the lookup.
+
+        Args:
+            env_name: Environment name.
+            resources: Freshly loaded resources, rewritten in place.
+
+        Raises:
+            InvalidConfigurationError: If a resource names an undeclared firewall.
+        """
+        if not any(INSTANCE_SEPARATOR in r.provider for r in resources):
+            return
+        env_config = self.load_environment(env_name)
+        normalize_instance_providers(resources, env_config.provider_settings)
 
     def get_all_resources_all_providers(self, env_name: str) -> list[ResourceConfig]:
         """Load all resources from all providers in an environment.
@@ -332,6 +352,7 @@ class ConfigManager(PathBasedManager):
                 resources = self.provider_centric.load_resources(
                     env_name, provider_name, resource_file
                 )
+                self._normalize_instances(env_name, resources)
 
                 # Track location for each resource
                 for resource in resources:
@@ -359,6 +380,7 @@ class ConfigManager(PathBasedManager):
                         package_dir, provider_name, env_name
                     )
                 )
+                self._normalize_instances(env_name, pkg_resources)
                 # Attach package variables to each resource
                 for resource in pkg_resources:
                     if pkg_vars:
@@ -390,6 +412,7 @@ class ConfigManager(PathBasedManager):
             pkg_resources, pkg_events, pkg_vars = self._package_loader.load_package(
                 package_dir, manifest.provider, env_name
             )
+            self._normalize_instances(env_name, pkg_resources)
             # Attach package variables to each resource
             for resource in pkg_resources:
                 if pkg_vars:
@@ -412,6 +435,7 @@ class ConfigManager(PathBasedManager):
         if resources_dir.exists():
             for config_file in resources_dir.glob("*.yaml"):
                 resources = self.resource_centric._load_single_file(config_file)
+                self._normalize_instances(env_name, resources)
 
                 # Track location for each resource
                 for resource in resources:

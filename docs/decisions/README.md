@@ -158,3 +158,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0021](0021-aws-provider-generates-hashicorpaws-terraform-with-credentials-from-the-standard-aws-chain.md) | AWS provider generates hashicorp/aws Terraform with credentials from the standard AWS chain | Accepted |
 | [0022](0022-existing-hosts-are-configured-through-a-host-provider-and-runner-that-never-create-or-delete-the-machine.md) | Existing hosts are configured through a host provider and runner that never create or delete the machine | Accepted |
 | [0023](0023-infra-plan-runs-providers-offline-validation-live-checks-stay-in-infra-doctor.md) | infra plan runs providers' offline validation; live checks stay in infra doctor | Accepted |
+| [0024](0024-opnsense-firewalls-are-provider-instances-several-per-environment.md) | OPNsense firewalls are provider instances, several per environment | Accepted |

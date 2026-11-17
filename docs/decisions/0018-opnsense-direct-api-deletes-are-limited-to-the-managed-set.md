@@ -10,6 +10,8 @@ tags:
 
 # ADR-0018: OPNsense direct-API deletes are limited to the managed set
 
+**Amended:** 2026-11-17 (#1450) — the managed set is per firewall because state rows carry the provider instance id (`opnsense@<name>`), so a delete on one firewall never reaches another, see ADR-0024
+
 ## Status
 
 Accepted

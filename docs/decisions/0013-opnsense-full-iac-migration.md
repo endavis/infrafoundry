@@ -10,6 +10,7 @@ tags:
 # ADR-0013: OPNsense Full-IaC Migration Coverage
 
 **Date:** 2026-04-30
+**Amended:** 2026-11-17 (#1450) — several firewalls per environment are managed as provider instances (`opnsense@<name>`), each with its own managed set; coverage is per firewall, see ADR-0024
 **Amended:** 2026-11-17 (#1389) — `hasync.settings` moved in scope; `<hasync>` removed from the out-of-scope list
 **Amended:** 2026-05-03 (#717) — `interface_assignments` per-component decision updated; cross-reference to ADR-0014's new Per-component decisions section
 **Amended:** 2026-05-04 (#713) — `nat_rules` per-component decision recorded (outbound + 1:1 ship via direct REST; port forwards deferred to a follow-up spike)

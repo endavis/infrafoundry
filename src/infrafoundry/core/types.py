@@ -55,6 +55,12 @@ class OPNsenseProviderSettings(TypedDict, total=False):
     ssh_key: str
     ha_sync_after_apply: bool | str
     ha_sync_timeout: int
+    verify_ssl: bool
+    proxy: str
+    # Several firewalls per environment (#1450): name -> per-firewall settings, and the
+    # name of the primary one (kept under the plain ``opnsense`` provider id).
+    firewalls: dict[str, dict[str, Any]]
+    primary: str
 
 
 class TailscaleProviderSettings(TypedDict, total=False):

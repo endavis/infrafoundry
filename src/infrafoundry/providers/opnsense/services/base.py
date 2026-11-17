@@ -7,6 +7,7 @@ from typing import Any, Self
 from infrafoundry.core.exceptions import APIError
 
 from ..api_client import OPNsenseClient
+from ..firewalls import allows_env_override, firewall_settings
 from ._credentials import resolve_credentials
 
 
@@ -51,14 +52,16 @@ class BaseService(ABC):  # noqa: B024  # ABC marks the base; no abstract methods
 
         config_manager = ConfigManager(config_dir)
         env_config = config_manager.load_environment(env_name)
-        provider_settings = env_config.get_provider_settings(provider_name)
+        provider_settings = firewall_settings(env_config, provider_name)
 
         if not provider_settings:
             raise ValueError(
                 f"No {provider_name} provider settings found for environment {env_name}"
             )
 
-        api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(provider_settings)
+        api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(
+            provider_settings, allow_env_override=allows_env_override(provider_name)
+        )
         extra: dict[str, Any] = {} if timeout is None else {"timeout": timeout}
         client = OPNsenseClient(
             api_key=api_key,

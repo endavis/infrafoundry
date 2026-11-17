@@ -10,6 +10,8 @@ tags:
 
 # ADR-0023: infra plan runs providers' offline validation; live checks stay in infra doctor
 
+**Amended:** 2026-11-17 (#1450) — offline validation and doctor run once per provider batch, so each firewall of an environment is validated on its own with `[<name>] `-prefixed results; the CARP pair check is doctor-only, see ADR-0024
+
 ## Status
 Accepted
 

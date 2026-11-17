@@ -18,11 +18,20 @@ from infrafoundry.core.exceptions import (
     ReferenceValidationError,
 )
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.provider_instances import qualified_provider_id
 from infrafoundry.core.types import OPNsenseProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense import endpoints
 from infrafoundry.providers.opnsense.api_client import OPNsenseClient
+from infrafoundry.providers.opnsense.firewalls import (
+    FIREWALLS_KEY,
+    allows_env_override,
+    firewall_label,
+    firewall_settings,
+    ha_backup_name,
+    validate_firewalls_settings,
+)
 from infrafoundry.providers.opnsense.services.carp_status import CarpStatusService  # #1393
 from infrafoundry.providers.opnsense.services.hasync_settings import (
     HasyncSettingsService,  # #1393
@@ -36,6 +45,7 @@ from infrafoundry.providers.opnsense.services.openvpn_instances import flatten_o
 from infrafoundry.providers.opnsense.validators import (
     AcmeClientValidator,
     CarpHealthValidator,  # #1393
+    CarpPairValidator,  # #1450
     CronJobsValidator,
     FirewallCategoryValidator,  # #1286
     FirewallRuleValidator,
@@ -110,21 +120,34 @@ class OPNsenseValidator:
     - DHCP configuration validity
     """
 
-    def __init__(self, env_config: EnvironmentConfig, report: ValidationReport) -> None:
+    def __init__(
+        self,
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+        provider_name: str = "opnsense",
+    ) -> None:
         """Initialize OPNsense validator.
 
         Args:
             env_config: Environment configuration including provider_settings
             report: ValidationReport to add results to
+            provider_name: ``opnsense`` (the primary) or ``opnsense@<firewall>`` (#1450);
+                selects which firewall's settings the checks use.
         """
         self.env_config = env_config
         self.report = report
+        self.provider_name = provider_name
         self.api_validator = BaseAPIValidator(
             "opnsense",
             env_config,
             report,
             env_prefix="OPNSENSE",
         )
+        raw_settings = self.api_validator.provider_settings
+        if isinstance(raw_settings, dict) and FIREWALLS_KEY in raw_settings:
+            self.api_validator.provider_settings = (
+                firewall_settings(raw_settings, provider_name) or {}
+            )
         self.provider_settings = cast(
             OPNsenseProviderSettings, self.api_validator.provider_settings
         )
@@ -165,8 +188,19 @@ class OPNsenseValidator:
         self.hasync_validator = HasyncValidator(report)  # #1389
         self.hasync_live_validator = HasyncLiveValidator(report)  # #1389
         self.carp_health_validator = CarpHealthValidator(report)  # #1393
+        self.carp_pair_validator = CarpPairValidator(report)  # #1450
         self.hostdiscovery_validator = HostDiscoveryValidator(report)
         self.source_nat_validator = SourceNatValidator(report)  # #1333
+
+    def _credential_env_map(self) -> dict[str, str]:
+        """Return the env vars credentials may fall back to; none for a non-primary firewall."""
+        if not allows_env_override(self.provider_name):
+            return {}
+        return {
+            "api_url": "OPNSENSE_API_URL",
+            "api_key": "OPNSENSE_API_KEY",
+            "api_secret": _API_SECRET_ENV,
+        }
 
     def validate_endpoint_support(self, resources: list[ResourceConfig]) -> None:
         """Check the in-scope resource types' endpoints against the box's version (#1239).
@@ -183,11 +217,13 @@ class OPNsenseValidator:
         types = sorted({r.type for r in resources})
         if not types:
             return
-        provider_settings = self.env_config.get_provider_settings("opnsense")
+        provider_settings = firewall_settings(self.env_config, self.provider_name)
         if not provider_settings:
             return
         try:
-            api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(provider_settings)
+            api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(
+                provider_settings, allow_env_override=allows_env_override(self.provider_name)
+            )
         except (ValueError, KeyError):
             return
         client = OPNsenseClient(
@@ -223,11 +259,13 @@ class OPNsenseValidator:
         """
         from .services._credentials import resolve_credentials
 
-        provider_settings = self.env_config.get_provider_settings("opnsense")
+        provider_settings = firewall_settings(self.env_config, self.provider_name)
         if not provider_settings:
             return
         try:
-            api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(provider_settings)
+            api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(
+                provider_settings, allow_env_override=allows_env_override(self.provider_name)
+            )
         except (ValueError, KeyError):
             return
         try:
@@ -271,6 +309,56 @@ class OPNsenseValidator:
                 peer_check=peer_check,
             )
         )
+        self._validate_carp_pair(carp_status, options.timeout)
+
+    def _validate_carp_pair(self, carp_status: dict[str, Any], timeout: int) -> None:
+        """Compare this node's CARP VIPs with its ``ha_backup`` firewall's (#1450).
+
+        Does nothing unless this firewall's entry sets ``ha_backup``. An unreadable
+        backup is a WARNING: the pair cannot be judged, which is not a CARP fault.
+
+        Args:
+            carp_status: This node's ``getVipStatus`` reply.
+            timeout: Per-request timeout for the backup client.
+        """
+        backup = ha_backup_name(self.env_config, self.provider_name)
+        if backup is None:
+            return
+        backup_id = qualified_provider_id("opnsense", backup)
+        try:
+            from .services._credentials import resolve_credentials
+
+            settings = firewall_settings(self.env_config, backup_id)
+            if not settings:
+                raise ValueError(f"no settings for firewall '{backup}'")
+            api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(
+                settings, allow_env_override=False
+            )
+            backup_client = OPNsenseClient(
+                api_key=api_key,
+                api_secret=api_secret,
+                base_url=api_url,
+                verify_ssl=verify_ssl,
+                proxy=proxy,
+                timeout=timeout,
+            )
+            peer_status = CarpStatusService(backup_client).vip_status()
+        except (APIError, httpx.HTTPError, ValueError, KeyError) as exc:
+            self.api_validator.add_error(
+                check_name="opnsense_carp_pair_read",
+                message=f"Could not read CARP state of ha_backup firewall '{backup}': {exc}",
+                level=ValidationLevel.WARNING,
+            )
+            return
+        self.carp_pair_validator.validate(
+            OPNsenseValidationContext(
+                resources=[],
+                live_carp_status=carp_status,
+                peer_carp_status=peer_status,
+                node_label=firewall_label(self.env_config, self.provider_name) or "this node",
+                peer_label=backup,
+            )
+        )
 
     @staticmethod
     def _check_ha_peer(client: OPNsenseClient, target: str, timeout: int) -> HaPeerCheck:
@@ -297,11 +385,7 @@ class OPNsenseValidator:
         - Authentication credentials are valid
         - Can retrieve system status
         """
-        env_map = {
-            "api_url": "OPNSENSE_API_URL",
-            "api_key": "OPNSENSE_API_KEY",
-            "api_secret": _API_SECRET_ENV,
-        }
+        env_map = self._credential_env_map()
         credentials = self.api_validator.get_credentials(
             ["api_url", "api_key", "api_secret"],
             env_vars=env_map,
@@ -371,11 +455,7 @@ class OPNsenseValidator:
                 OPNsense resource in the environment, so a reservation in
                 one package can name a subnet managed by another (#1133).
         """
-        env_map = {
-            "api_url": "OPNSENSE_API_URL",
-            "api_key": "OPNSENSE_API_KEY",
-            "api_secret": _API_SECRET_ENV,
-        }
+        env_map = self._credential_env_map()
         credentials = self.api_validator.get_credentials(
             ["api_url", "api_key", "api_secret"],
             env_vars=env_map,
@@ -605,8 +685,15 @@ class OPNsenseValidator:
             resources: Resources to validate
             reference_resources: Resources that references may resolve to.
         """
+        if self.provider_name == "opnsense":
+            for message in validate_firewalls_settings(
+                self.env_config.get_provider_settings("opnsense")
+            ):
+                self.api_validator.add_error(
+                    check_name="opnsense_firewalls_settings", message=message
+                )
         try:
-            resolve_ha_sync_options(self.env_config.get_provider_settings("opnsense"))
+            resolve_ha_sync_options(firewall_settings(self.env_config, self.provider_name))
         except InvalidConfigurationError as exc:
             self.api_validator.add_error(check_name="opnsense_ha_sync_settings", message=str(exc))
         resource_refs, reference_refs, xref_index = self._collect_refs(

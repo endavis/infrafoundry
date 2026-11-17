@@ -10,6 +10,7 @@ from typing import Any, ClassVar
 
 from infrafoundry.core.dependencies import DependencyGraph
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.provider_instances import split_provider_id
 
 
 @dataclass
@@ -67,6 +68,10 @@ class ExecutionPlanner:
         """
         if provider in self.provider_order:
             return self.provider_order.index(provider)
+        # A provider instance (``opnsense@fw-b``) follows its base provider's position.
+        base, instance = split_provider_id(provider)
+        if instance is not None and base in self.provider_order:
+            return self.provider_order.index(base)
         # Unlisted providers go after listed ones
         return len(self.provider_order)
 
@@ -80,7 +85,14 @@ class ExecutionPlanner:
         Returns:
             Sorted list of provider names
         """
-        return sorted(providers, key=self.get_provider_order_key, reverse=reverse)
+
+        def sort_key(provider: str) -> tuple[int, bool, str]:
+            # Instances run right after their base provider (primary, then backups);
+            # ``reverse`` flips that for destroy.
+            instance = split_provider_id(provider)[1]
+            return (self.get_provider_order_key(provider), instance is not None, instance or "")
+
+        return sorted(providers, key=sort_key, reverse=reverse)
 
     def plan_apply(
         self,

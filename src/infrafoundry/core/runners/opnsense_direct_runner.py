@@ -47,9 +47,11 @@ from pathlib import Path
 from typing import Any, override
 
 from rich.console import Console
+from rich.markup import escape
 
 from infrafoundry.core.managed_set import ManagedResources, ReleasedResource
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.provider_instances import split_provider_id
 from infrafoundry.core.result_types import ApplyResult, DestroyResult, PlanResult
 from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.types import ResourceOutcome
@@ -154,7 +156,8 @@ class OPNsenseDirectRunner(BaseRunner):
 
         Two conditions must hold:
 
-        1. ``provider.name == "opnsense"`` — direct-API runner is OPNsense-specific.
+        1. ``provider.name`` is ``opnsense`` or an instance ``opnsense@<firewall>`` (#1450) —
+           direct-API runner is OPNsense-specific.
         2. ``generate_opnsense_direct`` is callable on the provider.
 
         The first check guards against the ``deployment_executor.apply_single_provider``
@@ -163,9 +166,37 @@ class OPNsenseDirectRunner(BaseRunner):
         presence). The second check is the explicit opt-in marker per
         ADR-0014 §4 dispatch.
         """
-        if getattr(provider, "name", None) != "opnsense":
+        name = getattr(provider, "name", None)
+        if not isinstance(name, str) or split_provider_id(name)[0] != "opnsense":
             return False
         return callable(getattr(provider, "generate_opnsense_direct", None))
+
+    @staticmethod
+    def _manager_kwargs(provider: ProviderBase) -> dict[str, Any]:
+        """Return the extra manager kwargs a firewall instance needs (#1450).
+
+        The primary ``opnsense`` provider passes nothing, so managers keep their
+        ``provider_name="opnsense"`` default and the legacy call is unchanged.
+        """
+        name = getattr(provider, "name", None)
+        if isinstance(name, str) and name != "opnsense":
+            return {"provider_name": name}
+        return {}
+
+    def _label(self, provider: ProviderBase) -> str:
+        """Return the output label: ``opnsense_direct`` or ``opnsense_direct[<firewall>]``.
+
+        The bracket appears only when the provider reports a firewall label
+        (``firewalls:`` declared); anything else, including a mock, gets the legacy label.
+        """
+        getter = getattr(provider, "firewall_label", None)
+        env_name = getattr(provider, "_current_environment", None)
+        if callable(getter) and isinstance(env_name, str) and env_name:
+            firewall = getter(env_name)
+            if isinstance(firewall, str) and firewall:
+                # Escaped: Rich would read ``[fw-b]`` as a style tag and drop it.
+                return escape(f"opnsense_direct[{firewall}]")
+        return "opnsense_direct"
 
     @staticmethod
     def _resolve_env_name(provider: ProviderBase) -> str:
@@ -593,6 +624,7 @@ class OPNsenseDirectRunner(BaseRunner):
 
         any_changes = False
         summary_parts: list[str] = []
+        label = self._label(provider)
 
         for type_name, manager_cls, typed_resources in selected:
             manager = manager_cls(provider.config_dir)
@@ -601,6 +633,7 @@ class OPNsenseDirectRunner(BaseRunner):
             if sibling_resources is not None:
                 extra_kwargs["sibling_resources"] = sibling_resources
             extra_kwargs.update(self._dependent_kwargs(manager_cls, resources, managed))
+            extra_kwargs.update(self._manager_kwargs(provider))
             try:
                 diff = manager.plan(env_name, typed_resources, add_only=add_only, **extra_kwargs)
             except Exception as exc:
@@ -609,14 +642,14 @@ class OPNsenseDirectRunner(BaseRunner):
 
             type_summary = self._format_plan_summary(type_name, diff, add_only=add_only)
             summary_parts.append(type_summary)
-            self.console.print(f"  [dim]opnsense_direct: {type_summary}[/dim]")
-            self._print_warnings(getattr(diff, "warnings", None))
+            self.console.print(f"  [dim]{label}: {type_summary}[/dim]")
+            self._print_warnings(getattr(diff, "warnings", None), label)
 
             if not diff.is_empty:
                 any_changes = True
 
         if not summary_parts:
-            self.console.print("  [dim]opnsense_direct: no direct-API resources to plan[/dim]")
+            self.console.print(f"  [dim]{label}: no direct-API resources to plan[/dim]")
             return PlanResult(success=True, has_changes=False, changes_summary="No changes")
 
         return PlanResult(
@@ -652,7 +685,7 @@ class OPNsenseDirectRunner(BaseRunner):
         warnings = result.get("warnings")
         if isinstance(warnings, list):
             for warning in warnings:
-                self.console.print(f"  [yellow]opnsense_direct: {warning}[/yellow]")
+                self.console.print(f"  [yellow]{self._label(provider)}: {warning}[/yellow]")
         if isinstance(errors, list) and all(isinstance(e, str) for e in errors):
             return list(errors)
         return []
@@ -788,7 +821,9 @@ class OPNsenseDirectRunner(BaseRunner):
                 return ApplyResult(success=False, error=error)
 
         if not any_dispatched:
-            self.console.print("  [dim]opnsense_direct: no direct-API resources to apply[/dim]")
+            self.console.print(
+                f"  [dim]{self._label(provider)}: no direct-API resources to apply[/dim]"
+            )
             return self._empty_apply_result()
 
         # Fire finalization hooks once each (#758). Errors propagate — a failing
@@ -855,6 +890,7 @@ class OPNsenseDirectRunner(BaseRunner):
         if sibling_resources is not None:
             extra_kwargs["sibling_resources"] = sibling_resources
         extra_kwargs.update(self._dependent_kwargs(manager_cls, resources, managed))
+        extra_kwargs.update(self._manager_kwargs(provider))
         if deletes_only:
             extra_kwargs["deletes_only"] = True
         try:
@@ -890,17 +926,18 @@ class OPNsenseDirectRunner(BaseRunner):
             if isinstance(hook_key, str) and hook_key:
                 totals.hook_keys.add(hook_key)
 
-        self._log_apply_progress(type_name, result, created, updated, deleted)
-        self._print_warnings(result.get("warnings"))
+        label = self._label(provider)
+        self._log_apply_progress(type_name, result, created, updated, deleted, label)
+        self._print_warnings(result.get("warnings"), label)
         return None
 
-    def _print_warnings(self, warnings: Any) -> None:
+    def _print_warnings(self, warnings: Any, label: str = "opnsense_direct") -> None:
         """Print a manager's warnings in yellow; ignore anything but a list of strings."""
         if not isinstance(warnings, list):
             return
         for warning in warnings:
             if isinstance(warning, str):
-                self.console.print(f"  [yellow]opnsense_direct: {warning}[/yellow]")
+                self.console.print(f"  [yellow]{label}: {warning}[/yellow]")
 
     def _fire_finalization_hooks(
         self,
@@ -957,7 +994,9 @@ class OPNsenseDirectRunner(BaseRunner):
                     "opnsense_direct: no finalization hook registered for key %r; skipping", key
                 )
                 continue
-            self.console.print(f"  [dim]opnsense_direct: running finalization hook {key}[/dim]")
+            self.console.print(
+                f"  [dim]{self._label(provider)}: running finalization hook {key}[/dim]"
+            )
             hook(env_name)
 
     def _fire_post_apply_hook(self, provider: ProviderBase, env_name: str, changed: bool) -> None:
@@ -981,7 +1020,7 @@ class OPNsenseDirectRunner(BaseRunner):
             return
         message = hook(env_name, changed)
         if isinstance(message, str):
-            self.console.print(f"  [dim]opnsense_direct: {message}[/dim]")
+            self.console.print(f"  [dim]{self._label(provider)}: {message}[/dim]")
 
     @staticmethod
     def _empty_apply_result() -> ApplyResult:
@@ -1002,6 +1041,7 @@ class OPNsenseDirectRunner(BaseRunner):
         created: int,
         updated: int,
         deleted: int,
+        label: str = "opnsense_direct",
     ) -> None:
         """Log per-type apply progress, surfacing read-only informational messages.
 
@@ -1010,10 +1050,10 @@ class OPNsenseDirectRunner(BaseRunner):
         """
         message = result.get("message")
         if message:
-            self.console.print(f"  [dim]opnsense_direct: {type_name}: {message}[/dim]")
+            self.console.print(f"  [dim]{label}: {type_name}: {message}[/dim]")
             return
         self.console.print(
-            f"  [dim]opnsense_direct: {type_name}: applied "
+            f"  [dim]{label}: {type_name}: applied "
             f"{created} adds, {updated} updates, {deleted} deletes[/dim]"
         )
 
@@ -1051,6 +1091,7 @@ class OPNsenseDirectRunner(BaseRunner):
 
         total_destroyed = 0
         any_dispatched = False
+        label = self._label(provider)
 
         # Types that split deletes go first in reverse table order, so a subnet's
         # reservations are gone before the subnet is (#1264); the rest keep table order.
@@ -1068,6 +1109,7 @@ class OPNsenseDirectRunner(BaseRunner):
             extra_kwargs: dict[str, Any] = {}
             if sibling_resources is not None:
                 extra_kwargs["sibling_resources"] = sibling_resources
+            extra_kwargs.update(self._manager_kwargs(provider))
             try:
                 result = manager.destroy(
                     env_name, typed_resources, auto_approve=auto_approve, **extra_kwargs
@@ -1081,15 +1123,15 @@ class OPNsenseDirectRunner(BaseRunner):
 
             message = result.get("message")
             if message:
-                self.console.print(f"  [dim]opnsense_direct: {type_name}: {message}[/dim]")
+                self.console.print(f"  [dim]{label}: {type_name}: {message}[/dim]")
             else:
                 self.console.print(
-                    f"  [dim]opnsense_direct: {type_name}: destroyed {destroyed} resources[/dim]"
+                    f"  [dim]{label}: {type_name}: destroyed {destroyed} resources[/dim]"
                 )
-            self._print_warnings(result.get("warnings"))
+            self._print_warnings(result.get("warnings"), label)
 
         if not any_dispatched:
-            self.console.print("  [dim]opnsense_direct: no direct-API resources to destroy[/dim]")
+            self.console.print(f"  [dim]{label}: no direct-API resources to destroy[/dim]")
             return DestroyResult(success=True, resources_destroyed=0)
 
         try:
@@ -1137,6 +1179,7 @@ class OPNsenseDirectRunner(BaseRunner):
             extra_kwargs: dict[str, Any] = {}
             if sibling_resources is not None:
                 extra_kwargs["sibling_resources"] = sibling_resources
+            extra_kwargs.update(self._manager_kwargs(provider))
             try:
                 ids = manager.get_resource_ids(env_name, typed_resources, **extra_kwargs)
             except Exception as exc:

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from infrafoundry.core import warnings as infra_warnings
@@ -515,12 +516,12 @@ class ValidationOrchestrator:
         for result in report.results:
             if result.passed:
                 if verbose:
-                    self.console.print(f"  [green]✓[/green] {result.message}")
+                    self.console.print(f"  [green]✓[/green] {escape(result.message)}")
                 continue
 
             symbol = "⚠" if result.level.value == "warning" else "✗"
             color = "yellow" if result.level.value == "warning" else "red"
-            self.console.print(f"  [{color}]{symbol}[/{color}] {result.message}")
+            self.console.print(f"  [{color}]{symbol}[/{color}] {escape(result.message)}")
             if verbose and result.details:
                 for key, value in result.details.items():
                     self.console.print(f"      {key}: {value}")

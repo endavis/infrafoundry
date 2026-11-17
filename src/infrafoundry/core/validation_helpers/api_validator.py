@@ -35,6 +35,11 @@ class BaseAPIValidator:
         """Expose provider settings for convenience."""
         return self._validator.provider_settings
 
+    @provider_settings.setter
+    def provider_settings(self, value: dict[str, Any]) -> None:
+        """Replace the settings credentials are read from (a resolved firewall entry)."""
+        self._validator.provider_settings = value
+
     def get_credentials(
         self,
         required_fields: list[str],

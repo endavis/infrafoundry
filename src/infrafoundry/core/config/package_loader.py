@@ -28,6 +28,12 @@ from infrafoundry.core.config.models import PackageManifest
 from infrafoundry.core.config.yaml_loader import load_config_yaml
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.provider_instances import (
+    INSTANCE_SETTINGS,
+    qualified_provider_id,
+    stamp_instance,
+    validate_instance_name,
+)
 from infrafoundry.core.secrets.provider import SecretProvider
 from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
 
@@ -144,6 +150,9 @@ LEGACY_SINGLETON_RESOURCE_NAME: str = "settings"
 # Phase 2). The direct-OPNsense provider is the only consumer; nested format
 # under any other top-level key is not currently supported.
 NESTED_PROVIDER_NAMESPACE: str = "opnsense"
+
+# Top-level key beside ``opnsense:`` that selects the firewall for the whole file (#1450).
+FIREWALL_FILE_KEY: str = "firewall"
 
 
 class PackageLoader:
@@ -387,6 +396,13 @@ class PackageLoader:
             parsed = self._parse_resources_from_data(data, resource_file, effective_provider)
             resources.extend(parsed)
 
+        if manifest.firewall is not None:
+            for resource in resources:
+                if resource.provider.partition("@")[0] in INSTANCE_SETTINGS:
+                    stamp_instance(
+                        resource, manifest.firewall, f"package '{manifest.name}' firewall"
+                    )
+
         # ----- Events -----
         # Render event configs through Jinja2 to resolve variable references
         # (e.g., requires: ["{{ node01_name }}"] → requires: ["ontap-demo-01"])
@@ -596,7 +612,9 @@ class PackageLoader:
         # key always wins. Mixing with other formats is rejected explicitly.
         nested = data.get(NESTED_PROVIDER_NAMESPACE)
         if isinstance(nested, dict):
-            extra_keys = [k for k in data if k != NESTED_PROVIDER_NAMESPACE]
+            extra_keys = [
+                k for k in data if k not in (NESTED_PROVIDER_NAMESPACE, FIREWALL_FILE_KEY)
+            ]
             if extra_keys:
                 raise InvalidConfigurationError(
                     f"{resource_file}: cannot mix nested '{NESTED_PROVIDER_NAMESPACE}:' "
@@ -604,7 +622,10 @@ class PackageLoader:
                     "Use one format per file."
                 )
             return self._parse_nested_provider_format(
-                nested, NESTED_PROVIDER_NAMESPACE, resource_file
+                nested,
+                NESTED_PROVIDER_NAMESPACE,
+                resource_file,
+                firewall=data.get(FIREWALL_FILE_KEY),
             )
 
         # Check for resource-centric format
@@ -645,6 +666,7 @@ class PackageLoader:
         namespace_data: dict[str, Any],
         provider: str,
         resource_file: str,
+        firewall: str | None = None,
     ) -> list[ResourceConfig]:
         """Walk a nested ``provider:`` block and emit ``ResourceConfig`` items.
 
@@ -671,6 +693,8 @@ class PackageLoader:
             provider: Provider name that all emitted ``ResourceConfig`` items
                 should carry. For now only ``"opnsense"`` is used by callers.
             resource_file: Source filename for error messages.
+            firewall: File-level firewall name (#1450). Entries and singletons
+                without their own ``firewall:`` key are stamped with it.
 
         Returns:
             List of ``ResourceConfig`` objects with dotted ``type`` paths.
@@ -683,6 +707,10 @@ class PackageLoader:
         results: list[ResourceConfig] = []
         if not namespace_data:
             return results
+
+        if firewall is not None:
+            validate_instance_name(provider, firewall, f"{resource_file}: 'firewall'")
+        file_provider = qualified_provider_id(provider, firewall)
 
         # Walk the tree; ``stack`` holds (current-dotted-path-parts, value).
         # Empty path-parts means we are at the namespace root and have not
@@ -712,7 +740,7 @@ class PackageLoader:
                         ResourceConfig(
                             name=dotted,
                             type=dotted,
-                            provider=provider,
+                            provider=file_provider,
                             config=dict(value),
                         )
                     )
@@ -773,11 +801,16 @@ class PackageLoader:
                     entry_config = item.get("config", {})
                     if "name" not in entry_config:
                         entry_config["name"] = item["name"]
+                    entry_provider = item.get("provider", file_provider)
+                    if item.get("firewall") is not None:
+                        entry_provider = self._entry_firewall_provider(
+                            item, provider, resource_file, dotted
+                        )
                     results.append(
                         ResourceConfig(
                             name=item["name"],
                             type=dotted,
-                            provider=item.get("provider", provider),
+                            provider=entry_provider,
                             config=entry_config,
                             events=item.get("events"),
                             import_id=item.get("import_id"),
@@ -794,6 +827,32 @@ class PackageLoader:
                 )
 
         return results
+
+    @staticmethod
+    def _entry_firewall_provider(
+        item: dict[str, Any], default_provider: str, resource_file: str, where: str
+    ) -> str:
+        """Return the provider id for an entry carrying its own ``firewall:`` key.
+
+        Args:
+            item: Resource entry mapping.
+            default_provider: Provider used when the entry names none.
+            resource_file: Source filename for error messages.
+            where: Resource type or entry label for error messages.
+
+        Returns:
+            ``provider@firewall`` for the entry.
+
+        Raises:
+            InvalidConfigurationError: If the provider has no firewall support or
+                the name is invalid.
+        """
+        base = str(item.get("provider", default_provider)).partition("@")[0]
+        firewall = item["firewall"]
+        validate_instance_name(
+            base, firewall, f"{resource_file}: entry '{item.get('name', '?')}' ({where})"
+        )
+        return qualified_provider_id(base, firewall)
 
     def _parse_resource_centric(
         self, resources: list[Any], resource_file: str, default_provider: str
@@ -824,7 +883,13 @@ class PackageLoader:
                 ResourceConfig(
                     name=item["name"],
                     type=str(item["type"]),
-                    provider=item.get("provider", default_provider),
+                    provider=(
+                        self._entry_firewall_provider(
+                            item, default_provider, resource_file, str(item["type"])
+                        )
+                        if item.get("firewall") is not None
+                        else item.get("provider", default_provider)
+                    ),
                     config=config,
                     events=item.get("events"),
                     import_id=item.get("import_id"),
