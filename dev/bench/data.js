@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794936761830,
+  "lastUpdate": 1794937343046,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3120,6 +3120,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000003999845438132879",
             "extra": "mean: 68.86952205151003 usec\nrounds: 16144"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "43ac354740fd27671e963f60a2dd3cab5a7b6a24",
+          "message": "feat: apply a fresh opnsense box in one run with a firmware update (merges PR #1472, addresses #1458)\n\n* feat: defer version-gated opnsense types behind a firmware update\n\nWith system.firmware update: true in the run, a type the box's current\nversion cannot serve (an endpoint-support error or an\nUnsupportedVersionError from its manager) no longer fails the whole\nplan. The plan lists it as deferred, apply runs every other type first,\nthen re-checks the deferred types against the updated box and applies\nthem; one still unsupported fails with the normal error. Without\nupdate: true behaviour is unchanged. Gateway ordering is not changed:\na firmware update ran fine before the gateway existed.\n\nAddresses #1458\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* feat: set the gateway before a firmware update in one apply\n\nWith system.firmware update: true in the run, the forward pass applies\ninterfaces.vlans, interfaces.assignments and routing.gateways first, then\nsystem.firmware, then every other type in table order, then the deferred\ntypes. The update needs internet access, which the gateway provides.\nWithout update: true the order is unchanged, and the delete pass keeps\nreverse table order.\n\nAddresses #1458\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T17:41:18Z",
+          "tree_id": "785fd21419cd6bf3d6afe15fc3df888774066329",
+          "url": "https://github.com/endavis/infrafoundry/commit/43ac354740fd27671e963f60a2dd3cab5a7b6a24"
+        },
+        "date": 1794937342121,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 70.77962318989941,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000383228533402573",
+            "extra": "mean: 14.128360041095906 msec\nrounds: 73"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12717.618103965853,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005093286251529089",
+            "extra": "mean: 78.631076340322 usec\nrounds: 13597"
           }
         ]
       }
