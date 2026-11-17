@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794921955192,
+  "lastUpdate": 1794922250172,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2892,6 +2892,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000955849836185924",
             "extra": "mean: 90.77832691531148 usec\nrounds: 12465"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1ee8c091079e1e9d9638df6e0b7609166ccd1816",
+          "message": "feat: support more than one opnsense firewall per environment (merges PR #1456, addresses #1450)\n\nEach extra firewall is a provider instance with id opnsense@<name>; the\nprimary keeps the plain opnsense id, so flat api_url/api_key/api_secret\nconfigs and existing state rows are unchanged and no state migration is\nneeded. Settings take a firewalls map plus primary; resources select a\nfirewall per entry, per file, or per package manifest. Plan, apply,\ndestroy and doctor run once per firewall with labelled output, infra\ncommands gain --firewall, and ha_backup enables a CARP pair check in\ninfra doctor. Adds ADR-0024 and amends ADR-0013/0014/0016/0018/0023.\n\nAddresses #1450\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T13:29:51Z",
+          "tree_id": "22cb54ebc15c5262dfe5e378a624d6de3fe3a9ab",
+          "url": "https://github.com/endavis/infrafoundry/commit/1ee8c091079e1e9d9638df6e0b7609166ccd1816"
+        },
+        "date": 1794922249480,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 47.51319791067437,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00026475787829233",
+            "extra": "mean: 21.04678371428539 msec\nrounds: 49"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7794.049199550787,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013044414906656877",
+            "extra": "mean: 128.30301354238762 usec\nrounds: 8418"
           }
         ]
       }
