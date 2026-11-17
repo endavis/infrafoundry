@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794925282907,
+  "lastUpdate": 1794929974174,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3006,6 +3006,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007607486424509565",
             "extra": "mean: 88.7575883643477 usec\nrounds: 12307"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c3b26fad0505d302d9cd0c5a5078147cc7835557",
+          "message": "fix: target the sync interface address in the opnsense-vm sync https rule (merges PR #1468, addresses #1466)\n\nfix: use the symbolic opt1ip destination for the opnsense-vm sync https rule\n\nThe bootstrap's HTTPS rule on the sync interface wrote the node's sync\naddress as a literal destination. With rules in sync_items, the primary's\nrule replaced the backup's, so the backup stopped accepting config sync on\nits own address. Use the symbolic opt1ip network, as the LAN rule does with\nlanip, so the rule means \"this node's sync address\" on both nodes.\n\nExisting VMs need a rebuild or a managed replacement rule; the README says so.\n\nAddresses #1466\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T15:38:23Z",
+          "tree_id": "90ed14b5cf2a4967990e359893a30b82b8b1209c",
+          "url": "https://github.com/endavis/infrafoundry/commit/c3b26fad0505d302d9cd0c5a5078147cc7835557"
+        },
+        "date": 1794929973153,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 68.08129176697047,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0008688155346630287",
+            "extra": "mean: 14.688322945205169 msec\nrounds: 73"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12783.45962347607,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005216725283264503",
+            "extra": "mean: 78.2260850703951 usec\nrounds: 13624"
           }
         ]
       }
