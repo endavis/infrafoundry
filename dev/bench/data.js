@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794851689856,
+  "lastUpdate": 1794909617452,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2512,6 +2512,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001696122934272291",
             "extra": "mean: 62.66410316923435 usec\nrounds: 17670"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "64893c6053c87b582f030b987149d490d34d2e92",
+          "message": "feat: validate carp vhid uniqueness and vip subnet membership (merges PR #1438, addresses #1391)\n\nAdd VirtualIPTopologyValidator, an offline OPNsense validator that runs\non infra plan, apply and doctor (ADR-0023):\n\n- Warn when one CARP VHID is used on more than one interface, naming\n  every VIP involved. The same VHID on one interface is not reported.\n- Error when a CARP VIP address is outside the static network of its\n  interface assignment, unless it is inside an ipalias network on that\n  interface. Skipped when the interface address is not static in config\n  (DHCP, none, track-interface, no assignment), for IPv6 link-local and\n  on an address-family mismatch. ipalias and proxyarp VIPs are not\n  checked, since both are used outside the interface subnet.\n\nVirtualIPValidator is unchanged.\n\nAddresses #1391\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T09:59:12Z",
+          "tree_id": "bf7b0b5276cc1a29735a59405d26ed4548ce5dbc",
+          "url": "https://github.com/endavis/infrafoundry/commit/64893c6053c87b582f030b987149d490d34d2e92"
+        },
+        "date": 1794909616705,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 68.38747700488454,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0010027510109803018",
+            "extra": "mean: 14.622560208334276 msec\nrounds: 72"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12822.717987401878,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004902712545878663",
+            "extra": "mean: 77.98658607188308 usec\nrounds: 13541"
           }
         ]
       }
