@@ -81,7 +81,7 @@ class TestNFSRendering:
             _make_storage(
                 name="stor01-infra",
                 backend="nfs",
-                server="172.20.10.50",
+                server="192.0.2.50",
                 export="/export/vol1",
             )
         ]
@@ -89,7 +89,7 @@ class TestNFSRendering:
         assert 'resource "proxmox_virtual_environment_storage_nfs"' in content
         assert '"stor01_infra"' in content
         assert 'id     = "stor01-infra"' in content
-        assert 'server = "172.20.10.50"' in content
+        assert 'server = "192.0.2.50"' in content
         assert 'export = "/export/vol1"' in content
 
     def test_nfs_with_content_types(self, provider: ProxmoxProvider) -> None:
@@ -97,7 +97,7 @@ class TestNFSRendering:
         storages = [
             _make_storage(
                 backend="nfs",
-                server="172.20.10.50",
+                server="192.0.2.50",
                 export="/export/vol1",
                 content_types=["snippets", "vztmpl", "iso"],
             )
@@ -113,7 +113,7 @@ class TestNFSRendering:
         storages = [
             _make_storage(
                 backend="nfs",
-                server="172.20.10.50",
+                server="192.0.2.50",
                 export="/export/vol1",
                 nodes=["node1", "node2", "node3"],
             )
@@ -128,7 +128,7 @@ class TestNFSRendering:
         storages = [
             _make_storage(
                 backend="nfs",
-                server="172.20.10.50",
+                server="192.0.2.50",
                 export="/export/vol1",
                 content_types=["snippets"],
                 nodes=["node1"],
@@ -150,7 +150,7 @@ class TestCIFSRendering:
             _make_storage(
                 name="backup-share",
                 backend="cifs",
-                server="172.20.10.50",
+                server="192.0.2.50",
                 share="backups",
             )
         ]
@@ -158,7 +158,7 @@ class TestCIFSRendering:
         assert 'resource "proxmox_virtual_environment_storage_cifs"' in content
         assert '"backup_share"' in content
         assert 'id     = "backup-share"' in content
-        assert 'server = "172.20.10.50"' in content
+        assert 'server = "192.0.2.50"' in content
         assert 'share  = "backups"' in content
 
     def test_cifs_with_credentials(self, provider: ProxmoxProvider) -> None:
@@ -166,7 +166,7 @@ class TestCIFSRendering:
         storages = [
             _make_storage(
                 backend="cifs",
-                server="172.20.10.50",
+                server="192.0.2.50",
                 share="backups",
                 username="proxmox",
                 password="secret",
@@ -181,7 +181,7 @@ class TestCIFSRendering:
         storages = [
             _make_storage(
                 backend="cifs",
-                server="172.20.10.50",
+                server="192.0.2.50",
                 share="backups",
                 domain="WORKGROUP",
                 subdirectory="proxmox-backups",
@@ -288,13 +288,13 @@ class TestIntegration:
             _make_storage(
                 name="nfs-store",
                 backend="nfs",
-                server="192.168.1.1",
+                server="198.51.100.1",
                 export="/export/vol2",
             ),
             _make_storage(
                 name="cifs-store",
                 backend="cifs",
-                server="192.168.1.2",
+                server="198.51.100.2",
                 share="share",
                 username="admin",
             ),

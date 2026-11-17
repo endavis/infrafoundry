@@ -17,17 +17,17 @@ from infrafoundry.core.provider import ResourceConfig
 
 BASE_VARIABLES = """\
   cluster_name: ontap-demo
-  cluster_mgmt_ip: "172.20.99.80"
-  data_lif1_ip: "172.20.99.83"
-  data_lif2_ip: "172.20.99.84"
+  cluster_mgmt_ip: "192.0.2.80"
+  data_lif1_ip: "192.0.2.83"
+  data_lif2_ip: "192.0.2.84"
   node01_name: ontap-node-1
   node01_vmid: 1130
   node01_target: node2
-  node01_mgmt_ip: "172.20.99.81"
+  node01_mgmt_ip: "192.0.2.81"
   node02_name: ontap-node-2
   node02_vmid: 1131
   node02_target: node3
-  node02_mgmt_ip: "172.20.99.82"
+  node02_mgmt_ip: "192.0.2.82"
   ontap_password: test-password
 """
 

@@ -37,7 +37,7 @@ class TestComposition:
 
     def test_provider_settings_accessible(self, report: MagicMock) -> None:
         """Provider settings are accessible via api_validator."""
-        env_config = _make_env_config(hosts={"esxi-01": {"hostname": "192.168.1.10"}})
+        env_config = _make_env_config(hosts={"esxi-01": {"hostname": "192.0.2.10"}})
         validator = EsxiValidator(env_config, report)
         assert validator.provider_settings.get("hosts") is not None
 
@@ -62,8 +62,8 @@ class TestValidateConnectivity:
         mock_conn.return_value = MagicMock()
         env_config = _make_env_config(
             hosts={
-                "esxi-01": {"hostname": "192.168.1.10"},
-                "esxi-02": {"hostname": "192.168.1.11"},
+                "esxi-01": {"hostname": "192.0.2.10"},
+                "esxi-02": {"hostname": "192.0.2.11"},
             }
         )
         validator = EsxiValidator(env_config, report)

@@ -66,8 +66,8 @@ ansible_vars:
 
 ```yaml
 ansible_vars:
-  k3s_cluster_cidr: "10.100.0.0/16"
-  k3s_service_cidr: "10.101.0.0/16"
+  k3s_cluster_cidr: "198.51.100.0/24"
+  k3s_service_cidr: "203.0.113.0/24"
 ```
 
 ## Notes

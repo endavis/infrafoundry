@@ -529,7 +529,7 @@ def _reservation(name: str, subnet_ref: str) -> ResourceConfig:
         provider="opnsense",
         config={
             "hw_address": "aa:bb:cc:dd:ee:01",
-            "ip_address": "10.0.10.50",
+            "ip_address": "203.0.113.50",
             "hostname": name,
             "subnet_ref": subnet_ref,
         },
@@ -538,7 +538,10 @@ def _reservation(name: str, subnet_ref: str) -> ResourceConfig:
 
 def _subnet(name: str) -> ResourceConfig:
     return ResourceConfig(
-        name=name, type="kea.dhcp4.subnets", provider="opnsense", config={"subnet": "10.0.10.0/24"}
+        name=name,
+        type="kea.dhcp4.subnets",
+        provider="opnsense",
+        config={"subnet": "203.0.113.0/24"},
     )
 
 

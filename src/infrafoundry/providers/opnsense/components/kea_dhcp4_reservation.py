@@ -797,7 +797,7 @@ def _resolve_subnet_uuid(
 
     Args:
         cidr_to_uuid: Pre-built map from CIDR to UUID.
-        subnet_cidr: Operator-facing subnet reference (e.g., ``192.168.1.0/24``).
+        subnet_cidr: Operator-facing subnet reference (e.g., ``192.0.2.0/24``).
         resource_name: Operator-facing reservation name for error messages.
 
     Returns:

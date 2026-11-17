@@ -139,19 +139,19 @@ providers:
       - name: vcn_name
         default: k3s-vcn
       - name: vcn_cidr
-        default: "172.21.0.0/16"
+        default: "192.0.2.0/24"
       - name: vcn_dns_label
         default: k3svcn
       - name: control_subnet_name
         default: k3s-control-subnet
       - name: control_subnet_cidr
-        default: "172.21.0.0/24"
+        default: "192.0.2.0/25"
       - name: control_subnet_dns_label
         default: ctrl
       - name: worker_subnet_name
         default: k3s-worker-subnet
       - name: worker_subnet_cidr
-        default: "10.0.1.0/24"
+        default: "198.51.100.0/24"
       - name: worker_subnet_dns_label
         default: work
 

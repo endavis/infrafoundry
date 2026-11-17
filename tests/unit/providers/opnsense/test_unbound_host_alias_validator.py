@@ -471,7 +471,7 @@ class TestDottedPathXRefs:
             name="db-primary",
             type="unbound.host_overrides",
             provider="opnsense",
-            config={"hostname": "db", "domain": "internal", "ip": "172.21.0.1"},
+            config={"hostname": "db", "domain": "internal", "ip": "192.0.2.1"},
         )
         index = build_xref_index([host])
         # ``unbound.host_overrides.db-primary`` is a 3-part path → cross-
@@ -498,7 +498,7 @@ class TestDottedPathXRefs:
             name="db-primary",
             type="unbound.host_overrides",
             provider="opnsense",
-            config={"hostname": "db", "domain": "internal", "ip": "172.21.0.1"},
+            config={"hostname": "db", "domain": "internal", "ip": "192.0.2.1"},
         )
         index = build_xref_index([host])
         # Alias type ``unbound.host_aliases`` → current_plugin="unbound"

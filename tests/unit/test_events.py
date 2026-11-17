@@ -1098,7 +1098,7 @@ class TestScriptHandlerJumphostReexec:
         documented INFRAFOUNDRY_VAR_<key> contract under ``set -u``.
         """
         handler, _ = self._handler(tmp_path)
-        context = self._context(jumphost="jh", server_ip="172.21.0.1", cluster_name="k3s")
+        context = self._context(jumphost="jh", server_ip="192.0.2.1", cluster_name="k3s")
 
         run_result = MagicMock(returncode=0, stdout="", stderr="")
         with (
@@ -1143,7 +1143,7 @@ class TestScriptHandlerJumphostReexec:
 
         remote_bash = _build_remote_bash(str(remote_dir), "dump.sh")
         pkg_vars = {
-            "server_ip": "172.21.0.1",
+            "server_ip": "192.0.2.1",
             "cluster_name": "k3s-test",
             "count": 3,
             "agents": [{"name": "a1"}],  # object/array — only in JSON blob
@@ -1157,7 +1157,7 @@ class TestScriptHandlerJumphostReexec:
         )
 
         assert proc.returncode == 0, f"stderr: {proc.stderr}"
-        assert "ip=172.21.0.1" in proc.stdout
+        assert "ip=192.0.2.1" in proc.stdout
         assert "name=k3s-test" in proc.stdout
         assert "num=3" in proc.stdout
         # Full JSON remains available (incl. the array value that scalars skip).

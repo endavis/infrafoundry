@@ -699,18 +699,18 @@ class TestMonitorDefault:
         return _live("u1", want.name, raw_overrides=raw)
 
     def test_unset_monitor_matches_gateway_address(self) -> None:
-        want = _gw("TEST_GW", gateway="172.20.10.250")
-        live = self._live_from(want, monitor="172.20.10.250")
+        want = _gw("TEST_GW", gateway="198.51.100.250")
+        live = self._live_from(want, monitor="198.51.100.250")
         assert compute_diff([want], [live]).updates == []
 
     def test_unset_monitor_still_flags_a_different_address(self) -> None:
-        want = _gw("TEST_GW", gateway="172.20.10.250")
-        live = self._live_from(want, monitor="172.20.10.9")
+        want = _gw("TEST_GW", gateway="198.51.100.250")
+        live = self._live_from(want, monitor="198.51.100.9")
         assert len(compute_diff([want], [live]).updates) == 1
 
     def test_explicit_monitor_is_compared(self) -> None:
-        want = _gw("TEST_GW", gateway="172.20.10.250", monitor="172.20.10.9")
-        live = self._live_from(want, monitor="172.20.10.250")
+        want = _gw("TEST_GW", gateway="198.51.100.250", monitor="198.51.100.9")
+        live = self._live_from(want, monitor="198.51.100.250")
         assert len(compute_diff([want], [live]).updates) == 1
 
 

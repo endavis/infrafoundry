@@ -60,7 +60,7 @@ class Family:
             name=name,
             type=self.res_type,
             provider="opnsense",
-            config={"subnet_ref": ref, self.ident: ident, "ip_address": "10.0.10.5"},
+            config={"subnet_ref": ref, self.ident: ident, "ip_address": "192.0.2.5"},
         )
 
     def service(
@@ -79,7 +79,7 @@ class Family:
             "uuid": uuid,
             "subnet": subnet_uuid,
             self.ident: ident,
-            "ip_address": "10.0.10.5",
+            "ip_address": "192.0.2.5",
         }
 
     def patched(self, module: Any, service: MagicMock) -> Any:
@@ -95,8 +95,8 @@ V4 = Family(
     kea_dhcp4_subnet,
     kea_dhcp4_reservation,
     "hw_address",
-    "10.0.10.0/24",
-    "10.0.20.0/24",
+    "192.0.2.0/24",
+    "198.51.100.0/24",
     "aa:bb:cc:dd:ee:01",
     "aa:bb:cc:dd:ee:02",
 )
@@ -192,7 +192,7 @@ class TestReservationsKeptOnSubnets:
             cidr_to_uuid=cidr_to_uuid,
         )
         assert set(kept) == {"u-sub"}
-        assert kept["u-sub"] == [f"{fam.ident_a} 10.0.10.5", "hand 10.0.10.5"]
+        assert kept["u-sub"] == [f"{fam.ident_a} 192.0.2.5", "hand 192.0.2.5"]
 
         legacy = module.reservations_kept_on_subnets(
             live,
@@ -202,7 +202,7 @@ class TestReservationsKeptOnSubnets:
             name_to_cidr=name_to_cidr,
             cidr_to_uuid=cidr_to_uuid,
         )
-        assert legacy["u-sub"] == [f"{fam.ident_a} 10.0.10.5"]
+        assert legacy["u-sub"] == [f"{fam.ident_a} 192.0.2.5"]
 
     @FAMILIES
     def test_unresolvable_yaml_row_does_not_raise(self, fam: Family) -> None:
@@ -214,7 +214,7 @@ class TestReservationsKeptOnSubnets:
             name_to_cidr={},
             cidr_to_uuid={fam.cidr: "u-sub"},
         )
-        assert kept == {"u-sub": ["hand 10.0.10.5"]}
+        assert kept == {"u-sub": ["hand 192.0.2.5"]}
 
 
 class TestSubnetPlanRefusal:
@@ -230,12 +230,12 @@ class TestSubnetPlanRefusal:
                 managed_dependent_resources=[],
             )
         assert diff.deletes == []
-        assert diff.blocked == [("u-sub", fam.cidr, ["hand 10.0.10.5"])]
+        assert diff.blocked == [("u-sub", fam.cidr, ["hand 192.0.2.5"])]
         assert diff.is_empty
         assert len(diff.warnings) == 1
         warning = diff.warnings[0]
         assert fam.cidr in warning
-        assert "hand 10.0.10.5" in warning
+        assert "hand 192.0.2.5" in warning
         assert "1 reservation(s) InfraFoundry does not manage" in warning
 
     @FAMILIES
@@ -261,7 +261,7 @@ class TestSubnetPlanRefusal:
             name="lit",
             type=fam.res_type,
             provider="opnsense",
-            config={"subnet": fam.cidr, fam.ident: fam.ident_a, "ip_address": "10.0.10.9"},
+            config={"subnet": fam.cidr, fam.ident: fam.ident_a, "ip_address": "192.0.2.9"},
         )
         with fam.patched(fam.subnet_module, fam.service(_live_subnets(fam), live)):
             no_yaml = fam.subnet_mgr(tmp_path).plan("dev", [], dependent_resources=[])
@@ -270,7 +270,7 @@ class TestSubnetPlanRefusal:
         with fam.patched(fam.subnet_module, fam.service(_live_subnets(fam), live)):
             with_yaml = fam.subnet_mgr(tmp_path).plan("dev", [], dependent_resources=[literal])
         assert with_yaml.deletes == []
-        assert with_yaml.blocked[0][2] == [f"{fam.ident_a} 10.0.10.5"]
+        assert with_yaml.blocked[0][2] == [f"{fam.ident_a} 192.0.2.5"]
 
 
 class TestSubnetDeletesOnlyApply:

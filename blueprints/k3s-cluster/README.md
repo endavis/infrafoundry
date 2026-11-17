@@ -53,13 +53,13 @@ variables:
   server_vmid: 230
   server_target: node1
   server_mac: "02:00:00:00:07:00"
-  server_ip: "172.20.10.70"
+  server_ip: "192.0.2.70"
   agents:
     - name: my-k3s-agent-1
       vmid: 231
       target_node: node1
       mac: "02:00:00:00:07:01"
-      ip: "172.20.10.71"
+      ip: "192.0.2.71"
 ```
 
 ### OCI

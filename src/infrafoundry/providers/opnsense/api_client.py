@@ -274,7 +274,7 @@ class KeaClient:
         Args:
             subnet_data: Subnet configuration dictionary (DHCPv4 wire schema,
                 OPNsense 26.1; #1165):
-                - subnet: IPv4 subnet (e.g., "192.168.1.0/24")
+                - subnet: IPv4 subnet (e.g., "192.0.2.0/24")
                 - interface: Interface name (e.g., "opt1")
                 - pools: Newline-joined pool ranges
                 - description: Operator description

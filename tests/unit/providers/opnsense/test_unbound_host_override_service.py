@@ -161,7 +161,7 @@ class TestSynthesizeName:
 
 class TestRowToLive:
     def test_simple_a_record_row(self) -> None:
-        row = _row("web", "example.com", server="172.21.0.1")
+        row = _row("web", "example.com", server="192.0.2.1")
         live = _row_to_live(row)
         assert live.uuid == "u1"
         assert live.hostname == "web"
@@ -181,13 +181,13 @@ class TestRowToLive:
 
     def test_missing_rr_defaults_to_a(self) -> None:
         # No ``rr`` field on the wire → default to ``A``.
-        row = _row("web", "example.com", server="172.21.0.1")
+        row = _row("web", "example.com", server="192.0.2.1")
         live = _row_to_live(row)
         assert live.rr == "A"
 
     def test_empty_rr_string_defaults_to_a(self) -> None:
         # Defensive: empty wire string also yields the default.
-        row = _row("web", "example.com", rr="", server="172.21.0.1")
+        row = _row("web", "example.com", rr="", server="192.0.2.1")
         live = _row_to_live(row)
         assert live.rr == "A"
 
@@ -207,12 +207,12 @@ class TestRowToLive:
 
 class TestLiveToExportConfig:
     def test_simple_a_record(self) -> None:
-        live = _row_to_live(_row("web", "example.com", server="172.21.0.1", description="Web tier"))
+        live = _row_to_live(_row("web", "example.com", server="192.0.2.1", description="Web tier"))
         cfg = _live_to_export_config(live)
         assert cfg["hostname"] == "web"
         assert cfg["domain"] == "example.com"
         assert cfg["enabled"] is True
-        assert cfg["server"] == "172.21.0.1"
+        assert cfg["server"] == "192.0.2.1"
         assert cfg["description"] == "Web tier"
         # ``rr`` is the default; must not appear in the YAML output.
         assert "rr" not in cfg
@@ -283,26 +283,26 @@ class TestLiveToExportConfig:
             "uuid": "u1",
             "hostname": "web",
             "domain": "example.com",
-            "server": "172.21.0.1",
+            "server": "192.0.2.1",
         }
         live = _row_to_live(row)
         cfg = _live_to_export_config(live)
         assert cfg["enabled"] is True
 
     def test_enabled_zero_returns_false(self) -> None:
-        live = _row_to_live(_row("web", "example.com", server="172.21.0.1", enabled="0"))
+        live = _row_to_live(_row("web", "example.com", server="192.0.2.1", enabled="0"))
         cfg = _live_to_export_config(live)
         assert cfg["enabled"] is False
 
     def test_description_passthrough(self) -> None:
         live = _row_to_live(
-            _row("web", "example.com", server="172.21.0.1", description="Production web")
+            _row("web", "example.com", server="192.0.2.1", description="Production web")
         )
         cfg = _live_to_export_config(live)
         assert cfg["description"] == "Production web"
 
     def test_description_empty_omitted(self) -> None:
-        live = _row_to_live(_row("web", "example.com", server="172.21.0.1"))
+        live = _row_to_live(_row("web", "example.com", server="192.0.2.1"))
         cfg = _live_to_export_config(live)
         assert "description" not in cfg
 
@@ -310,7 +310,7 @@ class TestLiveToExportConfig:
         # A bare A-record host override must not carry any of the
         # type-specific keys — keeps existing operator YAML
         # round-tripping identical.
-        live = _row_to_live(_row("web", "example.com", server="172.21.0.1"))
+        live = _row_to_live(_row("web", "example.com", server="192.0.2.1"))
         cfg = _live_to_export_config(live)
         for key in ("rr", "mxprio", "mx"):
             assert key not in cfg
@@ -318,7 +318,7 @@ class TestLiveToExportConfig:
     def test_rr_a_explicit_still_omitted(self) -> None:
         # Even when the wire explicitly says ``rr: A``, YAML omits it
         # so the existing 5-field operator YAML round-trips unchanged.
-        live = _row_to_live(_row("web", "example.com", rr=_selected_rr("A"), server="172.21.0.1"))
+        live = _row_to_live(_row("web", "example.com", rr=_selected_rr("A"), server="192.0.2.1"))
         cfg = _live_to_export_config(live)
         assert "rr" not in cfg
 
@@ -341,7 +341,7 @@ class TestServiceSearch:
         client = MagicMock()
         client.request.return_value = {
             "rows": [
-                _row("web", "example.com", uuid="u1", server="172.21.0.1"),
+                _row("web", "example.com", uuid="u1", server="192.0.2.1"),
                 "not-a-dict",
                 _row(
                     "web6",
@@ -394,7 +394,7 @@ class TestExportToYaml:
                     "web",
                     "example.com",
                     uuid="u1",
-                    server="172.21.0.1",
+                    server="192.0.2.1",
                     description="Web tier",
                 ),
             ]
@@ -404,7 +404,7 @@ class TestExportToYaml:
         assert "name: web-example-com" in text
         assert "hostname: web" in text
         assert "domain: example.com" in text
-        assert "172.21.0.1" in text
+        assert "192.0.2.1" in text
         assert "description: Web tier" in text
         assert "enabled: true" in text
 
@@ -420,7 +420,7 @@ class TestExportToYaml:
         client = MagicMock()
         client.request.return_value = {
             "rows": [
-                _row("web", "example.com", uuid="u1", server="172.21.0.1"),
+                _row("web", "example.com", uuid="u1", server="192.0.2.1"),
                 _row(
                     "web6",
                     "example.com",
@@ -449,7 +449,7 @@ class TestExportToYaml:
         assert web["name"] == "web-example-com"
         assert web["config"]["hostname"] == "web"
         assert web["config"]["domain"] == "example.com"
-        assert web["config"]["server"] == "172.21.0.1"
+        assert web["config"]["server"] == "192.0.2.1"
         assert "rr" not in web["config"]
 
         web6 = overrides[1]
@@ -470,7 +470,7 @@ class TestExportToYaml:
         # ``name`` precedes ``config``. Operator diffs are noisy if this
         # churns.
         client = MagicMock()
-        client.request.return_value = {"rows": [_row("web", "example.com", server="172.21.0.1")]}
+        client.request.return_value = {"rows": [_row("web", "example.com", server="192.0.2.1")]}
         svc = UnboundHostOverrideService(client)
         text = svc.export_to_yaml()
         name_idx = text.index("name:")
@@ -511,7 +511,7 @@ def _override(
     hostname: str = "web",
     domain: str = "example.com",
     rr: str = "A",
-    server: str = "192.168.1.10",
+    server: str = "198.51.100.10",
     description: str = "",
     enabled: bool = True,
     mxprio: str = "",
@@ -538,7 +538,7 @@ def _live_for_diff(
     hostname: str = "web",
     domain: str = "example.com",
     rr: str = "A",
-    server: str = "192.168.1.10",
+    server: str = "198.51.100.10",
     description: str = "",
     enabled: str = "1",
     mxprio: str = "",
@@ -577,14 +577,14 @@ class TestPayload:
             "web-host",
             hostname="web",
             domain="example.com",
-            server="192.168.1.10",
+            server="198.51.100.10",
             description="primary web",
         )
         inner = override.to_payload()["host"]
         assert inner["hostname"] == "web"
         assert inner["domain"] == "example.com"
         assert inner["rr"] == "A"
-        assert inner["server"] == "192.168.1.10"
+        assert inner["server"] == "198.51.100.10"
         assert inner["description"] == "primary web"
 
     def test_payload_field_set_for_aaaa_record(self) -> None:
@@ -688,7 +688,7 @@ class TestComputeDiffAdds:
         assert diff.adds[0].hostname == "web"
 
     def test_a_and_aaaa_for_same_hostname_both_add(self) -> None:
-        a = _override("web-a", rr="A", server="192.168.1.10")
+        a = _override("web-a", rr="A", server="198.51.100.10")
         aaaa = _override("web-aaaa", rr="AAAA", server="2001:db8::10")
         diff = compute_diff([a, aaaa], [])
         assert len(diff.adds) == 2
@@ -705,8 +705,8 @@ class TestComputeDiffUpdates:
         assert want.description == "new description"
 
     def test_update_when_server_changes(self) -> None:
-        override = _override("foo", server="172.21.0.99")
-        live = _live_for_diff("u1", server="192.168.1.10")
+        override = _override("foo", server="192.0.2.99")
+        live = _live_for_diff("u1", server="198.51.100.10")
         diff = compute_diff([override], [live])
         assert len(diff.updates) == 1
 
@@ -843,7 +843,7 @@ class TestConfigsFromResources:
             {
                 "hostname": "web",
                 "domain": "example.com",
-                "server": "192.168.1.10",
+                "server": "198.51.100.10",
                 "description": "primary web",
             },
         )
@@ -854,7 +854,7 @@ class TestConfigsFromResources:
         assert cfg.hostname == "web"
         assert cfg.domain == "example.com"
         assert cfg.rr == "A"
-        assert cfg.server == "192.168.1.10"
+        assert cfg.server == "198.51.100.10"
         assert cfg.description == "primary web"
 
     def test_valid_aaaa_record_parses(self) -> None:

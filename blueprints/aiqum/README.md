@@ -27,7 +27,7 @@ variables:
   vmid: 222
   target_node: node1
   disk_storage: local-lvm
-  ip_address: "192.168.1.50"
+  ip_address: "198.51.100.50"
   dhcp_subnet: my-subnet
   # ... secrets and per-environment URLs (see below)
 ```
@@ -48,7 +48,7 @@ infra apply --env <env> --package aiqum
 | `vmid` | Proxmox VM ID | `222` |
 | `target_node` | Proxmox host | `node1` |
 | `disk_storage` | Proxmox storage pool for the disk | `local-lvm` |
-| `ip_address` | VM IP (assigned via DHCP reservation) | `192.168.1.50` |
+| `ip_address` | VM IP (assigned via DHCP reservation) | `198.51.100.50` |
 | `dhcp_subnet` | OPNsense Kea subnet reference | `opt1-servers` |
 | `aiqum_admin_password` | AIQUM admin password (replaces default `admin`) | (secret) |
 | `aiqum_admin_email` | Admin email for notifications | `admin@example.com` |

@@ -90,7 +90,7 @@ echo -e "${YELLOW}════════════════════�
 echo -e "${YELLOW}Proxmox Configuration${NC}"
 echo -e "${YELLOW}═══════════════════════════════════════════════════════${NC}"
 
-read -p "Proxmox API URL (e.g., https://192.168.1.100:8006/api2/json): " proxmox_url
+read -p "Proxmox API URL (e.g., https://192.0.2.100:8006/api2/json): " proxmox_url
 read -p "Proxmox API Token ID (e.g., root@pam!terraform): " proxmox_token_id
 read -sp "Proxmox API Token Secret: " proxmox_token_secret
 echo ""
@@ -108,7 +108,7 @@ echo -e "${YELLOW}════════════════════�
 echo -e "${YELLOW}OPNsense Configuration${NC}"
 echo -e "${YELLOW}═══════════════════════════════════════════════════════${NC}"
 
-read -p "OPNsense web UI URL (e.g., https://192.168.1.1): " opnsense_url
+read -p "OPNsense web UI URL (e.g., https://192.0.2.1): " opnsense_url
 read -p "OPNsense API Key: " opnsense_key
 read -sp "OPNsense API Secret: " opnsense_secret
 echo ""
@@ -118,12 +118,12 @@ echo -e "${YELLOW}════════════════════�
 echo -e "${YELLOW}Network Configuration${NC}"
 echo -e "${YELLOW}═══════════════════════════════════════════════════════${NC}"
 
-read -p "Your local network CIDR [192.168.1.0/24]: " network_cidr
-network_cidr=${network_cidr:-192.168.1.0/24}
-read -p "Gateway IP [192.168.1.1]: " gateway_ip
-gateway_ip=${gateway_ip:-192.168.1.1}
-read -p "Starting IP for VMs [192.168.1.100]: " vm_start_ip
-vm_start_ip=${vm_start_ip:-192.168.1.100}
+read -p "Your local network CIDR [192.0.2.0/24]: " network_cidr
+network_cidr=${network_cidr:-192.0.2.0/24}
+read -p "Gateway IP [192.0.2.1]: " gateway_ip
+gateway_ip=${gateway_ip:-192.0.2.1}
+read -p "Starting IP for VMs [192.0.2.100]: " vm_start_ip
+vm_start_ip=${vm_start_ip:-192.0.2.100}
 read -p "Domain name [demolab.local]: " domain_name
 domain_name=${domain_name:-demolab.local}
 

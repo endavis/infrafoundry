@@ -28,7 +28,7 @@ variables:
   vmid: 223
   target_node: node1
   disk_storage: local-lvm
-  ip_address: "192.168.1.51"
+  ip_address: "192.0.2.51"
   dhcp_subnet: my-subnet
   console_agent_url_base: "http://web/applications/console-connector"
   console_agent_installer: "netapp-console-agent-<version>"

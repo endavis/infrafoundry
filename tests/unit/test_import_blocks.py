@@ -192,7 +192,7 @@ class TestLoaderImportId:
             "kea_subnet:\n"
             "  - name: subnet-mgmt\n"
             "    import_id: uuid-123\n"
-            "    subnet: '172.21.0.0/24'\n"
+            "    subnet: '192.0.2.0/24'\n"
         )
         loader = ProviderCentricLoader(tmp_path)
         resources = loader.load_resources("prod", "opnsense", "kea_subnet")
@@ -205,7 +205,7 @@ class TestLoaderImportId:
         env_dir = tmp_path / "prod" / "opnsense"
         env_dir.mkdir(parents=True)
         config_file = env_dir / "kea_subnet.yaml"
-        config_file.write_text("kea_subnet:\n  - name: subnet-mgmt\n    subnet: '172.21.0.0/24'\n")
+        config_file.write_text("kea_subnet:\n  - name: subnet-mgmt\n    subnet: '192.0.2.0/24'\n")
         loader = ProviderCentricLoader(tmp_path)
         resources = loader.load_resources("prod", "opnsense", "kea_subnet")
         assert len(resources) == 1
@@ -224,7 +224,7 @@ class TestLoaderImportId:
             "    name: subnet-mgmt\n"
             "    import_id: uuid-456\n"
             "    config:\n"
-            "      subnet: '172.21.0.0/24'\n"
+            "      subnet: '192.0.2.0/24'\n"
         )
         loader = ResourceCentricLoader(tmp_path)
         resources = loader.load_resources("prod")

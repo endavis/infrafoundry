@@ -44,7 +44,7 @@ def _ipalias(name: str, **overrides: Any) -> ResourceConfig:
     config: dict[str, Any] = {
         "mode": "ipalias",
         "interface": "lan",
-        "address": "172.21.0.10",
+        "address": "198.51.100.10",
         "network": "24",
     }
     config.update(overrides)
@@ -57,7 +57,7 @@ def _carp(name: str, **overrides: Any) -> ResourceConfig:
     config: dict[str, Any] = {
         "mode": "carp",
         "interface": "lan",
-        "address": "172.21.0.1",
+        "address": "198.51.100.1",
         "network": "24",
         "vhid": "1",
         "password": "secret://env_secrets/opnsense/carp_passwords/lan_carp_1",
@@ -72,7 +72,7 @@ def _proxyarp(name: str, **overrides: Any) -> ResourceConfig:
     config: dict[str, Any] = {
         "mode": "proxyarp",
         "interface": "lan",
-        "address": "172.21.0.20",
+        "address": "198.51.100.20",
         "network": "32",
     }
     config.update(overrides)
@@ -157,7 +157,7 @@ class TestMode:
             provider="opnsense",
             config={
                 "interface": "lan",
-                "address": "172.21.0.10",
+                "address": "198.51.100.10",
                 "network": "24",
             },
         )
@@ -258,7 +258,7 @@ class TestInterface:
             provider="opnsense",
             config={
                 "mode": "ipalias",
-                "address": "172.21.0.10",
+                "address": "198.51.100.10",
                 "network": "24",
             },
         )
@@ -303,7 +303,7 @@ class TestAddress:
     def test_ipv4_passes(self, validator: VirtualIPValidator, report: ValidationReport) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                virtual_ips=[_ipalias("ok", address="10.1.2.3")],
+                virtual_ips=[_ipalias("ok", address="203.0.113.3")],
                 interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
@@ -381,7 +381,7 @@ class TestNetwork:
     def test_v4_mask_passes(self, validator: VirtualIPValidator, report: ValidationReport) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                virtual_ips=[_ipalias("ok", address="172.21.0.10", network="24")],
+                virtual_ips=[_ipalias("ok", address="198.51.100.10", network="24")],
                 interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
@@ -433,7 +433,7 @@ class TestNetwork:
             config={
                 "mode": "ipalias",
                 "interface": "lan",
-                "address": "172.21.0.10",
+                "address": "198.51.100.10",
             },
         )
         validator.validate(
@@ -485,7 +485,7 @@ class TestNetwork:
     ) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                virtual_ips=[_ipalias("bad", address="172.21.0.10", network="33")],
+                virtual_ips=[_ipalias("bad", address="198.51.100.10", network="33")],
                 interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
@@ -553,7 +553,7 @@ class TestCarpVhid:
             config={
                 "mode": "carp",
                 "interface": "lan",
-                "address": "172.21.0.1",
+                "address": "198.51.100.1",
                 "network": "24",
                 "password": "secret://env_secrets/x/y",
             },
@@ -662,7 +662,7 @@ class TestCarpPassword:
             config={
                 "mode": "carp",
                 "interface": "lan",
-                "address": "172.21.0.1",
+                "address": "198.51.100.1",
                 "network": "24",
                 "vhid": "1",
             },
@@ -1092,8 +1092,8 @@ class TestUniqueness:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[
-                    _carp("a", interface="lan", address="172.21.0.1", vhid="1"),
-                    _carp("b", interface="lan", address="172.21.0.1", vhid="1"),
+                    _carp("a", interface="lan", address="198.51.100.1", vhid="1"),
+                    _carp("b", interface="lan", address="198.51.100.1", vhid="1"),
                 ],
                 interface_assignment_names={"lan"},
                 existing_interfaces={},
@@ -1109,8 +1109,8 @@ class TestUniqueness:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[
-                    _carp("a", interface="lan", address="172.21.0.1", vhid="1"),
-                    _carp("b", interface="lan", address="172.21.0.1", vhid="2"),
+                    _carp("a", interface="lan", address="198.51.100.1", vhid="1"),
+                    _carp("b", interface="lan", address="198.51.100.1", vhid="2"),
                 ],
                 interface_assignment_names={"lan"},
                 existing_interfaces={},
@@ -1125,8 +1125,8 @@ class TestUniqueness:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[
-                    _ipalias("a", interface="lan", address="172.21.0.10"),
-                    _ipalias("b", interface="opt1", address="172.21.0.10"),
+                    _ipalias("a", interface="lan", address="198.51.100.10"),
+                    _ipalias("b", interface="opt1", address="198.51.100.10"),
                 ],
                 interface_assignment_names={"lan", "opt1"},
                 existing_interfaces={},
@@ -1142,8 +1142,8 @@ class TestUniqueness:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[
-                    _ipalias("a", interface="lan", address="172.21.0.1"),
-                    _carp("b", interface="lan", address="172.21.0.1", vhid="1"),
+                    _ipalias("a", interface="lan", address="198.51.100.1"),
+                    _carp("b", interface="lan", address="198.51.100.1", vhid="1"),
                 ],
                 interface_assignment_names={"lan"},
                 existing_interfaces={},
@@ -1157,8 +1157,8 @@ class TestUniqueness:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[
-                    _ipalias("a", address="172.21.0.10"),
-                    _ipalias("b", address="172.21.0.11"),
+                    _ipalias("a", address="198.51.100.10"),
+                    _ipalias("b", address="198.51.100.11"),
                 ],
                 interface_assignment_names={"lan"},
                 existing_interfaces={},
@@ -1170,12 +1170,12 @@ class TestUniqueness:
         self, validator: VirtualIPValidator, report: ValidationReport
     ) -> None:
         # ipalias has empty vhid, so the tuple is
-        # ("lan", "ipalias", "172.21.0.10", "") for both entries.
+        # ("lan", "ipalias", "198.51.100.10", "") for both entries.
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[
-                    _ipalias("a", address="172.21.0.10"),
-                    _ipalias("b", address="172.21.0.10"),
+                    _ipalias("a", address="198.51.100.10"),
+                    _ipalias("b", address="198.51.100.10"),
                 ],
                 interface_assignment_names={"lan"},
                 existing_interfaces={},
@@ -1209,7 +1209,7 @@ class TestEdgeCases:
             OPNsenseValidationContext(
                 virtual_ips=[
                     _ipalias("a"),
-                    _carp("b", address="172.21.0.2", vhid="2"),
+                    _carp("b", address="198.51.100.2", vhid="2"),
                     _proxyarp("c"),
                 ],
                 interface_assignment_names={"lan"},

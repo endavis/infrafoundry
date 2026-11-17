@@ -445,7 +445,7 @@ def test_generate_terraform_manifest(provider: KubernetesProvider, tmp_dirs: Any
                     "spec": {
                         "hostname": "oci-k3s-subnet-router",
                         "subnetRouter": {
-                            "advertiseRoutes": ["172.21.0.0/16"],
+                            "advertiseRoutes": ["192.0.2.0/24"],
                         },
                         "tags": ["tag:k8s"],
                     },

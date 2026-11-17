@@ -87,7 +87,7 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
       api_url: https://fw.example.com
       api_key: xxxxxxxxxxxxxxxxxxxx
       api_secret: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-      ssh_host: 172.20.10.250  # optional: only when sshd is not on the api_url host
+      ssh_host: 192.0.2.250  # optional: only when sshd is not on the api_url host
       ssh_user: root            # optional, default root
     kubernetes:
       kubeconfig_path: ~/.kube/config

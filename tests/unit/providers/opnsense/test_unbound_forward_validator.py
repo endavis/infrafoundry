@@ -35,7 +35,7 @@ from infrafoundry.providers.opnsense.validators.unbound_forward_validator import
 
 def _forward(name: str, **overrides: Any) -> ResourceConfig:
     config: dict[str, Any] = {
-        "server": "172.21.0.53",
+        "server": "192.0.2.53",
     }
     config.update(overrides)
     return ResourceConfig(name=name, type="unbound.forwards", provider="opnsense", config=config)
@@ -112,7 +112,7 @@ class TestDomain:
             name="ok",
             type="unbound.forwards",
             provider="opnsense",
-            config={"server": "172.21.0.53"},
+            config={"server": "192.0.2.53"},
         )
         validator.validate(OPNsenseValidationContext(forwards=[r]))
         assert not _failures(report, "unbound_forward_ok_domain")
@@ -140,7 +140,7 @@ class TestDomain:
 class TestServer:
     def test_v4_passes(self, validator: UnboundForwardValidator, report: ValidationReport) -> None:
         validator.validate(
-            OPNsenseValidationContext(forwards=[_forward("ok", server="172.21.0.53")])
+            OPNsenseValidationContext(forwards=[_forward("ok", server="192.0.2.53")])
         )
         assert not _failures(report, "unbound_forward_ok_server")
 
@@ -360,8 +360,8 @@ class TestUniqueness:
         validator.validate(
             OPNsenseValidationContext(
                 forwards=[
-                    _forward("a", server="172.21.0.53"),
-                    _forward("b", server="172.21.0.54"),
+                    _forward("a", server="192.0.2.53"),
+                    _forward("b", server="192.0.2.54"),
                 ]
             )
         )
@@ -374,8 +374,8 @@ class TestUniqueness:
         validator.validate(
             OPNsenseValidationContext(
                 forwards=[
-                    _forward("first", server="172.21.0.53"),
-                    _forward("dup", server="172.21.0.53"),
+                    _forward("first", server="192.0.2.53"),
+                    _forward("dup", server="192.0.2.53"),
                 ]
             )
         )

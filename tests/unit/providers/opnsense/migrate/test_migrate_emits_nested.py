@@ -182,7 +182,7 @@ class TestMigrateInterfaceAssignmentsEmitsNested:
                     "identifier": "lan",
                     "device": "igb1",
                     "description": "LAN",
-                    "ipv4": [{"ipaddr": "172.21.0.1", "subnet": "24"}],
+                    "ipv4": [{"ipaddr": "198.51.100.1", "subnet": "24"}],
                     "ipv6": [],
                     "is_physical": True,
                 },
@@ -237,7 +237,7 @@ class TestMigrateAliasesEmitsNested:
                     "name": "web_servers",
                     "type": {"host": {"value": "Host(s)", "selected": 1}},
                     "description": "Web tier",
-                    "content": "172.21.0.1\n172.21.0.2",
+                    "content": "198.51.100.1\n198.51.100.2",
                     "enabled": "1",
                 },
                 {
@@ -245,7 +245,7 @@ class TestMigrateAliasesEmitsNested:
                     "name": "trusted_nets",
                     "type": {"network": {"value": "Network(s)", "selected": 1}},
                     "description": "Trusted",
-                    "content": "172.21.0.0/24",
+                    "content": "198.51.100.0/24",
                     "enabled": "1",
                 },
             ]
@@ -586,7 +586,7 @@ class TestMigrateGatewaysEmitsNested:
                         "name": "WAN_GW",
                         "interface": "wan",
                         "ipprotocol": "inet",
-                        "gateway": "172.21.0.1",
+                        "gateway": "198.51.100.1",
                         "priority": "200",
                         "is_dynamic": "0",
                         "is_disabled": "0",
@@ -600,7 +600,7 @@ class TestMigrateGatewaysEmitsNested:
                     "name": "WAN_GW",
                     "interface": {"wan": {"value": "WAN", "selected": 1}},
                     "ipprotocol": {"inet": {"value": "IPv4", "selected": 1}},
-                    "gateway": "172.21.0.1",
+                    "gateway": "198.51.100.1",
                     "priority": "200",
                     "disabled": "0",
                     "monitor_disable": "0",
@@ -652,7 +652,7 @@ class TestMigrateStaticRoutesEmitsNested:
                 "rows": [
                     {
                         "uuid": "u1",
-                        "network": "10.0.10.0/24",
+                        "network": "203.0.113.0/24",
                         "gateway": "WAN_GW",
                         "descr": "internal",
                         "disabled": "0",
@@ -662,9 +662,9 @@ class TestMigrateStaticRoutesEmitsNested:
             # getroute/u1
             {
                 "route": {
-                    "network": "10.0.10.0/24",
+                    "network": "203.0.113.0/24",
                     "gateway": {
-                        "WAN_GW": {"value": "WAN_GW - 172.21.0.1", "selected": 1},
+                        "WAN_GW": {"value": "WAN_GW - 198.51.100.1", "selected": 1},
                     },
                     "descr": "internal",
                     "disabled": "0",
@@ -708,10 +708,10 @@ class TestMigrateVirtualIPsEmitsNested:
                         "uuid": "u1",
                         "interface": "lan",
                         "mode": "ipalias",
-                        "address": "172.21.0.10",
+                        "address": "198.51.100.10",
                         "vhid": "",
                         "subnet_bits": "24",
-                        "subnet": "172.21.0.10/24",
+                        "subnet": "198.51.100.10/24",
                         "descr": "alias",
                     },
                 ]
@@ -721,7 +721,7 @@ class TestMigrateVirtualIPsEmitsNested:
                 "vip": {
                     "interface": {"lan": {"value": "LAN", "selected": 1}},
                     "mode": {"ipalias": {"value": "IP Alias", "selected": 1}},
-                    "address": "172.21.0.10",
+                    "address": "198.51.100.10",
                     "subnet_bits": "24",
                     "vhid": "",
                     "advbase": "1",
@@ -779,7 +779,7 @@ class TestMigrateUnboundHostOverridesEmitsNested:
                     "hostname": "web",
                     "domain": "example.com",
                     "rr": "A",
-                    "server": "172.21.0.1",
+                    "server": "198.51.100.1",
                     "description": "",
                     "enabled": "1",
                 },
@@ -788,7 +788,7 @@ class TestMigrateUnboundHostOverridesEmitsNested:
                     "hostname": "mail",
                     "domain": "example.com",
                     "rr": "A",
-                    "server": "172.21.0.2",
+                    "server": "198.51.100.2",
                     "description": "",
                     "enabled": "1",
                 },
@@ -976,17 +976,17 @@ class TestMigrateKeaDHCPEmitsNested:
             return_value=[
                 {
                     "description": "lan",
-                    "subnet": "172.21.0.0/24",
-                    "pools": "172.21.0.10-172.21.0.99",
+                    "subnet": "198.51.100.0/24",
+                    "pools": "198.51.100.10-198.51.100.99",
                 },
             ]
         )
         service.search_dhcpv4_reservations = MagicMock(  # type: ignore[method-assign]
             return_value=[
                 {
-                    "subnet": "172.21.0.0/24",
+                    "subnet": "198.51.100.0/24",
                     "hw_address": "aa:bb:cc:dd:ee:ff",
-                    "ip_address": "172.21.0.50",
+                    "ip_address": "198.51.100.50",
                     "hostname": "fileserver",
                     "description": "FS",
                 },
@@ -1043,7 +1043,7 @@ class TestMigrateKeaDHCPEmitsNested:
         v4_subnets = [r for r in parsed if r.type == "kea.dhcp4.subnets"]
         assert len(v4_subnets) == 1
         assert v4_subnets[0].name == "lan"
-        assert v4_subnets[0].config["subnet"] == "172.21.0.0/24"
+        assert v4_subnets[0].config["subnet"] == "198.51.100.0/24"
 
     def test_kea_dhcp4_reservations_round_trip(
         self, manager_with_service: tuple[Any, MagicMock]

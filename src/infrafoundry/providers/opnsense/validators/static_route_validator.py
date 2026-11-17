@@ -122,7 +122,7 @@ class StaticRouteValidator(SpecializedValidator[OPNsenseValidationContext]):
             )
             return None
         try:
-            # ``strict=True`` rejects host bits set (e.g., ``172.21.0.1/24``).
+            # ``strict=True`` rejects host bits set (e.g., ``192.0.2.1/24``).
             return ipaddress.ip_network(network_raw, strict=True)
         except ValueError as exc:
             self.report.add_check(

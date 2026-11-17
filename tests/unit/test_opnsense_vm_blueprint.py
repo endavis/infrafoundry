@@ -37,11 +37,11 @@ VALUES = {
     "root_password": "pw-'quoted\"",
     "api_key": "key123",
     "api_secret": "secret-456",
-    "wan_ip": "172.20.10.250",
+    "wan_ip": "192.0.2.250",
     "wan_prefix": "24",
-    "lan_ip": "172.20.99.1",
+    "lan_ip": "203.0.113.1",
     "lan_prefix": "24",
-    "api_allow_cidr": "172.20.10.0/24",
+    "api_allow_cidr": "192.0.2.0/24",
     "api_allow_lan": "0",
 }
 

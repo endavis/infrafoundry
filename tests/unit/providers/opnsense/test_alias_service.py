@@ -165,22 +165,22 @@ class TestSplitContent:
         assert _split_content(None) == []
 
     def test_non_string_returns_empty_list(self) -> None:
-        assert _split_content(["172.21.0.1"]) == []
+        assert _split_content(["192.0.2.1"]) == []
 
     def test_single_value_returns_singleton(self) -> None:
-        assert _split_content("172.21.0.1") == ["172.21.0.1"]
+        assert _split_content("192.0.2.1") == ["192.0.2.1"]
 
     def test_multiline_splits(self) -> None:
-        assert _split_content("172.21.0.1\n172.21.0.2") == ["172.21.0.1", "172.21.0.2"]
+        assert _split_content("192.0.2.1\n192.0.2.2") == ["192.0.2.1", "192.0.2.2"]
 
     def test_trailing_newline_dropped(self) -> None:
-        assert _split_content("172.21.0.1\n172.21.0.2\n") == ["172.21.0.1", "172.21.0.2"]
+        assert _split_content("192.0.2.1\n192.0.2.2\n") == ["192.0.2.1", "192.0.2.2"]
 
     def test_blank_lines_dropped(self) -> None:
-        assert _split_content("172.21.0.1\n\n172.21.0.2") == ["172.21.0.1", "172.21.0.2"]
+        assert _split_content("192.0.2.1\n\n192.0.2.2") == ["192.0.2.1", "192.0.2.2"]
 
     def test_lines_stripped(self) -> None:
-        assert _split_content("  172.21.0.1  \n\t172.21.0.2\n") == ["172.21.0.1", "172.21.0.2"]
+        assert _split_content("  192.0.2.1  \n\t192.0.2.2\n") == ["192.0.2.1", "192.0.2.2"]
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ class TestSelectedUuids:
 
 class TestRowToLive:
     def test_simple_host_row(self) -> None:
-        row = _row("web-servers", type_value="host", content="172.21.0.1")
+        row = _row("web-servers", type_value="host", content="192.0.2.1")
         live = _row_to_live(row)
         assert live.uuid == "u1"
         assert live.name == "web-servers"
@@ -255,20 +255,20 @@ class TestLiveToExportConfig:
                 "web-servers",
                 type_value="host",
                 description="Web tier",
-                content="172.21.0.1",
+                content="192.0.2.1",
             )
         )
         cfg = _live_to_export_config(live)
         assert cfg["name"] == "web-servers"
         assert cfg["type"] == "host"
         assert cfg["description"] == "Web tier"
-        assert cfg["content"] == ["172.21.0.1"]
+        assert cfg["content"] == ["192.0.2.1"]
         assert cfg["enabled"] is True
 
     def test_multiline_content_splits(self) -> None:
-        live = _row_to_live(_row("hosts", type_value="host", content="172.21.0.1\n172.21.0.2\n"))
+        live = _row_to_live(_row("hosts", type_value="host", content="192.0.2.1\n192.0.2.2\n"))
         cfg = _live_to_export_config(live)
-        assert cfg["content"] == ["172.21.0.1", "172.21.0.2"]
+        assert cfg["content"] == ["192.0.2.1", "192.0.2.2"]
 
     def test_geoip_alias_emits_proto(self) -> None:
         live = _row_to_live(
@@ -327,7 +327,7 @@ class TestLiveToExportConfig:
             _row(
                 "alias",
                 type_value="host",
-                content="172.21.0.1",
+                content="192.0.2.1",
                 extra={
                     "categories": {
                         "uuid-b": {"value": "Cat B", "selected": 1},
@@ -346,7 +346,7 @@ class TestLiveToExportConfig:
             _row(
                 "alias",
                 type_value="host",
-                content="172.21.0.1",
+                content="192.0.2.1",
                 extra={"counters": "1"},
             )
         )
@@ -358,7 +358,7 @@ class TestLiveToExportConfig:
             _row(
                 "alias",
                 type_value="host",
-                content="172.21.0.1",
+                content="192.0.2.1",
                 extra={"counters": "0"},
             )
         )
@@ -366,14 +366,14 @@ class TestLiveToExportConfig:
         assert "counters" not in cfg
 
     def test_enabled_zero_returns_false(self) -> None:
-        live = _row_to_live(_row("alias", type_value="host", content="172.21.0.1", enabled="0"))
+        live = _row_to_live(_row("alias", type_value="host", content="192.0.2.1", enabled="0"))
         cfg = _live_to_export_config(live)
         assert cfg["enabled"] is False
 
     def test_optional_fields_omitted_when_absent(self) -> None:
         # A bare host alias must not carry any of the type-specific keys —
         # keeps existing operator YAML round-tripping identical.
-        live = _row_to_live(_row("alias", type_value="host", content="172.21.0.1"))
+        live = _row_to_live(_row("alias", type_value="host", content="192.0.2.1"))
         cfg = _live_to_export_config(live)
         for key in ("proto", "updatefreq", "categories", "counters", "interface"):
             assert key not in cfg
@@ -394,13 +394,13 @@ class TestPayload:
             "web_servers",
             type="host",
             description="Web tier",
-            content=("172.21.0.1", "172.21.0.2"),
+            content=("192.0.2.1", "192.0.2.2"),
         )
         inner = alias.to_payload()["alias"]
         assert inner["name"] == "web_servers"
         assert inner["type"] == "host"
         assert inner["description"] == "Web tier"
-        assert inner["content"] == "172.21.0.1\n172.21.0.2"
+        assert inner["content"] == "192.0.2.1\n192.0.2.2"
 
     def test_enabled_true_serializes_one(self) -> None:
         inner = _alias("foo", enabled=True).to_payload()["alias"]
@@ -457,19 +457,19 @@ class TestComputeDiffEmpty:
 
 class TestComputeDiffAdds:
     def test_new_alias_adds(self) -> None:
-        diff = compute_diff([_alias("web_servers", content=("172.21.0.1",))], [])
+        diff = compute_diff([_alias("web_servers", content=("192.0.2.1",))], [])
         assert len(diff.adds) == 1
         assert diff.adds[0].name == "web_servers"
 
 
 class TestComputeDiffUpdates:
     def test_update_when_description_changes(self) -> None:
-        alias = _alias("web_servers", content=("172.21.0.1",), description="new desc")
+        alias = _alias("web_servers", content=("192.0.2.1",), description="new desc")
         live = _live(
             "u1",
             name="web_servers",
             description="old desc",
-            content="172.21.0.1",
+            content="192.0.2.1",
         )
         diff = compute_diff([alias], [live])
         assert len(diff.updates) == 1
@@ -478,23 +478,23 @@ class TestComputeDiffUpdates:
         assert want.description == "new desc"
 
     def test_update_when_enabled_flips(self) -> None:
-        alias = _alias("web_servers", enabled=False, content=("172.21.0.1",))
-        live = _live("u1", name="web_servers", enabled="1", content="172.21.0.1")
+        alias = _alias("web_servers", enabled=False, content=("192.0.2.1",))
+        live = _live("u1", name="web_servers", enabled="1", content="192.0.2.1")
         diff = compute_diff([alias], [live])
         assert len(diff.updates) == 1
 
     def test_update_when_content_changes(self) -> None:
-        alias = _alias("web_servers", content=("172.21.0.1", "172.21.0.2"))
-        live = _live("u1", name="web_servers", content="172.21.0.1")
+        alias = _alias("web_servers", content=("192.0.2.1", "192.0.2.2"))
+        live = _live("u1", name="web_servers", content="192.0.2.1")
         diff = compute_diff([alias], [live])
         assert len(diff.updates) == 1
 
     def test_update_when_counters_flips(self) -> None:
-        alias = _alias("web_servers", content=("172.21.0.1",), counters=True)
+        alias = _alias("web_servers", content=("192.0.2.1",), counters=True)
         live = _live(
             "u1",
             name="web_servers",
-            content="172.21.0.1",
+            content="192.0.2.1",
             extra={"counters": "0"},
         )
         diff = compute_diff([alias], [live])
@@ -503,11 +503,11 @@ class TestComputeDiffUpdates:
     def test_no_update_when_payload_matches(self) -> None:
         # Build a live record carrying every field with default values
         # to verify the ``_needs_update`` engine compares apples to apples.
-        alias = _alias("web_servers", content=("172.21.0.1",))
+        alias = _alias("web_servers", content=("192.0.2.1",))
         live = _live(
             "u1",
             name="web_servers",
-            content="172.21.0.1",
+            content="192.0.2.1",
             extra={
                 "proto": "",
                 "updatefreq": "",
@@ -543,12 +543,12 @@ class TestComputeDiffDeletes:
         assert diff.is_empty
 
     def test_add_only_still_emits_updates(self) -> None:
-        alias = _alias("web_servers", content=("172.21.0.1",), description="changed")
+        alias = _alias("web_servers", content=("192.0.2.1",), description="changed")
         live = _live(
             "u1",
             name="web_servers",
             description="old",
-            content="172.21.0.1",
+            content="192.0.2.1",
         )
         diff = compute_diff([alias], [live], add_only=True)
         assert len(diff.updates) == 1
@@ -583,7 +583,7 @@ class TestComputeDiffSystemFiltering:
     def test_managed_alias_unaffected_by_system_filter(self) -> None:
         # System aliases coexisting with managed aliases must not affect
         # the diff for the managed entries.
-        managed = _live("m1", name="web_servers", content="172.21.0.1")
+        managed = _live("m1", name="web_servers", content="192.0.2.1")
         system = LiveAlias(
             uuid="i1",
             name="__lan_network",
@@ -598,12 +598,12 @@ class TestComputeDiffSystemFiltering:
 
 class TestComputeDiffLocked:
     def test_locked_resource_with_match_skipped_from_actions(self) -> None:
-        alias = _alias("survival", content=("172.21.0.1",), description="locked", lock=True)
+        alias = _alias("survival", content=("192.0.2.1",), description="locked", lock=True)
         live = _live(
             "u1",
             name="survival",
             description="drift!",
-            content="172.21.0.1",
+            content="192.0.2.1",
         )
         diff = compute_diff([alias], [live])
         assert diff.adds == []
@@ -657,7 +657,7 @@ class TestConfigsFromResources:
                 "name": "web_servers",
                 "type": "host",
                 "description": "lan",
-                "content": ["172.21.0.1"],
+                "content": ["192.0.2.1"],
             },
         )
         result = alias_configs_from_resources([r])
@@ -666,7 +666,7 @@ class TestConfigsFromResources:
         assert cfg.name == "web_servers"
         assert cfg.type == "host"
         assert cfg.description == "lan"
-        assert cfg.content == ("172.21.0.1",)
+        assert cfg.content == ("192.0.2.1",)
 
     def test_default_enabled_true(self) -> None:
         r = _resource("foo", {"name": "foo", "type": "host"})
@@ -721,7 +721,7 @@ class TestConfigsFromResources:
     def test_non_list_content_rejected(self) -> None:
         r = _resource(
             "bad",
-            {"name": "bad", "type": "host", "content": "172.21.0.1"},
+            {"name": "bad", "type": "host", "content": "192.0.2.1"},
         )
         with pytest.raises(ValueError, match="content"):
             alias_configs_from_resources([r])
@@ -876,7 +876,7 @@ class TestServiceWriteOps:
         client = MagicMock()
         client.request.return_value = {"result": "saved", "uuid": "new"}
         svc = AliasService(client)
-        alias = _alias("web_servers", content=("172.21.0.1",))
+        alias = _alias("web_servers", content=("192.0.2.1",))
         svc.add(alias)
         client.request.assert_called_once_with(
             "POST", "firewall/alias/addItem", data=alias.to_payload()
@@ -1014,7 +1014,7 @@ class TestExportToYaml:
                     uuid="u1",
                     type_value=_selected_type("host"),
                     description="Web tier",
-                    content="172.21.0.1\n172.21.0.2",
+                    content="192.0.2.1\n192.0.2.2",
                 ),
             ]
         }
@@ -1023,8 +1023,8 @@ class TestExportToYaml:
         assert "name: web_servers" in text
         assert "type: host" in text
         assert "description: Web tier" in text
-        assert "172.21.0.1" in text
-        assert "172.21.0.2" in text
+        assert "192.0.2.1" in text
+        assert "192.0.2.2" in text
         assert "enabled: true" in text
 
     def test_export_with_no_aliases_yields_empty_resources(self) -> None:
@@ -1046,7 +1046,7 @@ class TestExportToYaml:
                     uuid="u1",
                     type_value=_selected_type("host"),
                     description="Web tier",
-                    content="172.21.0.1",
+                    content="192.0.2.1",
                 ),
                 _row(
                     "geo_eu",
@@ -1069,7 +1069,7 @@ class TestExportToYaml:
         assert web["name"] == "web_servers"
         assert web["config"]["name"] == "web_servers"
         assert web["config"]["type"] == "host"
-        assert web["config"]["content"] == ["172.21.0.1"]
+        assert web["config"]["content"] == ["192.0.2.1"]
         assert "proto" not in web["config"]
 
         geo = aliases[1]
@@ -1084,7 +1084,7 @@ class TestExportToYaml:
             "rows": [
                 _row("__lan_network", type_value=_selected_type("internal")),
                 _row("bogons", type_value=_selected_type("external")),
-                _row("web_servers", type_value=_selected_type("host"), content="172.21.0.1"),
+                _row("web_servers", type_value=_selected_type("host"), content="192.0.2.1"),
             ]
         }
         svc = AliasService(client)

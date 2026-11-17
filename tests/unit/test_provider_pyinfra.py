@@ -31,7 +31,7 @@ def test_generate_pyinfra(provider: ProxmoxProvider) -> None:
             config={
                 "name": "web01",
                 "ssh_user": "admin",
-                "ipconfig": "ip=192.168.1.10/24,gw=192.168.1.1",
+                "ipconfig": "ip=192.0.2.10/24,gw=192.0.2.1",
                 "pyinfra_ops": [
                     {
                         "name": "Install nginx",
@@ -58,7 +58,7 @@ def test_generate_pyinfra(provider: ProxmoxProvider) -> None:
     inventory_content = (pyinfra_dir / "inventory.py").read_text()
     # snake_case conversion check
     assert "web01" in inventory_content
-    assert "192.168.1.10" in inventory_content
+    assert "192.0.2.10" in inventory_content
     assert "admin" in inventory_content
 
     deploy_content = (pyinfra_dir / "deploy.py").read_text()

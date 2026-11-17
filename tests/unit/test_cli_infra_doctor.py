@@ -207,8 +207,8 @@ class TestInfraDoctorPackage:
         orch.config_manager.get_all_resources_all_providers.return_value = [
             _vm("k3s-server", jumphost="ansible@jump"),
             _vm("other", jumphost="root@elsewhere"),
-            _dhcp("k3s-server", "10.0.1.70"),
-            _dhcp("other", "10.0.1.99"),
+            _dhcp("k3s-server", "192.0.2.70"),
+            _dhcp("other", "192.0.2.99"),
         ]
         dest = str(tmp_path / "kube" / "k3s.yaml")
         orch.config_manager.get_package_events.return_value = {
@@ -226,7 +226,7 @@ class TestInfraDoctorPackage:
             env_name="test", resource_filter=["k3s-server"], verbose=False
         )
         mock_check.assert_called_once_with(
-            "ansible@jump", [], [Target("k3s-server", "10.0.1.70", "ansible", False)]
+            "ansible@jump", [], [Target("k3s-server", "192.0.2.70", "ansible", False)]
         )
         assert "Jumphost preflight (ansible@jump)" in result.output
         assert "[OK] SSH to jumphost: detail" in result.output
@@ -414,7 +414,7 @@ class TestInfraDoctorProviderFilter:
         orch = _mock_orchestrator()
         orch.config_manager.get_all_resources_all_providers.return_value = [
             _vm("vm1", jumphost="ansible@jump"),
-            _dhcp("vm1", "10.0.1.70"),
+            _dhcp("vm1", "192.0.2.70"),
         ]
         orch.config_manager.get_package_events.return_value = {}
         orch.state_manager.get_resources.return_value = []

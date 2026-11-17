@@ -203,13 +203,13 @@ def _reservation(hostname: str, ip: str) -> ResourceConfig:
 class TestTargetsByJumphost:
     def test_vm_with_reservation_is_a_target(self) -> None:
         vm, plain = _resource("vm1"), _resource("no-reservation")
-        reservation = _reservation("vm1", "10.0.1.10")
+        reservation = _reservation("vm1", "198.51.100.10")
 
         targets = targets_by_jumphost(
             [vm, plain, reservation], [vm, plain, reservation], lambda r: True
         )
 
-        assert targets == {JUMP: [Target("vm1", "10.0.1.10", "ansible", True)]}
+        assert targets == {JUMP: [Target("vm1", "198.51.100.10", "ansible", True)]}
 
     def test_ssh_user_overrides_the_jumphost_user(self) -> None:
         vm = ResourceConfig(
@@ -226,7 +226,12 @@ class TestTargetsByJumphost:
             config={},
             package_variables={"jumphost": "jump.example"},
         )
-        everything = [vm, bare, _reservation("vm1", "10.0.1.10"), _reservation("vm2", "10.0.1.11")]
+        everything = [
+            vm,
+            bare,
+            _reservation("vm1", "198.51.100.10"),
+            _reservation("vm2", "198.51.100.11"),
+        ]
 
         targets = targets_by_jumphost([vm, bare], everything, lambda r: False)
 
@@ -288,30 +293,31 @@ def _target_report(targets: list[Target], extra: list[str]) -> Any:
 
 class TestTargetChecks:
     def test_deployed_target_ssh_ok(self) -> None:
-        target = Target("vm1", "10.0.1.10", "ansible", True)
+        target = Target("vm1", "198.51.100.10", "ansible", True)
 
         report, run = _target_report([target], ["target 0 ssh 0"])
 
         check = report.checks[-1]
-        assert (check.name, check.status) == ("target vm1 (10.0.1.10)", Status.OK)
-        assert "ansible@10.0.1.10 true" in run.calls[0][-1]
+        assert (check.name, check.status) == ("target vm1 (198.51.100.10)", Status.OK)
+        assert "ansible@198.51.100.10 true" in run.calls[0][-1]
         assert "UserKnownHostsFile=/dev/null" in run.calls[0][-1]
 
     def test_deployed_target_ssh_failure_carries_the_reason(self) -> None:
-        target = Target("vm1", "10.0.1.10", "ansible", True)
+        target = Target("vm1", "198.51.100.10", "ansible", True)
 
         report, _ = _target_report(
             [target],
             [
                 "target 0 ssh 255",
-                "target-error 0 ansible@10.0.1.10: Permission denied (publickey).",
+                "target-error 0 ansible@198.51.100.10: Permission denied (publickey).",
             ],
         )
 
         check = report.checks[-1]
         assert check.status is Status.FAIL
         assert check.detail == (
-            "ssh as ansible failed (exit 255): ansible@10.0.1.10: Permission denied (publickey)."
+            "ssh as ansible failed (exit 255): "
+            "ansible@198.51.100.10: Permission denied (publickey)."
         )
         assert report.failed
 
@@ -325,32 +331,32 @@ class TestTargetChecks:
         ],
     )
     def test_undeployed_target(self, route: int, ping: int, status: Status, detail: str) -> None:
-        target = Target("vm1", "10.0.1.10", "ansible", False)
+        target = Target("vm1", "198.51.100.10", "ansible", False)
 
         report, run = _target_report([target], [f"target 0 route {route}", f"target 0 ping {ping}"])
 
         assert (report.checks[-1].status, report.checks[-1].detail) == (status, detail)
-        assert "ip route get 10.0.1.10" in run.calls[0][-1]
+        assert "ip route get 198.51.100.10" in run.calls[0][-1]
         assert "ssh -o BatchMode=yes -o ConnectTimeout=5" not in run.calls[0][-1]
 
     def test_unknown_state_and_missing_user_are_skipped(self) -> None:
         targets = [
-            Target("vm1", "10.0.1.10", "ansible", None),
-            Target("vm2", "10.0.1.11", None, True),
+            Target("vm1", "198.51.100.10", "ansible", None),
+            Target("vm2", "198.51.100.11", None, True),
         ]
 
         report, run = _target_report(targets, [])
 
         assert [c.status for c in report.checks[-2:]] == [Status.SKIP, Status.SKIP]
-        assert "10.0.1.10" not in run.calls[0][-1]
-        assert "10.0.1.11" not in run.calls[0][-1]
+        assert "198.51.100.10" not in run.calls[0][-1]
+        assert "198.51.100.11" not in run.calls[0][-1]
 
     def test_target_values_are_shell_quoted(self) -> None:
-        target = Target("vm1", "10.0.1.10; rm -rf ~", "ansible", False)
+        target = Target("vm1", "198.51.100.10; rm -rf ~", "ansible", False)
 
         _, run = _target_report([target], [])
 
-        assert "ip route get '10.0.1.10; rm -rf ~'" in run.calls[0][-1]
+        assert "ip route get '198.51.100.10; rm -rf ~'" in run.calls[0][-1]
 
     def test_undeployed_target_lines_run_in_a_real_shell(self) -> None:
         """Route and ping report through bash; 192.0.2.1 (TEST-NET-1) never answers."""

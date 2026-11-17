@@ -19,17 +19,17 @@ BLUEPRINTS_DIR = Path(__file__).resolve().parents[2] / "blueprints"
 
 ONTAP_VARIABLES = """\
 cluster_name: ontap-demo
-cluster_mgmt_ip: "172.20.99.80"
-data_lif1_ip: "172.20.99.83"
-data_lif2_ip: "172.20.99.84"
+cluster_mgmt_ip: "192.0.2.80"
+data_lif1_ip: "192.0.2.83"
+data_lif2_ip: "192.0.2.84"
 node01_name: ontap-node-1
 node01_vmid: 1130
 node01_target: node2
-node01_mgmt_ip: "172.20.99.81"
+node01_mgmt_ip: "192.0.2.81"
 node02_name: ontap-node-2
 node02_vmid: 1131
 node02_target: node3
-node02_mgmt_ip: "172.20.99.82"
+node02_mgmt_ip: "192.0.2.82"
 ontap_password: test-password
 """
 
@@ -42,8 +42,8 @@ domain: lab.example.com
 root_password: test-password
 api_key: key123
 api_secret: secret-456
-wan_ip: "172.20.10.250"
-lan_ip: "172.20.99.1"
+wan_ip: "198.51.100.250"
+lan_ip: "192.0.2.1"
 """
 
 

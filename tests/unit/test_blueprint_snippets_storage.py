@@ -21,7 +21,7 @@ vm_name: demo
 vmid: 233
 target_node: node1
 disk_storage: local-lvm
-ip_address: "172.20.99.72"
+ip_address: "198.51.100.72"
 dhcp_subnet: demonet
 aiqum_admin_password: "pw"
 aiqum_admin_email: "a@example.com"
@@ -29,7 +29,7 @@ aiqum_url_base: "http://web/aiqum"
 smtp_server: "smtp.example.com"
 smtp_user: "aiqum"
 smtp_password: "pw"
-ontap_cluster_ip: "172.20.99.80"
+ontap_cluster_ip: "198.51.100.80"
 ontap_admin_password: "pw"
 """,
     "console-connector": f"""\
@@ -48,7 +48,7 @@ vm_name: demo
 vmid: 220
 target_node: node1
 mac_address: "02:00:00:00:00:01"
-ip_address: "172.20.10.71"
+ip_address: "203.0.113.71"
 dhcp_subnet: demonet
 """,
 }

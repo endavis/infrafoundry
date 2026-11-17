@@ -26,13 +26,13 @@ class TestISCToKeaMigration:
         mock.get_dhcpv4_config.return_value = {
             "lan": {
                 "enable": "1",
-                "subnet": "192.168.1.0",
+                "subnet": "192.0.2.0",
                 "subnet_bits": "24",
-                "range": {"from": "192.168.1.100", "to": "192.168.1.200"},
-                "gateway": "192.168.1.1",
+                "range": {"from": "192.0.2.100", "to": "192.0.2.200"},
+                "gateway": "192.0.2.1",
                 "domain": "example.local",
-                "dnsserver": ["192.168.1.1", "8.8.8.8"],
-                "ntpserver": ["192.168.1.1"],
+                "dnsserver": ["192.0.2.1", "8.8.8.8"],
+                "ntpserver": ["192.0.2.1"],
                 "defaultleasetime": "7200",
                 "maxleasetime": "86400",
             }
@@ -41,7 +41,7 @@ class TestISCToKeaMigration:
             "lan": [
                 {
                     "mac": "00:11:22:33:44:55",
-                    "ipaddr": "192.168.1.50",
+                    "ipaddr": "192.0.2.50",
                     "hostname": "server01",
                     "descr": "Main Server",
                 }
@@ -87,23 +87,23 @@ class TestISCToKeaMigration:
             # Check subnet conversion
             subnet = result["subnets"][0]
             assert subnet["name"] == "lan-dhcp"
-            assert subnet["config"]["subnet"] == "192.168.1.0/24"
+            assert subnet["config"]["subnet"] == "192.0.2.0/24"
             assert subnet["config"]["interface"] == "lan"
             assert len(subnet["config"]["pools"]) == 1
-            assert subnet["config"]["pools"][0]["range"] == "192.168.1.100 - 192.168.1.200"
-            assert subnet["config"]["router"] == "192.168.1.1"
+            assert subnet["config"]["pools"][0]["range"] == "192.0.2.100 - 192.0.2.200"
+            assert subnet["config"]["router"] == "192.0.2.1"
             assert subnet["config"]["domain"] == "example.local"
-            assert subnet["config"]["dns_servers"] == ["192.168.1.1", "8.8.8.8"]
-            assert subnet["config"]["ntp_servers"] == ["192.168.1.1"]
+            assert subnet["config"]["dns_servers"] == ["192.0.2.1", "8.8.8.8"]
+            assert subnet["config"]["ntp_servers"] == ["192.0.2.1"]
             assert subnet["config"]["valid_lifetime"] == 7200
             assert subnet["config"]["max_lifetime"] == 86400
 
             # Check reservation conversion
             reservation = result["reservations"][0]
             assert reservation["name"] == "server01"
-            assert reservation["config"]["subnet"] == "192.168.1.0/24"
+            assert reservation["config"]["subnet"] == "192.0.2.0/24"
             assert reservation["config"]["hw_address"] == "00:11:22:33:44:55"
-            assert reservation["config"]["ip_address"] == "192.168.1.50"
+            assert reservation["config"]["ip_address"] == "192.0.2.50"
             assert reservation["config"]["hostname"] == "server01"
             assert reservation["config"]["description"] == "Main Server"
 
@@ -113,8 +113,8 @@ class TestISCToKeaMigration:
         """Test DHCPv4 migration with interface filter."""
         # Add another interface to the mock
         mock_isc_service.get_dhcpv4_config.return_value = {
-            "lan": {"enable": "1", "subnet": "192.168.1.0", "subnet_bits": "24"},
-            "opt1": {"enable": "1", "subnet": "192.168.2.0", "subnet_bits": "24"},
+            "lan": {"enable": "1", "subnet": "192.0.2.0", "subnet_bits": "24"},
+            "opt1": {"enable": "1", "subnet": "198.51.100.0", "subnet_bits": "24"},
         }
         mock_isc_service.get_dhcpv4_static_maps.return_value = {"lan": [], "opt1": []}
 
@@ -126,14 +126,14 @@ class TestISCToKeaMigration:
 
             # Should only have lan subnet
             assert len(result["subnets"]) == 1
-            assert result["subnets"][0]["config"]["subnet"] == "192.168.1.0/24"
+            assert result["subnets"][0]["config"]["subnet"] == "192.0.2.0/24"
 
     def test_migrate_dhcpv4_disabled_interface(
         self, manager: ISCToKeaMigrationManager, mock_isc_service: MagicMock
     ) -> None:
         """Test DHCPv4 migration skips disabled interfaces."""
         mock_isc_service.get_dhcpv4_config.return_value = {
-            "lan": {"enable": "0", "subnet": "192.168.1.0", "subnet_bits": "24"}
+            "lan": {"enable": "0", "subnet": "192.0.2.0", "subnet_bits": "24"}
         }
         mock_isc_service.get_dhcpv4_static_maps.return_value = {"lan": []}
 
@@ -223,7 +223,7 @@ class TestISCToKeaMigration:
             assert "kea_dhcp6_reservation" in yaml_output
 
             # Should contain converted data
-            assert "192.168.1.0/24" in yaml_output
+            assert "192.0.2.0/24" in yaml_output
             assert "fd00::/64" in yaml_output
             assert "server01" in yaml_output
 
@@ -231,8 +231,8 @@ class TestISCToKeaMigration:
         """Test converting minimal ISC DHCPv4 subnet."""
         isc_config = {
             "enable": "1",
-            "subnet": "172.21.0.0",
-            "subnet_bits": "16",
+            "subnet": "203.0.113.0",
+            "subnet_bits": "25",
         }
 
         converter = _DHCPv4Converter()
@@ -240,7 +240,7 @@ class TestISCToKeaMigration:
 
         assert result is not None
         assert result["name"] == "opt1-dhcp"
-        assert result["config"]["subnet"] == "172.21.0.0/16"
+        assert result["config"]["subnet"] == "203.0.113.0/25"
         assert result["config"]["interface"] == "opt1"
         assert result["config"]["pools"] == []
 
@@ -248,11 +248,11 @@ class TestISCToKeaMigration:
         """Test converting minimal ISC DHCPv4 static map."""
         static_map = {
             "mac": "aa:bb:cc:dd:ee:ff",
-            "ipaddr": "172.21.0.100",
+            "ipaddr": "203.0.113.100",
         }
         subnet_config = {
-            "subnet": "172.21.0.0",
-            "subnet_bits": "16",
+            "subnet": "203.0.113.0",
+            "subnet_bits": "25",
         }
 
         converter = _DHCPv4Converter()
@@ -260,19 +260,19 @@ class TestISCToKeaMigration:
 
         assert result is not None
         assert result["config"]["hw_address"] == "aa:bb:cc:dd:ee:ff"
-        assert result["config"]["ip_address"] == "172.21.0.100"
-        assert result["config"]["subnet"] == "172.21.0.0/16"
+        assert result["config"]["ip_address"] == "203.0.113.100"
+        assert result["config"]["subnet"] == "203.0.113.0/25"
 
     def test_convert_dhcpv4_reservation_without_mac(
         self, manager: ISCToKeaMigrationManager
     ) -> None:
         """Test that reservation without MAC is skipped."""
         static_map = {
-            "ipaddr": "172.21.0.100",
+            "ipaddr": "203.0.113.100",
         }
         subnet_config = {
-            "subnet": "172.21.0.0",
-            "subnet_bits": "16",
+            "subnet": "203.0.113.0",
+            "subnet_bits": "25",
         }
 
         converter = _DHCPv4Converter()

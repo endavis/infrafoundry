@@ -34,11 +34,11 @@ InfraFoundry aligns OPNsense Kea DHCPv4 reservations with Proxmox VMs so VMs use
        type: kea_subnet
        name: lan-subnet
        config:
-         subnet: "172.20.10.0/24"
+         subnet: "192.0.2.0/24"
          interface: opt1
          pools:
-           - range: "172.20.10.100-172.20.10.200"
-         dns_servers: ["172.20.10.1"]
+           - range: "192.0.2.100-192.0.2.200"
+         dns_servers: ["192.0.2.1"]
    ```
 
    `interface` is sent when the subnet is written, but OPNsense 26.1 does not
@@ -60,7 +60,7 @@ InfraFoundry aligns OPNsense Kea DHCPv4 reservations with Proxmox VMs so VMs use
        config:
          subnet_ref: lan-subnet           # name of the kea_subnet above
          hw_address: "02:00:00:10:00:96"
-         ip_address: "172.20.10.50"
+         ip_address: "192.0.2.50"
          hostname: "my-vm-01"
          description: "My VM - Managed by InfraFoundry"
    ```
@@ -73,9 +73,9 @@ InfraFoundry aligns OPNsense Kea DHCPv4 reservations with Proxmox VMs so VMs use
        type: kea_reservation
        name: my-vm-dhcp
        config:
-         subnet: "172.20.10.0/24"        # CIDR of the kea_subnet above
+         subnet: "192.0.2.0/24"        # CIDR of the kea_subnet above
          hw_address: "02:00:00:10:00:96"
-         ip_address: "172.20.10.50"
+         ip_address: "192.0.2.50"
          hostname: "my-vm-01"
          description: "My VM - Managed by InfraFoundry"
    ```

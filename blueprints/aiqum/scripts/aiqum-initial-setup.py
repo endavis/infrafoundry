@@ -138,7 +138,7 @@ class AIQUMClient:
     jumphosts where ``requests`` is not installed.
 
     Attributes:
-        base_url: AIQUM base URL (e.g. ``https://192.168.1.50``).
+        base_url: AIQUM base URL (e.g. ``https://192.0.2.50``).
     """
 
     def __init__(

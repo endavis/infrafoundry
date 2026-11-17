@@ -132,7 +132,7 @@ def test_one_to_one_round_trip_apply_then_plan_zero(service: NATRuleService) -> 
             kind="one_to_one",
             interface=_test_interface(),
             external="198.51.100.99",
-            source_net="10.99.99.99",
+            source_net="192.0.2.99",
             description="integration test 1:1",
             sequence=999,
         )
@@ -159,7 +159,7 @@ def test_port_forward_round_trip_apply_then_plan_zero(service: NATRuleService) -
             name="test-pf-roundtrip",
             kind="port_forward",
             interface=_test_interface(),
-            target="10.99.99.10",
+            target="192.0.2.10",
             local_port="8080",
             destination_net="wanip",
             destination_port="80",
@@ -257,7 +257,7 @@ def test_per_kind_isolation_same_name(service: NATRuleService) -> None:
         kind="one_to_one",
         interface=iface,
         external="198.51.100.88",
-        source_net="10.88.88.88",
+        source_net="203.0.113.88",
         description="1:1 shared",
         sequence=995,
     )

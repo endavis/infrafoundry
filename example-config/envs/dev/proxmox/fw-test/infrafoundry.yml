@@ -14,12 +14,12 @@ variables:
   vm_name: fw-test
   vmid: 950
   target_node: node3
-  pve_host: "192.168.1.13"
+  pve_host: "192.0.2.13"
 
   # sha256 of the .img.bz2, from the release's checksums file
   image_sha256: ""
 
   # WAN on the management VLAN, LAN on an isolated bridge
-  wan_ip: "192.168.1.250"
-  lan_ip: "172.20.99.1"
-  api_allow_cidr: "192.168.1.0/24"
+  wan_ip: "192.0.2.250"
+  lan_ip: "198.51.100.1"
+  api_allow_cidr: "192.0.2.0/24"

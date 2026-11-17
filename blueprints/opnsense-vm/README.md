@@ -75,7 +75,7 @@ variables:
   vm_name: fw-test
   vmid: 950
   target_node: node3
-  pve_host: "172.20.10.102"
+  pve_host: "192.0.2.102"
   image_sha256: "<sha256 of the .img.bz2 from the release checksums file>"
 ```
 
@@ -102,6 +102,7 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 | -------- | ----------- |
 | `vm_name` | Proxmox VM name and the firewall's hostname |
 | `vmid` | Proxmox VM ID |
+| `pve_host` | Address Ansible uses to SSH to `target_node` as root |
 
 ### Package secrets (required)
 
@@ -116,7 +117,6 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
 | `target_node` | `node3` | Proxmox node for the VM |
-| `pve_host` | `172.20.10.102` | Address Ansible uses to SSH to `target_node` as root |
 | `disk_storage` | `local-lvm` | Storage for the imported disk |
 | `memory` / `cores` | `2048` / `2` | VM size |
 | `disk_size` | `0` | Boot disk size in GiB; `0` keeps the image's own size (about 3 GB). Larger values resize the disk before first boot. Changing it replaces the VM |
@@ -124,14 +124,14 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 | `image_sha256` | `""` | sha256 of `image_source`; empty skips the check |
 | `image_cache_dir` | `/var/lib/vz/template/cache/infrafoundry` | Where downloads and decompressed images are kept |
 | `wan_bridge` / `wan_vlan` | `vmbr0` / `10` | WAN bridge and VLAN tag |
-| `wan_ip` / `wan_prefix` | `172.20.10.250` / `24` | Static WAN address |
+| `wan_ip` / `wan_prefix` | `192.0.2.250` / `24` | Static WAN address |
 | `lan_bridge` | `vmbr1` | LAN bridge |
-| `lan_ip` / `lan_prefix` | `172.20.99.1` / `24` | LAN address |
+| `lan_ip` / `lan_prefix` | `203.0.113.1` / `24` | LAN address |
 | `sync_bridge` | `""` | Bridge for the optional sync NIC (`em2`); empty keeps the two-NIC VM |
 | `sync_vlan` | `0` | VLAN tag for the sync NIC; `0` is untagged |
 | `sync_ip` / `sync_prefix` | `""` / `24` | Static address of the sync interface; `sync_ip` is required when `sync_bridge` is set |
 | `domain` | `lab.local` | Domain |
-| `api_allow_cidr` | `172.20.10.0/24` | Source allowed to reach the web GUI/API on the WAN |
+| `api_allow_cidr` | `192.0.2.0/24` | Source allowed to reach the web GUI/API on the WAN |
 | `api_allow_lan` | `false` | Also let `api_allow_cidr` reach the web GUI/API on the LAN address through the WAN; set it when the provider's `api_url` is the LAN address |
 | `boot_timeout` | `600` | Seconds to wait for the first login prompt, and for the API afterwards |
 | `base_tags` | `[opnsense, fw-test]` | Base Proxmox tags; changing it on an existing VM changes its tags and replaces the VM |

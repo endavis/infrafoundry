@@ -98,7 +98,7 @@ class TestImageValidator:
                 name="my-vcn",
                 type="vcn",
                 provider="oci",
-                config={"cidr_block": "172.21.0.0/16"},
+                config={"cidr_block": "192.0.2.0/24"},
             )
         ]
         images = [{"id": "ocid1.image.oc1..aaa", "displayName": "Oracle-Linux-8"}]

@@ -31,12 +31,17 @@ ENGINES: list[tuple[str, Callable[..., Any], Any, Any]] = [
     ("vlan", vlan.compute_diff, ("igb0", 10), ("igb0", 20)),
     ("alias", alias.compute_diff, "web", "db"),
     ("gateway", gateway.compute_diff, "gw1", "gw2"),
-    ("static_route", static_route.compute_diff, ("10.0.0.0/8", "gw1"), ("10.1.0.0/16", "gw1")),
+    (
+        "static_route",
+        static_route.compute_diff,
+        ("198.51.100.0/24", "gw1"),
+        ("203.0.113.0/24", "gw1"),
+    ),
     (
         "virtual_ip",
         virtual_ip.compute_diff,
-        ("lan", "ipalias", "172.21.0.2", ""),
-        ("lan", "ipalias", "172.21.0.3", ""),
+        ("lan", "ipalias", "192.0.2.2", ""),
+        ("lan", "ipalias", "192.0.2.3", ""),
     ),
     ("host_override", unbound_host_override.compute_diff, ("a", "x.lan", "A"), ("b", "x.lan", "A")),
     (

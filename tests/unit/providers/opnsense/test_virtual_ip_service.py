@@ -49,7 +49,7 @@ def _vip(
     *,
     interface: str = "lan",
     mode: str = "ipalias",
-    address: str = "172.21.0.10",
+    address: str = "192.0.2.10",
     network: str = "24",
     description: str = "",
     enabled: bool = True,
@@ -92,7 +92,7 @@ def _live(
     *,
     interface: str = "lan",
     mode: str = "ipalias",
-    address: str = "172.21.0.10",
+    address: str = "192.0.2.10",
     vhid: str = "",
     raw_overrides: dict[str, Any] | None = None,
 ) -> LiveVirtualIP:
@@ -171,12 +171,12 @@ class TestPayloadCarp:
         inner = _vip(
             "foo",
             mode="carp",
-            address="172.21.0.1",
+            address="192.0.2.1",
             password="s3kr1t",
             vhid="1",
             advbase="2",
             advskew="50",
-            peer="172.21.0.2",
+            peer="192.0.2.2",
             peer6="fe80::2",
             nosync=True,
         ).to_payload()["vip"]
@@ -185,7 +185,7 @@ class TestPayloadCarp:
         assert inner["vhid"] == "1"
         assert inner["advbase"] == "2"
         assert inner["advskew"] == "50"
-        assert inner["peer"] == "172.21.0.2"
+        assert inner["peer"] == "192.0.2.2"
         assert inner["peer6"] == "fe80::2"
         assert inner["nosync"] == "1"
         # ipalias-only fields absent.
@@ -211,7 +211,7 @@ class TestPayloadProxyArp:
         assert "noexpand" not in inner
         # Required core fields still present.
         assert inner["interface"] == "lan"
-        assert inner["address"] == "172.21.0.10"
+        assert inner["address"] == "192.0.2.10"
         assert inner["network"] == "24"
 
 
@@ -222,22 +222,22 @@ class TestPayloadProxyArp:
 
 class TestDiffKey:
     def test_includes_mode_and_vhid(self) -> None:
-        v = _vip("foo", interface="lan", mode="carp", address="172.21.0.1", vhid="1")
-        assert v.diff_key == ("lan", "carp", "172.21.0.1", "1")
+        v = _vip("foo", interface="lan", mode="carp", address="192.0.2.1", vhid="1")
+        assert v.diff_key == ("lan", "carp", "192.0.2.1", "1")
 
     def test_yaml_name_does_not_affect_diff_key(self) -> None:
-        a = _vip("name-one", interface="lan", mode="ipalias", address="172.21.0.1")
-        b = _vip("name-two", interface="lan", mode="ipalias", address="172.21.0.1")
+        a = _vip("name-one", interface="lan", mode="ipalias", address="192.0.2.1")
+        b = _vip("name-two", interface="lan", mode="ipalias", address="192.0.2.1")
         assert a.diff_key == b.diff_key
 
     def test_two_carp_at_same_address_distinguished_by_vhid(self) -> None:
-        a = _vip("a", mode="carp", address="172.21.0.1", vhid="1")
-        b = _vip("b", mode="carp", address="172.21.0.1", vhid="2")
+        a = _vip("a", mode="carp", address="192.0.2.1", vhid="1")
+        b = _vip("b", mode="carp", address="192.0.2.1", vhid="2")
         assert a.diff_key != b.diff_key
 
     def test_ipalias_vs_carp_at_same_address_distinguished(self) -> None:
-        a = _vip("a", mode="ipalias", address="172.21.0.1")
-        b = _vip("b", mode="carp", address="172.21.0.1", vhid="1")
+        a = _vip("a", mode="ipalias", address="192.0.2.1")
+        b = _vip("b", mode="carp", address="192.0.2.1", vhid="1")
         assert a.diff_key != b.diff_key
 
 
@@ -281,7 +281,7 @@ class TestComputeDiffUpdates:
             uuid="u1",
             interface="lan",
             mode="ipalias",
-            address="172.21.0.10",
+            address="192.0.2.10",
             vhid="",
             raw=live_raw,
         )
@@ -302,7 +302,7 @@ class TestComputeDiffUpdates:
             uuid="u1",
             interface="lan",
             mode="carp",
-            address="172.21.0.10",
+            address="192.0.2.10",
             vhid="1",
             raw=live_raw,
         )
@@ -312,11 +312,11 @@ class TestComputeDiffUpdates:
 
     def test_changing_address_is_delete_plus_add(self) -> None:
         # Identity tuple changed → delete + add.
-        old_live = _live("u1", address="172.21.0.10")
-        new_vip = _vip("foo", address="172.21.0.20")
+        old_live = _live("u1", address="192.0.2.10")
+        new_vip = _vip("foo", address="192.0.2.20")
         diff = compute_diff([new_vip], [old_live])
         assert len(diff.adds) == 1
-        assert diff.adds[0].address == "172.21.0.20"
+        assert diff.adds[0].address == "192.0.2.20"
         assert len(diff.deletes) == 1
         assert diff.deletes[0].uuid == "u1"
 
@@ -350,11 +350,11 @@ class TestComputeDiffLocked:
         # Locked entry has no live counterpart; another live entry
         # exists at a different address → only the unmanaged live
         # entry should be deleted.
-        locked_yaml = _vip("locked", lock=True, address="172.21.0.10")
-        other_live = _live("u2", address="172.16.0.10")
+        locked_yaml = _vip("locked", lock=True, address="192.0.2.10")
+        other_live = _live("u2", address="198.51.100.10")
         diff = compute_diff([locked_yaml], [other_live])
         assert len(diff.deletes) == 1
-        assert diff.deletes[0].address == "172.16.0.10"
+        assert diff.deletes[0].address == "198.51.100.10"
 
 
 class TestDiffIsEmpty:
@@ -415,7 +415,7 @@ class TestParserIpalias:
             {
                 "mode": "ipalias",
                 "interface": "lan",
-                "address": "172.21.0.10",
+                "address": "192.0.2.10",
                 "network": "24",
             },
         )
@@ -423,14 +423,14 @@ class TestParserIpalias:
         assert len(result) == 1
         cfg = result[0]
         assert cfg.mode == "ipalias"
-        assert cfg.address == "172.21.0.10"
+        assert cfg.address == "192.0.2.10"
         assert cfg.network == "24"
         assert cfg.gateway == ""
 
     def test_default_mode_is_ipalias(self) -> None:
         r = _resource(
             "foo",
-            {"interface": "lan", "address": "172.21.0.10", "network": "24"},
+            {"interface": "lan", "address": "192.0.2.10", "network": "24"},
         )
         cfg = virtual_ip_configs_from_resources([r])[0]
         assert cfg.mode == "ipalias"
@@ -443,7 +443,7 @@ class TestParserCarp:
             {
                 "mode": "carp",
                 "interface": "lan",
-                "address": "172.21.0.1",
+                "address": "192.0.2.1",
                 "network": "24",
                 "vhid": "1",
                 "password": "s3kr1t",
@@ -462,7 +462,7 @@ class TestParserCarp:
             {
                 "mode": "carp",
                 "interface": "lan",
-                "address": "172.21.0.1",
+                "address": "192.0.2.1",
                 "network": "24",
                 "password": "x",
             },
@@ -476,7 +476,7 @@ class TestParserCarp:
             {
                 "mode": "carp",
                 "interface": "lan",
-                "address": "172.21.0.1",
+                "address": "192.0.2.1",
                 "network": "24",
                 "vhid": 5,
                 "password": "x",
@@ -493,7 +493,7 @@ class TestParserProxyarp:
             {
                 "mode": "proxyarp",
                 "interface": "lan",
-                "address": "172.21.0.10",
+                "address": "192.0.2.10",
                 "network": "24",
             },
         )
@@ -511,7 +511,7 @@ class TestParserRejection:
             {
                 "mode": "alias",  # NOT a valid mode (issue body was wrong)
                 "interface": "lan",
-                "address": "172.21.0.10",
+                "address": "192.0.2.10",
                 "network": "24",
             },
         )
@@ -519,7 +519,7 @@ class TestParserRejection:
             virtual_ip_configs_from_resources([r])
 
     def test_missing_interface_rejected(self) -> None:
-        r = _resource("bad", {"mode": "ipalias", "address": "172.21.0.10", "network": "24"})
+        r = _resource("bad", {"mode": "ipalias", "address": "192.0.2.10", "network": "24"})
         with pytest.raises(ValueError, match="interface"):
             virtual_ip_configs_from_resources([r])
 
@@ -529,7 +529,7 @@ class TestParserRejection:
             virtual_ip_configs_from_resources([r])
 
     def test_missing_network_rejected(self) -> None:
-        r = _resource("bad", {"mode": "ipalias", "interface": "lan", "address": "172.21.0.10"})
+        r = _resource("bad", {"mode": "ipalias", "interface": "lan", "address": "192.0.2.10"})
         with pytest.raises(ValueError, match="network"):
             virtual_ip_configs_from_resources([r])
 
@@ -541,7 +541,7 @@ class TestParserRejection:
             config={
                 "mode": "ipalias",
                 "interface": "lan",
-                "address": "172.21.0.10",
+                "address": "192.0.2.10",
                 "network": "24",
             },
         )
@@ -556,7 +556,7 @@ class TestParserRejection:
             {
                 "mode": "ipalias",
                 "interface": "lan",
-                "address": "172.21.0.10",
+                "address": "192.0.2.10",
                 "network": "24",
                 "lock": "yes",
             },
@@ -567,7 +567,7 @@ class TestParserRejection:
     def test_non_virtual_ip_resources_ignored(self) -> None:
         v = _resource(
             "ok",
-            {"mode": "ipalias", "interface": "lan", "address": "172.21.0.10", "network": "24"},
+            {"mode": "ipalias", "interface": "lan", "address": "192.0.2.10", "network": "24"},
         )
         other = ResourceConfig(name="x", type="firewall.aliases", provider="opnsense", config={})
         result = virtual_ip_configs_from_resources([v, other])
@@ -586,7 +586,7 @@ class TestRowToLive:
             "uuid": "u1",
             "interface": "lan",
             "mode": "ipalias",
-            "address": "172.21.0.10",
+            "address": "192.0.2.10",
             "network": "24",
             "vhid": "",
         }
@@ -594,7 +594,7 @@ class TestRowToLive:
         assert live.uuid == "u1"
         assert live.interface == "lan"
         assert live.mode == "ipalias"
-        assert live.address == "172.21.0.10"
+        assert live.address == "192.0.2.10"
         assert live.vhid == ""
 
     def test_missing_keys_default(self) -> None:
@@ -610,7 +610,7 @@ class TestRowToLive:
             "uuid": "u1",
             "interface": {"lan": {"value": "LAN", "selected": 1}},
             "mode": {"carp": {"value": "CARP", "selected": 1}},
-            "address": "172.21.0.1",
+            "address": "192.0.2.1",
             "vhid": "5",
         }
         live = _row_to_live(row)
@@ -620,14 +620,14 @@ class TestRowToLive:
 
 class TestSynthesizeName:
     def test_ipalias_no_vhid_suffix(self) -> None:
-        live = _live("u1", interface="lan", mode="ipalias", address="172.21.0.10")
+        live = _live("u1", interface="lan", mode="ipalias", address="192.0.2.10")
         name = _synthesize_name(live)
-        assert name == "vip-ipalias-lan-172-21-0-10"
+        assert name == "vip-ipalias-lan-192-0-2-10"
 
     def test_carp_appends_vhid(self) -> None:
-        live = _live("u1", interface="lan", mode="carp", address="172.21.0.1", vhid="1")
+        live = _live("u1", interface="lan", mode="carp", address="192.0.2.1", vhid="1")
         name = _synthesize_name(live)
-        assert name == "vip-carp-lan-172-21-0-1-vhid1"
+        assert name == "vip-carp-lan-192-0-2-1-vhid1"
 
     def test_ipv6_address_replaced(self) -> None:
         live = _live("u1", interface="lan", mode="ipalias", address="2001:db8::1")
@@ -636,7 +636,7 @@ class TestSynthesizeName:
         assert name == "vip-ipalias-lan-2001-db8--1"
 
     def test_lowercase(self) -> None:
-        live = _live("u1", interface="LAN", mode="ipalias", address="172.21.0.1")
+        live = _live("u1", interface="LAN", mode="ipalias", address="192.0.2.1")
         assert _synthesize_name(live).islower()
 
 
@@ -658,9 +658,9 @@ class TestServiceSearch:
         client = MagicMock()
         client.request.return_value = {
             "rows": [
-                {"uuid": "u1", "interface": "lan", "mode": "ipalias", "address": "172.21.0.10"},
+                {"uuid": "u1", "interface": "lan", "mode": "ipalias", "address": "192.0.2.10"},
                 "not-a-dict",  # filtered out
-                {"uuid": "u2", "interface": "wan", "mode": "carp", "address": "172.21.0.1"},
+                {"uuid": "u2", "interface": "wan", "mode": "carp", "address": "192.0.2.1"},
             ]
         }
         svc = VirtualIPService(client)
@@ -683,11 +683,11 @@ class TestServiceSearch:
 class TestServiceGet:
     def test_get_uses_get_verb(self) -> None:
         client = MagicMock()
-        client.request.return_value = {"vip": {"address": "172.21.0.10"}}
+        client.request.return_value = {"vip": {"address": "192.0.2.10"}}
         svc = VirtualIPService(client)
         result = svc.get("u1")
         client.request.assert_called_once_with("GET", "interfaces/vip_settings/getItem/u1")
-        assert result == {"vip": {"address": "172.21.0.10"}}
+        assert result == {"vip": {"address": "192.0.2.10"}}
 
 
 class TestServiceWriteOps:
@@ -741,7 +741,7 @@ class TestApplyDiff:
         client = MagicMock()
         client.request.return_value = {"result": "saved"}
         svc = VirtualIPService(client)
-        diff = Diff(adds=[_vip("foo"), _vip("bar", address="172.21.0.20")])
+        diff = Diff(adds=[_vip("foo"), _vip("bar", address="192.0.2.20")])
         counts = svc.apply_diff(diff)
         endpoints = [c.args[1] for c in client.request.call_args_list]
         assert endpoints.count("interfaces/vip_settings/addItem") == 2
@@ -767,7 +767,7 @@ class TestApplyDiff:
         diff = Diff(
             deletes=[
                 _live("u1"),
-                _live("u2", address="172.21.0.20"),
+                _live("u2", address="192.0.2.20"),
             ]
         )
         counts = svc.apply_diff(diff)
@@ -782,8 +782,8 @@ class TestApplyDiff:
         client.request.return_value = {"result": "saved"}
         svc = VirtualIPService(client)
         live_for_update = _live("u1")
-        live_for_delete = _live("u2", address="172.21.0.20")
-        new = _vip("new", address="192.168.0.10")
+        live_for_delete = _live("u2", address="192.0.2.20")
+        new = _vip("new", address="203.0.113.10")
         update_target = _vip("foo", description="changed")
         diff = Diff(
             adds=[new],
@@ -819,7 +819,7 @@ class TestExportToYaml:
                         "uuid": "u1",
                         "interface": "lan",
                         "mode": "ipalias",
-                        "address": "172.21.0.10",
+                        "address": "192.0.2.10",
                         "network": "24",
                         "vhid": "",
                     },
@@ -829,7 +829,7 @@ class TestExportToYaml:
                 "vip": {
                     "interface": {"lan": {"value": "LAN", "selected": 1}},
                     "mode": {"ipalias": {"value": "IP Alias", "selected": 1}},
-                    "address": "172.21.0.10",
+                    "address": "192.0.2.10",
                     "network": "24",
                     "descr": "lan vip",
                     "gateway": "",
@@ -840,9 +840,9 @@ class TestExportToYaml:
         ]
         svc = VirtualIPService(client)
         text = svc.export_to_yaml()
-        assert "vip-ipalias-lan-172-21-0-10" in text
+        assert "vip-ipalias-lan-192-0-2-10" in text
         assert "mode: ipalias" in text
-        assert "address: 172.21.0.10" in text
+        assert "address: 192.0.2.10" in text
         assert "interface: lan" in text
         # Password placeholder NOT emitted for ipalias.
         assert "password" not in text
@@ -856,7 +856,7 @@ class TestExportToYaml:
                         "uuid": "u1",
                         "interface": "lan",
                         "mode": "carp",
-                        "address": "172.21.0.1",
+                        "address": "192.0.2.1",
                         "network": "24",
                         "vhid": "1",
                     },
@@ -866,7 +866,7 @@ class TestExportToYaml:
                 "vip": {
                     "interface": {"lan": {"value": "LAN", "selected": 1}},
                     "mode": {"carp": {"value": "CARP", "selected": 1}},
-                    "address": "172.21.0.1",
+                    "address": "192.0.2.1",
                     "network": "24",
                     "vhid": "1",
                     "advbase": "1",
@@ -898,7 +898,7 @@ class TestLiveToExportConfig:
             "vip": {
                 "interface": {"lan": {"value": "LAN", "selected": 1}},
                 "mode": {"ipalias": {"value": "IP Alias", "selected": 1}},
-                "address": "172.21.0.10",
+                "address": "192.0.2.10",
                 "network": "24",
                 "descr": "lan",
                 "gateway": "my-gw",
@@ -918,7 +918,7 @@ class TestLiveToExportConfig:
             "vip": {
                 "interface": {"lan": {"value": "LAN", "selected": 1}},
                 "mode": {"carp": {"value": "CARP", "selected": 1}},
-                "address": "172.21.0.1",
+                "address": "192.0.2.1",
                 "network": "24",
                 "vhid": "5",
                 "advbase": "1",
@@ -940,7 +940,7 @@ class TestLiveToExportConfig:
             "vip": {
                 "interface": {"lan": {"value": "LAN", "selected": 1}},
                 "mode": {"proxyarp": {"value": "Proxy ARP", "selected": 1}},
-                "address": "172.21.0.10",
+                "address": "192.0.2.10",
                 "network": "24",
             }
         }

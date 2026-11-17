@@ -225,11 +225,11 @@ class TestParseNestedList:
                     "aliases": [
                         {
                             "name": "web-servers",
-                            "config": {"type": "host", "content": "172.21.0.1"},
+                            "config": {"type": "host", "content": "198.51.100.1"},
                         },
                         {
                             "name": "db-servers",
-                            "config": {"type": "host", "content": "172.21.0.5"},
+                            "config": {"type": "host", "content": "198.51.100.5"},
                         },
                     ]
                 }
@@ -277,7 +277,7 @@ class TestParseNestedList:
                 "kea": {
                     "dhcp4": {
                         "subnets": [
-                            {"name": "lan", "config": {"subnet": "172.21.0.0/24"}},
+                            {"name": "lan", "config": {"subnet": "198.51.100.0/24"}},
                         ]
                     }
                 }
@@ -463,7 +463,7 @@ class TestParseNestedShapeMismatch:
             "opnsense": {
                 "unbound": {
                     "advanced": {"private_domains": ["test.example.net"]},
-                    "forwards": [{"name": "f1", "server": "172.21.0.53"}],
+                    "forwards": [{"name": "f1", "server": "198.51.100.53"}],
                 }
             }
         }
@@ -812,7 +812,7 @@ class TestFlatFormatNoLongerTranslated:
                     "provider": "opnsense",
                     "type": "kea_subnet",
                     "name": "lan",
-                    "config": {"subnet": "172.21.0.0/24"},
+                    "config": {"subnet": "198.51.100.0/24"},
                 }
             ]
         }
@@ -830,7 +830,7 @@ class TestFlatFormatNoLongerTranslated:
                     "provider": "opnsense",
                     "type": "kea.dhcp4.subnets",
                     "name": "lan",
-                    "config": {"subnet": "172.21.0.0/24"},
+                    "config": {"subnet": "198.51.100.0/24"},
                 }
             ]
         }
@@ -921,7 +921,7 @@ class TestNestedFormatProviderCentricLoader:
         loader = ProviderCentricLoader(temp_dir)
         self._write_yaml(
             temp_dir / "dev" / "opnsense" / "aliases.yaml",
-            ("aliases:\n  - name: trusted\n    type: host\n    content: 172.21.0.1\n"),
+            ("aliases:\n  - name: trusted\n    type: host\n    content: 198.51.100.1\n"),
         )
         resources = loader.load_resources("dev", "opnsense", "aliases")
         assert len(resources) == 1
@@ -974,7 +974,7 @@ class TestNestedFormatResourceCentricLoader:
                 "    type: kea_subnet\n"
                 "    name: lan\n"
                 "    config:\n"
-                "      subnet: 172.21.0.0/24\n"
+                "      subnet: 198.51.100.0/24\n"
             ),
         )
         with pytest.raises(InvalidConfigurationError) as excinfo:

@@ -40,7 +40,7 @@ def _override(name: str, **overrides: Any) -> ResourceConfig:
     config: dict[str, Any] = {
         "hostname": "web",
         "domain": "example.com",
-        "server": "192.168.1.10",
+        "server": "192.0.2.10",
     }
     config.update(overrides)
     return ResourceConfig(
@@ -185,7 +185,7 @@ class TestServer:
         self, validator: UnboundHostOverrideValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            OPNsenseValidationContext(overrides=[_override("ok", rr="A", server="192.168.1.10")])
+            OPNsenseValidationContext(overrides=[_override("ok", rr="A", server="192.0.2.10")])
         )
         assert not _failures(report, "unbound_host_override_ok_server")
 
@@ -209,9 +209,7 @@ class TestServer:
         self, validator: UnboundHostOverrideValidator, report: ValidationReport
     ) -> None:
         validator.validate(
-            OPNsenseValidationContext(
-                overrides=[_override("bad", rr="AAAA", server="192.168.1.10")]
-            )
+            OPNsenseValidationContext(overrides=[_override("bad", rr="AAAA", server="192.0.2.10")])
         )
         assert _failures(report, "unbound_host_override_bad_server")
 
@@ -444,7 +442,7 @@ class TestUniqueness:
         validator.validate(
             OPNsenseValidationContext(
                 overrides=[
-                    _override("v4", rr="A", server="192.168.1.10"),
+                    _override("v4", rr="A", server="192.0.2.10"),
                     _override("v6", rr="AAAA", server="2001:db8::10"),
                 ]
             )

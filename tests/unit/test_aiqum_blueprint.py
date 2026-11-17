@@ -47,7 +47,7 @@ def test_aiqum_example_package_loads_blueprint(loader: PackageLoader) -> None:
     assert variables["vmid"] == 222
     assert variables["target_node"] == "node1"
     assert variables["disk_storage"] == "local-lvm"
-    assert variables["ip_address"] == "192.168.1.50"
+    assert variables["ip_address"] == "198.51.100.50"
     assert variables["dhcp_subnet"] == "my-subnet"
 
     # --- Blueprint defaults flow through unchanged ---
@@ -135,7 +135,7 @@ def test_aiqum_example_dhcp_config_uses_merged_values(loader: PackageLoader) -> 
     config = dhcp.config
 
     assert config["subnet_ref"] == "my-subnet"
-    assert config["ip_address"] == "192.168.1.50"
+    assert config["ip_address"] == "198.51.100.50"
     assert config["hostname"] == "aiqum"
     assert config["description"] == "NetApp Active IQ Unified Manager"
 
@@ -185,7 +185,7 @@ def test_aiqum_blueprint_supports_multiple_instances(tmp_path: Path) -> None:
               vmid: 230
               target_node: node1
               disk_storage: local-lvm
-              ip_address: "192.168.1.51"
+              ip_address: "198.51.100.51"
               dhcp_subnet: subnet-a
               aiqum_admin_password: "pw-a"
               aiqum_admin_email: "a@example.com"
@@ -210,7 +210,7 @@ def test_aiqum_blueprint_supports_multiple_instances(tmp_path: Path) -> None:
               vmid: 231
               target_node: node2
               disk_storage: local-lvm
-              ip_address: "192.168.1.52"
+              ip_address: "198.51.100.52"
               dhcp_subnet: subnet-b
               aiqum_admin_password: "pw-b"
               aiqum_admin_email: "b@example.com"
@@ -249,8 +249,8 @@ def test_aiqum_blueprint_supports_multiple_instances(tmp_path: Path) -> None:
     dhcp_b = next(r for r in resources_b if r.type == "kea.dhcp4.reservations")
     assert dhcp_a.name == "aiqum-a"
     assert dhcp_b.name == "aiqum-b"
-    assert dhcp_a.config["ip_address"] == "192.168.1.51"
-    assert dhcp_b.config["ip_address"] == "192.168.1.52"
+    assert dhcp_a.config["ip_address"] == "198.51.100.51"
+    assert dhcp_b.config["ip_address"] == "198.51.100.52"
     assert dhcp_a.config["subnet_ref"] == "subnet-a"
     assert dhcp_b.config["subnet_ref"] == "subnet-b"
 
@@ -275,7 +275,7 @@ def test_aiqum_empty_vlan_tag_attaches_untagged(tmp_path: Path) -> None:
               vmid: 232
               target_node: node1
               disk_storage: local-lvm
-              ip_address: "172.20.99.70"
+              ip_address: "203.0.113.70"
               dhcp_subnet: demonet
               bridge: demolan
               vlan_tag: ""
@@ -285,7 +285,7 @@ def test_aiqum_empty_vlan_tag_attaches_untagged(tmp_path: Path) -> None:
               smtp_server: "smtp.example.com"
               smtp_user: "aiqum"
               smtp_password: "pw"
-              ontap_cluster_ip: "172.20.99.80"
+              ontap_cluster_ip: "203.0.113.80"
               ontap_admin_password: "pw"
             """
         )
@@ -319,7 +319,7 @@ def test_aiqum_balloon_is_rendered_only_when_set(
               vmid: 233
               target_node: node1
               disk_storage: local-lvm
-              ip_address: "172.20.99.72"
+              ip_address: "203.0.113.72"
               dhcp_subnet: demonet
               aiqum_admin_password: "pw"
               aiqum_admin_email: "a@example.com"
@@ -327,7 +327,7 @@ def test_aiqum_balloon_is_rendered_only_when_set(
               smtp_server: "smtp.example.com"
               smtp_user: "aiqum"
               smtp_password: "pw"
-              ontap_cluster_ip: "172.20.99.80"
+              ontap_cluster_ip: "203.0.113.80"
               ontap_admin_password: "pw"{extra}
             """
         )
@@ -368,7 +368,7 @@ def _load_dns(
     extra: str = "",
     vm_name: str = "aiqum-a",
     vmid: int = 230,
-    ip: str = "192.168.1.51",
+    ip: str = "198.51.100.51",
 ) -> list[ResourceConfig]:
     envs = tmp_path / "envs"
     package = envs / "test" / "proxmox" / vm_name
@@ -405,7 +405,7 @@ def test_aiqum_publish_dns_emits_override_matching_reservation(tmp_path: Path) -
     assert override.provider == "opnsense"
     assert override.name == "aiqum-a-dns"
     assert override.config["hostname"] == reservation.config["hostname"] == "aiqum-a"
-    assert override.config["server"] == reservation.config["ip_address"] == "192.168.1.51"
+    assert override.config["server"] == reservation.config["ip_address"] == "198.51.100.51"
     assert override.config["domain"] == "lab.test"
 
 
@@ -417,7 +417,7 @@ def test_aiqum_publish_dns_without_domain_fails(tmp_path: Path) -> None:
 def test_aiqum_dns_override_names_are_distinct_per_instance(tmp_path: Path) -> None:
     extra = 'publish_dns: true\ndns_domain: "lab.test"\n'
     a = _load_dns(tmp_path / "a", extra)
-    b = _load_dns(tmp_path / "b", extra, vm_name="aiqum-b", vmid=231, ip="192.168.1.52")
+    b = _load_dns(tmp_path / "b", extra, vm_name="aiqum-b", vmid=231, ip="198.51.100.52")
 
     name_a = next(r.name for r in a if r.type == "unbound.host_overrides")
     name_b = next(r.name for r in b if r.type == "unbound.host_overrides")

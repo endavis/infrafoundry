@@ -111,7 +111,7 @@ def raise_on_failed_write(response: Any, action: str) -> Any:
     Args:
         response: Decoded response from an add/set/del call.
         action: What was attempted, for the error message (e.g.
-            ``"add static route 172.20.99.0/24"``).
+            ``"add static route 192.0.2.0/24"``).
 
     Returns:
         ``response`` unchanged when the write did not fail.

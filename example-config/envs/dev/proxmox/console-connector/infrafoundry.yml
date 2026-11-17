@@ -21,7 +21,7 @@ variables:
   disk_storage: local-lvm
 
   # --- Network ---
-  ip_address: "192.168.1.51"
+  ip_address: "192.0.2.51"
   dhcp_subnet: my-subnet
 
   # --- Console agent installer (mirrored from the NetApp Support Site) ---

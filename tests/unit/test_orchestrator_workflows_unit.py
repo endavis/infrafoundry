@@ -2074,7 +2074,7 @@ def _jumphost_destroy(
         name="k3s-server-dhcp",
         provider="opnsense",
         type="kea.dhcp4.reservations",
-        config={"hostname": "k3s-server", "ip_address": "10.0.1.10"},
+        config={"hostname": "k3s-server", "ip_address": "192.0.2.10"},
         package_variables=pkg_vars,
     )
     providers: dict[str, ProviderBase] = {"proxmox": MagicMock()}
@@ -2115,7 +2115,7 @@ def test_destroy_forgets_destroyed_vm_on_the_jumphost(console: Console) -> None:
     ) as forget:
         _destroy(orchestrator)
 
-    forget.assert_called_once_with("ansible@jump.example", ["k3s-server", "10.0.1.10"])
+    forget.assert_called_once_with("ansible@jump.example", ["k3s-server", "192.0.2.10"])
 
 
 def test_destroy_without_deletions_leaves_known_hosts_alone(console: Console) -> None:

@@ -27,7 +27,7 @@ class TestExtractInventoryBlock:
             "    web:\n"
             "      hosts:\n"
             "        web-01:\n"
-            "          ansible_host: 172.21.0.1\n"
+            "          ansible_host: 192.0.2.1\n"
         )
         stripped, raw = extract_inventory_block(text)
 

@@ -25,7 +25,7 @@ class TestInventoryGeneratorGenerate:
             "  webservers:\n"
             "    hosts:\n"
             "      web-01:\n"
-            "        ansible_host: 192.168.1.10\n"
+            "        ansible_host: 192.0.2.10\n"
             "    vars:\n"
             "      ansible_user: root\n"
         )
@@ -38,7 +38,7 @@ class TestInventoryGeneratorGenerate:
         with open(output_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        assert data["groups"]["webservers"]["hosts"]["web-01"]["ansible_host"] == "192.168.1.10"
+        assert data["groups"]["webservers"]["hosts"]["web-01"]["ansible_host"] == "192.0.2.10"
         assert data["groups"]["webservers"]["vars"]["ansible_user"] == "root"
 
     def test_generate_with_jinja2_variables(self, temp_dir: Path) -> None:
@@ -51,14 +51,14 @@ class TestInventoryGeneratorGenerate:
             "      node-01:\n"
             '        ansible_host: "{{ node01_ip }}"\n'
         )
-        variables = {"node01_ip": "172.21.0.1"}
+        variables = {"node01_ip": "198.51.100.1"}
 
         output_path = generator.generate(raw, variables, temp_dir)
 
         with open(output_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        assert data["groups"]["cluster"]["hosts"]["node-01"]["ansible_host"] == "172.21.0.1"
+        assert data["groups"]["cluster"]["hosts"]["node-01"]["ansible_host"] == "198.51.100.1"
 
     def test_generate_undefined_variable_raises(self, temp_dir: Path) -> None:
         """Undefined variables raise InvalidConfigurationError."""
@@ -117,9 +117,9 @@ class TestInventoryGeneratorGenerate:
             "        ansible_connection: local\n"
         )
         variables = {
-            "node1_ip": "172.20.10.1",
-            "node2_ip": "172.20.10.2",
-            "cluster_mgmt_ip": "172.20.10.203",
+            "node1_ip": "192.0.2.1",
+            "node2_ip": "192.0.2.2",
+            "cluster_mgmt_ip": "192.0.2.203",
         }
 
         output_path = generator.generate(raw, variables, temp_dir)
@@ -127,7 +127,7 @@ class TestInventoryGeneratorGenerate:
         with open(output_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        assert data["groups"]["proxmox_hosts"]["hosts"]["node1"]["ansible_host"] == "172.20.10.1"
+        assert data["groups"]["proxmox_hosts"]["hosts"]["node1"]["ansible_host"] == "192.0.2.1"
         assert data["groups"]["ontap_cluster"]["hosts"]["ontap-mgmt"]["ansible_connection"] == (
             "local"
         )
@@ -146,9 +146,9 @@ class TestInventoryGeneratorGenerate:
         )
         variables = {
             "workers": [
-                {"name": "worker-01", "ip": "172.21.0.11"},
-                {"name": "worker-02", "ip": "172.21.0.12"},
-                {"name": "worker-03", "ip": "172.21.0.13"},
+                {"name": "worker-01", "ip": "198.51.100.11"},
+                {"name": "worker-02", "ip": "198.51.100.12"},
+                {"name": "worker-03", "ip": "198.51.100.13"},
             ]
         }
 
@@ -159,9 +159,9 @@ class TestInventoryGeneratorGenerate:
 
         hosts = data["groups"]["k3s_workers"]["hosts"]
         assert set(hosts.keys()) == {"worker-01", "worker-02", "worker-03"}
-        assert hosts["worker-01"]["ansible_host"] == "172.21.0.11"
-        assert hosts["worker-02"]["ansible_host"] == "172.21.0.12"
-        assert hosts["worker-03"]["ansible_host"] == "172.21.0.13"
+        assert hosts["worker-01"]["ansible_host"] == "198.51.100.11"
+        assert hosts["worker-02"]["ansible_host"] == "198.51.100.12"
+        assert hosts["worker-03"]["ansible_host"] == "198.51.100.13"
 
     def test_generate_with_if_conditional(self, temp_dir: Path) -> None:
         """`{% if %}` selects between branches."""
@@ -180,7 +180,7 @@ class TestInventoryGeneratorGenerate:
         variables = {
             "use_public_ip": True,
             "public_ip": "203.0.113.5",
-            "private_ip": "172.21.0.5",
+            "private_ip": "198.51.100.5",
         }
 
         output_path = generator.generate(raw, variables, temp_dir)

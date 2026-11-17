@@ -196,7 +196,7 @@ sdn_zones:
   - name: demonet
     config:
       kind: vxlan            # the only kind supported so far
-      peers: ["172.20.10.100", "172.20.10.101", "172.20.10.102"]
+      peers: ["192.0.2.100", "192.0.2.101", "192.0.2.102"]
       mtu: 8950              # optional; VXLAN adds ~50 bytes, keep it below the underlay MTU
       # nodes: [node1, node3]  # optional; default is every node
 sdn_vnets:

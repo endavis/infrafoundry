@@ -41,7 +41,7 @@ class TestParseResourceCentric:
                 "name": "infra",
                 "config": {
                     "backend": "nfs",
-                    "server": "172.20.10.50",
+                    "server": "192.0.2.50",
                 },
             }
         ]

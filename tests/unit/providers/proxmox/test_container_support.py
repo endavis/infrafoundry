@@ -325,15 +325,15 @@ class TestContainerInitialization:
                     {
                         "name": "eth0",
                         "bridge": "vmbr0",
-                        "ip": "172.20.10.50/24",
-                        "gw": "172.20.10.1",
+                        "ip": "192.0.2.50/24",
+                        "gw": "192.0.2.1",
                     }
                 ],
             )
         ]
         content = _render_containers(provider, containers)
-        assert 'address = "172.20.10.50/24"' in content
-        assert 'gateway = "172.20.10.1"' in content
+        assert 'address = "192.0.2.50/24"' in content
+        assert 'gateway = "192.0.2.1"' in content
 
     def test_ssh_keys(self, provider: ProxmoxProvider) -> None:
         """SSH keys should render in user_account block."""
@@ -557,13 +557,13 @@ class TestFullContainerRendering:
                         "name": "eth0",
                         "bridge": "vmbr0",
                         "tag": 10,
-                        "ip": "172.20.10.50/24",
-                        "gw": "172.20.10.1",
+                        "ip": "192.0.2.50/24",
+                        "gw": "192.0.2.1",
                     }
                 ],
                 mount_point=[{"volume": "stor01:infra", "path": "/var/www/html", "shared": True}],
                 hostname="web-01",
-                dns={"domain": "example.com", "servers": ["172.20.10.1"]},
+                dns={"domain": "example.com", "servers": ["192.0.2.1"]},
                 ssh_keys=["ssh-rsa AAAA..."],
                 features={"nesting": False, "mount": ["nfs"]},
                 startup={"order": 2, "up_delay": 10, "down_delay": 5},

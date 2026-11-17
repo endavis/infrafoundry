@@ -112,7 +112,7 @@
   iptables:
     chain: INPUT
     protocol: udp
-    source: "{{ k3s_vcn_cidr | default('172.21.0.0/16') }}"
+    source: "{{ k3s_vcn_cidr | default('192.0.2.0/24') }}"
     destination_port: 8472
     jump: ACCEPT
     comment: "flannel VXLAN"
@@ -124,7 +124,7 @@
   iptables:
     chain: INPUT
     protocol: tcp
-    source: "{{ k3s_vcn_cidr | default('172.21.0.0/16') }}"
+    source: "{{ k3s_vcn_cidr | default('192.0.2.0/24') }}"
     destination_port: 10250
     jump: ACCEPT
     comment: "kubelet API"
@@ -136,7 +136,7 @@
   iptables:
     chain: INPUT
     protocol: tcp
-    source: "{{ k3s_vcn_cidr | default('172.21.0.0/16') }}"
+    source: "{{ k3s_vcn_cidr | default('192.0.2.0/24') }}"
     destination_port: 6443
     jump: ACCEPT
     comment: "kubernetes API"

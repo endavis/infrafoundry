@@ -16,7 +16,7 @@ def env_config() -> EnvironmentData:
             "esxi": {
                 "hosts": {
                     "esxi-01": {
-                        "hostname": "192.168.1.10",
+                        "hostname": "192.0.2.10",
                         "username": "root",
                     },
                 },
@@ -83,13 +83,13 @@ class TestExport:
     ) -> None:
         """Should filter to specific host."""
         assert "provider_settings" in env_config
-        env_config["provider_settings"]["esxi"]["hosts"]["esxi-02"] = {"hostname": "192.168.1.11"}
+        env_config["provider_settings"]["esxi"]["hosts"]["esxi-02"] = {"hostname": "192.0.2.11"}
         exporter = EsxiConfigExporter(env_config)
         mock_ssh.return_value = ""
         exporter.export(host_filter="esxi-01")
         # Should only call SSH for esxi-01, not esxi-02
         for call in mock_ssh.call_args_list:
-            assert call[0][0] == "192.168.1.10"  # esxi-01's hostname
+            assert call[0][0] == "192.0.2.10"  # esxi-01's hostname
 
     @patch.object(EsxiConfigExporter, "_ssh_command")
     def test_export_with_resource_filter(
@@ -192,7 +192,7 @@ class TestSSHCommand:
     def test_ssh_command_success(self, mock_run: MagicMock, exporter: EsxiConfigExporter) -> None:
         """Should execute SSH command and return stdout."""
         mock_run.return_value = MagicMock(stdout="output data")
-        result = exporter._ssh_command("192.168.1.10", "root", "esxcli test")
+        result = exporter._ssh_command("192.0.2.10", "root", "esxcli test")
         assert result == "output data"
 
     @patch("subprocess.run")
@@ -201,11 +201,11 @@ class TestSSHCommand:
     ) -> None:
         """Should build SSH command with correct arguments."""
         mock_run.return_value = MagicMock(stdout="")
-        exporter._ssh_command("192.168.1.10", "root", "esxcli test")
+        exporter._ssh_command("192.0.2.10", "root", "esxcli test")
 
         call_args = mock_run.call_args[0][0]
         assert call_args[0] == "ssh"
-        assert "root@192.168.1.10" in call_args
+        assert "root@192.0.2.10" in call_args
         assert "esxcli test" in call_args
         assert "-o" in call_args
 
@@ -215,7 +215,7 @@ class TestSSHCommand:
     ) -> None:
         """Should include connect timeout in SSH args."""
         mock_run.return_value = MagicMock(stdout="")
-        exporter._ssh_command("192.168.1.10", "root", "test")
+        exporter._ssh_command("192.0.2.10", "root", "test")
 
         call_args = mock_run.call_args[0][0]
         assert "ConnectTimeout=10" in " ".join(call_args)

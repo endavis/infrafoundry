@@ -46,7 +46,7 @@ def test_service_vm_example_package_loads_blueprint(loader: PackageLoader) -> No
     assert variables["vmid"] == 210
     assert variables["target_node"] == "node1"
     assert variables["mac_address"] == "02:00:00:F8:F4:7D"
-    assert variables["ip_address"] == "172.20.10.60"
+    assert variables["ip_address"] == "192.0.2.60"
     assert variables["dhcp_subnet"] == "opt1-servers"
     assert variables["tags"] == ["infra", "web"]
     assert variables["dhcp_description"] == "Infrastructure web server (example)"
@@ -141,7 +141,7 @@ def test_service_vm_dhcp_config_uses_merged_values(loader: PackageLoader) -> Non
     assert config["subnet_ref"] == "opt1-servers"
     # hw_address must be lowercased by the blueprint template
     assert config["hw_address"] == "02:00:00:f8:f4:7d"
-    assert config["ip_address"] == "172.20.10.60"
+    assert config["ip_address"] == "192.0.2.60"
     assert config["hostname"] == "demo-web"
     assert config["description"] == "Infrastructure web server (example)"
 
@@ -184,7 +184,7 @@ def test_service_vm_blueprint_supports_multiple_instances(tmp_path: Path) -> Non
               vmid: 220
               target_node: node1
               mac_address: "AA:AA:AA:AA:AA:01"
-              ip_address: "172.20.10.71"
+              ip_address: "198.51.100.71"
               dhcp_subnet: subnet-a
             """
         )
@@ -200,7 +200,7 @@ def test_service_vm_blueprint_supports_multiple_instances(tmp_path: Path) -> Non
               vmid: 221
               target_node: node2
               mac_address: "BB:BB:BB:BB:BB:02"
-              ip_address: "172.20.10.72"
+              ip_address: "198.51.100.72"
               dhcp_subnet: subnet-b
             """
         )
@@ -230,8 +230,8 @@ def test_service_vm_blueprint_supports_multiple_instances(tmp_path: Path) -> Non
     dhcp_b = next(r for r in resources_b if r.type == "kea.dhcp4.reservations")
     assert dhcp_a.name == "svc-a"
     assert dhcp_b.name == "svc-b"
-    assert dhcp_a.config["ip_address"] == "172.20.10.71"
-    assert dhcp_b.config["ip_address"] == "172.20.10.72"
+    assert dhcp_a.config["ip_address"] == "198.51.100.71"
+    assert dhcp_b.config["ip_address"] == "198.51.100.72"
     assert dhcp_a.config["subnet_ref"] == "subnet-a"
     assert dhcp_b.config["subnet_ref"] == "subnet-b"
 
@@ -266,7 +266,7 @@ def test_service_vm_config_passes_proxmox_validation(tmp_path: Path) -> None:
               vmid: 213
               target_node: node1
               mac_address: "AA:BB:CC:DD:EE:FF"
-              ip_address: "172.20.10.63"
+              ip_address: "198.51.100.63"
               dhcp_subnet: opt1-servers
             """
         )

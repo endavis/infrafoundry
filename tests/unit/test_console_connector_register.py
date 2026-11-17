@@ -44,7 +44,7 @@ def _load() -> ModuleType:
 reg: Any = _load()
 
 FULL_VARS: dict[str, Any] = {
-    "ip_address": "172.21.0.5",
+    "ip_address": "192.0.2.5",
     "vm_name": "agent1",
     "console_client_id": "cid",
     "console_client_secret": SECRET,

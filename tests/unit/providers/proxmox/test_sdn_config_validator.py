@@ -9,7 +9,7 @@ from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.proxmox.validators import SDNConfigValidator
 from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 
-PEERS = ["172.20.10.100", "172.20.10.101"]
+PEERS = ["192.0.2.100", "192.0.2.101"]
 
 
 def _zone(name: str = "demonet", **config: Any) -> ResourceConfig:
@@ -51,7 +51,7 @@ def test_unsupported_kind() -> None:
     assert _errors([_zone(kind="evpn")], []) == ["proxmox_sdn_zone_demonet_kind"]
 
 
-@pytest.mark.parametrize("peers", [None, [], "172.20.10.100"])
+@pytest.mark.parametrize("peers", [None, [], "192.0.2.100"])
 def test_vxlan_zone_needs_peers(peers: Any) -> None:
     zone = ResourceConfig(name="demonet", type="sdn_zone", provider="proxmox", config={})
     if peers is not None:

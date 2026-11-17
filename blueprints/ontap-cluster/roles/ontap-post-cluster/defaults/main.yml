@@ -88,7 +88,7 @@ ontap_svm_routes: []
 # ontap_svm_routes:
 #   - vserver: svm_data
 #     destination: "0.0.0.0/0"
-#     gateway: "192.168.1.1"
+#     gateway: "198.51.100.1"
 
 # DNS configuration for the SVM
 ontap_dns:
@@ -96,11 +96,11 @@ ontap_dns:
     domains:
       - lab.local
     nameservers:
-      - "192.168.1.1"
+      - "198.51.100.1"
 
 # NTP server configuration
 ontap_ntp_servers:
-  - "192.168.1.1"
+  - "198.51.100.1"
 
 # CIFS server configuration (workgroup mode)
 ontap_cifs_server: {}
@@ -117,7 +117,7 @@ ontap_export_policies: []
 #   - name: nfs_data
 #     vserver: svm_data
 #     rules:
-#       - client_match: "172.20.10.0/24"
+#       - client_match: "192.0.2.0/24"
 #         protocols: [nfs]
 #         ro_rule: [sys]
 #         rw_rule: [sys]

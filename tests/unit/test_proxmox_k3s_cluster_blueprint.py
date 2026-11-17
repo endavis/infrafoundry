@@ -57,7 +57,7 @@ def test_proxmox_k3s_cluster_example_loads_blueprint(loader: PackageLoader) -> N
     assert variables["server_name"] == "k3s-dev-server"
     assert variables["server_vmid"] == 240
     assert variables["server_target"] == "node1"
-    assert variables["server_ip"] == "172.20.10.80"
+    assert variables["server_ip"] == "192.0.2.80"
     assert len(variables["agents"]) == 2
     assert variables["agents"][0]["name"] == "k3s-dev-agent-1"
     assert variables["agents"][1]["name"] == "k3s-dev-agent-2"
@@ -181,17 +181,17 @@ def test_proxmox_k3s_cluster_example_dhcp_configs(loader: PackageLoader) -> None
     server = dhcps_by_name["k3s-dev-server-dhcp"].config
     assert server["subnet_ref"] == "my-subnet"
     assert server["hw_address"] == "02:00:00:00:08:00"
-    assert server["ip_address"] == "172.20.10.80"
+    assert server["ip_address"] == "192.0.2.80"
     assert server["hostname"] == "k3s-dev-server"
 
     agent1 = dhcps_by_name["k3s-dev-agent-1-dhcp"].config
     assert agent1["hw_address"] == "02:00:00:00:08:01"
-    assert agent1["ip_address"] == "172.20.10.81"
+    assert agent1["ip_address"] == "192.0.2.81"
     assert agent1["hostname"] == "k3s-dev-agent-1"
 
     agent2 = dhcps_by_name["k3s-dev-agent-2-dhcp"].config
     assert agent2["hw_address"] == "02:00:00:00:08:02"
-    assert agent2["ip_address"] == "172.20.10.82"
+    assert agent2["ip_address"] == "192.0.2.82"
     assert agent2["hostname"] == "k3s-dev-agent-2"
 
 
@@ -245,18 +245,18 @@ def test_proxmox_k3s_cluster_blueprint_supports_multiple_instances(tmp_path: Pat
               server_vmid: 300
               server_target: node1
               server_mac: "02:00:00:00:0A:00"
-              server_ip: "172.21.0.10"
+              server_ip: "198.51.100.10"
               agents:
                 - name: k3s-a-agent-1
                   vmid: 301
                   target_node: node1
                   mac: "02:00:00:00:0A:01"
-                  ip: "172.21.0.11"
+                  ip: "198.51.100.11"
                 - name: k3s-a-agent-2
                   vmid: 302
                   target_node: node2
                   mac: "02:00:00:00:0A:02"
-                  ip: "172.21.0.12"
+                  ip: "198.51.100.12"
             """
         )
     )
@@ -275,28 +275,28 @@ def test_proxmox_k3s_cluster_blueprint_supports_multiple_instances(tmp_path: Pat
               server_vmid: 400
               server_target: node3
               server_mac: "02:00:00:00:0B:00"
-              server_ip: "10.0.1.10"
+              server_ip: "203.0.113.10"
               agents:
                 - name: k3s-b-agent-1
                   vmid: 401
                   target_node: node1
                   mac: "02:00:00:00:0B:01"
-                  ip: "10.0.1.11"
+                  ip: "203.0.113.11"
                 - name: k3s-b-agent-2
                   vmid: 402
                   target_node: node2
                   mac: "02:00:00:00:0B:02"
-                  ip: "10.0.1.12"
+                  ip: "203.0.113.12"
                 - name: k3s-b-agent-3
                   vmid: 403
                   target_node: node3
                   mac: "02:00:00:00:0B:03"
-                  ip: "10.0.1.13"
+                  ip: "203.0.113.13"
                 - name: k3s-b-agent-4
                   vmid: 404
                   target_node: node1
                   mac: "02:00:00:00:0B:04"
-                  ip: "10.0.1.14"
+                  ip: "203.0.113.14"
             """
         )
     )
@@ -369,7 +369,7 @@ def test_proxmox_k3s_cluster_blueprint_with_zero_agents(tmp_path: Path) -> None:
               server_vmid: 500
               server_target: node1
               server_mac: "02:00:00:00:0C:00"
-              server_ip: "172.21.2.10"
+              server_ip: "192.0.2.10"
               agents: []
             """
         )
@@ -439,13 +439,15 @@ def _run_post_terraform(tmp_path: Path, *, k3s_version: str | None, jumphost: st
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "HOME": str(tmp_path),
         "SSH_LOG": str(log),
-        "INFRAFOUNDRY_VAR_server_ip": "172.21.0.1",
+        "INFRAFOUNDRY_VAR_server_ip": "198.51.100.1",
         "INFRAFOUNDRY_VAR_server_name": "srv",
         "INFRAFOUNDRY_VAR_jumphost": jumphost,
         "INFRAFOUNDRY_VAR_k3s_server_args": "--disable traefik",
         "INFRAFOUNDRY_VAR_cluster_name": "c",
         "INFRAFOUNDRY_VAR_kubeconfig_dir": str(tmp_path / "kube"),
-        "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"agents": [{"name": "ag1", "ip": "172.21.0.2"}]}),
+        "INFRAFOUNDRY_PACKAGE_VARS": json.dumps(
+            {"agents": [{"name": "ag1", "ip": "198.51.100.2"}]}
+        ),
     }
     if k3s_version is not None:
         env["INFRAFOUNDRY_VAR_k3s_version"] = k3s_version

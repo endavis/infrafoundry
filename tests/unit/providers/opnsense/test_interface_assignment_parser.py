@@ -47,10 +47,10 @@ def _live(
 
 class TestParseLiveToConfigHappyPath:
     def test_static_v4_only(self) -> None:
-        live = _live(ipv4={"ipaddr": "172.21.0.1", "subnet": "24"})
+        live = _live(ipv4={"ipaddr": "192.0.2.1", "subnet": "24"})
         cfg = _parse_live_to_config(live)
         assert cfg.ipv4_type == "static"
-        assert cfg.ipv4_address == "172.21.0.1"
+        assert cfg.ipv4_address == "192.0.2.1"
         assert cfg.ipv4_subnet == 24
         assert cfg.ipv6_type == "none"
 
@@ -64,7 +64,7 @@ class TestParseLiveToConfigHappyPath:
 
     def test_dual_stack(self) -> None:
         live = _live(
-            ipv4={"ipaddr": "172.21.0.1", "subnet": "24"},
+            ipv4={"ipaddr": "192.0.2.1", "subnet": "24"},
             ipv6={"ipaddrv6": "fd00::1", "subnetv6": "64"},
         )
         cfg = _parse_live_to_config(live)
@@ -134,7 +134,7 @@ class TestParseLiveToConfigErrorPaths:
             _parse_live_to_config(live)
 
     def test_static_v4_missing_subnet_raises(self) -> None:
-        live = _live(ipv4={"ipaddr": "172.21.0.1"})
+        live = _live(ipv4={"ipaddr": "192.0.2.1"})
         with pytest.raises(ValueError, match="subnet"):
             _parse_live_to_config(live)
 
@@ -144,7 +144,7 @@ class TestParseLiveToConfigErrorPaths:
             _parse_live_to_config(live)
 
     def test_static_v4_non_integer_subnet_raises(self) -> None:
-        live = _live(ipv4={"ipaddr": "172.21.0.1", "subnet": "not-a-number"})
+        live = _live(ipv4={"ipaddr": "192.0.2.1", "subnet": "not-a-number"})
         with pytest.raises(ValueError, match="not an integer"):
             _parse_live_to_config(live)
 

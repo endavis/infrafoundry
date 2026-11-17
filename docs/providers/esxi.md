@@ -48,10 +48,10 @@ provider_settings:
     timeout: 30  # SSH timeout in seconds (optional, default: 30)
     hosts:
       esxi-01:
-        hostname: "192.168.1.10"
+        hostname: "192.0.2.10"
         username: "root"
       esxi-02:
-        hostname: "192.168.1.11"
+        hostname: "192.0.2.11"
         username: "root"
 ```
 

@@ -122,26 +122,26 @@ class TestCidrIp:
     """Tests for the cidr_ip filter."""
 
     def test_ipv4(self) -> None:
-        assert cidr_ip("172.21.0.1/24") == "172.21.0.1"
+        assert cidr_ip("192.0.2.1/24") == "192.0.2.1"
 
     def test_ipv6(self) -> None:
         assert cidr_ip("fd00::1/64") == "fd00::1"
 
     def test_host_route(self) -> None:
-        assert cidr_ip("192.168.1.1/32") == "192.168.1.1"
+        assert cidr_ip("198.51.100.1/32") == "198.51.100.1"
 
 
 class TestCidrPrefix:
     """Tests for the cidr_prefix filter."""
 
     def test_ipv4(self) -> None:
-        assert cidr_prefix("172.21.0.1/24") == "24"
+        assert cidr_prefix("192.0.2.1/24") == "24"
 
     def test_ipv6(self) -> None:
         assert cidr_prefix("fd00::1/64") == "64"
 
     def test_host_route(self) -> None:
-        assert cidr_prefix("192.168.1.1/32") == "32"
+        assert cidr_prefix("198.51.100.1/32") == "32"
 
 
 class TestRequired:
@@ -217,4 +217,4 @@ class TestCreateJinja2Env:
         """CIDR filters work in templates."""
         env = create_jinja2_env()
         template = env.from_string("{{ addr | cidr_ip }}/{{ addr | cidr_prefix }}")
-        assert template.render(addr="172.21.0.1/24") == "172.21.0.1/24"
+        assert template.render(addr="192.0.2.1/24") == "192.0.2.1/24"

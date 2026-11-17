@@ -145,15 +145,11 @@ class TestConsoleRestoreBlueprintInput:
 LIVE_NODE_RECORDS = [
     {
         "name": "ontap-demo-01",
-        "management_interfaces": [
-            {"name": "ontap-demo-01_mgmt1", "ip": {"address": "172.20.99.81"}}
-        ],
+        "management_interfaces": [{"name": "ontap-demo-01_mgmt1", "ip": {"address": "192.0.2.81"}}],
     },
     {
         "name": "ontap-demo-02",
-        "management_interfaces": [
-            {"name": "ontap-demo-02_mgmt1", "ip": {"address": "172.20.99.82"}}
-        ],
+        "management_interfaces": [{"name": "ontap-demo-02_mgmt1", "ip": {"address": "192.0.2.82"}}],
     },
 ]
 
@@ -204,9 +200,9 @@ class TestConsoleRestoreNodeName:
     @pytest.mark.parametrize(
         ("mgmt_ip", "expected"),
         [
-            ("172.20.99.81", ["ontap-demo-01"]),
-            ("172.20.99.82", ["ontap-demo-02"]),
-            ("172.21.0.9", []),
+            ("192.0.2.81", ["ontap-demo-01"]),
+            ("192.0.2.82", ["ontap-demo-02"]),
+            ("198.51.100.9", []),
         ],
     )
     def test_pick_condition_matches_only_the_node_with_that_ip(

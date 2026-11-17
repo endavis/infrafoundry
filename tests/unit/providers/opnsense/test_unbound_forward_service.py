@@ -46,7 +46,7 @@ from infrafoundry.providers.opnsense.services.unbound_forward import (
 def _forward(
     name: str,
     *,
-    server: str = "172.21.0.53",
+    server: str = "192.0.2.53",
     type: str = "forward",
     domain: str = "",
     port: str = "53",
@@ -77,7 +77,7 @@ def _live(
     *,
     type: str = "forward",
     domain: str = "",
-    server: str = "172.21.0.53",
+    server: str = "192.0.2.53",
     port: str = "53",
     raw_overrides: dict[str, Any] | None = None,
 ) -> LiveUnboundForward:
@@ -125,14 +125,14 @@ class TestPayload:
             "corp",
             type="forward",
             domain="corp.example",
-            server="172.21.0.53",
+            server="192.0.2.53",
             port="53",
             description="forward corp",
         )
         inner = forward.to_payload()["dot"]
         assert inner["type"] == "forward"
         assert inner["domain"] == "corp.example"
-        assert inner["server"] == "172.21.0.53"
+        assert inner["server"] == "192.0.2.53"
         assert inner["port"] == "53"
         assert inner["description"] == "forward corp"
 
@@ -219,7 +219,7 @@ class TestComputeDiffAdds:
     def test_new_forward_adds(self) -> None:
         diff = compute_diff([_forward("foo")], [])
         assert len(diff.adds) == 1
-        assert diff.adds[0].server == "172.21.0.53"
+        assert diff.adds[0].server == "192.0.2.53"
 
 
 class TestComputeDiffUpdates:
@@ -251,7 +251,7 @@ class TestComputeDiffUpdates:
             uuid="u1",
             type="forward",
             domain="",
-            server="172.21.0.53",
+            server="192.0.2.53",
             port="53",
             raw=live_raw,
         )
@@ -265,7 +265,7 @@ class TestComputeDiffUpdates:
             uuid="u1",
             type="forward",
             domain="",
-            server="172.21.0.53",
+            server="192.0.2.53",
             port="53",
             raw=live_raw,
         )
@@ -281,8 +281,8 @@ class TestComputeDiffUpdates:
         assert len(diff.deletes) == 1
 
     def test_changing_server_is_delete_plus_add(self) -> None:
-        old_live = _live("u1", server="172.21.0.53")
-        new_forward = _forward("foo", server="172.21.0.54")
+        old_live = _live("u1", server="192.0.2.53")
+        new_forward = _forward("foo", server="192.0.2.54")
         diff = compute_diff([new_forward], [old_live])
         assert len(diff.adds) == 1
         assert len(diff.deletes) == 1
@@ -329,11 +329,11 @@ class TestComputeDiffLocked:
 
     def test_locked_resource_does_not_appear_as_delete_when_only_in_yaml(self) -> None:
         forward = _forward("locked-name", lock=True)
-        live_other = _live("u2", server="172.21.0.99")
+        live_other = _live("u2", server="192.0.2.99")
         diff = compute_diff([forward], [live_other])
         # Other live still deleted.
         assert len(diff.deletes) == 1
-        assert diff.deletes[0].server == "172.21.0.99"
+        assert diff.deletes[0].server == "192.0.2.99"
 
 
 class TestDiffIsEmpty:
@@ -403,7 +403,7 @@ class TestConfigsFromResources:
             {
                 "type": "forward",
                 "domain": "corp.example",
-                "server": "172.21.0.53",
+                "server": "192.0.2.53",
                 "port": 53,
                 "description": "lan",
             },
@@ -414,7 +414,7 @@ class TestConfigsFromResources:
         assert cfg.name == "corp-forward"
         assert cfg.type == "forward"
         assert cfg.domain == "corp.example"
-        assert cfg.server == "172.21.0.53"
+        assert cfg.server == "192.0.2.53"
         assert cfg.port == "53"
         assert cfg.description == "lan"
 
@@ -553,14 +553,14 @@ class TestRowToLive:
             "uuid": "u1",
             "type": "forward",
             "domain": "x",
-            "server": "172.21.0.53",
+            "server": "192.0.2.53",
             "port": "53",
         }
         live = _row_to_live(row)
         assert live.uuid == "u1"
         assert live.type == "forward"
         assert live.domain == "x"
-        assert live.server == "172.21.0.53"
+        assert live.server == "192.0.2.53"
         assert live.port == "53"
         assert live.raw == row
 
@@ -590,13 +590,13 @@ class TestRowToLive:
 
 class TestSynthesizeName:
     def test_v4_domain(self) -> None:
-        live = _live("u1", type="forward", domain="x.example", server="172.21.0.53", port="53")
-        assert _synthesize_name(live) == "forward-forward-x-example-172-21-0-53-53"
+        live = _live("u1", type="forward", domain="x.example", server="192.0.2.53", port="53")
+        assert _synthesize_name(live) == "forward-forward-x-example-192-0-2-53-53"
 
     def test_global_forwarder(self) -> None:
         # Empty domain → ``global``.
-        live = _live("u1", type="forward", domain="", server="172.21.0.53", port="53")
-        assert _synthesize_name(live) == "forward-forward-global-172-21-0-53-53"
+        live = _live("u1", type="forward", domain="", server="192.0.2.53", port="53")
+        assert _synthesize_name(live) == "forward-forward-global-192-0-2-53-53"
 
     def test_v6_server(self) -> None:
         live = _live("u1", type="dot", domain="x", server="2001:db8::53", port="853")
@@ -604,8 +604,8 @@ class TestSynthesizeName:
         assert _synthesize_name(live) == "forward-dot-x-2001-db8--53-853"
 
     def test_lowercase(self) -> None:
-        live = _live("u1", type="forward", domain="X.EXAMPLE", server="172.21.0.53", port="53")
-        assert _synthesize_name(live) == "forward-forward-x-example-172-21-0-53-53"
+        live = _live("u1", type="forward", domain="X.EXAMPLE", server="192.0.2.53", port="53")
+        assert _synthesize_name(live) == "forward-forward-x-example-192-0-2-53-53"
 
 
 # ---------------------------------------------------------------------------
@@ -721,7 +721,7 @@ class TestApplyDiff:
         client = MagicMock()
         client.request.return_value = {"result": "saved"}
         svc = UnboundForwardService(client)
-        diff = Diff(adds=[_forward("foo"), _forward("bar", server="172.21.0.54")])
+        diff = Diff(adds=[_forward("foo"), _forward("bar", server="192.0.2.54")])
         counts = svc.apply_diff(diff)
         endpoints = [c.args[1] for c in client.request.call_args_list]
         assert endpoints.count("unbound/settings/addForward") == 2
@@ -747,7 +747,7 @@ class TestApplyDiff:
         diff = Diff(
             deletes=[
                 _live("u1"),
-                _live("u2", server="172.21.0.54"),
+                _live("u2", server="192.0.2.54"),
             ]
         )
         counts = svc.apply_diff(diff)
@@ -762,8 +762,8 @@ class TestApplyDiff:
         client.request.return_value = {"result": "saved"}
         svc = UnboundForwardService(client)
         live_for_update = _live("u1")
-        live_for_delete = _live("u2", server="172.21.0.54")
-        new = _forward("new", server="172.21.0.55")
+        live_for_delete = _live("u2", server="192.0.2.54")
+        new = _forward("new", server="192.0.2.55")
         update_target = _forward("foo", description="changed")
         diff = Diff(
             adds=[new],
@@ -800,7 +800,7 @@ class TestExportToYaml:
                         "uuid": "u1",
                         "type": "forward",
                         "domain": "x.example",
-                        "server": "172.21.0.53",
+                        "server": "192.0.2.53",
                         "port": "53",
                         "verify": "",
                         "forward_tcp_upstream": "0",
@@ -818,7 +818,7 @@ class TestExportToYaml:
                         "dot": {"value": "DoT", "selected": 0},
                     },
                     "domain": "x.example",
-                    "server": "172.21.0.53",
+                    "server": "192.0.2.53",
                     "port": "53",
                     "verify": "",
                     "forward_tcp_upstream": "0",
@@ -831,11 +831,11 @@ class TestExportToYaml:
         svc = UnboundForwardService(client)
         text = svc.export_to_yaml()
         # Synthetic name appears.
-        assert "forward-forward-x-example-172-21-0-53-53" in text
+        assert "forward-forward-x-example-192-0-2-53-53" in text
         # Field decoding worked.
         assert "type: forward" in text
         assert "domain: x.example" in text
-        assert "server: 172.21.0.53" in text
+        assert "server: 192.0.2.53" in text
         assert "description: lan" in text
         assert "enabled: true" in text
 
