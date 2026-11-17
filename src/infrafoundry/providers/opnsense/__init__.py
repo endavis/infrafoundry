@@ -695,14 +695,15 @@ class OPNsenseProvider(
         service.reconfigure()
 
     def post_apply_hook(self, env_name: str, changed: bool) -> str:
-        """Sync the config to the HA backup after a successful apply (#1390).
+        """Sync the config to the HA backup after a successful apply or destroy (#1390, #1442).
 
-        Called once by ``OPNsenseDirectRunner.apply`` after the finalization hooks,
-        on the success path only. Errors propagate, failing the apply.
+        Called once by ``OPNsenseDirectRunner.apply`` after the finalization hooks, and
+        once by ``OPNsenseDirectRunner.destroy`` after every component destroyed, on the
+        success path only. Errors propagate, failing the apply or destroy.
 
         Args:
             env_name: Active environment name.
-            changed: True when the apply created, updated or deleted anything.
+            changed: True when the run created, updated or deleted anything.
 
         Returns:
             A status line for the runner to print.

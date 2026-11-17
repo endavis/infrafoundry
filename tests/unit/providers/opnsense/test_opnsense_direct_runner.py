@@ -1075,7 +1075,7 @@ class TestPostApplyHook:
             OPNsenseDirectRunner().apply(provider_with_env)
         provider_with_env.post_apply_hook.assert_not_called()
 
-    def test_not_called_on_plan_or_destroy(self, provider_with_env: MagicMock) -> None:
+    def test_not_called_on_plan(self, provider_with_env: MagicMock) -> None:
         manager_cls = self._setup(provider_with_env)
         manager_cls.return_value.plan.return_value = Diff()
         manager_cls.return_value.destroy.return_value = {
@@ -1086,7 +1086,6 @@ class TestPostApplyHook:
         runner = OPNsenseDirectRunner()
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             runner.plan(provider_with_env)
-            runner.destroy(provider_with_env)
         provider_with_env.post_apply_hook.assert_not_called()
 
     def test_hook_error_propagates(self, provider_with_env: MagicMock) -> None:
@@ -1119,6 +1118,71 @@ class TestPostApplyHook:
         self._setup(provider_with_env, created=1)
         del provider_with_env.post_apply_hook
         assert self._apply(provider_with_env)["success"] is True
+
+
+class TestPostDestroyHook:
+    """``destroy`` fires ``post_apply_hook(env, changed)`` once after all deletes (#1442)."""
+
+    def _setup(self, provider: MagicMock, destroyed: int = 1) -> MagicMock:
+        instance = MagicMock()
+        instance.destroy.return_value = {"success": True, "resources_destroyed": destroyed}
+        manager_cls = MagicMock(return_value=instance)
+        provider.get_direct_api_resource_types.return_value = {"interfaces.vlans": manager_cls}
+        return instance
+
+    def _destroy(self, provider: MagicMock) -> Any:
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            return OPNsenseDirectRunner().destroy(provider)
+
+    def test_fires_once_with_changed_true_after_deletes(self, provider_with_env: MagicMock) -> None:
+        instance = self._setup(provider_with_env, destroyed=2)
+        order: list[str] = []
+
+        def _destroy_effect(*_a: Any, **_k: Any) -> dict[str, Any]:
+            order.append("destroy")
+            return {"success": True, "resources_destroyed": 2}
+
+        def _post_effect(*_a: Any) -> str:
+            order.append("post")
+            return ""
+
+        instance.destroy.side_effect = _destroy_effect
+        provider_with_env.post_apply_hook.side_effect = _post_effect
+        result = self._destroy(provider_with_env)
+        assert result.get("success") is True
+        provider_with_env.post_apply_hook.assert_called_once_with("test-env", True)
+        assert order == ["destroy", "post"]
+
+    def test_noop_destroy_reports_changed_false(self, provider_with_env: MagicMock) -> None:
+        self._setup(provider_with_env, destroyed=0)
+        self._destroy(provider_with_env)
+        provider_with_env.post_apply_hook.assert_called_once_with("test-env", False)
+
+    def test_hook_failure_fails_the_destroy(self, provider_with_env: MagicMock) -> None:
+        self._setup(provider_with_env)
+        provider_with_env.post_apply_hook.side_effect = RuntimeError("sync failed")
+        result = self._destroy(provider_with_env)
+        assert result.get("success") is False
+        assert "sync failed" in str(result.get("error"))
+
+    def test_provider_without_the_hook_is_a_noop(self, provider_with_env: MagicMock) -> None:
+        self._setup(provider_with_env)
+        del provider_with_env.post_apply_hook
+        assert self._destroy(provider_with_env).get("success") is True
+
+    def test_not_called_when_a_component_fails(self, provider_with_env: MagicMock) -> None:
+        instance = self._setup(provider_with_env)
+        instance.destroy.side_effect = RuntimeError("boom")
+        result = self._destroy(provider_with_env)
+        assert result.get("success") is False
+        provider_with_env.post_apply_hook.assert_not_called()
+
+    def test_not_called_when_nothing_is_dispatched(self, provider_with_env: MagicMock) -> None:
+        self._setup(provider_with_env)
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().destroy(provider_with_env)
+        provider_with_env.post_apply_hook.assert_not_called()
 
 
 class TestUnboundReconfigureCoalescing:

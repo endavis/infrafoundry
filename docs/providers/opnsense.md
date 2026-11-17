@@ -211,7 +211,7 @@ After an apply, the runner makes one reconfigure call per service whose componen
 
 ## HA Sync After Apply
 
-When the firewall is the primary of an HA pair, an apply also has to push the config to the backup. After every component has applied and the finalization hooks have run, the provider reads `synchronize_to_ip` from the live `core/hasync/get`. If a backup is set, it calls `core/hasync_status/version` as a preflight and then `core/hasync_status/restartAll`, the action behind the GUI's "Synchronize and reconfigure all". It runs on `apply` only, not on `plan` or `destroy`, and not after a failed component. It runs after the `hasync.settings` reconfigure, so an apply that sets `synchronize_to_ip` for the first time syncs to the new target.
+When the firewall is the primary of an HA pair, an apply also has to push the config to the backup. After every component has applied and the finalization hooks have run, the provider reads `synchronize_to_ip` from the live `core/hasync/get`. If a backup is set, it calls `core/hasync_status/version` as a preflight and then `core/hasync_status/restartAll`, the action behind the GUI's "Synchronize and reconfigure all". It runs after a successful `apply` and after a successful `destroy` (#1442), where `changed` is true when something was deleted, so the backup loses the removed resources too. It does not run on `plan` or after a failed component. It runs after the `hasync.settings` reconfigure, so an apply that sets `synchronize_to_ip` for the first time syncs to the new target.
 
 `ha_sync_after_apply` controls it:
 

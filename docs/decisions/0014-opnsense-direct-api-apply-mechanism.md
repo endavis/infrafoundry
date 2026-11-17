@@ -55,6 +55,8 @@ tags:
 **Amended:** 2026-11-11 (#791) — `monit.settings`, `monit.alerts`, `monit.tests` and `monit.services` per-component decision recorded (core, stock-kind direct-REST against `monit/settings/*`; one `settings/get` read serves all four types; secrets never echoed; services delete before tests and a still-referenced row is blocked, not deleted; new shared finalization hook `monit_reconfigure`).
 **Amended:** 2026-11-16 (#1392) — `kea.dhcp4.ha` and `kea.dhcp4.ha_peers` per-component decision recorded (stock direct-REST on `kea/dhcpv4/*`; the `dhcpv4.ha` singleton write omits `general`; peers are a managed-set list keyed by `name`; shared `kea_reconfigure` hook). The peer write envelope and the `delPeer` reply were verified by a live test.
 **Amended:** 2026-11-17 (#1390) — the runner gains a provider-side `post_apply_hook(env_name, changed)`, called once after the finalization hooks on the success path of `apply`; the OPNsense provider uses it to sync the config to the HA backup (see "Finalization hooks").
+
+**Amended:** 2026-11-17 (#1442) — `destroy` also calls `post_apply_hook(env_name, changed)` once, after every component has destroyed, so the HA backup loses the deleted resources too; a hook error fails the destroy.
 **Status:** Accepted
 
 ## Status
@@ -727,7 +729,7 @@ A sixth hook, `tailscale_reconfigure` (#787), is shared by the three `tailscale.
 
 A seventh hook, `monit_reconfigure` (#791), is shared by the four `monit.*` managers (the settings singleton and three lists), so one `monit/service/reconfigure` call fires per apply when any of them changed state.
 
-A provider may also expose `post_apply_hook(env_name, changed) -> str` (#1390), which is not keyed by manager. `apply()` calls it once, after the finalization hooks and only when every component applied, so it sees the final state. `changed` is true when the apply created, updated or deleted anything. A `str` result is printed; any other result is ignored. It never runs on `plan`, on `destroy`, after a failed component or when nothing was dispatched, and its errors propagate and fail the apply. `OPNsenseProvider` uses it to trigger the HA config sync after the apply ([HA Sync After Apply](../providers/opnsense.md#ha-sync-after-apply)).
+A provider may also expose `post_apply_hook(env_name, changed) -> str` (#1390), which is not keyed by manager. `apply()` calls it once, after the finalization hooks and only when every component applied, so it sees the final state. `changed` is true when the apply created, updated or deleted anything. A `str` result is printed; any other result is ignored. `destroy()` calls it the same way (#1442), with `changed` true when anything was destroyed; a hook error there returns a failed `DestroyResult`. It never runs on `plan`, after a failed component or when nothing was dispatched, and its errors fail the run. `OPNsenseProvider` uses it to trigger the HA config sync after the apply ([HA Sync After Apply](../providers/opnsense.md#ha-sync-after-apply)).
 
 Future components with shared post-apply work register their own key here.
 

@@ -1021,7 +1021,7 @@ opnsense:
 
 ### Sync after apply (#1390)
 
-After a successful apply the provider calls `core/hasync_status/version` and then `core/hasync_status/restartAll` when the live `synchronizetoip` is set. User-facing behaviour is in [HA Sync After Apply](../providers/opnsense.md#ha-sync-after-apply).
+After a successful apply or destroy (#1442) the provider calls `core/hasync_status/version` and then `core/hasync_status/restartAll` when the live `synchronizetoip` is set. User-facing behaviour is in [HA Sync After Apply](../providers/opnsense.md#ha-sync-after-apply).
 
 - The bundled specs list the `hasync_status` actions `version`, `services`, `stop`, `start`, `restart` and `restartAll`, all POST. Only `version` and `restartAll` are used.
 - Source: `HasyncStatusController` (`restartAll`) runs `exec_sync` and `reload_templates` through `ha_xmlrpc_exec.php`, then restarts each service on the backup. `exec_sync` always echoes `{"status": "done"}`, so errors while pushing the config are not reported.

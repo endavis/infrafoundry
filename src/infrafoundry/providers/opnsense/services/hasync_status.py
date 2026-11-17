@@ -190,13 +190,13 @@ class HasyncStatusService(BaseService):
 def run_ha_sync_after_apply(
     env_name: str, provider_name: str, config_dir: Path, changed: bool
 ) -> str:
-    """Sync the config to the HA backup after a successful apply.
+    """Sync the config to the HA backup after a successful apply or destroy.
 
     Args:
         env_name: Active environment name.
         provider_name: Provider name (``opnsense``).
         config_dir: Configuration directory.
-        changed: Whether the apply created, updated or deleted anything.
+        changed: Whether the apply or destroy created, updated or deleted anything.
 
     Returns:
         A status line for the runner to print.

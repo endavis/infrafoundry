@@ -961,18 +961,20 @@ class OPNsenseDirectRunner(BaseRunner):
             hook(env_name)
 
     def _fire_post_apply_hook(self, provider: ProviderBase, env_name: str, changed: bool) -> None:
-        """Run the provider's optional ``post_apply_hook(env_name, changed)`` (#1390).
+        """Run the provider's optional ``post_apply_hook(env_name, changed)`` (#1390, #1442).
+
+        Called once at the end of a successful ``apply`` or ``destroy``.
 
         Duck-typed: a provider without a callable hook is a no-op, and a ``str``
         result is printed dim while any other result is ignored.
 
         Args:
-            provider: Provider whose components were applied.
+            provider: Provider whose components were applied or destroyed.
             env_name: Active environment name.
-            changed: True when the apply created, updated or deleted anything.
+            changed: True when the apply or destroy created, updated or deleted anything.
 
         Raises:
-            Any exception the hook raises, so a failing hook fails the apply.
+            Any exception the hook raises, so a failing hook fails the apply or destroy.
         """
         hook = getattr(provider, "post_apply_hook", None)
         if not callable(hook):
@@ -1022,7 +1024,9 @@ class OPNsenseDirectRunner(BaseRunner):
 
         Iterates ``provider.get_direct_api_resource_types()`` and dispatches
         each registered component manager's ``destroy``. Aggregates counts
-        across types.
+        across types. After every component has destroyed, the provider's optional
+        ``post_apply_hook(env_name, changed)`` fires once (#1442); a hook error
+        returns a failed result, and a failed component skips the hook.
 
         Args:
             provider: OPNsense provider instance (env must be set).
@@ -1087,6 +1091,12 @@ class OPNsenseDirectRunner(BaseRunner):
         if not any_dispatched:
             self.console.print("  [dim]opnsense_direct: no direct-API resources to destroy[/dim]")
             return DestroyResult(success=True, resources_destroyed=0)
+
+        try:
+            self._fire_post_apply_hook(provider, env_name, changed=total_destroyed > 0)
+        except Exception as exc:
+            logger.exception("opnsense_direct post-destroy hook failed")
+            return DestroyResult(success=False, error=str(exc))
 
         return DestroyResult(success=True, resources_destroyed=total_destroyed)
 
