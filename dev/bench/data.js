@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794909617452,
+  "lastUpdate": 1794912878595,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2550,6 +2550,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004902712545878663",
             "extra": "mean: 77.98658607188308 usec\nrounds: 13541"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "69fe42df7489223c226924c5a27b34535cf13da1",
+          "message": "feat: add opnsense hasync.settings component for ha pairing (merges PR #1439, addresses #1389)\n\nManage System > High Availability > Settings through core/hasync/get,\nset and reconfigure, as the singleton hasync.settings (YAML\nopnsense.hasync.settings, snake_case keys mapped to the 11 wire\nfields). A changed apply writes once and runs one hasync reconfigure\nfrom the hasync_reconfigure finalization hook. Destroy is a no-op.\n\npassword must be a secret:// reference resolved through the shared\nOPNsense secrets helper (a literal is a validation warning); it is\nredacted in plan output, never logged, and exported by config migrate\nonly as a placeholder. If a release stops returning it in clear, it is\ntreated as write-only and is sent with update_password or with another\nchange.\n\nValidation: the offline validator checks keys, types, IPs, the pfsync\nversion and the password form on every plan; infra doctor rejects a\npfsync_interface or sync_items entry the box does not offer, and the\nmanager refuses them at apply before any write.\n\nADR-0013 moves <hasync> into scope; ADR-0014 records the component.\n\nAddresses #1389\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T10:53:39Z",
+          "tree_id": "3d09ab268e2a494eb28a9f4ba1471258f8084b6e",
+          "url": "https://github.com/endavis/infrafoundry/commit/69fe42df7489223c226924c5a27b34535cf13da1"
+        },
+        "date": 1794912877917,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 107.01061257232234,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00015230544165065362",
+            "extra": "mean: 9.344867541283882 msec\nrounds: 109"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16570.991052484915,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000030263620450133287",
+            "extra": "mean: 60.3464208527253 usec\nrounds: 17638"
           }
         ]
       }
