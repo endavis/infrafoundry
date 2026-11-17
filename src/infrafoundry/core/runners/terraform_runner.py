@@ -134,7 +134,7 @@ class TerraformRunner(BaseRunner):
         # and cheap (~100ms no-op). Running it unconditionally avoids a
         # class of stale-lock / stale-.terraform bugs that arose when we
         # trusted .terraform/ presence as proof of consistency. See #524.
-        cmd = [self.tool_path, "init"]
+        cmd = [self.tool_path, "init", "-input=false"]
         if reconfigure:
             cmd.append("-reconfigure")
         if migrate_state:
@@ -156,6 +156,7 @@ class TerraformRunner(BaseRunner):
             result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 cmd,
                 cwd=working_dir,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 check=True,
@@ -248,6 +249,7 @@ class TerraformRunner(BaseRunner):
         try:
             result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "version", "-json"],
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 check=True,
@@ -270,6 +272,7 @@ class TerraformRunner(BaseRunner):
             result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "validate"],
                 cwd=tf_dir,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 env=env,
@@ -340,6 +343,10 @@ class TerraformRunner(BaseRunner):
 
         # Build command using full path to terraform binary
         cmd = [self.tool_path, command]
+        if command in {"plan", "apply", "destroy"}:
+            # Never prompt for missing variables or confirmation: a prompt blocks
+            # the run forever when nobody can answer it (#1467).
+            cmd.append("-input=false")
         if auto_approve and command in {"apply", "destroy"}:
             cmd.append("-auto-approve")
 
@@ -393,6 +400,7 @@ class TerraformRunner(BaseRunner):
             result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 cmd,
                 cwd=tf_dir,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 env=env,
@@ -409,6 +417,7 @@ class TerraformRunner(BaseRunner):
         process = subprocess.Popen(  # tool_path binary, runner-built list argv, no shell
             cmd,
             cwd=tf_dir,
+            stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -947,6 +956,7 @@ class TerraformRunner(BaseRunner):
             result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "state", "list"],
                 cwd=working_dir,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 check=True,
@@ -973,6 +983,7 @@ class TerraformRunner(BaseRunner):
             subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "state", "rm", address],
                 cwd=working_dir,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 check=True,
@@ -999,6 +1010,7 @@ class TerraformRunner(BaseRunner):
             result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "show", "-json"],
                 cwd=tf_dir,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 check=True,

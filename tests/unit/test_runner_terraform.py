@@ -1336,3 +1336,79 @@ class TestForgetKeptOnDestroy:
             assert runner.forget_kept_on_destroy(make_provider(), []) == []
         init.assert_not_called()
         rm.assert_not_called()
+
+
+def _popen_process() -> MagicMock:
+    """Build a finished fake process for the streamed apply/destroy path."""
+    process = MagicMock()
+    process.stdout = iter([])
+    process.stderr = MagicMock()
+    process.stderr.__iter__ = MagicMock(return_value=iter([]))
+    process.returncode = 0
+    process.wait.return_value = 0
+    return process
+
+
+class TestNonInteractive:
+    """Terraform must never wait for input nobody can give (#1467)."""
+
+    def test_init_is_non_interactive(self, runner: TerraformRunner, provider: MagicMock) -> None:
+        """Init passes -input=false and closes stdin."""
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+            runner.initialize(provider.terraform_dir)
+        assert "-input=false" in mock_run.call_args[0][0]
+        assert mock_run.call_args[1]["stdin"] == subprocess.DEVNULL
+
+    def test_plan_is_non_interactive(self, runner: TerraformRunner, provider: MagicMock) -> None:
+        """Plan passes -input=false and closes stdin."""
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+            runner.plan(provider)
+        plan_call = mock_run.call_args_list[-1]
+        assert plan_call[0][0][1] == "plan"
+        assert "-input=false" in plan_call[0][0]
+        assert plan_call[1]["stdin"] == subprocess.DEVNULL
+
+    @pytest.mark.parametrize("command", ["apply", "destroy"])
+    def test_apply_and_destroy_are_non_interactive(
+        self, runner: TerraformRunner, provider: MagicMock, command: str
+    ) -> None:
+        """Apply and destroy pass -input=false and close stdin."""
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run") as mock_run,
+            patch("subprocess.Popen", return_value=_popen_process()) as mock_popen,
+        ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="", stderr="")
+            getattr(runner, command)(provider, auto_approve=True)
+        args = mock_popen.call_args[0][0]
+        assert args[1] == command
+        assert "-input=false" in args
+        assert mock_popen.call_args[1]["stdin"] == subprocess.DEVNULL
+
+    def test_other_commands_close_stdin_without_input_flag(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        """state list, validate, show and version reject -input, so only stdin is closed."""
+        (provider.terraform_dir / "terraform.tfstate").write_text("{}")
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = SimpleNamespace(returncode=0, stdout="{}", stderr="")
+            runner.state_list(provider.terraform_dir)
+            runner.state_rm(provider.terraform_dir, "null_resource.x")
+            runner.validate_config(provider)
+            runner.get_resource_ids(provider)
+            runner.get_version()
+        assert mock_run.call_count == 5
+        for call in mock_run.call_args_list:
+            assert "-input=false" not in call[0][0]
+            assert call[1]["stdin"] == subprocess.DEVNULL
