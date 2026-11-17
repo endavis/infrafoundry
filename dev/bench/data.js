@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794922578021,
+  "lastUpdate": 1794925282907,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2968,6 +2968,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005039335600915736",
             "extra": "mean: 71.89392273026607 usec\nrounds: 15530"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "96f56cca8f281e852d5f95b7e4a32de1d7e733ff",
+          "message": "fix: resolve templates by provider type for non-primary opnsense firewalls (merges PR #1463, addresses #1462)\n\nA non-primary firewall's provider is named opnsense@<name> (#1450).\nTemplate lookups used that name, so its Terraform generation failed with\n\"Template not found: opnsense@<name>/provider.tf.j2\". The templates\ndirectory and the default provider, variables and outputs templates now\nresolve by provider type.\n\nget_terraform_env_vars read the flat opnsense settings, which a\nfirewalls: map does not have, so no TF_VAR_opnsense_* was set for any\nfirewall. It now reads each firewall's own settings, and OPNSENSE_* env\noverrides reach only the primary. reset_kea_dhcpv4/6 use the provider's\nown name instead of \"opnsense\".\n\nGenerated directories and local Terraform state stay per instance on\npurpose; the primary keeps generated/<env>/terraform/opnsense/.\n\nAddresses #1462\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T14:20:25Z",
+          "tree_id": "bf9c30b0513da39a2f4923cc9e63f018c0038ca9",
+          "url": "https://github.com/endavis/infrafoundry/commit/96f56cca8f281e852d5f95b7e4a32de1d7e733ff"
+        },
+        "date": 1794925282105,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 59.818107780031255,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00050176834780563",
+            "extra": "mean: 16.71734591935428 msec\nrounds: 62"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 11266.642305500965,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007607486424509565",
+            "extra": "mean: 88.7575883643477 usec\nrounds: 12307"
           }
         ]
       }
