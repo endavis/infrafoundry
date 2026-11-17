@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794922250172,
+  "lastUpdate": 1794922578021,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2930,6 +2930,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000013044414906656877",
             "extra": "mean: 128.30301354238762 usec\nrounds: 8418"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3cad8c41828ea2643287736097e3bda7e055a3be",
+          "message": "feat: update opnsense firmware through system.firmware (merges PR #1457, addresses #1452)\n\nAdd an opt-in minor firmware update to the system.firmware component.\nWith update: true, plan runs a firmware check and shows a pending update\nas a change. Apply starts the update, waits for the job and any reboot\n(update_timeout, default 1800 s), verifies the version, and does this\nbefore plugin installs so a fresh box can install plugins in one run.\nWithout update, behavior is unchanged. Major upgrades are not supported.\n\nAddresses #1452\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T13:35:16Z",
+          "tree_id": "6c703949f79a44fae3bc70d4fda15e8bb57300fe",
+          "url": "https://github.com/endavis/infrafoundry/commit/3cad8c41828ea2643287736097e3bda7e055a3be"
+        },
+        "date": 1794922577314,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 73.03316510839332,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006099336458690218",
+            "extra": "mean: 13.692409448718733 msec\nrounds: 78"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13909.381516874968,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005039335600915736",
+            "extra": "mean: 71.89392273026607 usec\nrounds: 15530"
           }
         ]
       }
