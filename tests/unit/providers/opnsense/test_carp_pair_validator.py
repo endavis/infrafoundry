@@ -136,7 +136,7 @@ def _client(vips: dict[str, Any] | Exception, sync_target: str = "") -> MagicMoc
 
 
 def _validate(
-    env: Any, primary: MagicMock, backup: MagicMock
+    env: Any, primary: MagicMock, backup: MagicMock, provider_name: str = "opnsense"
 ) -> tuple[ValidationReport, list[str]]:
     clients = {"https://fw-a.example.com": primary, "https://fw-b.example.com": backup}
     built: list[str] = []
@@ -147,7 +147,7 @@ def _validate(
 
     report = ValidationReport()
     with patch(f"{_V}.OPNsenseClient", side_effect=factory):
-        OPNsenseValidator(env, report, provider_name="opnsense").validate_ha_health()
+        OPNsenseValidator(env, report, provider_name=provider_name).validate_ha_health()
     return report, built
 
 
@@ -201,3 +201,15 @@ def test_no_ha_backup_means_no_second_client() -> None:
     primary = _client(_status(("1", "192.0.2.1", "MASTER")), sync_target="192.0.2.2")
     _, built = _validate(env, primary, MagicMock())
     assert built == ["https://fw-a.example.com"]
+
+
+def test_declared_backup_node_is_checked_as_a_backup() -> None:
+    primary = _client(_status(("1", "192.0.2.1", "MASTER")), sync_target="192.0.2.2")
+    backup = _client(_status(("1", "192.0.2.1", "BACKUP")))
+    report, _ = _validate(_env(), primary, backup, provider_name="opnsense@fw-b")
+    results = _by_name(report)
+    assert results["opnsense_carp_role"].passed
+    assert "fw-a" in results["opnsense_carp_role"].message
+    assert results["opnsense_carp_vip_1"].passed
+    assert not report.has_errors()
+    assert not report.has_warnings()

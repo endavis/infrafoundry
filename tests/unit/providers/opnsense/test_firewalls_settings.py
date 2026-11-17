@@ -15,6 +15,7 @@ from infrafoundry.providers.opnsense.firewalls import (
     firewall_label,
     firewall_settings,
     ha_backup_name,
+    ha_primary_name,
     validate_firewalls_settings,
 )
 from infrafoundry.providers.opnsense.services._credentials import (
@@ -107,6 +108,17 @@ class TestFirewallSettings:
         assert ha_backup_name(MULTI, "opnsense") == "fw-b"
         assert ha_backup_name(MULTI, "opnsense@fw-b") is None
         assert ha_backup_name(FLAT, "opnsense") is None
+
+    def test_ha_primary_name(self) -> None:
+        assert ha_primary_name(MULTI, "opnsense@fw-b") == "fw-a"
+        assert ha_primary_name(MULTI, "opnsense") is None
+        assert ha_primary_name(FLAT, "opnsense") is None
+        undeclared = {"firewalls": {"fw-a": {}, "fw-c": {}}, "primary": "fw-a"}
+        assert ha_primary_name(undeclared, "opnsense@fw-c") is None
+
+    def test_ha_primary_name_ignores_self_reference(self) -> None:
+        selfref = {"firewalls": {"fw-a": {"ha_backup": "fw-a"}}}
+        assert ha_primary_name(selfref, "opnsense") is None
 
     def test_env_override_only_for_the_primary(self) -> None:
         assert allows_env_override("opnsense") is True
