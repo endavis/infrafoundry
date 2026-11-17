@@ -53,6 +53,8 @@ class OPNsenseProviderSettings(TypedDict, total=False):
     ssh_user: str
     ssh_port: int
     ssh_key: str
+    ha_sync_after_apply: bool | str
+    ha_sync_timeout: int
 
 
 class TailscaleProviderSettings(TypedDict, total=False):

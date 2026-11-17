@@ -30,6 +30,8 @@ class BaseService(ABC):  # noqa: B024  # ABC marks the base; no abstract methods
         env_name: str,
         provider_name: str,
         config_dir: Path,
+        *,
+        timeout: int | None = None,
     ) -> OPNsenseClient:
         """Build an authenticated API client from environment configuration.
 
@@ -37,6 +39,7 @@ class BaseService(ABC):  # noqa: B024  # ABC marks the base; no abstract methods
             env_name: Environment name (e.g., 'prod', 'dev')
             provider_name: Provider name (e.g., 'opnsense')
             config_dir: Path to configuration directory
+            timeout: Per-request timeout in seconds; ``None`` keeps the client default.
 
         Returns:
             Configured :class:`OPNsenseClient`
@@ -56,12 +59,14 @@ class BaseService(ABC):  # noqa: B024  # ABC marks the base; no abstract methods
             )
 
         api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(provider_settings)
+        extra: dict[str, Any] = {} if timeout is None else {"timeout": timeout}
         client = OPNsenseClient(
             api_key=api_key,
             api_secret=api_secret,
             base_url=api_url,
             verify_ssl=verify_ssl,
             proxy=proxy,
+            **extra,
         )
         return client
 

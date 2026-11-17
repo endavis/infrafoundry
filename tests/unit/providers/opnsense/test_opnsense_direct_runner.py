@@ -1024,6 +1024,103 @@ def _ufwd_resource(name: str) -> ResourceConfig:
     )
 
 
+class TestPostApplyHook:
+    """The provider's ``post_apply_hook(env, changed)`` fires once, last, on success (#1390)."""
+
+    def _setup(
+        self, provider: MagicMock, *, created: int = 0, hook_key: str | None = None
+    ) -> MagicMock:
+        manager_cls, _ = _hook_manager(hook_key=hook_key, created=created)
+        provider.get_direct_api_resource_types.return_value = {"interfaces.vlans": manager_cls}
+        return manager_cls
+
+    def _apply(self, provider: MagicMock) -> Any:
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            return OPNsenseDirectRunner().apply(provider)
+
+    def test_fires_once_with_changed_true_after_finalization_hooks(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        order: list[str] = []
+        self._setup(provider_with_env, created=1, hook_key="my_hook")
+        provider_with_env.get_finalization_hooks.return_value = {
+            "my_hook": lambda _env: order.append("finalization")
+        }
+
+        def _post(_env: str, _changed: bool) -> str:
+            order.append("post")
+            return "x"
+
+        provider_with_env.post_apply_hook.side_effect = _post
+        self._apply(provider_with_env)
+        provider_with_env.post_apply_hook.assert_called_once_with("test-env", True)
+        assert order == ["finalization", "post"]
+
+    def test_noop_apply_reports_changed_false(self, provider_with_env: MagicMock) -> None:
+        self._setup(provider_with_env, created=0)
+        self._apply(provider_with_env)
+        provider_with_env.post_apply_hook.assert_called_once_with("test-env", False)
+
+    def test_not_called_when_a_component_fails(self, provider_with_env: MagicMock) -> None:
+        manager_cls = self._setup(provider_with_env, created=1)
+        manager_cls.return_value.apply.side_effect = RuntimeError("boom")
+        result = self._apply(provider_with_env)
+        assert result["success"] is False
+        provider_with_env.post_apply_hook.assert_not_called()
+
+    def test_not_called_when_nothing_is_dispatched(self, provider_with_env: MagicMock) -> None:
+        self._setup(provider_with_env)
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=[]):
+            OPNsenseDirectRunner().apply(provider_with_env)
+        provider_with_env.post_apply_hook.assert_not_called()
+
+    def test_not_called_on_plan_or_destroy(self, provider_with_env: MagicMock) -> None:
+        manager_cls = self._setup(provider_with_env)
+        manager_cls.return_value.plan.return_value = Diff()
+        manager_cls.return_value.destroy.return_value = {
+            "success": True,
+            "resources_deleted": 0,
+        }
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        runner = OPNsenseDirectRunner()
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.plan(provider_with_env)
+            runner.destroy(provider_with_env)
+        provider_with_env.post_apply_hook.assert_not_called()
+
+    def test_hook_error_propagates(self, provider_with_env: MagicMock) -> None:
+        self._setup(provider_with_env, created=1)
+        provider_with_env.post_apply_hook.side_effect = RuntimeError("sync failed")
+        with pytest.raises(RuntimeError, match="sync failed"):
+            self._apply(provider_with_env)
+
+    def test_str_result_is_printed_and_other_results_ignored(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        self._setup(provider_with_env, created=1)
+        provider_with_env.post_apply_hook.return_value = "HA sync done"
+        runner = OPNsenseDirectRunner()
+        runner.console = MagicMock()
+        resources = [_vlan_resource("v1", "igb0", 10)]
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+        printed = [str(c.args[0]) for c in runner.console.print.call_args_list]
+        assert any("HA sync done" in line for line in printed)
+
+        provider_with_env.post_apply_hook.return_value = MagicMock()
+        runner.console.reset_mock()
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            runner.apply(provider_with_env)
+        printed = [str(c.args[0]) for c in runner.console.print.call_args_list]
+        assert not any("MagicMock" in line for line in printed)
+
+    def test_provider_without_the_hook_is_a_noop(self, provider_with_env: MagicMock) -> None:
+        self._setup(provider_with_env, created=1)
+        del provider_with_env.post_apply_hook
+        assert self._apply(provider_with_env)["success"] is True
+
+
 class TestUnboundReconfigureCoalescing:
     """All three unbound managers (host_override / host_alias / forward)
     declare ``FINALIZATION_HOOK = "unbound_reconfigure"`` (#776). The runner

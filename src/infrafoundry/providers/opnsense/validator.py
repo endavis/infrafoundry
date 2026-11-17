@@ -11,7 +11,7 @@ from typing import Any, TypedDict, cast
 import urllib3
 
 from infrafoundry.core.config.models import EnvironmentConfig
-from infrafoundry.core.exceptions import ReferenceValidationError
+from infrafoundry.core.exceptions import InvalidConfigurationError, ReferenceValidationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import OPNsenseProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
@@ -19,6 +19,7 @@ from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense import endpoints
 from infrafoundry.providers.opnsense.api_client import OPNsenseClient
 from infrafoundry.providers.opnsense.services.hasync_settings import live_options
+from infrafoundry.providers.opnsense.services.hasync_status import resolve_ha_sync_options
 from infrafoundry.providers.opnsense.validators import (
     AcmeClientValidator,
     CronJobsValidator,
@@ -511,6 +512,10 @@ class OPNsenseValidator:
             resources: Resources to validate
             reference_resources: Resources that references may resolve to.
         """
+        try:
+            resolve_ha_sync_options(self.env_config.get_provider_settings("opnsense"))
+        except InvalidConfigurationError as exc:
+            self.api_validator.add_error(check_name="opnsense_ha_sync_settings", message=str(exc))
         resource_refs, reference_refs, xref_index = self._collect_refs(
             resources, reference_resources
         )

@@ -171,6 +171,14 @@ def test_hasync_settings_registers_its_endpoints() -> None:
     assert endpoints.HASYNC_GET in endpoints.DOCTOR_ENDPOINTS
 
 
+def test_post_apply_ha_sync_endpoints_are_registered() -> None:
+    for ep in (endpoints.HASYNC_STATUS_VERSION, endpoints.HASYNC_STATUS_RESTART_ALL):
+        assert ep in endpoints.POST_APPLY_ENDPOINTS
+        assert ep in endpoints.registered_endpoints()
+        assert ep.method == "POST"
+    assert endpoints.HASYNC_GET in endpoints.POST_APPLY_ENDPOINTS
+
+
 def test_source_nat_registers_get_set_apply() -> None:
     registered = endpoints.RESOURCE_TYPE_ENDPOINTS["firewall.source_nat"]
     assert endpoints.SOURCE_NAT_GET in registered

@@ -418,6 +418,9 @@ SYSLOG_RECONFIGURE = Endpoint("POST", "syslog/service/reconfigure")
 HASYNC_GET = Endpoint("GET", "core/hasync/get")
 HASYNC_SET = Endpoint("POST", "core/hasync/set")
 HASYNC_RECONFIGURE = Endpoint("POST", "core/hasync/reconfigure")
+# --- HA config sync after apply (#1390) ---
+HASYNC_STATUS_VERSION = Endpoint("POST", "core/hasync_status/version")
+HASYNC_STATUS_RESTART_ALL = Endpoint("POST", "core/hasync_status/restartAll")
 # In-tree plugin controller: not in stock specs (see the module docstring).
 ASSIGN_SETTINGS = _crud(
     "interfaces/assign_settings",
@@ -741,6 +744,13 @@ DOCTOR_ENDPOINTS: tuple[Endpoint, ...] = (
     GATEWAY.search,
     UNBOUND_HOST_OVERRIDE.search,
     HASYNC_GET,  # #1389: the live validator reads the pfsync interface and sync-item options
+)
+
+#: Endpoints the provider's post-apply HA sync calls (#1390).
+POST_APPLY_ENDPOINTS: tuple[Endpoint, ...] = (
+    HASYNC_GET,
+    HASYNC_STATUS_VERSION,
+    HASYNC_STATUS_RESTART_ALL,
 )
 
 #: Release series (``major.minor``) whose bundled specs the conformance test enforces.
