@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794914395852,
+  "lastUpdate": 1794915988038,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2626,6 +2626,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007643108774453147",
             "extra": "mean: 69.84789912001432 usec\nrounds: 15910"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "adf26ab12f68bb63a9274c163ae74533fd7d61ef",
+          "message": "feat: report opnsense carp pair health in infra doctor (merges PR #1443, addresses #1393)\n\ninfra doctor now runs a read-only HA health check for the OPNsense\nprovider. It reads per-VIP CARP state from\ndiagnostics/interface/getVipStatus and synchronizetoip from\ncore/hasync/get and, when a sync target is set, asks the peer for its\nversion through core/hasync_status/version, bounded by ha_sync_timeout.\nIt never calls the carpStatus write endpoint and needs no credentials\nbeyond the primary's.\n\nA node with a sync target is the sync source, so its VIPs are expected\nMASTER. Errors: a sync-source VIP not MASTER, INIT/DISABLED VIPs, mixed\nMASTER/BACKUP on a node of unknown role, CARP disallowed, an unreachable\npeer. Warnings: maintenance mode, demotion, CARP VIPs without a sync\ntarget (role unknown), a peer that answers without a version. A single\nnode with no CARP VIPs and no sync target is silent. A both-MASTER split\ncannot be seen from the primary alone; an unreachable peer while all\nVIPs are MASTER says it cannot be ruled out.\n\nAddresses #1393\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T11:45:28Z",
+          "tree_id": "5c6d4556e146d3a06c68614ebd92061a195ea169",
+          "url": "https://github.com/endavis/infrafoundry/commit/adf26ab12f68bb63a9274c163ae74533fd7d61ef"
+        },
+        "date": 1794915987157,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 104.81807190124667,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00014766867612361106",
+            "extra": "mean: 9.540339579439511 msec\nrounds: 107"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16385.99991700759,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006158125487477085",
+            "extra": "mean: 61.027706887882125 usec\nrounds: 17843"
           }
         ]
       }
