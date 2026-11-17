@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794940022519,
+  "lastUpdate": 1794941768063,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3234,6 +3234,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000003335638552713203",
             "extra": "mean: 63.929442539421466 usec\nrounds: 16681"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "864973e9e12f8bedce549115a09e02593d935127",
+          "message": "fix: give each provider its own remote terraform state location (merges PR #1476, addresses #1464)\n\nProviders in one environment all rendered the same backend key, prefix\nor workspace name, so they overwrote or locked each other's state.\n\nWith one backend-rendering provider the configured location is\nunchanged. With several, the provider id is inserted per backend type\n(s3/azurerm key path, gcs prefix, remote workspace, postgres schema).\nbackend.bare_key_provider pins one provider to the bare location, and a\n{provider} placeholder overrides the automatic rule. A warning names the\nprovider, old and new location and the terraform init -migrate-state\nsteps whenever the automatic rule moves a location. State is never moved\nsilently. The local backend is unaffected.\n\nAdds ADR-0025 and documents the rule, the pin, the placeholder and the\nmigration steps.\n\nAddresses #1464\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T18:55:16Z",
+          "tree_id": "abd190aae0cdb805a5109068f9476f3e9768431e",
+          "url": "https://github.com/endavis/infrafoundry/commit/864973e9e12f8bedce549115a09e02593d935127"
+        },
+        "date": 1794941767308,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 105.7184186024581,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003126074210270902",
+            "extra": "mean: 9.459089657407613 msec\nrounds: 108"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16768.14398001911,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000033604862941220772",
+            "extra": "mean: 59.6368925023305 usec\nrounds: 17405"
           }
         ]
       }
