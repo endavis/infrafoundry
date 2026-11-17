@@ -100,3 +100,26 @@ def test_install_failed_raises(service: SystemFirmwareService) -> None:
     service.system_client.install_plugin.return_value = {"result": "failed"}  # type: ignore[attr-defined]
     with pytest.raises(APIError):
         service.install_plugin("os-a")
+
+
+def test_desired_update_defaults(service: SystemFirmwareService) -> None:
+    assert service.desired_update(_res()) == (False, 1800)
+    assert service.desired_update(_res(update=True)) == (True, 1800)
+    assert service.desired_update(_res(update=True, update_timeout=600)) == (True, 600)
+
+
+def test_desired_update_ignores_invalid_timeout(service: SystemFirmwareService) -> None:
+    assert service.desired_update(_res(update=True, update_timeout=0)) == (True, 1800)
+    assert service.desired_update(_res(update=True, update_timeout=True)) == (True, 1800)
+
+
+def test_update_keys_are_not_settings_fields(service: SystemFirmwareService) -> None:
+    desired = service.build_desired_firmware_settings_fields(
+        _res(update=True, update_timeout=600, mirror="m")
+    )
+    assert desired == {"mirror": "m"}
+
+
+def test_pending_update_ignores_non_update_status(service: SystemFirmwareService) -> None:
+    assert service.pending_update({"status": "upgrade"}) is None
+    assert service.pending_update({"status": "none"}) is None

@@ -95,6 +95,41 @@ class SystemFirmwareValidator(SpecializedValidator[OPNsenseValidationContext]):
                             level=ValidationLevel.WARNING,
                         )
 
+        # update — opt-in bool; update_timeout — positive int seconds (#1452).
+        update = config.get("update")
+        if update is not None and not isinstance(update, bool):
+            self.report.add_check(
+                check_name=f"{check}_update",
+                passed=False,
+                message=(
+                    f"system.firmware '{resource.name}' update must be a boolean, "
+                    f"got {type(update).__name__}"
+                ),
+                level=ValidationLevel.ERROR,
+            )
+        timeout = config.get("update_timeout")
+        if timeout is not None:
+            if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout <= 0:
+                self.report.add_check(
+                    check_name=f"{check}_update_timeout",
+                    passed=False,
+                    message=(
+                        f"system.firmware '{resource.name}' update_timeout must be a "
+                        f"positive integer (seconds), got {timeout!r}"
+                    ),
+                    level=ValidationLevel.ERROR,
+                )
+            elif update is not True:
+                self.report.add_check(
+                    check_name=f"{check}_update_timeout_unused",
+                    passed=False,
+                    message=(
+                        f"system.firmware '{resource.name}' sets update_timeout without "
+                        f"update: true; it has no effect"
+                    ),
+                    level=ValidationLevel.WARNING,
+                )
+
         # Plain string settings fields.
         for field in ("mirror", "flavour", "type", "subscription", "reboot"):
             value = config.get(field)

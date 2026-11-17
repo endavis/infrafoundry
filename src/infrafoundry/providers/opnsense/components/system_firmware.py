@@ -19,6 +19,12 @@ Apply semantics (per the #806 user decision, 2026-05-10):
   state" symmetry.
 - **Destroy is a no-op.** Don't auto-uninstall.
 
+With ``update: true`` the singleton also updates the firmware (#1452): plan
+runs a firmware check and shows a pending minor update as a change; apply
+starts the update, waits for the job and any reboot, and re-reads the version
+before the plugin installs. Without ``update`` no firmware-update endpoint is
+called. Settings written in the same run take effect from the next update.
+
 Settings drift (only keys present in YAML: ``mirror``, ``flavour``, ...) is
 written through ``core/firmware/set`` (#1149; verified live on 26.1.6_2).
 Plugins are read from ``core/firmware/info`` and settings from
@@ -30,10 +36,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
 
-from ..services.system_firmware import SystemFirmwareService
+from ..services.system_firmware import PendingUpdate, SystemFirmwareService
 from ._singleton import SingletonDiff, enforce_singleton
 from .base import BaseComponentManager
 
@@ -58,8 +65,11 @@ class SystemFirmwareManager(BaseComponentManager):
 
         - ``adds`` — one ``{"plugin": name}`` entry per missing plugin,
           sorted by name.
-        - ``updates`` — at most one entry, ``{"settings": {...}}``, when
-          settings drift.
+        - ``updates`` — ``{"settings": {...}}`` when settings drift and, with
+          ``update: true`` and a pending minor update,
+          ``{"firmware_update": {"from": ..., "to": ...}}`` (listed first;
+          a reboot warning goes in ``warnings`` when OPNsense expects one).
+          A failed check is a warning only.
 
         ``deletes``/``locked`` are always empty for firmware. ``is_empty``
         is True iff there is no missing plugin AND no settings drift
@@ -78,6 +88,21 @@ class SystemFirmwareManager(BaseComponentManager):
         del add_only
         enforce_singleton(resources, "system.firmware")
         service = SystemFirmwareService.from_environment(env_name, provider_name, self.config_dir)
+        warnings: list[str] = []
+        pending: PendingUpdate | None = None
+        update_enabled, _ = service.desired_update(resources[0])
+        if update_enabled:
+            status = service.check_for_updates()
+            problem = service.status_problem(status)
+            if problem is not None:
+                warnings.append(f"system.firmware: cannot plan a firmware update: {problem}")
+            else:
+                pending = service.pending_update(status)
+            if pending is not None and pending.reboot:
+                warnings.append(
+                    "system.firmware: the firmware update will reboot the box "
+                    f"({pending.from_version} -> {pending.to_version})"
+                )
         info = service.get_firmware_info()
 
         # Plugin reconciliation
@@ -98,10 +123,17 @@ class SystemFirmwareManager(BaseComponentManager):
         desired_settings = service.build_desired_firmware_settings_fields(resources[0])
         settings_diff = service.settings_drift(live_settings, desired_settings)
 
-        return SingletonDiff(
+        diff = SingletonDiff(
             {"settings": settings_diff} if settings_diff is not None else None,
             adds=[{"plugin": name} for name in install_missing],
+            warnings=warnings,
         )
+        if pending is not None:
+            diff.updates.insert(
+                0,
+                {"firmware_update": {"from": pending.from_version, "to": pending.to_version}},
+            )
+        return diff
 
     def apply(
         self,
@@ -112,7 +144,12 @@ class SystemFirmwareManager(BaseComponentManager):
         add_only: bool = False,
         provider_name: str = "opnsense",
     ) -> dict[str, Any]:
-        """Apply: install missing plugins (one call per name), then write settings drift.
+        """Apply: update firmware (opt-in), install missing plugins, write settings drift.
+
+        With ``update: true`` the run first checks for a pending minor update,
+        starts it, waits for the job and any reboot, and re-reads the version.
+        A check that reports an error raises. A box that is already current
+        makes no update call.
 
         Each install is queued and then awaited; a plugin that is still not
         installed afterwards raises ``APIError`` (#1238), and neither the
@@ -132,12 +169,42 @@ class SystemFirmwareManager(BaseComponentManager):
             ``action="add"`` and ``resource_name=<plugin_name>``.
 
         Raises:
-            APIError: If an install is rejected, times out, or finishes
-                without the plugin being installed.
+            APIError: If the firmware check reports an error, the update does
+                not reach the expected version in ``update_timeout``, or an
+                install is rejected, times out, or finishes without the
+                plugin being installed.
         """
         del auto_approve, add_only
         enforce_singleton(resources, "system.firmware")
         service = SystemFirmwareService.from_environment(env_name, provider_name, self.config_dir)
+        outcomes: list[ResourceOutcome] = []
+        updated = 0
+        update_enabled, update_timeout = service.desired_update(resources[0])
+        if update_enabled:
+            status = service.check_for_updates()
+            problem = service.status_problem(status)
+            if problem is not None:
+                raise APIError(
+                    f"system.firmware: cannot update the firmware: {problem}",
+                    provider="opnsense",
+                )
+            pending = service.pending_update(status)
+            if pending is not None:
+                logger.info(
+                    "system.firmware: updating firmware %s -> %s",
+                    pending.from_version,
+                    pending.to_version,
+                )
+                service.start_update()
+                service.wait_for_update(pending.to_version, timeout=update_timeout)
+                outcomes.append(
+                    ResourceOutcome(
+                        address="opnsense_system_firmware.update",
+                        action="update",
+                        resource_name=resources[0].name,
+                    )
+                )
+                updated += 1
         info = service.get_firmware_info()
 
         installed = service.extract_installed_plugins(info)
@@ -150,7 +217,6 @@ class SystemFirmwareManager(BaseComponentManager):
                 extra,
             )
 
-        outcomes: list[ResourceOutcome] = []
         created = 0
         for plugin_name in install_missing:
             service.install_plugin(plugin_name)
@@ -167,14 +233,13 @@ class SystemFirmwareManager(BaseComponentManager):
         live_settings = service.extract_firmware_settings_fields(service.get_firmware_settings())
         desired_settings = service.build_desired_firmware_settings_fields(resources[0])
         settings_diff = service.settings_drift(live_settings, desired_settings)
-        updated = 0
         if settings_diff is not None:
             logger.info(
                 "system.firmware: updating settings %s",
                 sorted(settings_diff.keys()),
             )
             service.set_firmware_settings({"firmware": settings_diff})
-            updated = 1
+            updated += 1
             outcomes.append(
                 ResourceOutcome(
                     address="opnsense_system_firmware.settings",

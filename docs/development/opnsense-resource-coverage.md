@@ -44,7 +44,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<system>/dnsserver` + `<system>/dnsallowoverride` + `<system>/dnsXgw` | `system.dns` | **Unsupported on 26.1 (#1149); implementation removed (#1244).** No API on OPNsense 26.1 (its endpoints 404); configured on the legacy System > Settings > General page. `infra plan`/`apply` and `infra doctor` reject the type with this reason; the [endpoint check](#endpoint-registry-and-version-check-1239) would reject it too. |
 | `<system>/ssh` | `system.ssh` | **Unsupported on 26.1 (#1149); implementation removed (#1244).** No API on OPNsense 26.1 (its endpoints 404); configured on the legacy System > Settings > Administration page. `infra plan`/`apply` and `infra doctor` reject the type with this reason; the [endpoint check](#endpoint-registry-and-version-check-1239) would reject it too. |
 | `<system>/webgui` | `system.webgui` | **Unsupported on 26.1 (#1149); implementation removed (#1244).** No API on OPNsense 26.1 (its endpoints 404); configured on the legacy System > Settings > Administration page. `infra plan`/`apply` and `infra doctor` reject the type with this reason; the [endpoint check](#endpoint-registry-and-version-check-1239) would reject it too. |
-| `<system>/firmware` | `system.firmware` | Supported (direct-API; #806, reworked #1149). Reads `core/firmware/info` (plugins) and `core/firmware/get` (settings) — verified live on 26.1.6_2. Install-missing-only for plugins (extras warned, never removed); settings drift for the keys present in YAML is written via `core/firmware/set`. **Live results on 26.1.6_2 (#1238):** `POST core/firmware/set` verified (`reboot` 0 → 1 → 0). `install/<pkg>` only queues a background job; the request reached OPNsense but was refused because the box was out of date (the mirror required 26.1.11_10), so a full install check needs a box at the mirror's current release. Apply now waits on `core/firmware/upgradestatus` and re-reads `core/firmware/info`, and fails with the firmware log tail if the plugin is not installed afterwards. Plan counts each missing plugin as an add, matching apply. `remove/<pkg>` and `lock/<pkg>` not tested (apply never calls them). |
+| `<system>/firmware` | `system.firmware` | Supported (direct-API; #806, reworked #1149). Reads `core/firmware/info` (plugins) and `core/firmware/get` (settings) — verified live on 26.1.6_2. Install-missing-only for plugins (extras warned, never removed); settings drift for the keys present in YAML is written via `core/firmware/set`. **Live results on 26.1.6_2 (#1238):** `POST core/firmware/set` verified (`reboot` 0 → 1 → 0). `install/<pkg>` only queues a background job; the request reached OPNsense but was refused because the box was out of date (the mirror required 26.1.11_10), so a full install check needs a box at the mirror's current release. Apply now waits on `core/firmware/upgradestatus` and re-reads `core/firmware/info`, and fails with the firmware log tail if the plugin is not installed afterwards. Plan counts each missing plugin as an add, matching apply. `remove/<pkg>` and `lock/<pkg>` not tested (apply never calls them). With `update: true` it also applies the pending minor firmware update before the plugin installs (#1452, not yet verified live); see [System firmware update (#1452)](#system-firmware-update-1452). |
 | `<system>/remotebackup` (GDrive) | `system.remotebackup` | **Unsupported on 26.1 (#1149); implementation removed (#1244).** No API on OPNsense 26.1 (its endpoints 404); configured on the legacy System > Configuration > Backups page (Google Drive; the page name is an inference, not measured). `infra plan`/`apply` and `infra doctor` reject the type with this reason; the [endpoint check](#endpoint-registry-and-version-check-1239) would reject it too. |
 | `<sysctl>` | `system.tuning` | Supported (direct-API; #806, reworked #1149). Per-tunable add/update by name via `core/tunables/*`; tunables not in YAML are never touched. `core/tunables/get` verified live on 26.1.6_2. **Live results on 26.1.6_2 (#1238):** `setItem/<uuid>` verified (changed, then reverted); `addItem` verified (58 → 59 entries); `reconfigure` verified (ran after each tuning apply; re-plan stable); `delItem/<uuid>` verified by hand (apply never calls it). |
 | `<dhcpdv6>/<optN>/<ra*>` (legacy ISC RA) → `radvd/settings/*Entry` (modern controller) | `radvd` | Supported (direct-API; #788). **Hybrid YAML-singleton/wire-list** — operator authors a single dict-shape `radvd` resource whose `interfaces` mapping carries one inner mapping per interface; the wire stores those as per-UUID records (verb suffix `*Entry`, NOT `*Item` — confirmed via live probe 2026-05-10). Identity is the wire `interface` field per record. Full-reconcile semantics: interfaces in live state but absent from YAML get DELETED (safe — deleting a record stops RA emission, no data loss). Per-interface `enabled` field replaces a global enable toggle. New shared finalization hook `radvd_reconfigure` coalesces a single `radvd/service/reconfigure` call per apply. **Source-XML location is the legacy `<dhcpdv6>/<optN>/<ra*>` path** — this resource type targets the modern MVC controller only; the legacy path is read-only reference for migration values (Kea owns DHCPv6 leases via `kea.dhcp6.*`, the modern radvd controller owns RA emission). Wire field names use OPNsense's CamelCase (`MinRtrAdvInterval`, `MaxRtrAdvInterval`, `AdvDefaultPreference`, `RDNSS`, `DNSSL`); operator-facing YAML uses snake_case (`min_interval`, `max_interval`, `priority`, `dns_servers`, `domain_search`, `routes`) with translation at the apply boundary. See [ADR-0014 §`radvd`](../decisions/0014-opnsense-direct-api-apply-mechanism.md#radvd-788-2026-05-12). |
@@ -1101,6 +1101,46 @@ opnsense:
 - **Plan warning.** When at least one enabled outbound rule is declared and the effective mode is `automatic` or `disabled`, the plan warns that the rules have no effect and names `firewall.source_nat`. The effective mode is the declared `snat_mode`, otherwise the live one. No warning is issued when the live mode cannot be read.
 
 **Verified live** on a test firewall: `firewall/source_nat/set` with the `filter.general` envelope returned `saved`, `firewall/source_nat/apply` returned `OK`, and afterwards `searchRule` listed the rule and the plan showed no changes. The new code was then run live on the same box. With the mode set back to `automatic` and one managed outbound rule stored, `searchRule` returned no rows, yet the plan showed `firewall.nat` with nothing to add and printed the inert-mode warning. Declaring `snat_mode: hybrid` planned one `firewall.source_nat` update and no warning; the apply ran the `source_nat_apply` hook once, the mode read back `hybrid`, `searchRule` listed the rule again, and the re-plan showed no changes. `config migrate` emitted the declared mode. Copies a box already holds are not removed: live outbound rules are matched by name, so duplicates collapse to one match.
+
+## System firmware update (#1452)
+
+`system.firmware` can bring the box to the latest minor release of its series before it installs plugins. A box built from the nano image of a base release stays on that release until it is updated, and a stale box refuses plugin installs (#1238). The update is opt-in.
+
+| YAML | meaning |
+| :--- | :--- |
+| `update` | `true` applies the pending minor update; absent or `false` calls no update endpoint |
+| `update_timeout` | seconds for the update job and the reboot wait together, default `1800` |
+
+```yaml
+opnsense:
+  system:
+    firmware:
+      update: true
+      update_timeout: 2400
+      plugins:
+        - os-acme-client
+```
+
+`update` and `update_timeout` are never written to the box and `config migrate` never emits them. The validator rejects a non-boolean `update` and a non-positive-integer `update_timeout`, and warns about `update_timeout` without `update: true`.
+
+**Endpoints** (checked against the OPNsense 26.1 core sources and bundled spec, not yet run live):
+
+| Endpoint | Kind | Use |
+| :--- | :--- | :--- |
+| `POST core/firmware/check` | starts a job, no release change | refresh the package catalogue; with `update: true`, plan and apply run it first |
+| `GET core/firmware/status` | read-only | the cached check result: `status` (`update`, `upgrade`, `none`, `error`), `upgrade_packages`, `product_id`, `product_version`, `status_reboot` |
+| `POST core/firmware/update` | starts a job, may reboot the box | the minor update; it takes no version argument |
+| `GET core/firmware/upgradestatus` | read-only | job status (`running`, `done`, `reboot`, `error`) and log |
+| `GET core/firmware/info` | read-only | the running `product_version` |
+
+`core/firmware/upgrade` (major upgrade) and `core/firmware/reboot` are never registered or called. There is no target-release setting, because the endpoint installs the latest release of the series.
+
+- **Plan.** With `update: true`, plan posts a check, waits for the job (up to 300 s) and reads the status. `update` plans `{"firmware_update": {"from": ..., "to": ...}}` as an update, with a warning when OPNsense expects a reboot. `none`, and `upgrade` (a major release, which is out of scope), plan clean. A status of `error`, or no cached check data, only warns, with the status message; apply raises instead. The target is the `new_version` of the `upgrade_packages` row named `product_id`.
+- **Apply.** The order is check, update, wait, re-read the version, plugin installs, settings write. A box that is already current makes no update call. The wait polls `upgradestatus` through the reboot OPNsense starts itself: `running`, `reboot`, connection errors and 5xx answers count as in progress. Any other status triggers a read of `core/firmware/info`; the expected version is success, and a second observation without it is a failure. Authentication errors are not retried. A failure or timeout raises with the sanitised tail of the firmware log (URLs reduced to `scheme://host`, the subscription masked). Reaching the expected version with a "Partial update failure" in the log succeeds with a warning.
+- **Settings in the same run.** `mirror`, `type` and `reboot` written in the same apply take effect from the next update, because the settings write comes last.
+- **HA pairs.** Update each node through its own environment so both reach the same release. The HA sync after apply runs after the update.
+
+**Not yet verified live.** The first live run on a nano-image firewall is the open success criterion of #1452.
 
 ## How deletes work: the managed set (#1256)
 

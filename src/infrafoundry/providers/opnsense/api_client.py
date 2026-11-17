@@ -786,6 +786,41 @@ class SystemClient:
             endpoints.FIRMWARE_UPGRADESTATUS.method, endpoints.FIRMWARE_UPGRADESTATUS.path()
         )
 
+    def check_firmware(self) -> dict[str, Any]:
+        """Start a firmware check job (``POST core/firmware/check``, #1452).
+
+        The check refreshes the package catalogue and does not change the
+        release. It only starts a job; poll :meth:`get_upgrade_status`.
+
+        Returns:
+            Raw API response (a job acknowledgement).
+        """
+        return self.client.request(endpoints.FIRMWARE_CHECK.method, endpoints.FIRMWARE_CHECK.path())
+
+    def get_firmware_status(self) -> dict[str, Any]:
+        """Read the cached firmware check result (``GET core/firmware/status``, #1452).
+
+        Returns:
+            Raw API response: ``status``, ``upgrade_packages``, ``product_id``,
+            ``product_version``, ``status_reboot`` and related keys.
+        """
+        return self.client.request(
+            endpoints.FIRMWARE_STATUS.method, endpoints.FIRMWARE_STATUS.path()
+        )
+
+    def update_firmware(self) -> dict[str, Any]:
+        """Start the minor firmware update (``POST core/firmware/update``, #1452).
+
+        Starts a background job that takes no version argument and may reboot
+        the box on its own. Poll :meth:`get_upgrade_status`.
+
+        Returns:
+            Raw API response (a job acknowledgement).
+        """
+        return self.client.request(
+            endpoints.FIRMWARE_UPDATE.method, endpoints.FIRMWARE_UPDATE.path()
+        )
+
     def remove_plugin(self, name: str) -> dict[str, Any]:
         """Remove an OPNsense plugin (unverified; apply never calls this).
 

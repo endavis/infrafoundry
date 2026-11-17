@@ -18,9 +18,14 @@ from pathlib import Path
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
-from infrafoundry.core.exceptions import APIError, InvalidConfigurationError
+from infrafoundry.core.exceptions import (
+    APIError,
+    AuthenticationError,
+    InvalidConfigurationError,
+)
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.components.system_firmware import (
     SystemFirmwareManager,
@@ -31,7 +36,7 @@ SERVICE_PATH = "infrafoundry.providers.opnsense.components.system_firmware.Syste
 
 
 def _resource(
-    *, plugins: list[str] | None = None, extra: dict[str, str] | None = None
+    *, plugins: list[str] | None = None, extra: dict[str, Any] | None = None
 ) -> ResourceConfig:
     return ResourceConfig(
         name="system.firmware",
@@ -474,3 +479,398 @@ class TestPlanApplyParity:
             result = manager.apply("test-env", [resource])
         assert len(diff.adds) == adds == result["resources_created"]
         assert len(diff.updates) == updates == result["resources_updated"]
+
+
+# ---------------------------------------------------------------------------
+# Firmware update (#1452)
+# ---------------------------------------------------------------------------
+
+_STATUS_UPDATE = {
+    "status": "update",
+    "all_packages": {},
+    "product_id": "opnsense",
+    "product_version": "26.1.6_2",
+    "status_reboot": "0",
+    "upgrade_packages": [
+        {"name": "opnsense", "current_version": "26.1.6_2", "new_version": "26.1.7"},
+        {"name": "curl", "current_version": "8.0", "new_version": "8.1"},
+    ],
+}
+_STATUS_NONE = {
+    "status": "none",
+    "all_packages": {},
+    "product_id": "opnsense",
+    "product_version": "26.1.6_2",
+    "status_reboot": "0",
+}
+
+
+def _update_service(
+    status: dict[str, Any],
+    *,
+    installed: list[str] | None = None,
+    versions: list[str] | None = None,
+) -> SystemFirmwareService:
+    """Service mock whose check reports ``status`` and whose box reaches the new version.
+
+    ``versions`` are the successive ``product_version`` answers of
+    ``firmware/info`` once the update has been started; before that the box
+    runs the status' own version.
+    """
+    service = _make_service_mock(installed=installed)
+    client = _client(service)
+    base_info = client.get_firmware_info.side_effect
+    state = {"updated": False}
+    queue = list(versions if versions is not None else ["26.1.7"])
+
+    def _info() -> dict[str, Any]:
+        info: dict[str, Any] = base_info()
+        if not state["updated"]:
+            info["product_version"] = status.get("product_version", "")
+        else:
+            info["product_version"] = queue.pop(0) if len(queue) > 1 else queue[0]
+        return info
+
+    def _update() -> dict[str, Any]:
+        state["updated"] = True
+        return {"status": "ok", "msg_uuid": "x"}
+
+    client.get_firmware_info.side_effect = _info
+    client.check_firmware.return_value = {"status": "ok", "msg_uuid": "x"}
+    client.get_firmware_status.return_value = status
+    client.update_firmware.side_effect = _update
+    return service
+
+
+def _plan(
+    manager: SystemFirmwareManager, service: SystemFirmwareService, resource: ResourceConfig
+) -> Any:
+    with patch(SERVICE_PATH) as svc_cls, patch(TIME_PATH) as fake_time:
+        fake_time.monotonic.return_value = 0.0
+        svc_cls.from_environment.return_value = service
+        return manager.plan("test-env", [resource])
+
+
+def _apply(
+    manager: SystemFirmwareManager, service: SystemFirmwareService, resource: ResourceConfig
+) -> Any:
+    with patch(SERVICE_PATH) as svc_cls, patch(TIME_PATH) as fake_time:
+        fake_time.monotonic.return_value = 0.0
+        svc_cls.from_environment.return_value = service
+        return manager.apply("test-env", [resource])
+
+
+class TestPlanFirmwareUpdate:
+    def test_update_absent_calls_no_firmware_update_endpoint(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_UPDATE, installed=["os-tailscale"])
+        diff = _plan(SystemFirmwareManager(tmp_path), service, _resource(plugins=["os-tailscale"]))
+        client = _client(service)
+        assert diff.is_empty
+        client.check_firmware.assert_not_called()
+        client.get_firmware_status.assert_not_called()
+        client.update_firmware.assert_not_called()
+
+    def test_update_false_calls_nothing(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_UPDATE, installed=["os-tailscale"])
+        resource = _resource(plugins=["os-tailscale"], extra={"update": False})
+        diff = _plan(SystemFirmwareManager(tmp_path), service, resource)
+        assert diff.is_empty
+        _client(service).check_firmware.assert_not_called()
+
+    def test_current_box_plans_clean(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_NONE, installed=["os-tailscale"])
+        resource = _resource(plugins=["os-tailscale"], extra={"update": True})
+        diff = _plan(SystemFirmwareManager(tmp_path), service, resource)
+        assert diff.is_empty
+        assert diff.warnings == []
+        _client(service).check_firmware.assert_called_once_with()
+
+    def test_pending_update_is_a_change(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_UPDATE, installed=["os-tailscale"])
+        resource = _resource(plugins=["os-tailscale"], extra={"update": True})
+        diff = _plan(SystemFirmwareManager(tmp_path), service, resource)
+        assert diff.updates == [{"firmware_update": {"from": "26.1.6_2", "to": "26.1.7"}}]
+        assert not diff.is_empty
+        _client(service).update_firmware.assert_not_called()
+
+    def test_pending_update_with_reboot_warns(self, tmp_path: Path) -> None:
+        service = _update_service(
+            {**_STATUS_UPDATE, "status_reboot": "1"}, installed=["os-tailscale"]
+        )
+        resource = _resource(plugins=["os-tailscale"], extra={"update": True})
+        diff = _plan(SystemFirmwareManager(tmp_path), service, resource)
+        assert len(diff.warnings) == 1
+        assert "reboot" in diff.warnings[0]
+
+    def test_target_falls_back_to_current_without_product_row(self, tmp_path: Path) -> None:
+        status = {**_STATUS_UPDATE, "upgrade_packages": [{"name": "curl", "new_version": "9"}]}
+        service = _update_service(status, installed=["os-tailscale"])
+        resource = _resource(plugins=["os-tailscale"], extra={"update": True})
+        diff = _plan(SystemFirmwareManager(tmp_path), service, resource)
+        assert diff.updates == [{"firmware_update": {"from": "26.1.6_2", "to": "26.1.6_2"}}]
+
+    def test_major_upgrade_only_plans_clean(self, tmp_path: Path) -> None:
+        status = {**_STATUS_NONE, "status": "upgrade"}
+        service = _update_service(status, installed=["os-tailscale"])
+        resource = _resource(plugins=["os-tailscale"], extra={"update": True})
+        diff = _plan(SystemFirmwareManager(tmp_path), service, resource)
+        assert diff.is_empty
+
+    def test_error_status_warns_without_entry(self, tmp_path: Path) -> None:
+        status = {"status": "error", "status_msg": "Could not connect to https://pkg.example.com/x"}
+        service = _update_service(status, installed=["os-tailscale"])
+        resource = _resource(plugins=["os-tailscale"], extra={"update": True})
+        diff = _plan(SystemFirmwareManager(tmp_path), service, resource)
+        assert diff.is_empty
+        assert len(diff.warnings) == 1
+        assert "Could not connect" in diff.warnings[0]
+        assert "/x" not in diff.warnings[0]
+
+    def test_no_check_data_warns(self, tmp_path: Path) -> None:
+        service = _update_service({"status": "none"}, installed=["os-tailscale"])
+        resource = _resource(plugins=["os-tailscale"], extra={"update": True})
+        diff = _plan(SystemFirmwareManager(tmp_path), service, resource)
+        assert diff.is_empty
+        assert len(diff.warnings) == 1
+
+    def test_update_and_settings_drift_are_two_updates(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_UPDATE, installed=["os-tailscale"])
+        resource = _resource(
+            plugins=["os-tailscale"], extra={"update": True, "mirror": "https://m.example.com"}
+        )
+        diff = _plan(SystemFirmwareManager(tmp_path), service, resource)
+        assert len(diff.updates) == 2
+        assert "firmware_update" in diff.updates[0]
+        assert "settings" in diff.updates[1]
+
+    def test_check_wait_times_out(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_UPDATE, installed=["os-tailscale"])
+        _client(service).get_upgrade_status.return_value = {"status": "running", "log": ""}
+        resource = _resource(plugins=["os-tailscale"], extra={"update": True})
+        with patch(SERVICE_PATH) as svc_cls, patch(TIME_PATH) as fake_time:
+            fake_time.monotonic.side_effect = [0.0, 301.0]
+            svc_cls.from_environment.return_value = service
+            with pytest.raises(APIError, match="timed out"):
+                SystemFirmwareManager(tmp_path).plan("test-env", [resource])
+
+
+class TestApplyFirmwareUpdate:
+    def test_update_absent_calls_nothing(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_UPDATE, installed=["os-tailscale"])
+        result = _apply(
+            SystemFirmwareManager(tmp_path), service, _resource(plugins=["os-tailscale"])
+        )
+        client = _client(service)
+        client.check_firmware.assert_not_called()
+        client.update_firmware.assert_not_called()
+        assert result["resources_updated"] == 0
+
+    def test_current_box_makes_no_update_call(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_NONE, installed=["os-tailscale"])
+        resource = _resource(plugins=["os-tailscale"], extra={"update": True})
+        result = _apply(SystemFirmwareManager(tmp_path), service, resource)
+        _client(service).update_firmware.assert_not_called()
+        assert result["resources_updated"] == 0
+
+    def test_update_runs_before_plugins_and_settings(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_UPDATE, installed=[])
+        client = _client(service)
+        calls: list[str] = []
+
+        def _rec(name: str, value: Any) -> Any:
+            calls.append(name)
+            return value
+
+        client.check_firmware.side_effect = lambda: _rec("check", {"status": "ok"})
+        orig_update = client.update_firmware.side_effect
+        client.update_firmware.side_effect = lambda: _rec("update", orig_update())
+        orig_install = client.install_plugin.side_effect
+        client.install_plugin.side_effect = lambda n: _rec("install", orig_install(n))
+        client.set_firmware_settings.side_effect = lambda p: _rec("settings", {"result": "saved"})
+        client.get_upgrade_status.return_value = {"status": "done", "log": ""}
+        resource = _resource(
+            plugins=["os-acme-client"], extra={"update": True, "mirror": "https://m.example.com"}
+        )
+        result = _apply(SystemFirmwareManager(tmp_path), service, resource)
+        assert calls == ["check", "update", "install", "settings"]
+        assert result["resources_created"] == 1
+        assert result["resources_updated"] == 2
+        outcomes = [(o.address, o.action) for o in result["resource_outcomes"]]
+        assert outcomes == [
+            ("opnsense_system_firmware.update", "update"),
+            ("opnsense_firmware_plugin.os-acme-client", "add"),
+            ("opnsense_system_firmware.settings", "update"),
+        ]
+
+    def test_error_status_raises_before_any_write(self, tmp_path: Path) -> None:
+        service = _update_service({"status": "error", "status_msg": "boom"}, installed=[])
+        resource = _resource(plugins=["os-acme-client"], extra={"update": True})
+        with pytest.raises(APIError, match="boom"):
+            _apply(SystemFirmwareManager(tmp_path), service, resource)
+        client = _client(service)
+        client.update_firmware.assert_not_called()
+        client.install_plugin.assert_not_called()
+
+    def test_start_failure_raises(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_UPDATE, installed=[])
+        client = _client(service)
+        client.update_firmware.side_effect = APIError("refused", provider="opnsense")
+        resource = _resource(plugins=["os-acme-client"], extra={"update": True})
+        with pytest.raises(APIError, match="refused"):
+            _apply(SystemFirmwareManager(tmp_path), service, resource)
+        client.install_plugin.assert_not_called()
+
+    def test_rejected_start_raises(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_UPDATE, installed=[])
+        _client(service).update_firmware.side_effect = None
+        _client(service).update_firmware.return_value = {"result": "failed"}
+        resource = _resource(plugins=["os-acme-client"], extra={"update": True})
+        with pytest.raises(APIError, match="rejected"):
+            _apply(SystemFirmwareManager(tmp_path), service, resource)
+
+    def test_update_timeout_is_passed_to_the_wait(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_UPDATE, installed=["os-tailscale"])
+        resource = _resource(
+            plugins=["os-tailscale"], extra={"update": True, "update_timeout": 900}
+        )
+        with patch.object(service, "wait_for_update") as wait:
+            _apply(SystemFirmwareManager(tmp_path), service, resource)
+        wait.assert_called_once_with("26.1.7", timeout=900)
+
+    def test_update_timeout_defaults_to_1800(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_UPDATE, installed=["os-tailscale"])
+        resource = _resource(plugins=["os-tailscale"], extra={"update": True})
+        with patch.object(service, "wait_for_update") as wait:
+            _apply(SystemFirmwareManager(tmp_path), service, resource)
+        wait.assert_called_once_with("26.1.7", timeout=1800)
+
+
+class TestWaitForUpdate:
+    def _service(self, versions: list[str]) -> SystemFirmwareService:
+        service = _make_service_mock()
+        client = _client(service)
+        queue = list(versions)
+        client.get_firmware_info.side_effect = lambda: {
+            "product_version": queue.pop(0) if len(queue) > 1 else queue[0],
+            "plugin": [],
+        }
+        return service
+
+    def test_success_through_a_reboot(self) -> None:
+        service = self._service(["26.1.7"])
+        client = _client(service)
+        client.get_upgrade_status.side_effect = [
+            {"status": "running", "log": "***GOT REQUEST TO UPDATE***"},
+            {"status": "reboot", "log": "rebooting"},
+            httpx.ConnectError("down"),
+            APIError("bad gateway", status_code=502, provider="opnsense"),
+            {"status": "error", "log": ""},
+        ]
+        with patch(TIME_PATH) as fake_time:
+            fake_time.monotonic.return_value = 0.0
+            service.wait_for_update("26.1.7", timeout=100, interval=1)
+        assert fake_time.sleep.call_count == 4
+
+    def test_transient_error_while_reading_info_is_in_progress(self) -> None:
+        service = _make_service_mock()
+        client = _client(service)
+        client.get_upgrade_status.return_value = {"status": "done", "log": ""}
+        client.get_firmware_info.side_effect = [
+            APIError("503", status_code=503, provider="opnsense"),
+            {"product_version": "26.1.7", "plugin": []},
+        ]
+        with patch(TIME_PATH) as fake_time:
+            fake_time.monotonic.return_value = 0.0
+            service.wait_for_update("26.1.7", timeout=100, interval=1)
+
+    def test_failed_update_reports_log_tail(self) -> None:
+        service = self._service(["26.1.6_2"])
+        _client(service).get_upgrade_status.return_value = {
+            "status": "done",
+            "log": "line1\nFetching failed for https://pkg.example.com/secret/path\n***DONE***",
+        }
+        with patch(TIME_PATH) as fake_time:
+            fake_time.monotonic.return_value = 0.0
+            with pytest.raises(APIError) as exc:
+                service.wait_for_update("26.1.7", timeout=100, interval=1)
+        text = str(exc.value)
+        assert "26.1.7" in text
+        assert "Fetching failed" in text
+        assert "secret/path" not in text
+        assert "https://pkg.example.com/***" in text
+
+    def test_stale_done_gets_one_more_observation(self) -> None:
+        service = self._service(["26.1.6_2", "26.1.7"])
+        _client(service).get_upgrade_status.return_value = {"status": "done", "log": ""}
+        with patch(TIME_PATH) as fake_time:
+            fake_time.monotonic.return_value = 0.0
+            service.wait_for_update("26.1.7", timeout=100, interval=1)
+        assert fake_time.sleep.call_count == 1
+
+    def test_reboot_timeout_carries_the_last_log(self) -> None:
+        service = self._service(["26.1.6_2"])
+        client = _client(service)
+        client.get_upgrade_status.side_effect = [
+            {"status": "running", "log": "installing base"},
+            httpx.ConnectError("down"),
+            httpx.ConnectError("down"),
+        ]
+        with patch(TIME_PATH) as fake_time:
+            fake_time.monotonic.side_effect = [0.0, 1.0, 2.0, 101.0]
+            with pytest.raises(APIError) as exc:
+                service.wait_for_update("26.1.7", timeout=100, interval=1)
+        assert "timed out after 100s" in str(exc.value)
+        assert "installing base" in str(exc.value)
+
+    def test_authentication_error_is_not_swallowed(self) -> None:
+        service = self._service(["26.1.7"])
+        _client(service).get_upgrade_status.side_effect = AuthenticationError(
+            "denied", provider="opnsense"
+        )
+        with patch(TIME_PATH) as fake_time:
+            fake_time.monotonic.return_value = 0.0
+            with pytest.raises(AuthenticationError):
+                service.wait_for_update("26.1.7", timeout=100, interval=1)
+
+    def test_subscription_is_masked_in_the_log(self) -> None:
+        service = self._service(["26.1.6_2"])
+        client = _client(service)
+        client.get_firmware_settings.return_value = {
+            "firmware": {"subscription": "sekret-key", "mirror": "", "reboot": "0"}
+        }
+        client.get_upgrade_status.return_value = {"status": "done", "log": "key sekret-key bad"}
+        with patch(TIME_PATH) as fake_time:
+            fake_time.monotonic.return_value = 0.0
+            with pytest.raises(APIError) as exc:
+                service.wait_for_update("26.1.7", timeout=100, interval=1)
+        assert "sekret-key" not in str(exc.value)
+
+    def test_partial_failure_with_expected_version_succeeds_with_warning(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        service = self._service(["26.1.7"])
+        _client(service).get_upgrade_status.return_value = {
+            "status": "done",
+            "log": "Partial update failure",
+        }
+        with patch(TIME_PATH) as fake_time, caplog.at_level(logging.WARNING):
+            fake_time.monotonic.return_value = 0.0
+            service.wait_for_update("26.1.7", timeout=100, interval=1)
+        assert "partial update failure" in caplog.text
+
+
+class TestFirmwareUpdateConfigNeverWritten:
+    def test_set_payload_carries_no_update_keys(self, tmp_path: Path) -> None:
+        service = _update_service(_STATUS_NONE, installed=["os-tailscale"])
+        resource = _resource(
+            plugins=["os-tailscale"],
+            extra={"update": True, "update_timeout": 900, "mirror": "https://m.example.com"},
+        )
+        _apply(SystemFirmwareManager(tmp_path), service, resource)
+        payload = _client(service).set_firmware_settings.call_args.args[0]
+        assert payload == {"firmware": {"mirror": "https://m.example.com"}}
+
+    def test_export_has_no_update_keys(self) -> None:
+        service = _make_service_mock(installed=["os-tailscale"])
+        out = service.export_to_yaml()
+        assert "update" not in out
