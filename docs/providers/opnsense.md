@@ -71,6 +71,8 @@ provider_settings:
 | `ssh_user` | `root` | SSH user for that install |
 | `ssh_port` | `22` | SSH port for that install |
 | `ssh_key` | ssh-agent or `~/.ssh/config` | Private key path for that install |
+| `ha_sync_after_apply` | `true` | Sync the config to the HA backup after an apply: `true` (only when the apply changed something), `"always"`, or `false` |
+| `ha_sync_timeout` | `300` | Seconds to wait for each HA sync call, an integer above 0 |
 
 Keep the key and secret in the environment's SOPS-encrypted `secrets.yaml` and reference them with `secret://` URIs.
 
@@ -206,6 +208,35 @@ After a migration, plan and apply with `--add-only` until the YAML describes the
 ## Finalization Hooks
 
 After an apply, the runner makes one reconfigure call per service whose components changed, however many of its types changed. The hook keys (`OPNsenseProvider.get_finalization_hooks`) are `kea_reconfigure`, `unbound_reconfigure`, `radvd_reconfigure`, `cron_reconfigure`, `openvpn_reconfigure`, `tunables_reconfigure`, `interfaces_settings_reconfigure`, `syslog_reconfigure`, `hasync_reconfigure`, `source_nat_apply`, `hostdiscovery_reconfigure`, `acmeclient_reconfigure`, `tailscale_reconfigure` and `monit_reconfigure`. A hook that fails fails the apply.
+
+## HA Sync After Apply
+
+When the firewall is the primary of an HA pair, an apply also has to push the config to the backup. After every component has applied and the finalization hooks have run, the provider reads `synchronize_to_ip` from the live `core/hasync/get`. If a backup is set, it calls `core/hasync_status/version` as a preflight and then `core/hasync_status/restartAll`, the action behind the GUI's "Synchronize and reconfigure all". It runs on `apply` only, not on `plan` or `destroy`, and not after a failed component. It runs after the `hasync.settings` reconfigure, so an apply that sets `synchronize_to_ip` for the first time syncs to the new target.
+
+`ha_sync_after_apply` controls it:
+
+| Value | Meaning |
+|-------|---------|
+| `true` (default) | Sync only when the apply created, updated or deleted something. A no-op apply restarts nothing on the backup. |
+| `"always"` | Sync even when nothing changed. |
+| `false` | Never sync. |
+
+`ha_sync_timeout` (default `300` seconds) applies to all three calls. An unreachable backup makes the preflight answer only after about 60 seconds, so the 30 second client default would hide the endpoint's message. A bad value for either key fails `infra plan` and `infra apply` before anything is written.
+
+The apply prints one status line, or one of these skips:
+
+- `HA sync after apply disabled (ha_sync_after_apply: false)`
+- `HA sync skipped: apply changed nothing`
+- `HA sync skipped: no synchronize_to_ip on this node`
+
+When the preflight or the sync fails, the apply fails with an error that names the backup address and the endpoint and quotes the endpoint's message, for example `HA sync to backup 192.0.2.2 failed at core/hasync_status/version: <message>`. A timeout or connection error names the backup, the endpoint and `ha_sync_timeout`.
+
+**State after a failure.** The primary has already been written, so the next apply sees no difference on the primary and, with the default `true`, syncs nothing. To retry the sync from InfraFoundry, apply once with `ha_sync_after_apply: "always"`, then set it back.
+
+!!! warning "Errors while pushing the config are not reported"
+    OPNsense's `exec_sync` always answers `{"status": "done"}`, so a failure while pushing the config to the backup is not visible to InfraFoundry. A successful apply means the endpoints answered `ok`, not that the backup holds the config. Check the backup after the first sync.
+
+`destroy` does not sync to the backup.
 
 ## Endpoint and Version Check
 

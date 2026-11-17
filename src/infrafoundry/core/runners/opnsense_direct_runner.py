@@ -708,6 +708,11 @@ class OPNsenseDirectRunner(BaseRunner):
                 - managed_resources: Managed rows by type, as for ``plan``
                   (ADR-0018).
 
+        After the finalization hooks, a provider that exposes
+        ``post_apply_hook(env_name, changed)`` has it called once (#1390). It runs
+        only when every component applied, never on ``plan`` or ``destroy``, and its
+        errors fail the apply.
+
         Returns:
             ApplyResult with resource counts and a ``resource_outcomes`` list
             for downstream lifecycle event firing.
@@ -790,6 +795,12 @@ class OPNsenseDirectRunner(BaseRunner):
         # post-apply hook (e.g., Kea reconfigure) must fail the apply.
         if totals.hook_keys:
             self._fire_finalization_hooks(provider, env_name, totals.hook_keys)
+
+        # Provider post-apply hook (#1390): runs once, after every component applied and
+        # the finalization hooks ran, so a sync sees the final state. Errors propagate.
+        self._fire_post_apply_hook(
+            provider, env_name, changed=(totals.created + totals.updated + totals.deleted) > 0
+        )
 
         applied: ApplyResult = {
             "success": True,
@@ -948,6 +959,27 @@ class OPNsenseDirectRunner(BaseRunner):
                 continue
             self.console.print(f"  [dim]opnsense_direct: running finalization hook {key}[/dim]")
             hook(env_name)
+
+    def _fire_post_apply_hook(self, provider: ProviderBase, env_name: str, changed: bool) -> None:
+        """Run the provider's optional ``post_apply_hook(env_name, changed)`` (#1390).
+
+        Duck-typed: a provider without a callable hook is a no-op, and a ``str``
+        result is printed dim while any other result is ignored.
+
+        Args:
+            provider: Provider whose components were applied.
+            env_name: Active environment name.
+            changed: True when the apply created, updated or deleted anything.
+
+        Raises:
+            Any exception the hook raises, so a failing hook fails the apply.
+        """
+        hook = getattr(provider, "post_apply_hook", None)
+        if not callable(hook):
+            return
+        message = hook(env_name, changed)
+        if isinstance(message, str):
+            self.console.print(f"  [dim]opnsense_direct: {message}[/dim]")
 
     @staticmethod
     def _empty_apply_result() -> ApplyResult:

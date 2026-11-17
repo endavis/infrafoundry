@@ -987,7 +987,9 @@ Configure the pair on the primary only. Leave `this_server_name` empty so each n
 
 **Order and disabling.** It depends on `interfaces.assignments` and is applied after the CARP virtual IPs. Destroy is a no-op. To turn sync off, declare `sync_items: []`, `synchronize_to_ip: ""` and `pfsync_interface: ""`.
 
-**CARP pair.** Configure the primary only. Nothing is pushed to the backup until the XMLRPC sync runs; a post-apply sync trigger is a separate piece of work.
+**CARP pair.** Configure the primary only. Nothing is pushed to the backup until the XMLRPC sync runs; the provider triggers it after an apply (see below).
+
+**Sync after apply.** See [Sync after apply (#1390)](#sync-after-apply-1390) below.
 
 **Migrate.** `config migrate --component hasync.settings` exports the fields on the box; `password` is only the placeholder `secret://env_secrets/opnsense/hasync/password` when the box holds one.
 
@@ -1016,6 +1018,22 @@ opnsense:
   - `config migrate` exports only the `secret://` placeholder for `password`.
   - Posting `password: ""` with `set` clears a stored password.
 - Not verified: XMLRPC sync to a real backup node and pfsync traffic, since there is no second firewall. The write-only path above stays in place in case another release masks `password`.
+
+### Sync after apply (#1390)
+
+After a successful apply the provider calls `core/hasync_status/version` and then `core/hasync_status/restartAll` when the live `synchronizetoip` is set. User-facing behaviour is in [HA Sync After Apply](../providers/opnsense.md#ha-sync-after-apply).
+
+- The bundled specs list the `hasync_status` actions `version`, `services`, `stop`, `start`, `restart` and `restartAll`, all POST. Only `version` and `restartAll` are used.
+- Source: `HasyncStatusController` (`restartAll`) runs `exec_sync` and `reload_templates` through `ha_xmlrpc_exec.php`, then restarts each service on the backup. `exec_sync` always echoes `{"status": "done"}`, so errors while pushing the config are not reported.
+- Probed on a single test firewall (26.1.11):
+  - With no target set, `version` answers `{"response": false}`.
+  - With an unreachable target (`192.0.2.2`), `version` returns an error only after about 60 seconds and `restartAll` times out. The sync client therefore uses `ha_sync_timeout` (default 300 seconds) for all calls.
+- Verified live on the same test firewall, with an unreachable documentation address as the backup and the HA settings restored afterwards:
+  - An apply that changed something failed after the preflight with exit code 1 and `HA sync to backup 192.0.2.2 failed at core/hasync_status/version: fetch error. remote host down? ...`.
+  - A no-op apply printed `HA sync skipped: apply changed nothing` and exited 0.
+  - With `ha_sync_after_apply: false`, an apply with a change printed the disabled line and exited 0. With `"always"`, a no-op apply still ran the sync and failed the same way.
+  - Clearing `synchronize_to_ip` through `hasync.settings` printed `HA sync skipped: no synchronize_to_ip on this node`.
+- Not verified: a successful sync to a real backup node.
 
 ## Outbound NAT mode (#1333)
 

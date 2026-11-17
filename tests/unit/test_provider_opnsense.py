@@ -339,6 +339,17 @@ class TestOPNsenseResourceTypes:
             provider.get_finalization_hooks()["hasync_reconfigure"]("env")
         factory.return_value.reconfigure.assert_called_once_with()
 
+    def test_post_apply_hook_delegates_to_the_ha_sync_flow(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        with patch(
+            "infrafoundry.providers.opnsense.services.hasync_status.run_ha_sync_after_apply",
+            return_value="line",
+        ) as run:
+            result = provider.post_apply_hook("env", True)
+        assert result == "line"
+        run.assert_called_once_with("env", "opnsense", provider.config_dir, True)
+
     def test_source_nat_is_dispatched_before_nat_with_its_own_hook(
         self, provider: OPNsenseProvider
     ) -> None:

@@ -457,6 +457,9 @@ class OPNsenseProvider(
     def get_finalization_hooks(self) -> dict[str, Callable[[str], None]]:
         """Return end-of-apply hooks the direct-API runner fires per key (#758, #776, #777).
 
+        Not part of this table: :meth:`post_apply_hook` (#1390) syncs the config to the
+        HA backup once per apply, whatever changed.
+
         Each component manager opts in by declaring a ``FINALIZATION_HOOK``
         ClassVar; ``OPNsenseDirectRunner`` collects those keys for managers
         that mutated state during a given apply, dedupes them, and calls
@@ -690,6 +693,23 @@ class OPNsenseProvider(
 
         service = SyslogSettingsService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
+
+    def post_apply_hook(self, env_name: str, changed: bool) -> str:
+        """Sync the config to the HA backup after a successful apply (#1390).
+
+        Called once by ``OPNsenseDirectRunner.apply`` after the finalization hooks,
+        on the success path only. Errors propagate, failing the apply.
+
+        Args:
+            env_name: Active environment name.
+            changed: True when the apply created, updated or deleted anything.
+
+        Returns:
+            A status line for the runner to print.
+        """
+        from .services.hasync_status import run_ha_sync_after_apply
+
+        return run_ha_sync_after_apply(env_name, self.name, self.config_dir, changed)
 
     def _reconfigure_hasync(self, env_name: str) -> None:
         """Reload the HA sync settings after a change (#1389).

@@ -95,6 +95,7 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
   ```
 - **Schema hints:**
   - `provider_settings.opnsense` SSH keys (all optional): `ssh_host` (default: the `api_url` hostname), `ssh_user` (default `root`), `ssh_port` (default `22`), `ssh_key` (default: ssh-agent / `~/.ssh/config`). The interface-assignments controller install uses them (key auth only). `provider_ssh.opnsense` is not read by the installer. `OPNSENSE_SSH_HOST` applies only with `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE=1`.
+  - `provider_settings.opnsense` HA sync keys (optional): `ha_sync_after_apply` (`true` default, `false`, or `"always"`) and `ha_sync_timeout` (seconds, default `300`). After an apply, the provider syncs the config to the HA backup. See [HA Sync After Apply](../providers/opnsense.md#ha-sync-after-apply).
   - `providers` (optional, list[str]): List of provider names to enable. If omitted, all registered providers are enabled.
   - `backend` (optional, dict): Terraform backend configuration for state management. Enables remote state storage and locking for team collaboration. See [State Management](../architecture/state-management.md#backend-configuration) for details.
     - `type` (required if backend specified): Backend type - `s3`, `gcs`, `azurerm`, `postgres`, `remote` (Terraform Cloud), or `local`

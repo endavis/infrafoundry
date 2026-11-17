@@ -389,6 +389,48 @@ class TestValidateReferences:
         offline.api_validator.get_credentials.assert_not_called()
         offline.api_validator.fetch_json.assert_not_called()
 
+    @pytest.mark.parametrize(
+        "settings",
+        [{"ha_sync_after_apply": "yes"}, {"ha_sync_timeout": 0}],
+    )
+    def test_offline_flags_bad_ha_sync_settings(
+        self, report: MagicMock, settings: dict[str, Any]
+    ) -> None:
+        """A bad ``ha_sync_*`` value fails before anything is written (#1390)."""
+        offline = OPNsenseValidator(
+            make_env_config(provider_settings={"opnsense": settings}), report
+        )
+        offline.api_validator.add_error = MagicMock()  # type: ignore[method-assign]
+
+        offline.validate_offline([])
+
+        calls = [
+            c
+            for c in offline.api_validator.add_error.call_args_list
+            if c.kwargs.get("check_name") == "opnsense_ha_sync_settings"
+        ]
+        assert len(calls) == 1
+        assert "ha_sync_" in calls[0].kwargs["message"]
+
+    @pytest.mark.parametrize(
+        "settings",
+        [{}, {"ha_sync_after_apply": "always", "ha_sync_timeout": 60}, None],
+    )
+    def test_offline_accepts_valid_ha_sync_settings(
+        self, report: MagicMock, settings: dict[str, Any] | None
+    ) -> None:
+        provider_settings = {} if settings is None else {"opnsense": settings}
+        offline = OPNsenseValidator(make_env_config(provider_settings=provider_settings), report)
+        offline.api_validator.add_error = MagicMock()  # type: ignore[method-assign]
+
+        offline.validate_offline([])
+
+        assert not [
+            c
+            for c in offline.api_validator.add_error.call_args_list
+            if c.kwargs.get("check_name") == "opnsense_ha_sync_settings"
+        ]
+
     def test_dispatches_monit(self, validator: OPNsenseValidator) -> None:
         """The monit validator receives only the ``monit.*`` slice (#791)."""
         validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
