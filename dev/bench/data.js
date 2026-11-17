@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794917960588,
+  "lastUpdate": 1794918310652,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2778,6 +2778,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001027299996108404",
             "extra": "mean: 125.75823743026537 usec\nrounds: 8453"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7c15c84b9a4fd504ba4a11d33ff427ebf30d79ab",
+          "message": "fix: report non-terraform runner failures as deployment errors (merges PR #1449, addresses #1447)\n\nraise_on_runner_failure wrapped every failed runner result in\nTerraformError, so a failed opnsense_direct destroy showed\n\"Terraform Execution Failed\" with a terraform init suggestion. It now\ntakes the runner name and raises DeploymentError (IF-RUNNER-003) with a\nrunner-neutral message for runners other than terraform and opentofu.\nTerraform runner failures keep TerraformError.\n\nAddresses #1447\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T12:23:59Z",
+          "tree_id": "524758ba52acd44b8a891d7ca436b347bb64d149",
+          "url": "https://github.com/endavis/infrafoundry/commit/7c15c84b9a4fd504ba4a11d33ff427ebf30d79ab"
+        },
+        "date": 1794918310156,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 70.39724721073325,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0010234632171186029",
+            "extra": "mean: 14.205100904109402 msec\nrounds: 73"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12913.786004505133,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004387407841856631",
+            "extra": "mean: 77.4366246777775 usec\nrounds: 13591"
           }
         ]
       }
