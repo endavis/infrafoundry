@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794937343046,
+  "lastUpdate": 1794937670988,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3158,6 +3158,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005093286251529089",
             "extra": "mean: 78.631076340322 usec\nrounds: 13597"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c5b4a6a239f18a1d00bb854e5c9edf33fb823c58",
+          "message": "fix: check a declared ha_backup node as a carp backup in doctor (merges PR #1473, addresses #1470)\n\nA firewall that another entry names as its ha_backup now has every CARP\nVIP expected BACKUP (MASTER is an error) and no longer gets the\nrole-unknown warning. Single firewalls and primaries are unchanged.\n\nAddresses #1470\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T17:46:42Z",
+          "tree_id": "b2a369b858159302caa7331ae0cb1ede2fb77c4d",
+          "url": "https://github.com/endavis/infrafoundry/commit/c5b4a6a239f18a1d00bb854e5c9edf33fb823c58"
+        },
+        "date": 1794937670400,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 44.22600253629417,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004136369909907259",
+            "extra": "mean: 22.61113242553061 msec\nrounds: 47"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7750.423318537343,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000988976573526522",
+            "extra": "mean: 129.02521048214427 usec\nrounds: 8338"
           }
         ]
       }
