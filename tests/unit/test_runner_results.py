@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from infrafoundry.core.exceptions import TerraformError
+from infrafoundry.core.exceptions import DeploymentError, TerraformError
 from infrafoundry.core.runner_results import raise_on_runner_failure
 
 
@@ -60,3 +60,41 @@ def test_raise_on_runner_failure_handles_missing_keys() -> None:
     assert err.exit_code is None
     assert err.stderr is None
     assert err.stdout is None
+
+
+def test_raise_on_runner_failure_non_terraform_runner_raises_deployment_error() -> None:
+    """A non-Terraform runner raises a plain DeploymentError naming the runner."""
+    result = {
+        "success": False,
+        "error": "component failed",
+        "exit_code": 2,
+        "stderr": "detail",
+    }
+
+    with pytest.raises(DeploymentError) as exc_info:
+        raise_on_runner_failure(
+            result, provider_name="opnsense", phase="apply", runner_name="opnsense_direct"
+        )
+
+    err = exc_info.value
+    assert not isinstance(err, TerraformError)
+    assert "opnsense_direct apply failed for provider 'opnsense': component failed" in str(err)
+    assert "Terraform" not in str(err)
+    assert err.context["exit_code"] == 2
+    assert err.context["stderr"] == "detail"
+    assert "stdout" not in err.context
+
+
+@pytest.mark.parametrize("runner_name", ["terraform", "opentofu", None])
+def test_raise_on_runner_failure_terraform_runners_raise_terraform_error(
+    runner_name: str | None,
+) -> None:
+    """Terraform, OpenTofu and the default keep raising TerraformError."""
+    result = {"success": False, "error": "boom", "exit_code": 1}
+
+    with pytest.raises(TerraformError) as exc_info:
+        raise_on_runner_failure(
+            result, provider_name="proxmox", phase="plan", runner_name=runner_name
+        )
+
+    assert "Terraform plan failed for provider 'proxmox': boom" in str(exc_info.value)

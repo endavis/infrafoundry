@@ -17,6 +17,7 @@ from infrafoundry.cli.errors import (
 from infrafoundry.core.exceptions import (
     CircularDependencyError,
     ConfigurationError,
+    DeploymentError,
     EnvironmentNotFoundError,
     InfraFoundryError,
     InvalidConfigurationError,
@@ -250,6 +251,11 @@ class TestGetErrorCode:
         """Test TerraformError maps correctly."""
         exc = TerraformError("Terraform failed")
         assert get_error_code(exc) == "IF-RUNNER-001"
+
+    def test_deployment_error(self) -> None:
+        """Test DeploymentError maps to IF-RUNNER-003, not the Terraform code."""
+        exc = DeploymentError("opnsense_direct apply failed")
+        assert get_error_code(exc) == "IF-RUNNER-003"
 
     def test_state_error(self) -> None:
         """Test StateError maps correctly."""
