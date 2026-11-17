@@ -7,7 +7,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrafoundry.core.exceptions import APIError, InvalidConfigurationError
+from infrafoundry.core.exceptions import (
+    APIError,
+    InvalidConfigurationError,
+    UnsupportedVersionError,
+)
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.services.source_nat import SourceNatService
 
@@ -128,3 +132,10 @@ def test_export_to_yaml_emits_the_mode() -> None:
     svc, _ = _service(LIVE_AUTOMATIC)
     data = yaml.safe_load(svc.export_to_yaml())
     assert data == {"opnsense": {"firewall": {"source_nat": {"snat_mode": "automatic"}}}}
+
+
+def test_live_general_raises_the_version_error_the_runner_defers() -> None:
+    """A pre-26.1 box raises ``UnsupportedVersionError`` (an ``APIError``) (#1458)."""
+    svc, _ = _service()
+    with pytest.raises(UnsupportedVersionError, match=r"needs OPNsense 26\.1 or later"):
+        svc.live_general({"filter": {"general": {}}})

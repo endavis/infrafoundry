@@ -127,6 +127,10 @@ class TimeoutError(APIError):
     """Operation timed out."""
 
 
+class UnsupportedVersionError(APIError):
+    """The remote box's current version does not serve what a resource type needs (#1458)."""
+
+
 # Validation Errors
 
 
@@ -481,6 +485,7 @@ __all__ = [
     "TerraformError",
     "TimeoutError",
     "UnsupportedResourceTypeError",
+    "UnsupportedVersionError",
     # Validation
     "ValidationError",
 ]

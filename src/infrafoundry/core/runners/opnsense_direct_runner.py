@@ -49,6 +49,7 @@ from typing import Any, override
 from rich.console import Console
 from rich.markup import escape
 
+from infrafoundry.core.exceptions import UnsupportedVersionError
 from infrafoundry.core.managed_set import ManagedResources, ReleasedResource
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_instances import split_provider_id
@@ -57,6 +58,15 @@ from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.types import ResourceOutcome
 
 logger = logging.getLogger(__name__)
+
+_FIRMWARE_TYPE = "system.firmware"
+
+
+class _Deferred:
+    """Marker returned when a type waits for the firmware update (#1458)."""
+
+
+_DEFERRED = _Deferred()
 
 
 @dataclass
@@ -617,16 +627,30 @@ class OPNsenseDirectRunner(BaseRunner):
         # any manager touches the box (#1239). ``apply`` runs plan first. Types
         # dispatched only to delete managed objects are checked too (#1256).
         types_in_scope = [type_name for type_name, _, _ in selected]
+        update_run = self._firmware_update_requested(selected)
+        deferred: set[str] = set()
         if types_in_scope:
             support_errors = self._check_endpoint_support(provider, env_name, types_in_scope)
             if support_errors:
-                return PlanResult(success=False, error="\n".join(support_errors))
+                # With a firmware update in the run, a type the box cannot serve yet waits
+                # for the update instead of failing the whole plan (#1458).
+                unsupported = (
+                    self._unsupported_by_type(provider, env_name, types_in_scope)
+                    if update_run
+                    else {}
+                )
+                if not unsupported or _FIRMWARE_TYPE in unsupported:
+                    return PlanResult(success=False, error="\n".join(support_errors))
+                deferred = set(unsupported)
 
         any_changes = False
         summary_parts: list[str] = []
         label = self._label(provider)
 
         for type_name, manager_cls, typed_resources in selected:
+            if type_name in deferred:
+                self._note_deferred(type_name, label, summary_parts)
+                continue
             manager = manager_cls(provider.config_dir)
             sibling_resources = self._sibling_resources_for(manager_cls, resources)
             extra_kwargs: dict[str, Any] = self._managed_kwargs(type_name, manager_cls, managed)
@@ -636,6 +660,12 @@ class OPNsenseDirectRunner(BaseRunner):
             extra_kwargs.update(self._manager_kwargs(provider))
             try:
                 diff = manager.plan(env_name, typed_resources, add_only=add_only, **extra_kwargs)
+            except UnsupportedVersionError as exc:
+                if not update_run or type_name == _FIRMWARE_TYPE:
+                    logger.exception("opnsense_direct %s plan failed", type_name)
+                    return PlanResult(success=False, error=str(exc))
+                self._note_deferred(type_name, label, summary_parts)
+                continue
             except Exception as exc:
                 logger.exception("opnsense_direct %s plan failed", type_name)
                 return PlanResult(success=False, error=str(exc))
@@ -659,7 +689,12 @@ class OPNsenseDirectRunner(BaseRunner):
         )
 
     def _check_endpoint_support(
-        self, provider: ProviderBase, env_name: str, resource_types: list[str]
+        self,
+        provider: ProviderBase,
+        env_name: str,
+        resource_types: list[str],
+        *,
+        print_warnings: bool = True,
     ) -> list[str]:
         """Ask the provider whether the box's version serves the types' endpoints (#1239).
 
@@ -671,9 +706,10 @@ class OPNsenseDirectRunner(BaseRunner):
             provider: Provider being planned.
             env_name: Active environment name.
             resource_types: Resource types that have resources in scope.
+            print_warnings: Whether to print the hook's warnings.
 
         Returns:
-            The error messages; warnings are printed.
+            The error messages; warnings are printed unless ``print_warnings`` is False.
         """
         hook = getattr(provider, "check_endpoint_support", None)
         if not callable(hook):
@@ -683,12 +719,57 @@ class OPNsenseDirectRunner(BaseRunner):
             return []
         errors = result.get("errors")
         warnings = result.get("warnings")
-        if isinstance(warnings, list):
+        if print_warnings and isinstance(warnings, list):
             for warning in warnings:
                 self.console.print(f"  [yellow]{self._label(provider)}: {warning}[/yellow]")
         if isinstance(errors, list) and all(isinstance(e, str) for e in errors):
             return list(errors)
         return []
+
+    @staticmethod
+    def _firmware_update_requested(
+        selected: list[tuple[str, type[Any], list[ResourceConfig]]],
+    ) -> bool:
+        """Whether ``system.firmware`` with ``update: true`` is in the run (#1458)."""
+        for type_name, _, typed in selected:
+            if type_name != _FIRMWARE_TYPE:
+                continue
+            for resource in typed:
+                value = resource.config.get("update")
+                if isinstance(value, str):
+                    if value.strip() not in ("", "0", "false", "False", "no", "No", "off"):
+                        return True
+                elif value:
+                    return True
+        return False
+
+    def _unsupported_by_type(
+        self, provider: ProviderBase, env_name: str, resource_types: list[str]
+    ) -> dict[str, list[str]]:
+        """Split the endpoint-support errors by the type they belong to (#1458).
+
+        Args:
+            provider: Provider being planned.
+            env_name: Active environment name.
+            resource_types: Types in scope.
+
+        Returns:
+            Error messages by type, only for the types the box cannot serve.
+        """
+        unsupported: dict[str, list[str]] = {}
+        for type_name in resource_types:
+            errors = self._check_endpoint_support(
+                provider, env_name, [type_name], print_warnings=False
+            )
+            if errors:
+                unsupported[type_name] = errors
+        return unsupported
+
+    def _note_deferred(self, type_name: str, label: str, summary_parts: list[str]) -> None:
+        """Record that a type waits for the firmware update (#1458)."""
+        note = f"{type_name}: deferred until the firmware update"
+        summary_parts.append(note)
+        self.console.print(f"  [dim]{label}: {note}[/dim]")
 
     @staticmethod
     def _format_plan_summary(type_name: str, diff: Any, *, add_only: bool) -> str:
@@ -773,37 +854,62 @@ class OPNsenseDirectRunner(BaseRunner):
         totals = _ApplyTotals()
         any_dispatched = bool(selected)
 
+        # A firmware update in the run lets a type the box cannot serve yet wait: it is
+        # applied after every other type, so after system.firmware, and fails with its
+        # normal error only if the box still cannot serve it (#1458).
+        update_run = self._firmware_update_requested(selected)
+        deferred: dict[str, tuple[type[Any], list[ResourceConfig]]] = {}
+        if update_run:
+            in_scope = [type_name for type_name, _, _ in selected]
+            if self._check_endpoint_support(provider, env_name, in_scope, print_warnings=False):
+                unsupported = self._unsupported_by_type(provider, env_name, in_scope)
+                if _FIRMWARE_TYPE in unsupported:
+                    return ApplyResult(success=False, error="\n".join(unsupported[_FIRMWARE_TYPE]))
+                for type_name, manager_cls, typed_resources in selected:
+                    if type_name in unsupported:
+                        deferred[type_name] = (manager_cls, typed_resources)
+                        self._note_deferred(type_name, self._label(provider), [])
+
         # Deletes of types that split them run first, in reverse table order, so a
         # child (reservations) is deleted while its parent (subnets) is still live;
         # the forward pass below then only adds and updates them (#1264). Add-only and
         # filtered runs have no deletes and make one add-only call as before.
         two_phase = not add_only
-        if two_phase:
-            for type_name, manager_cls, typed_resources in reversed(selected):
-                if not self._splits_deletes(manager_cls):
-                    continue
-                error = self._apply_one(
-                    provider,
-                    env_name,
-                    auto_approve,
-                    type_name,
-                    manager_cls,
-                    typed_resources,
-                    resources,
-                    managed,
-                    totals,
-                    add_only=False,
-                    deletes_only=True,
-                    release=True,
-                )
-                if error is not None:
-                    return ApplyResult(success=False, error=error)
 
-        for type_name, manager_cls, typed_resources in selected:
+        def run_deletes(
+            type_name: str,
+            manager_cls: type[Any],
+            typed_resources: list[ResourceConfig],
+            defer: bool = True,
+        ) -> str | _Deferred | None:
+            if not self._splits_deletes(manager_cls):
+                return None
+            return self._apply_one(
+                provider,
+                env_name,
+                auto_approve,
+                type_name,
+                manager_cls,
+                typed_resources,
+                resources,
+                managed,
+                totals,
+                add_only=False,
+                deletes_only=True,
+                release=True,
+                defer_unsupported=defer and update_run and type_name != _FIRMWARE_TYPE,
+            )
+
+        def run_forward(
+            type_name: str,
+            manager_cls: type[Any],
+            typed_resources: list[ResourceConfig],
+            defer: bool = True,
+        ) -> str | _Deferred | None:
             splits = two_phase and self._splits_deletes(manager_cls)
             if splits and not typed_resources:
-                continue  # only had managed rows to delete, done in the first phase
-            error = self._apply_one(
+                return None  # only had managed rows to delete, done in the first phase
+            return self._apply_one(
                 provider,
                 env_name,
                 auto_approve,
@@ -816,9 +922,46 @@ class OPNsenseDirectRunner(BaseRunner):
                 add_only=add_only or splits,
                 deletes_only=False,
                 release=not add_only and not splits,
+                defer_unsupported=defer and update_run and type_name != _FIRMWARE_TYPE,
             )
-            if error is not None:
-                return ApplyResult(success=False, error=error)
+
+        if two_phase:
+            for type_name, manager_cls, typed_resources in reversed(selected):
+                if type_name in deferred:
+                    continue
+                outcome = run_deletes(type_name, manager_cls, typed_resources)
+                if isinstance(outcome, _Deferred):
+                    deferred[type_name] = (manager_cls, typed_resources)
+                elif outcome is not None:
+                    return ApplyResult(success=False, error=outcome)
+
+        for type_name, manager_cls, typed_resources in selected:
+            if type_name in deferred:
+                continue
+            outcome = run_forward(type_name, manager_cls, typed_resources)
+            if isinstance(outcome, _Deferred):
+                deferred[type_name] = (manager_cls, typed_resources)
+            elif outcome is not None:
+                return ApplyResult(success=False, error=outcome)
+
+        if deferred:
+            # The firmware update has run: re-check, and fail as the plan would have
+            # without an update if a deferred type is still unsupported (#1458).
+            late_errors = self._check_endpoint_support(
+                provider, env_name, list(deferred), print_warnings=False
+            )
+            if late_errors:
+                return ApplyResult(success=False, error="\n".join(late_errors))
+            items = list(deferred.items())
+            if two_phase:
+                for type_name, (manager_cls, typed_resources) in reversed(items):
+                    outcome = run_deletes(type_name, manager_cls, typed_resources, defer=False)
+                    if isinstance(outcome, str):
+                        return ApplyResult(success=False, error=outcome)
+            for type_name, (manager_cls, typed_resources) in items:
+                outcome = run_forward(type_name, manager_cls, typed_resources, defer=False)
+                if isinstance(outcome, str):
+                    return ApplyResult(success=False, error=outcome)
 
         if not any_dispatched:
             self.console.print(
@@ -864,7 +1007,8 @@ class OPNsenseDirectRunner(BaseRunner):
         add_only: bool,
         deletes_only: bool,
         release: bool,
-    ) -> str | None:
+        defer_unsupported: bool = False,
+    ) -> str | _Deferred | None:
         """Run one manager's apply and fold its result into ``totals``.
 
         Args:
@@ -880,9 +1024,12 @@ class OPNsenseDirectRunner(BaseRunner):
             add_only: Passed to the manager (suppresses deletes).
             deletes_only: When True, passes ``deletes_only=True`` (the delete phase).
             release: Whether managed names that left YAML are released after this call.
+            defer_unsupported: When True, a version-gated ``UnsupportedVersionError`` from
+                the manager returns ``_DEFERRED`` instead of an error (#1458).
 
         Returns:
-            ``None`` on success, otherwise the error message of the failed call.
+            ``None`` on success, ``_DEFERRED`` when the type was deferred, otherwise the
+            error message of the failed call.
         """
         manager = manager_cls(provider.config_dir)
         sibling_resources = self._sibling_resources_for(manager_cls, resources)
@@ -901,6 +1048,12 @@ class OPNsenseDirectRunner(BaseRunner):
                 add_only=add_only,
                 **extra_kwargs,
             )
+        except UnsupportedVersionError as exc:
+            if defer_unsupported:
+                self._note_deferred(type_name, self._label(provider), [])
+                return _DEFERRED
+            logger.exception("opnsense_direct %s apply failed", type_name)
+            return str(exc)
         except Exception as exc:
             logger.exception("opnsense_direct %s apply failed", type_name)
             return str(exc)

@@ -21,7 +21,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from infrafoundry.core.exceptions import APIError, InvalidConfigurationError
+from infrafoundry.core.exceptions import (
+    APIError,
+    InvalidConfigurationError,
+    UnsupportedVersionError,
+)
 from infrafoundry.core.provider import ResourceConfig
 
 from .. import endpoints
@@ -82,12 +86,12 @@ class SourceNatService(BaseService):
         """Return ``response["filter"]["general"]``.
 
         Raises:
-            APIError: If ``snat_mode`` is missing, as on OPNsense before 26.1.
+            UnsupportedVersionError: If ``snat_mode`` is missing, as on OPNsense before 26.1.
         """
         filter_model = response.get("filter") if isinstance(response, dict) else None
         general = filter_model.get("general") if isinstance(filter_model, dict) else None
         if not isinstance(general, dict) or "snat_mode" not in general:
-            raise APIError(
+            raise UnsupportedVersionError(
                 "firewall.source_nat needs OPNsense 26.1 or later: firewall/source_nat/get "
                 "returned no filter.general.snat_mode (older releases keep the outbound NAT "
                 "mode outside the MVC model)",
