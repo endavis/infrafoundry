@@ -121,7 +121,7 @@ class TestMode:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -130,7 +130,9 @@ class TestMode:
     def test_carp_passes(self, validator: VirtualIPValidator, report: ValidationReport) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                virtual_ips=[_carp("ok")], managed_interface_names={"lan"}, existing_interfaces={}
+                virtual_ips=[_carp("ok")],
+                interface_assignment_names={"lan"},
+                existing_interfaces={},
             )
         )
         assert not _failures(report, "virtual_ip_ok_mode")
@@ -139,7 +141,7 @@ class TestMode:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_proxyarp("ok")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -161,7 +163,7 @@ class TestMode:
         )
         validator.validate(
             OPNsenseValidationContext(
-                virtual_ips=[r], managed_interface_names={"lan"}, existing_interfaces={}
+                virtual_ips=[r], interface_assignment_names={"lan"}, existing_interfaces={}
             )
         )
         assert not _failures(report, "virtual_ip_ok_mode")
@@ -174,7 +176,7 @@ class TestMode:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", mode="alias")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -186,7 +188,7 @@ class TestMode:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", mode="other")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -198,7 +200,7 @@ class TestMode:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", mode=123)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -217,7 +219,7 @@ class TestInterface:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", interface="lan")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -229,7 +231,7 @@ class TestInterface:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", interface="wan")],
-                managed_interface_names=set(),
+                interface_assignment_names=set(),
                 existing_interfaces={"wan": object()},
             )
         )
@@ -241,7 +243,7 @@ class TestInterface:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", interface="bogus")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={"wan": object()},
             )
         )
@@ -262,7 +264,7 @@ class TestInterface:
         )
         validator.validate(
             OPNsenseValidationContext(
-                virtual_ips=[r], managed_interface_names=set(), existing_interfaces={}
+                virtual_ips=[r], interface_assignment_names=set(), existing_interfaces={}
             )
         )
         assert _failures(report, "virtual_ip_bad_interface")
@@ -273,7 +275,7 @@ class TestInterface:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", interface="")],
-                managed_interface_names=set(),
+                interface_assignment_names=set(),
                 existing_interfaces={},
             )
         )
@@ -285,7 +287,7 @@ class TestInterface:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", interface=123)],
-                managed_interface_names=set(),
+                interface_assignment_names=set(),
                 existing_interfaces={},
             )
         )
@@ -302,7 +304,7 @@ class TestAddress:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", address="10.1.2.3")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -312,7 +314,7 @@ class TestAddress:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", address="2001:db8::1", network="64")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -333,7 +335,7 @@ class TestAddress:
         )
         validator.validate(
             OPNsenseValidationContext(
-                virtual_ips=[r], managed_interface_names={"lan"}, existing_interfaces={}
+                virtual_ips=[r], interface_assignment_names={"lan"}, existing_interfaces={}
             )
         )
         assert _failures(report, "virtual_ip_bad_address")
@@ -344,7 +346,7 @@ class TestAddress:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", address="")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -356,7 +358,7 @@ class TestAddress:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", address=12345)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -368,7 +370,7 @@ class TestAddress:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", address="not-an-ip")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -380,7 +382,7 @@ class TestNetwork:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", address="172.21.0.10", network="24")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -390,7 +392,7 @@ class TestNetwork:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", address="2001:db8::1", network="64")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -403,7 +405,7 @@ class TestNetwork:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", address="2001:db8::1", network="96")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -415,7 +417,7 @@ class TestNetwork:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", network=24)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -436,7 +438,7 @@ class TestNetwork:
         )
         validator.validate(
             OPNsenseValidationContext(
-                virtual_ips=[r], managed_interface_names={"lan"}, existing_interfaces={}
+                virtual_ips=[r], interface_assignment_names={"lan"}, existing_interfaces={}
             )
         )
         assert _failures(report, "virtual_ip_bad_network")
@@ -447,7 +449,7 @@ class TestNetwork:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", network="")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -459,7 +461,7 @@ class TestNetwork:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", network="not-a-number")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -472,7 +474,7 @@ class TestNetwork:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", network=True)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -484,7 +486,7 @@ class TestNetwork:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", address="172.21.0.10", network="33")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -494,7 +496,7 @@ class TestNetwork:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", network="0")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -506,7 +508,7 @@ class TestNetwork:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", address="2001:db8::1", network="129")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -523,7 +525,7 @@ class TestCarpVhid:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("ok", vhid="42")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -535,7 +537,7 @@ class TestCarpVhid:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("ok", vhid=7)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -558,7 +560,7 @@ class TestCarpVhid:
         )
         validator.validate(
             OPNsenseValidationContext(
-                virtual_ips=[r], managed_interface_names={"lan"}, existing_interfaces={}
+                virtual_ips=[r], interface_assignment_names={"lan"}, existing_interfaces={}
             )
         )
         assert _failures(report, "virtual_ip_bad_vhid")
@@ -569,7 +571,7 @@ class TestCarpVhid:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", vhid="")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -581,7 +583,7 @@ class TestCarpVhid:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", vhid="abc")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -593,7 +595,7 @@ class TestCarpVhid:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", vhid="0")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -605,7 +607,7 @@ class TestCarpVhid:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", vhid="256")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -615,7 +617,7 @@ class TestCarpVhid:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", vhid=True)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -630,7 +632,7 @@ class TestCarpPassword:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("ok", password="secret://env_secrets/opnsense/carp/lan_1")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -642,7 +644,7 @@ class TestCarpPassword:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("ok", password="hunter2")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -667,7 +669,7 @@ class TestCarpPassword:
         )
         validator.validate(
             OPNsenseValidationContext(
-                virtual_ips=[r], managed_interface_names={"lan"}, existing_interfaces={}
+                virtual_ips=[r], interface_assignment_names={"lan"}, existing_interfaces={}
             )
         )
         assert _errors(report, "virtual_ip_bad_password")
@@ -678,7 +680,7 @@ class TestCarpPassword:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", password="")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -690,7 +692,7 @@ class TestCarpPassword:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", password=123)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -709,7 +711,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("ok", advbase="2")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -721,7 +723,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", advbase=2)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -733,7 +735,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", advskew=100)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -743,7 +745,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("ok", peer="192.0.2.5")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -755,7 +757,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("ok", peer="")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -767,7 +769,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", peer="not-an-ip")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -780,7 +782,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", peer="2001:db8::1")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -792,7 +794,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", peer=123)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -802,7 +804,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("ok", peer6="2001:db8::5")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -814,7 +816,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", peer6="192.0.2.5")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -826,7 +828,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("ok", nosync=True)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -838,7 +840,7 @@ class TestCarpOptionalFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("bad", nosync="yes")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -857,7 +859,7 @@ class TestIpaliasFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", gateway="WAN_DHCP")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -870,7 +872,7 @@ class TestIpaliasFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", gateway="")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -882,7 +884,7 @@ class TestIpaliasFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", gateway=123)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -894,7 +896,7 @@ class TestIpaliasFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", noexpand=True)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -906,7 +908,7 @@ class TestIpaliasFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", noexpand="yes")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -918,7 +920,7 @@ class TestIpaliasFields:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", nobind="0")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -937,7 +939,7 @@ class TestModeMismatchWarnings:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", vhid="5")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -950,7 +952,7 @@ class TestModeMismatchWarnings:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_proxyarp("ok", password="hunter2")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -964,7 +966,7 @@ class TestModeMismatchWarnings:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_carp("ok", gateway="WAN_DHCP")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -977,7 +979,7 @@ class TestModeMismatchWarnings:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_proxyarp("ok", noexpand=True)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -991,7 +993,7 @@ class TestModeMismatchWarnings:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", vhid="", password="")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1011,7 +1013,7 @@ class TestTypeChecks:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", description="LAN VIP")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1023,7 +1025,7 @@ class TestTypeChecks:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", description=123)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1035,7 +1037,7 @@ class TestTypeChecks:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", enabled="yes")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1047,7 +1049,7 @@ class TestTypeChecks:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", lock="yes")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1059,7 +1061,7 @@ class TestTypeChecks:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", enabled=True)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1071,7 +1073,7 @@ class TestTypeChecks:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", lock=True)],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1093,7 +1095,7 @@ class TestUniqueness:
                     _carp("a", interface="lan", address="172.21.0.1", vhid="1"),
                     _carp("b", interface="lan", address="172.21.0.1", vhid="1"),
                 ],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1110,7 +1112,7 @@ class TestUniqueness:
                     _carp("a", interface="lan", address="172.21.0.1", vhid="1"),
                     _carp("b", interface="lan", address="172.21.0.1", vhid="2"),
                 ],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1126,7 +1128,7 @@ class TestUniqueness:
                     _ipalias("a", interface="lan", address="172.21.0.10"),
                     _ipalias("b", interface="opt1", address="172.21.0.10"),
                 ],
-                managed_interface_names={"lan", "opt1"},
+                interface_assignment_names={"lan", "opt1"},
                 existing_interfaces={},
             )
         )
@@ -1143,7 +1145,7 @@ class TestUniqueness:
                     _ipalias("a", interface="lan", address="172.21.0.1"),
                     _carp("b", interface="lan", address="172.21.0.1", vhid="1"),
                 ],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1158,7 +1160,7 @@ class TestUniqueness:
                     _ipalias("a", address="172.21.0.10"),
                     _ipalias("b", address="172.21.0.11"),
                 ],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1175,7 +1177,7 @@ class TestUniqueness:
                     _ipalias("a", address="172.21.0.10"),
                     _ipalias("b", address="172.21.0.10"),
                 ],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1193,7 +1195,7 @@ class TestEdgeCases:
     ) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                virtual_ips=[], managed_interface_names=set(), existing_interfaces={}
+                virtual_ips=[], interface_assignment_names=set(), existing_interfaces={}
             )
         )
         assert report.results == []
@@ -1210,7 +1212,7 @@ class TestEdgeCases:
                     _carp("b", address="172.21.0.2", vhid="2"),
                     _proxyarp("c"),
                 ],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1227,7 +1229,7 @@ class TestEdgeCases:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", mode="bogus")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1242,7 +1244,7 @@ class TestEdgeCases:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("bad", mode="bogus", address="not-an-ip")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )
@@ -1274,7 +1276,7 @@ class TestDottedPathXRefs:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", interface="interfaces.assignments.lan")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
                 index=index,
             )
@@ -1302,7 +1304,7 @@ class TestDottedPathXRefs:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok", interface="assignments.lan")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
                 index=index,
             )
@@ -1318,7 +1320,7 @@ class TestDottedPathXRefs:
         validator.validate(
             OPNsenseValidationContext(
                 virtual_ips=[_ipalias("ok")],
-                managed_interface_names={"lan"},
+                interface_assignment_names={"lan"},
                 existing_interfaces={},
             )
         )

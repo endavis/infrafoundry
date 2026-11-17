@@ -371,6 +371,53 @@ class TestValidateReferences:
         assert context.virtual_ips == [vip]
         assert context.index is not None
 
+    @pytest.mark.parametrize(
+        ("vip_interface", "expect_error"),
+        [("opt98", False), ("opt99", True)],
+    )
+    def test_vip_interface_resolves_against_config_assignments(
+        self, env_config: Any, vip_interface: str, expect_error: bool
+    ) -> None:
+        """A VIP on a config-only interface assignment is not "unknown" (#1441)."""
+        real_report = ValidationReport()
+        real = OPNsenseValidator(env_config, real_report)
+        real.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "api_url": "https://opnsense.example.com",
+                "api_key": "key",
+                "api_secret": "secret",
+            }
+        )
+        real.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
+        assignment = ResourceConfig(
+            name="opt98",
+            type="interfaces.assignments",
+            provider="opnsense",
+            config={"device": "vtnet9"},
+        )
+        vip = ResourceConfig(
+            name="carp-vip",
+            type="interfaces.virtual_ips",
+            provider="opnsense",
+            config={
+                "mode": "carp",
+                "interface": vip_interface,
+                "address": "192.0.2.10",
+                "network": "24",
+                "vhid": "10",
+                "password": "secret://carp/password",
+            },
+        )
+
+        real.validate_references([assignment, vip])
+
+        failed = [
+            r
+            for r in real_report.results
+            if r.check_name == "virtual_ip_carp-vip_interface" and not r.passed
+        ]
+        assert bool(failed) is expect_error
+
     def test_offline_runs_topology_without_credentials(self, report: MagicMock) -> None:
         """``validate_offline`` runs the topology validator with no API access (#1391)."""
         offline = OPNsenseValidator(make_env_config(), report)
