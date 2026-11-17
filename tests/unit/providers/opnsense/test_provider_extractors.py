@@ -18,6 +18,7 @@ from infrafoundry.providers.opnsense import OPNsenseProvider, _ExtractorAdapter
 EXPECTED_RESOURCE_TYPES = [
     "cron.jobs",
     "firewall.aliases",
+    "hasync.settings",
     "firewall.rules",
     "firewall.categories",
     "routing.gateways",

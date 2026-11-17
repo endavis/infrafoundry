@@ -135,6 +135,7 @@ These are the types the provider accepts, in the dotted form you use under `opns
 |-------|-------|--------|
 | System | `system.firmware`, `system.tuning`, `system.users`, `system.groups` | [Coverage matrix](../development/opnsense-resource-coverage.md#coverage-matrix) |
 | Interfaces | `interfaces.settings`, `interfaces.vlans`, `interfaces.assignments`, `interfaces.virtual_ips` | [Interface settings](../development/opnsense-resource-coverage.md#interface-settings-1092) |
+| High availability | `hasync.settings` | [HA sync settings](../development/opnsense-resource-coverage.md#ha-sync-settings-1389) |
 | Syslog | `syslog.settings` | [Syslog settings](../development/opnsense-resource-coverage.md#syslog-settings-804) |
 | Firewall | `firewall.aliases`, `firewall.source_nat`, `firewall.nat`, `firewall.rules`, `firewall.categories` | [Outbound NAT mode](../development/opnsense-resource-coverage.md#outbound-nat-mode-1333), [Firewall categories](../development/opnsense-resource-coverage.md#firewall-categories-1286) |
 | Routing | `routing.gateways`, `routing.static` | [Coverage matrix](../development/opnsense-resource-coverage.md#coverage-matrix) |
@@ -195,7 +196,7 @@ foundry config migrate --env <env> --provider opnsense --component firewall.alia
 | `-o`, `--output` | Output file; defaults to `envs/{env}/resources/migrated-{component}.yaml` |
 | `--dry-run` | Show what would be generated without writing files |
 
-The component is the extractor key the provider registers, not always the same as a resource type. The keys are `acmeclient.accounts`, `acmeclient.actions`, `acmeclient.certs`, `acmeclient.settings`, `acmeclient.validations`, `cron.jobs`, `firewall.aliases`, `firewall.categories`, `firewall.nat`, `firewall.rules`, `firewall.source_nat`, `hostdiscovery`, `interfaces.assignments`, `interfaces.settings`, `interfaces.virtual_ips`, `interfaces.vlans`, `isc_to_kea`, `kea.dhcp4.ha`, `kea.dhcp4.ha_peers`, `kea_dhcp`, `monit.alerts`, `monit.services`, `monit.settings`, `monit.tests`, `routing.gateways`, `routing.static`, `syslog.settings`, `tailscale.auth`, `tailscale.settings`, `tailscale.subnets`, `unbound.forwards`, `unbound.host_aliases`, `unbound.host_overrides` and `unbound.settings`. An unknown component is refused with this list.
+The component is the extractor key the provider registers, not always the same as a resource type. The keys are `acmeclient.accounts`, `acmeclient.actions`, `acmeclient.certs`, `acmeclient.settings`, `acmeclient.validations`, `cron.jobs`, `firewall.aliases`, `firewall.categories`, `firewall.nat`, `firewall.rules`, `firewall.source_nat`, `hasync.settings`, `hostdiscovery`, `interfaces.assignments`, `interfaces.settings`, `interfaces.virtual_ips`, `interfaces.vlans`, `isc_to_kea`, `kea.dhcp4.ha`, `kea.dhcp4.ha_peers`, `kea_dhcp`, `monit.alerts`, `monit.services`, `monit.settings`, `monit.tests`, `routing.gateways`, `routing.static`, `syslog.settings`, `tailscale.auth`, `tailscale.settings`, `tailscale.subnets`, `unbound.forwards`, `unbound.host_aliases`, `unbound.host_overrides` and `unbound.settings`. An unknown component is refused with this list.
 
 !!! note "The command's own help example"
     The `--help` text of `config migrate` shows `--component vlans`. The registered key is `interfaces.vlans`, and `vlans` is refused as an unsupported component.
@@ -204,7 +205,7 @@ After a migration, plan and apply with `--add-only` until the YAML describes the
 
 ## Finalization Hooks
 
-After an apply, the runner makes one reconfigure call per service whose components changed, however many of its types changed. The hook keys (`OPNsenseProvider.get_finalization_hooks`) are `kea_reconfigure`, `unbound_reconfigure`, `radvd_reconfigure`, `cron_reconfigure`, `openvpn_reconfigure`, `tunables_reconfigure`, `interfaces_settings_reconfigure`, `syslog_reconfigure`, `source_nat_apply`, `hostdiscovery_reconfigure`, `acmeclient_reconfigure`, `tailscale_reconfigure` and `monit_reconfigure`. A hook that fails fails the apply.
+After an apply, the runner makes one reconfigure call per service whose components changed, however many of its types changed. The hook keys (`OPNsenseProvider.get_finalization_hooks`) are `kea_reconfigure`, `unbound_reconfigure`, `radvd_reconfigure`, `cron_reconfigure`, `openvpn_reconfigure`, `tunables_reconfigure`, `interfaces_settings_reconfigure`, `syslog_reconfigure`, `hasync_reconfigure`, `source_nat_apply`, `hostdiscovery_reconfigure`, `acmeclient_reconfigure`, `tailscale_reconfigure` and `monit_reconfigure`. A hook that fails fails the apply.
 
 ## Endpoint and Version Check
 

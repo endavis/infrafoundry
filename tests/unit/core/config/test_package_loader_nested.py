@@ -572,6 +572,25 @@ class TestParseNestedShapeMismatch:
         SyslogSettingsValidator(report).validate(OPNsenseValidationContext(resources=found))
         assert not [r for r in report.results if r.level == ValidationLevel.ERROR]
 
+    def test_hasync_settings_is_a_singleton_dict(self, temp_dir: Path) -> None:
+        """``hasync.settings`` loads as one singleton (#1389)."""
+        from infrafoundry.core.config.package_loader import SINGLETON_RESOURCE_TYPES
+
+        assert "hasync.settings" in SINGLETON_RESOURCE_TYPES
+        loader = PackageLoader(temp_dir)
+        data = {"opnsense": {"hasync": {"settings": {"verify_peer": True, "sync_items": ["a"]}}}}
+        resources = loader._parse_resources_from_data(data, "t.yaml", "opnsense")
+        found = [r for r in resources if r.type == "hasync.settings"]
+        assert len(found) == 1
+        assert found[0].name == "hasync.settings"
+        assert found[0].config == {"verify_peer": True, "sync_items": ["a"]}
+
+    def test_hasync_settings_list_rejected(self, temp_dir: Path) -> None:
+        loader = PackageLoader(temp_dir)
+        data: dict[str, Any] = {"opnsense": {"hasync": {"settings": [{"verify_peer": True}]}}}
+        with pytest.raises(InvalidConfigurationError, match="declared as a dict"):
+            loader._parse_resources_from_data(data, "bad.yaml", "opnsense")
+
     def test_source_nat_is_a_singleton_dict(self, temp_dir: Path) -> None:
         """``firewall.source_nat`` loads as one singleton next to the ``firewall.nat`` list."""
         from infrafoundry.core.config.package_loader import SINGLETON_RESOURCE_TYPES

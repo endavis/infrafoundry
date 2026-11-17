@@ -57,6 +57,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<openvpn>` (legacy `os-openvpn-legacy` plugin) | none | Unmanaged. A cutover recreates the client as a modern `openvpn.instances` entry; import any legacy server or other legacy configuration by hand. |
 | `<OPNsense>/AcmeClient` (`os-acme-client` plugin, `acmeclient/*`) | `acmeclient.settings`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs` | Supported (direct-API; #790). The wire `name` is the identity (the CN for certs), and certs reference accounts, validations and actions by handle. Secret fields take `secret://` URIs. The four list types delete only managed rows; `config migrate` extractors exist for all five. The plugin comes from `system.firmware`; its renewal cron job is plugin-managed. Add, update, delete, re-plan and `config migrate` are verified live; `fetchCronIntegration` is not. See [ACME client (#790)](#acme-client-790). |
 | `<OPNsense>/tailscale` (`os-tailscale` plugin, `tailscale/*`) | `tailscale.settings`, `tailscale.auth`, `tailscale.subnets` | Supported (direct-API; #787). `settings` and `auth` are singletons, `subnets` is a managed-set list keyed by the normalized CIDR. The pre-auth key must be a `secret://` URI. One `tailscale/service/reconfigure` fires per apply; the plugin is never started and no tailnet is joined. A `config migrate` extractor exists for each. See [Tailscale (#787)](#tailscale-787). |
+| `<hasync>` (core `core/hasync/*`) | `hasync.settings` | Supported (direct-API; #1389). A singleton over System > High Availability > Settings: pfsync, XMLRPC sync target, credentials and the sync items. `password` is a `secret://` URI and is never shown or echoed. See [HA sync settings](#ha-sync-settings-1389). |
 | `<OPNsense>/Syslog` | `syslog.settings` | Supported (direct-API; #804). A singleton over the `general` section of the syslog model (local logging switch and log rotation); only declared fields are compared, the whole live `general` object is echoed back on write; destroy is a no-op; the `syslog_reconfigure` hook fires one reconfigure per apply. Remote `destinations` are not managed. The `set` and `reconfigure` calls are verified live. See [Syslog settings](#syslog-settings-804). |
 | `<OPNsense>/monit` general (core `monit/settings/*`) | `monit.settings` | Supported (direct-API; #791). A singleton over the `general` section: mail relay, SSL, the `httpd` control interface and the M/Monit link. Only declared fields are compared; lists compare as sets. `password`, `httpd_password` and `mmonit_url` take `secret://` URIs and are never logged or echoed. Destroy is a no-op. See [Monit (#791)](#monit-791). |
 | `<OPNsense>/monit` alerts | `monit.alerts` | Supported (direct-API; #791). A managed-set list keyed by `recipient`. `events` is a list of the 29 monit event names; an empty list means all events. See [Monit (#791)](#monit-791). |
@@ -70,7 +71,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<system>/timeservers` (NTP) | none | **Out of scope.** Same reason: legacy PHP page only (`services_ntpd.php`), usually left at the defaults. |
 | `<OPNsense>/Firewall/Category` (MVC `firewall/category/*Item`) | `firewall.categories` | Supported (direct-API; #1286). Identity is the wire `name` (`config.name`, default the resource name). `auto` and `color` are optional. Deletes use the managed set; the provider's `infrafoundry` marker category is never part of the diff; a category the box reports in use is kept with a warning. A `config migrate` extractor exists. See [Firewall categories (#1286)](#firewall-categories-1286). |
 
-Sections intentionally **out of IaC scope** (per ADR-0013): `<hasync>`, `<gres>`, `<gifs>`, `<laggs>`, `<bridges>`, `<ppps>`, `<wireless>`. These are set-once items and are migrated via selective `config.xml` import on the target box.
+Sections intentionally **out of IaC scope** (per ADR-0013): `<gres>`, `<gifs>`, `<laggs>`, `<bridges>`, `<ppps>`, `<wireless>`. These are set-once items and are migrated via selective `config.xml` import on the target box.
 
 ## Trust CAs and certificates (#807)
 
@@ -961,6 +962,61 @@ Configure the pair on the primary only. Leave `this_server_name` empty so each n
   - Writing the HA settings re-runs option-data auto-collect on `auto_collect` subnets (see above), which is why the HA types dispatch first.
 - Not verified: XMLRPC sync of the settings to a backup node (only one test firewall was available), so the CARP-pair behaviour above remains an expectation.
 
+## HA sync settings (#1389)
+
+`opnsense.hasync.settings` is a singleton dict over the `hasync` model (System > High Availability > Settings). Every key is optional and only declared keys are compared and written.
+
+| YAML key | Wire field | Type |
+| --- | --- | --- |
+| `disable_preempt` | `disablepreempt` | bool |
+| `disconnect_ppps` | `disconnectppps` | bool |
+| `pfsync_interface` | `pfsyncinterface` | string, `""` = none |
+| `pfsync_peer_ip` | `pfsyncpeerip` | IPv4 or `""` |
+| `pfsync_version` | `pfsyncversion` | `"1301"` or `"1400"` (an int is accepted) |
+| `pfsync_defer` | `pfsyncdefer` | bool |
+| `synchronize_to_ip` | `synchronizetoip` | IPv4/IPv6 or `""` |
+| `verify_peer` | `verifypeer` | bool |
+| `username` | `username` | string |
+| `password` | `password` | `secret://` URI |
+| `sync_items` | `syncitems` | list of strings, compared as a set |
+| `update_password` | not a wire field | bool |
+
+**Password.** Use a `secret://env_secrets/...` URI; a plaintext value is a validator WARNING. A readable live password is compared and written on a difference. When the box returns it empty or masked it cannot be compared, so it never counts as drift: the resolved password is still sent when another declared field is written in the same apply, or when `update_password: true` is set. A plan warns when the password is unreadable, no flag is set and nothing else changes. The password is never logged, shown in a plan (`[REDACTED]`) or echoed back, and an empty `password` is rejected, so a stored password can be replaced but not cleared.
+
+**Validation.** On plan: unknown keys, types, IP formats, the `pfsync_version` enum, the `sync_items` shape and `update_password` without `password`. In `infra doctor`: `pfsync_interface` must be a managed interface assignment or an interface the box offers, and each `sync_items` entry must be one the box offers. The manager also refuses an unknown value before any write.
+
+**Order and disabling.** It depends on `interfaces.assignments` and is applied after the CARP virtual IPs. Destroy is a no-op. To turn sync off, declare `sync_items: []`, `synchronize_to_ip: ""` and `pfsync_interface: ""`.
+
+**CARP pair.** Configure the primary only. Nothing is pushed to the backup until the XMLRPC sync runs; a post-apply sync trigger is a separate piece of work.
+
+**Migrate.** `config migrate --component hasync.settings` exports the fields on the box; `password` is only the placeholder `secret://env_secrets/opnsense/hasync/password` when the box holds one.
+
+```yaml
+opnsense:
+  hasync:
+    settings:
+      disable_preempt: false
+      pfsync_interface: lan
+      pfsync_peer_ip: 192.0.2.2
+      pfsync_version: "1400"
+      synchronize_to_ip: 192.0.2.2
+      username: fw-test-sync
+      password: secret://env_secrets/opnsense/hasync/password
+      sync_items: [aliases, rules, virtualip]
+```
+
+**Verified and not verified.**
+
+- Verified: the three endpoints in every bundled 26.1 spec, and the `pfsyncversion` option keys (`1301`, `1400`) on a live read.
+- Verified live on a single test firewall (26.1.11), with documentation addresses and a throwaway secret, restored afterwards:
+  - `infra plan` showed one update, and `infra apply` wrote it with one `set` and one `core/hasync/reconfigure`, which returned `ok`.
+  - `password` reads back in clear, so it is compared like any other field and a re-plan is a no-op.
+  - The secret appeared in no output, log or generated file.
+  - `infra doctor` rejects an unknown `pfsync_interface` and an unknown `sync_items` entry, and `infra apply` refuses them before writing.
+  - `config migrate` exports only the `secret://` placeholder for `password`.
+  - Posting `password: ""` with `set` clears a stored password.
+- Not verified: XMLRPC sync to a real backup node and pfsync traffic, since there is no second firewall. The write-only path above stays in place in case another release masks `password`.
+
 ## Outbound NAT mode (#1333)
 
 `opnsense.firewall.source_nat` is a singleton dict over the `snat_mode` field of the `filter.general` node of the firewall filter model. The name follows the wire controller (`firewall/source_nat`), because `firewall.nat` is a list.
@@ -997,7 +1053,7 @@ opnsense:
 
 - **Managed-set types** delete a live object only if it matches a managed entry: `interfaces.vlans`, `interfaces.assignments`, `firewall.aliases`, `routing.gateways`, `routing.static`, `interfaces.virtual_ips`, `unbound.host_overrides`, `unbound.host_aliases`, `unbound.forwards`, `kea.dhcp4.subnets`, `kea.dhcp4.reservations`, `kea.dhcp4.ha_peers`, `kea.dhcp6.subnets`, `kea.dhcp6.reservations`, `trust.cas`, `trust.certs`, `openvpn.static_keys`, `openvpn.instances`, `firewall.categories`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs`, `tailscale.subnets`, `monit.alerts`, `monit.tests` and `monit.services`.
 - **Marker types** (`firewall.rules`, `firewall.nat`, `cron.jobs`) already delete only objects carrying InfraFoundry's marker. They use the same dispatch and release rules but need no managed set.
-- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hostdiscovery`, `firewall.source_nat`, `kea.dhcp4.ha`, `acmeclient.settings`, `tailscale.settings`, `tailscale.auth`, `monit.settings`, `radvd`) are unaffected.
+- **Singletons** (`system.*`, `unbound.advanced`, `unbound.settings`, `interfaces.settings`, `syslog.settings`, `hasync.settings`, `hostdiscovery`, `firewall.source_nat`, `kea.dhcp4.ha`, `acmeclient.settings`, `tailscale.settings`, `tailscale.auth`, `monit.settings`, `radvd`) are unaffected.
 
 **Upgrading.** There is no migration. The first `infra plan` after upgrading can show deletes you have not seen before: any object InfraFoundry applied for a type whose YAML entries were all removed was previously left on the box and is now deleted. Hand-added objects next to managed ones, which the old full reconcile deleted, are now kept and shown as unmanaged. Review the first plan before applying.
 

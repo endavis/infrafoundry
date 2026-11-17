@@ -413,6 +413,11 @@ INTERFACES_SETTINGS_RECONFIGURE = Endpoint("POST", "interfaces/settings/reconfig
 SYSLOG_SETTINGS_GET = Endpoint("GET", "syslog/settings/get")
 SYSLOG_SETTINGS_SET = Endpoint("POST", "syslog/settings/set")
 SYSLOG_RECONFIGURE = Endpoint("POST", "syslog/service/reconfigure")
+
+# --- high availability sync settings (#1389) ---
+HASYNC_GET = Endpoint("GET", "core/hasync/get")
+HASYNC_SET = Endpoint("POST", "core/hasync/set")
+HASYNC_RECONFIGURE = Endpoint("POST", "core/hasync/reconfigure")
 # In-tree plugin controller: not in stock specs (see the module docstring).
 ASSIGN_SETTINGS = _crud(
     "interfaces/assign_settings",
@@ -584,6 +589,8 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     ),
     # #804
     "syslog.settings": (SYSLOG_SETTINGS_GET, SYSLOG_SETTINGS_SET, SYSLOG_RECONFIGURE),
+    # #1389
+    "hasync.settings": (HASYNC_GET, HASYNC_SET, HASYNC_RECONFIGURE),
     "interfaces.vlans": VLAN.all(),
     "interfaces.assignments": (*ASSIGN_SETTINGS.all(), INTERFACES_INFO),
     "interfaces.virtual_ips": VIP.all(),
@@ -733,6 +740,7 @@ DOCTOR_ENDPOINTS: tuple[Endpoint, ...] = (
     INTERFACES_EXPORT,
     GATEWAY.search,
     UNBOUND_HOST_OVERRIDE.search,
+    HASYNC_GET,  # #1389: the live validator reads the pfsync interface and sync-item options
 )
 
 #: Release series (``major.minor``) whose bundled specs the conformance test enforces.

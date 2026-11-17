@@ -10,6 +10,7 @@ tags:
 # ADR-0013: OPNsense Full-IaC Migration Coverage
 
 **Date:** 2026-04-30
+**Amended:** 2026-11-17 (#1389) — `hasync.settings` moved in scope; `<hasync>` removed from the out-of-scope list
 **Amended:** 2026-05-03 (#717) — `interface_assignments` per-component decision updated; cross-reference to ADR-0014's new Per-component decisions section
 **Amended:** 2026-05-04 (#713) — `nat_rules` per-component decision recorded (outbound + 1:1 ship via direct REST; port forwards deferred to a follow-up spike)
 **Amended:** 2026-05-03 (#721) — `gateways` per-component decision recorded (direct REST against `routing/settings/*Gateway`; natural-key identity)
@@ -47,6 +48,7 @@ We will close the IaC gap so OPNsense box-to-box migration is achievable through
 | `trust.cas`, `trust.certs` ([#807](https://github.com/endavis/infrafoundry/issues/807)) | Added 2026-10-27 (#1093). `system.webgui` and the OpenVPN client refer to certificates by reference, so the references must resolve after a rebuild. |
 | `acmeclient_*` ([#790](https://github.com/endavis/infrafoundry/issues/790)) | Added 2026-10-27 (#1093). Certificates issued by the ACME client stop renewing if its accounts, validations and actions are not carried over. Implemented by #790 as `acmeclient.settings`, `.accounts`, `.validations`, `.actions` and `.certs`; the renewal cron job is plugin-managed, see [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md). |
 | `monit.*` ([#791](https://github.com/endavis/infrafoundry/issues/791)) | Added 2026-11-11 (#791). A rebuilt box otherwise loses its curated monitoring (alerts, services and the tests they run) and the operator re-creates it by hand in the GUI. Implemented as `monit.settings`, `monit.alerts`, `monit.tests` and `monit.services`; see [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md#monit-791-2026-11-11). |
+| `hasync.settings` ([#1389](https://github.com/endavis/infrafoundry/issues/1389)) | Added 2026-11-17 (#1389). An OPNsense CARP pair is paired by hand and drifts silently. InfraFoundry manages the primary only; XMLRPC carries the configuration to the backup. |
 
 **Tooling work:**
 
@@ -56,7 +58,6 @@ We will close the IaC gap so OPNsense box-to-box migration is achievable through
 
 | Section | Reason |
 | --- | --- |
-| `<hasync>` | Set-once HA pairing config. |
 | `<gres>`, `<gifs>`, `<laggs>`, `<bridges>`, `<ppps>`, `<wireless>` | Each typically a single record per box; not worth a component. |
 
 ISC DHCP (`<dhcpd>`/`<dhcpdv6>`) is also out of scope going forward — Kea is the supported path and the existing ISC→Kea helper covers the migration when needed.
@@ -65,7 +66,7 @@ ISC DHCP (`<dhcpd>`/`<dhcpdv6>`) is also out of scope going forward — Kea is t
 
 - **Drop-in replacement is the operator's stated goal.** The current Kea-only coverage doesn't get there.
 - **Interface assignment is the lever that makes hardware swaps repeatable.** Without it, every cutover requires hand-editing `config.xml` interface mappings on the target. With it, hardware-identical successor boxes are a "change endpoint, re-apply" operation.
-- **The deferred items are deliberately small and stable.** HA sync and physical layer constructs (LAGG/bridge/GRE/etc.) change infrequently and are well-served by OPNsense's selective `config.xml` import. Putting them under IaC is a future option, not a prerequisite. OpenVPN, certificates and ACME were in this list until 2026-10-27 (#1093); they moved in scope because other managed settings depend on them.
+- **The deferred items are deliberately small and stable.** HA sync moved in scope on 2026-11-17 (#1389). Physical layer constructs (LAGG/bridge/GRE/etc.) change infrequently and are well-served by OPNsense's selective `config.xml` import. Putting them under IaC is a future option, not a prerequisite. OpenVPN, certificates and ACME were in this list until 2026-10-27 (#1093); they moved in scope because other managed settings depend on them.
 - **The scope is bounded and incremental.** Each gap is its own component with a clear contract (template + validator + manager + tests + `config migrate` extractor). Issues can ship independently and the migration runbook absorbs each one as it lands.
 
 ## Data model and apply mechanism
@@ -122,6 +123,7 @@ Each step above is a separate feature issue. Issue numbers will be added to this
 - Issue [#808](https://github.com/endavis/infrafoundry/issues/808): feat: add `openvpn.instances` direct-API resource for OpenVPN client instances (moved in scope by #1093; scope changed from the legacy plugin to modern instances).
 - Issue [#807](https://github.com/endavis/infrafoundry/issues/807): feat: add `trust.cas` and `trust.certs` direct-API resources (moved in scope by #1093).
 - Issue [#790](https://github.com/endavis/infrafoundry/issues/790): feat: add the `acmeclient_*` resource types (moved in scope by #1093). Implemented as the `acmeclient.*` types; the renewal cron job is plugin-managed rather than a `cron.jobs` reference.
+- Issue [#1389](https://github.com/endavis/infrafoundry/issues/1389): feat: add the `hasync.settings` direct-API resource for HA pairing (moved in scope 2026-11-17; `<hasync>` was previously out of scope).
 - Issue [#791](https://github.com/endavis/infrafoundry/issues/791): feat: add the `monit.*` resource types. Implemented as `monit.settings`, `monit.alerts`, `monit.tests` and `monit.services`.
 
 ## Related Documentation
