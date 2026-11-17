@@ -7,6 +7,9 @@ from infrafoundry.providers.opnsense.validators._xref import (
 )
 from infrafoundry.providers.opnsense.validators.acmeclient_validator import AcmeClientValidator
 from infrafoundry.providers.opnsense.validators.alias_validator import AliasValidator
+from infrafoundry.providers.opnsense.validators.carp_health_validator import (
+    CarpHealthValidator,  # #1393
+)
 from infrafoundry.providers.opnsense.validators.cron_jobs_validator import CronJobsValidator
 from infrafoundry.providers.opnsense.validators.firewall_categories_validator import (
     FirewallCategoryValidator,
@@ -91,6 +94,7 @@ from infrafoundry.providers.opnsense.validators.vlan_validator import VLANValida
 __all__ = [
     "AcmeClientValidator",
     "AliasValidator",
+    "CarpHealthValidator",  # #1393
     "CronJobsValidator",
     "FirewallCategoryValidator",
     "FirewallRuleValidator",

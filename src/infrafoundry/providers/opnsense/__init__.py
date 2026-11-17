@@ -954,6 +954,7 @@ class OPNsenseProvider(
         validator = OPNsenseValidator(env_config, report)
         validator.validate_references(resources)
         validator.validate_endpoint_support(resources)
+        validator.validate_ha_health()  # #1393
 
     def validate_references_in_context(
         self,
@@ -966,6 +967,7 @@ class OPNsenseProvider(
         validator = OPNsenseValidator(env_config, report)
         validator.validate_references(resources, reference_resources)
         validator.validate_endpoint_support(resources)
+        validator.validate_ha_health()  # #1393
 
     def validate_offline(
         self,

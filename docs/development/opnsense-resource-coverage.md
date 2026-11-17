@@ -57,7 +57,7 @@ Source of truth for "supported": `OPNsenseProvider.get_resource_types()` in `src
 | `<openvpn>` (legacy `os-openvpn-legacy` plugin) | none | Unmanaged. A cutover recreates the client as a modern `openvpn.instances` entry; import any legacy server or other legacy configuration by hand. |
 | `<OPNsense>/AcmeClient` (`os-acme-client` plugin, `acmeclient/*`) | `acmeclient.settings`, `acmeclient.accounts`, `acmeclient.validations`, `acmeclient.actions`, `acmeclient.certs` | Supported (direct-API; #790). The wire `name` is the identity (the CN for certs), and certs reference accounts, validations and actions by handle. Secret fields take `secret://` URIs. The four list types delete only managed rows; `config migrate` extractors exist for all five. The plugin comes from `system.firmware`; its renewal cron job is plugin-managed. Add, update, delete, re-plan and `config migrate` are verified live; `fetchCronIntegration` is not. See [ACME client (#790)](#acme-client-790). |
 | `<OPNsense>/tailscale` (`os-tailscale` plugin, `tailscale/*`) | `tailscale.settings`, `tailscale.auth`, `tailscale.subnets` | Supported (direct-API; #787). `settings` and `auth` are singletons, `subnets` is a managed-set list keyed by the normalized CIDR. The pre-auth key must be a `secret://` URI. One `tailscale/service/reconfigure` fires per apply; the plugin is never started and no tailnet is joined. A `config migrate` extractor exists for each. See [Tailscale (#787)](#tailscale-787). |
-| `<hasync>` (core `core/hasync/*`) | `hasync.settings` | Supported (direct-API; #1389). A singleton over System > High Availability > Settings: pfsync, XMLRPC sync target, credentials and the sync items. `password` is a `secret://` URI and is never shown or echoed. See [HA sync settings](#ha-sync-settings-1389). |
+| `<hasync>` (core `core/hasync/*`) | `hasync.settings` | Supported (direct-API; #1389). A singleton over System > High Availability > Settings: pfsync, XMLRPC sync target, credentials and the sync items. `password` is a `secret://` URI and is never shown or echoed. See [HA sync settings](#ha-sync-settings-1389) and [CARP pair health](#carp-pair-health-1393). |
 | `<OPNsense>/Syslog` | `syslog.settings` | Supported (direct-API; #804). A singleton over the `general` section of the syslog model (local logging switch and log rotation); only declared fields are compared, the whole live `general` object is echoed back on write; destroy is a no-op; the `syslog_reconfigure` hook fires one reconfigure per apply. Remote `destinations` are not managed. The `set` and `reconfigure` calls are verified live. See [Syslog settings](#syslog-settings-804). |
 | `<OPNsense>/monit` general (core `monit/settings/*`) | `monit.settings` | Supported (direct-API; #791). A singleton over the `general` section: mail relay, SSL, the `httpd` control interface and the M/Monit link. Only declared fields are compared; lists compare as sets. `password`, `httpd_password` and `mmonit_url` take `secret://` URIs and are never logged or echoed. Destroy is a no-op. See [Monit (#791)](#monit-791). |
 | `<OPNsense>/monit` alerts | `monit.alerts` | Supported (direct-API; #791). A managed-set list keyed by `recipient`. `events` is a list of the 29 monit event names; an empty list means all events. See [Monit (#791)](#monit-791). |
@@ -1034,6 +1034,49 @@ After a successful apply the provider calls `core/hasync_status/version` and the
   - With `ha_sync_after_apply: false`, an apply with a change printed the disabled line and exited 0. With `"always"`, a no-op apply still ran the sync and failed the same way.
   - Clearing `synchronize_to_ip` through `hasync.settings` printed `HA sync skipped: no synchronize_to_ip on this node`.
 - Not verified: a successful sync to a real backup node.
+
+## CARP pair health (#1393)
+
+`infra doctor` reports CARP VIP state and HA peer reachability for the managed node. It is doctor-only (ADR-0023): `infra plan` does not run it. User-facing behaviour is in [Validation and Checks](../providers/opnsense.md#validation-and-checks).
+
+**Endpoints (all read-only):**
+
+- `GET diagnostics/interface/getVipStatus`: `rows[]` with `interface`, `vhid`, `advbase`, `advskew`, `subnet`, `status`, `mode` and `vhid_txt`, and a `carp` block with `demotion`, `allow`, `maintenancemode` and `status_msg`.
+- `GET core/hasync/get`: the live `synchronizetoip`.
+- `POST core/hasync_status/version`: called only when a sync target is set. It reads state and writes nothing.
+- `diagnostics/interface/carpStatus/*` is a write. It is never called and never registered.
+
+**Role is inferred, with no new setting.** InfraFoundry manages the primary only. A node with `synchronizetoip` set is the sync source, so every VIP is expected to be MASTER. A node with CARP rows and no sync target has an unknown role, so one warning (`opnsense_carp_role`) is reported and only the checks that hold for any role apply.
+
+| Finding | Severity | Check |
+| :--- | :--- | :--- |
+| Sync-source VIP is BACKUP | Error | `opnsense_carp_vip_<n>` |
+| VIP in INIT, DISABLED or an unknown state (either role) | Error | `opnsense_carp_vip_<n>` |
+| MASTER and BACKUP VIPs mixed, no sync target | Error | `opnsense_carp_split` |
+| `allow` is 0 | Error | `opnsense_carp_allow` |
+| Peer error, error status or timeout, with a sync target | Error | `opnsense_ha_peer` |
+| `maintenancemode` on | Warning | `opnsense_carp_maintenance` |
+| `demotion` above 0 | Warning | `opnsense_carp_demotion` |
+| CARP VIPs present, no sync target | Warning | `opnsense_carp_role` |
+| Peer answers with no version | Warning | `opnsense_ha_peer` |
+| `getVipStatus` or `core/hasync/get` could not be read | Warning | `opnsense_carp_status_read` |
+| Invalid `ha_sync_timeout` | Error | `opnsense_ha_sync_settings` |
+
+Errors are used so that doctor prints the detail lines without `--verbose`; a warning-only run shows only a count. A single node (no rows, no sync target) adds nothing, and a sync target with no CARP rows adds only the peer result.
+
+**What "split" can mean.** The primary cannot read the backup's VIP states, so a both-MASTER split is not detectable. Reported instead: the managed node is not MASTER on every VIP, its VIPs are mixed MASTER and BACKUP, or the peer is unreachable while the node is MASTER, in which case the message says a both-MASTER split cannot be ruled out.
+
+**Peer check timing.** OPNsense answers `version` after about 60 seconds when the peer is down. The client uses `ha_sync_timeout` (default 300 seconds), so doctor waits at most that long. `core/hasync/get` is read a second time when `hasync.settings` is in scope; that is accepted.
+
+**Verified and not verified:**
+
+- Verified by unit tests against mocked replies: every row of the table above, the silent single node, malformed rows, the client timeout taken from `ha_sync_timeout`, and that no `carpStatus` path is requested.
+- Verified in the source: `getVipStatus` (GET) and `core/hasync_status/version` (POST) exist in every bundled 26.1 spec, from 26.1 through 26.1.11.
+- Verified live on a single 26.1.11 test firewall with no CARP VIPs:
+  - `getVipStatus` returned `rows: []` and the `carp` block (`demotion "0"`, `allow "1"`, `maintenancemode false`). `infra doctor` added no CARP or peer line.
+  - With `synchronize_to_ip` set to an unreachable documentation address, `infra doctor` failed after about 60 s with `HA peer check: ... failed at core/hasync_status/version: fetch error. remote host down?`. The error was shown without `--verbose`.
+  - The HA settings were restored afterwards.
+- Not verified: MASTER, BACKUP, INIT and mixed VIP states, `demotion`, maintenance mode, and the reply of a reachable peer. They need CARP VIPs and a second node.
 
 ## Outbound NAT mode (#1333)
 

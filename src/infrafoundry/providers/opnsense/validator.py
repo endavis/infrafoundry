@@ -8,20 +8,34 @@ import logging
 from dataclasses import replace
 from typing import Any, TypedDict, cast
 
+import httpx
 import urllib3
 
 from infrafoundry.core.config.models import EnvironmentConfig
-from infrafoundry.core.exceptions import InvalidConfigurationError, ReferenceValidationError
+from infrafoundry.core.exceptions import (
+    APIError,
+    InvalidConfigurationError,
+    ReferenceValidationError,
+)
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import OPNsenseProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense import endpoints
 from infrafoundry.providers.opnsense.api_client import OPNsenseClient
-from infrafoundry.providers.opnsense.services.hasync_settings import live_options
-from infrafoundry.providers.opnsense.services.hasync_status import resolve_ha_sync_options
+from infrafoundry.providers.opnsense.services.carp_status import CarpStatusService  # #1393
+from infrafoundry.providers.opnsense.services.hasync_settings import (
+    HasyncSettingsService,  # #1393
+    live_options,
+)
+from infrafoundry.providers.opnsense.services.hasync_status import (
+    HasyncStatusService,  # #1393
+    resolve_ha_sync_options,
+)
+from infrafoundry.providers.opnsense.services.openvpn_instances import flatten_option  # #1393
 from infrafoundry.providers.opnsense.validators import (
     AcmeClientValidator,
+    CarpHealthValidator,  # #1393
     CronJobsValidator,
     FirewallCategoryValidator,  # #1286
     FirewallRuleValidator,
@@ -60,7 +74,10 @@ from infrafoundry.providers.opnsense.validators import (
     build_xref_index,
 )
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex
-from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
+from infrafoundry.providers.opnsense.validators.context import (
+    HaPeerCheck,
+    OPNsenseValidationContext,
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -147,6 +164,7 @@ class OPNsenseValidator:
         self.syslog_settings_validator = SyslogSettingsValidator(report)  # #804
         self.hasync_validator = HasyncValidator(report)  # #1389
         self.hasync_live_validator = HasyncLiveValidator(report)  # #1389
+        self.carp_health_validator = CarpHealthValidator(report)  # #1393
         self.hostdiscovery_validator = HostDiscoveryValidator(report)
         self.source_nat_validator = SourceNatValidator(report)  # #1333
 
@@ -195,6 +213,81 @@ class OPNsenseValidator:
                 check_name="opnsense_endpoint_support",
                 message=f"OPNsense {result.version}: endpoints for {', '.join(types)} are served",
             )
+
+    def validate_ha_health(self) -> None:
+        """Report CARP VIP state and HA peer reachability (#1393, doctor only).
+
+        Read-only: ``getVipStatus``, ``core/hasync/get`` and, when a sync target is
+        set, ``core/hasync_status/version``. Returns silently when credentials are
+        missing; ``validate_connectivity`` already reports that.
+        """
+        from .services._credentials import resolve_credentials
+
+        provider_settings = self.env_config.get_provider_settings("opnsense")
+        if not provider_settings:
+            return
+        try:
+            api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(provider_settings)
+        except (ValueError, KeyError):
+            return
+        try:
+            options = resolve_ha_sync_options(provider_settings)
+        except InvalidConfigurationError as exc:
+            self.api_validator.add_error(check_name="opnsense_ha_sync_settings", message=str(exc))
+            return
+        client = OPNsenseClient(
+            api_key=api_key,
+            api_secret=api_secret,
+            base_url=api_url,
+            verify_ssl=verify_ssl,
+            proxy=proxy,
+            timeout=options.timeout,
+        )
+        try:
+            carp_status = CarpStatusService(client).vip_status()
+            settings_service = HasyncSettingsService(client)
+            hasync = settings_service.live_hasync(settings_service.get_settings())
+        except (APIError, httpx.HTTPError) as exc:
+            self.api_validator.add_error(
+                check_name="opnsense_carp_status_read",
+                message=f"Could not read CARP or HA sync state: {exc}",
+                level=ValidationLevel.WARNING,
+            )
+            return
+        sync_target = flatten_option(hasync.get("synchronizetoip")).strip()
+        peer_check: HaPeerCheck | None = None
+        if sync_target:
+            logger.info(
+                "checking HA peer %s; can take up to %s s when it is down",
+                sync_target,
+                options.timeout,
+            )
+            peer_check = self._check_ha_peer(client, sync_target, options.timeout)
+        self.carp_health_validator.validate(
+            OPNsenseValidationContext(
+                resources=[],
+                live_carp_status=carp_status,
+                live_sync_target=sync_target,
+                peer_check=peer_check,
+            )
+        )
+
+    @staticmethod
+    def _check_ha_peer(client: OPNsenseClient, target: str, timeout: int) -> HaPeerCheck:
+        """Call ``core/hasync_status/version`` and turn the outcome into a ``HaPeerCheck``."""
+        try:
+            reply = HasyncStatusService(client, timeout).version(target)
+        except APIError as exc:
+            return HaPeerCheck(ok=False, message=str(exc))
+        response = reply.get("response")
+        version: str | None = None
+        if isinstance(response, dict):
+            firmware = response.get("firmware")
+            candidate = (
+                firmware.get("_my_version") if isinstance(firmware, dict) else None
+            ) or response.get("product_version")
+            version = str(candidate) if candidate else None
+        return HaPeerCheck(ok=True, version=version, answered=bool(response))
 
     def validate_connectivity(self) -> None:
         """Validate connectivity to OPNsense API.
