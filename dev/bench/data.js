@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794929974174,
+  "lastUpdate": 1794930256935,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3044,6 +3044,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005216725283264503",
             "extra": "mean: 78.2260850703951 usec\nrounds: 13624"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9d3c58a0d55bc90638fa3391414d9470d393e795",
+          "message": "fix: send combined network and check results for opnsense virtual ip writes (merges PR #1469, addresses #1465)\n\nOPNsense's VipSettingsController reads vip.network as \"<address>/<bits>\"\nand splits it into the subnet and subnet_bits model fields. The service\nsent the bare prefix length, so adds were rejected, and because add,\nupdate and delete never checked the result the apply reported success\nand the plan never converged.\n\n- send network as \"<address>/<bits>\" in to_payload (YAML shape unchanged)\n- read live rows via subnet/subnet_bits (searchItem address is combined)\n  and getItem network, so the diff key uses the bare address\n- compare network in combined form in _needs_update\n- raise APIError with the validations when add, update or delete fail\n\nExisting tests changed (wire/row format only, same behavior tested):\n- test_virtual_ip_service.py _live helper raw row: address \"A\" -> \"A/24\";\n  network \"24\" -> subnet \"A\" + subnet_bits \"24\"\n- TestPayloadProxyArp.test_proxyarp_minimal_fields: network == \"24\" ->\n  \"192.0.2.10/24\"\n- TestExportToYaml.test_ipalias_exports: searchItem row address\n  \"192.0.2.10\" -> \"192.0.2.10/24\", network \"24\" -> subnet + subnet_bits;\n  getItem network \"24\" -> \"192.0.2.10/24\"\n- TestExportToYaml.test_carp_export_redacts_password: same reshaping with\n  192.0.2.1 (row) and getItem network \"24\" -> \"192.0.2.1/24\"\n- TestLiveToExportConfig.test_ipalias_decoding, ...proxyarp_no_extra_fields:\n  getItem network \"24\" -> \"192.0.2.10/24\"\n- TestLiveToExportConfig.test_carp_decoding_password_placeholder: getItem\n  network \"24\" -> \"192.0.2.1/24\"\n- test_virtual_ip_manager.py _live helper raw row: address \"A\" -> \"A/24\";\n  network \"24\" -> subnet \"A\" + subnet_bits \"24\"\n\nAddresses #1465\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T15:43:14Z",
+          "tree_id": "940c2262f1501094c142749060a9cd5d59545700",
+          "url": "https://github.com/endavis/infrafoundry/commit/9d3c58a0d55bc90638fa3391414d9470d393e795"
+        },
+        "date": 1794930256521,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 48.82811365126272,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0002150512689564955",
+            "extra": "mean: 20.480004760006523 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7863.175302665192,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009636027706480924",
+            "extra": "mean: 127.17508659142496 usec\nrounds: 8338"
           }
         ]
       }
