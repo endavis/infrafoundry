@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from infrafoundry.core.exceptions import UnsupportedVersionError
 from infrafoundry.core.protocols import (
     Applyable,
     Destroyable,
@@ -2262,3 +2263,339 @@ class TestTailscaleHookCoalescing:
         with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
             OPNsenseDirectRunner().apply(provider_with_env)
         hook.assert_called_once_with("test-env")
+
+
+# ---------------------------------------------------------------------------
+# Version-gated types and a firmware update in the same run (#1458)
+# ---------------------------------------------------------------------------
+
+_GATED_ERROR = "opnsense resource type 'firewall.source_nat' needs X, which 26.1.6 does not serve"
+
+
+def _gated_setup(
+    provider: MagicMock,
+    *,
+    update: Any,
+    calls: list[str],
+    gated_apply_raises_until_updated: bool = False,
+    unsupported_after_update: bool = False,
+) -> tuple[dict[str, MagicMock], list[ResourceConfig]]:
+    """Dispatch table with a gated type listed before ``system.firmware``."""
+    state = {"updated": False}
+    managers: dict[str, MagicMock] = {}
+    table: dict[str, Any] = {}
+    resources: list[ResourceConfig] = []
+    for type_name in ("firewall.source_nat", "system.firmware", "interfaces.vlans"):
+        instance = MagicMock()
+        instance.plan.return_value = Diff()
+
+        def _apply(*_a: Any, _t: str = type_name, **_k: Any) -> dict[str, Any]:
+            if _t == "system.firmware":
+                state["updated"] = True
+            if (
+                _t == "firewall.source_nat"
+                and gated_apply_raises_until_updated
+                and not state["updated"]
+            ):
+                calls.append(f"{_t}:raised")
+                raise UnsupportedVersionError("firewall.source_nat needs OPNsense 26.1 or later")
+            calls.append(_t)
+            return {"resources_created": 0, "resources_updated": 0, "resources_deleted": 0}
+
+        instance.apply.side_effect = _apply
+        managers[type_name] = instance
+        table[type_name] = MagicMock(return_value=instance)
+        config: dict[str, Any] = {}
+        if type_name == "system.firmware" and update is not None:
+            config["update"] = update
+        resources.append(
+            ResourceConfig(name=type_name, type=type_name, provider="opnsense", config=config)
+        )
+    provider.get_direct_api_resource_types.return_value = table
+
+    def _hook(_env: str, types: list[str]) -> dict[str, list[str]]:
+        gated = "firewall.source_nat" in types and (
+            not state["updated"] or unsupported_after_update
+        )
+        return {"errors": [_GATED_ERROR] if gated else [], "warnings": []}
+
+    provider.check_endpoint_support.side_effect = _hook
+    return managers, resources
+
+
+class TestVersionGatedDeferral:
+    """A version-gated type waits for ``system.firmware`` with ``update: true`` (#1458)."""
+
+    def _plan(self, provider: MagicMock, resources: list[ResourceConfig]) -> Any:
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            return OPNsenseDirectRunner().plan(provider)
+
+    def _apply(self, provider: MagicMock, resources: list[ResourceConfig]) -> Any:
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            return OPNsenseDirectRunner().apply(provider)
+
+    def test_plan_defers_unsupported_type_when_update_is_set(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        managers, resources = _gated_setup(provider_with_env, update=True, calls=[])
+        result = self._plan(provider_with_env, resources)
+        assert result["success"] is True
+        assert (
+            "firewall.source_nat: deferred until the firmware update" in result["changes_summary"]
+        )
+        managers["firewall.source_nat"].plan.assert_not_called()
+        managers["system.firmware"].plan.assert_called_once()
+        managers["interfaces.vlans"].plan.assert_called_once()
+
+    def test_plan_fails_as_before_without_update(self, provider_with_env: MagicMock) -> None:
+        managers, resources = _gated_setup(provider_with_env, update=None, calls=[])
+        result = self._plan(provider_with_env, resources)
+        assert result["success"] is False
+        assert _GATED_ERROR in result["error"]
+        managers["interfaces.vlans"].plan.assert_not_called()
+
+    def test_plan_fails_when_update_is_false(self, provider_with_env: MagicMock) -> None:
+        _, resources = _gated_setup(provider_with_env, update=False, calls=[])
+        result = self._plan(provider_with_env, resources)
+        assert result["success"] is False
+        assert _GATED_ERROR in result["error"]
+
+    def test_plan_defers_a_type_whose_manager_reports_an_old_version(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        managers, resources = _gated_setup(provider_with_env, update=True, calls=[])
+        provider_with_env.check_endpoint_support.side_effect = None
+        provider_with_env.check_endpoint_support.return_value = {"errors": [], "warnings": []}
+        managers["firewall.source_nat"].plan.side_effect = UnsupportedVersionError("old box")
+        result = self._plan(provider_with_env, resources)
+        assert result["success"] is True
+        assert "firewall.source_nat: deferred" in result["changes_summary"]
+
+    def test_plan_fails_on_manager_version_error_without_update(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        managers, resources = _gated_setup(provider_with_env, update=None, calls=[])
+        provider_with_env.check_endpoint_support.side_effect = None
+        provider_with_env.check_endpoint_support.return_value = {"errors": [], "warnings": []}
+        managers["firewall.source_nat"].plan.side_effect = UnsupportedVersionError("old box")
+        result = self._plan(provider_with_env, resources)
+        assert result["success"] is False
+        assert "old box" in result["error"]
+
+    def test_plan_does_not_defer_an_unsupported_firmware_type(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        _, resources = _gated_setup(provider_with_env, update=True, calls=[])
+        provider_with_env.check_endpoint_support.side_effect = lambda _e, types: {
+            "errors": ["firmware unsupported"] if "system.firmware" in types else [],
+            "warnings": [],
+        }
+        result = self._plan(provider_with_env, resources)
+        assert result["success"] is False
+        assert "firmware unsupported" in result["error"]
+
+    def test_apply_runs_deferred_type_after_the_firmware_update(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        calls: list[str] = []
+        _, resources = _gated_setup(provider_with_env, update=True, calls=calls)
+        result = self._apply(provider_with_env, resources)
+        assert result["success"] is True
+        assert calls == ["interfaces.vlans", "system.firmware", "firewall.source_nat"]
+
+    def test_apply_fails_when_still_unsupported_after_the_update(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        calls: list[str] = []
+        _, resources = _gated_setup(
+            provider_with_env, update=True, calls=calls, unsupported_after_update=True
+        )
+        result = self._apply(provider_with_env, resources)
+        assert result["success"] is False
+        assert _GATED_ERROR in result["error"]
+        assert "firewall.source_nat" not in calls
+
+    def test_apply_retries_a_type_the_manager_rejected_before_the_update(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        calls: list[str] = []
+        _, resources = _gated_setup(
+            provider_with_env, update=True, calls=calls, gated_apply_raises_until_updated=True
+        )
+        provider_with_env.check_endpoint_support.side_effect = None
+        provider_with_env.check_endpoint_support.return_value = {"errors": [], "warnings": []}
+        result = self._apply(provider_with_env, resources)
+        assert result["success"] is True
+        # The firmware update now runs before source_nat (#1458), so it is no longer
+        # rejected first; the retry path only matters for a type listed ahead of it.
+        assert calls == ["interfaces.vlans", "system.firmware", "firewall.source_nat"]
+
+    def test_apply_reports_the_manager_error_when_still_rejected(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        managers, resources = _gated_setup(provider_with_env, update=True, calls=[])
+        provider_with_env.check_endpoint_support.side_effect = None
+        provider_with_env.check_endpoint_support.return_value = {"errors": [], "warnings": []}
+        managers["firewall.source_nat"].apply.side_effect = UnsupportedVersionError("still old")
+        result = self._apply(provider_with_env, resources)
+        assert result["success"] is False
+        assert "still old" in result["error"]
+
+    def test_apply_without_update_keeps_table_order_and_checks_nothing(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        calls: list[str] = []
+        _, resources = _gated_setup(provider_with_env, update=None, calls=calls)
+        result = self._apply(provider_with_env, resources)
+        assert result["success"] is True
+        assert calls == ["firewall.source_nat", "system.firmware", "interfaces.vlans"]
+        provider_with_env.check_endpoint_support.assert_not_called()
+
+    def test_apply_without_update_fails_on_manager_version_error(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        managers, resources = _gated_setup(provider_with_env, update=None, calls=[])
+        managers["firewall.source_nat"].apply.side_effect = UnsupportedVersionError("old box")
+        result = self._apply(provider_with_env, resources)
+        assert result["success"] is False
+        assert "old box" in result["error"]
+        managers["system.firmware"].apply.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Forward order with a firmware update: gateway step, firmware, the rest (#1458)
+# ---------------------------------------------------------------------------
+
+_TABLE_ORDER = (
+    "firewall.aliases",
+    "firewall.rules",
+    "routing.gateways",
+    "system.firmware",
+    "interfaces.assignments",
+    "interfaces.vlans",
+    "firewall.source_nat",
+)
+
+
+def _ordered_setup(
+    provider: MagicMock,
+    types: tuple[str, ...],
+    *,
+    update: Any,
+    calls: list[str],
+    deletes: list[str] | None = None,
+) -> list[ResourceConfig]:
+    """Dispatch table in ``types`` order; every manager records its apply (and delete) call."""
+    table: dict[str, Any] = {}
+    resources: list[ResourceConfig] = []
+    for type_name in types:
+        instance = MagicMock()
+        instance.plan.return_value = Diff()
+
+        def _apply(*_a: Any, _t: str = type_name, **kw: Any) -> dict[str, Any]:
+            if kw.get("deletes_only") and deletes is not None:
+                deletes.append(_t)
+            else:
+                calls.append(_t)
+            return {"resources_created": 0, "resources_updated": 0, "resources_deleted": 0}
+
+        instance.apply.side_effect = _apply
+        table[type_name] = MagicMock(return_value=instance)
+        config: dict[str, Any] = {}
+        if type_name == "system.firmware" and update is not None:
+            config["update"] = update
+        resources.append(
+            ResourceConfig(name=type_name, type=type_name, provider="opnsense", config=config)
+        )
+    provider.get_direct_api_resource_types.return_value = table
+    provider.check_endpoint_support.return_value = {"errors": [], "warnings": []}
+    return resources
+
+
+class TestForwardOrderWithFirmwareUpdate:
+    """``system.firmware`` with ``update: true`` runs the gateway step first (#1458)."""
+
+    def _apply(self, provider: MagicMock, resources: list[ResourceConfig]) -> Any:
+        with patch.object(OPNsenseDirectRunner, "_load_provider_resources", return_value=resources):
+            return OPNsenseDirectRunner().apply(provider)
+
+    def test_update_orders_gateway_step_then_firmware_then_table_order(
+        self, provider_with_env: MagicMock
+    ) -> None:
+        calls: list[str] = []
+        resources = _ordered_setup(provider_with_env, _TABLE_ORDER, update=True, calls=calls)
+        assert self._apply(provider_with_env, resources)["success"] is True
+        assert calls == [
+            "interfaces.vlans",
+            "interfaces.assignments",
+            "routing.gateways",
+            "system.firmware",
+            "firewall.aliases",
+            "firewall.rules",
+            "firewall.source_nat",
+        ]
+
+    def test_without_update_keeps_table_order(self, provider_with_env: MagicMock) -> None:
+        calls: list[str] = []
+        resources = _ordered_setup(provider_with_env, _TABLE_ORDER, update=None, calls=calls)
+        assert self._apply(provider_with_env, resources)["success"] is True
+        assert calls == list(_TABLE_ORDER)
+
+    def test_update_false_keeps_table_order(self, provider_with_env: MagicMock) -> None:
+        calls: list[str] = []
+        resources = _ordered_setup(provider_with_env, _TABLE_ORDER, update=False, calls=calls)
+        assert self._apply(provider_with_env, resources)["success"] is True
+        assert calls == list(_TABLE_ORDER)
+
+    def test_update_with_only_some_pre_firmware_types(self, provider_with_env: MagicMock) -> None:
+        calls: list[str] = []
+        types = ("firewall.rules", "routing.gateways", "system.firmware", "firewall.aliases")
+        resources = _ordered_setup(provider_with_env, types, update=True, calls=calls)
+        assert self._apply(provider_with_env, resources)["success"] is True
+        assert calls == [
+            "routing.gateways",
+            "system.firmware",
+            "firewall.rules",
+            "firewall.aliases",
+        ]
+
+    def test_update_orders_deferred_type_last(self, provider_with_env: MagicMock) -> None:
+        calls: list[str] = []
+        types = ("firewall.source_nat", "firewall.rules", "routing.gateways", "system.firmware")
+        resources = _ordered_setup(provider_with_env, types, update=True, calls=calls)
+        state = {"updated": False}
+        inner = provider_with_env.get_direct_api_resource_types.return_value
+        for name, factory in inner.items():
+            real = factory.return_value.apply.side_effect
+
+            def _wrapped(*a: Any, _n: str = name, _real: Any = real, **k: Any) -> Any:
+                if _n == "system.firmware":
+                    state["updated"] = True
+                return _real(*a, _t=_n, **k)
+
+            factory.return_value.apply.side_effect = _wrapped
+
+        def _hook(_env: str, in_scope: list[str]) -> dict[str, list[str]]:
+            gated = "firewall.source_nat" in in_scope and not state["updated"]
+            return {"errors": ["source_nat gated"] if gated else [], "warnings": []}
+
+        provider_with_env.check_endpoint_support.side_effect = _hook
+        assert self._apply(provider_with_env, resources)["success"] is True
+        assert calls == [
+            "routing.gateways",
+            "system.firmware",
+            "firewall.rules",
+            "firewall.source_nat",
+        ]
+
+    def test_delete_pass_order_is_unchanged_with_update(self, provider_with_env: MagicMock) -> None:
+        calls: list[str] = []
+        deletes: list[str] = []
+        resources = _ordered_setup(
+            provider_with_env, _TABLE_ORDER, update=True, calls=calls, deletes=deletes
+        )
+        for factory in provider_with_env.get_direct_api_resource_types.return_value.values():
+            factory.splits_deletes = True
+        with patch.object(OPNsenseDirectRunner, "_splits_deletes", return_value=True):
+            assert self._apply(provider_with_env, resources)["success"] is True
+        assert deletes == list(reversed(_TABLE_ORDER))
