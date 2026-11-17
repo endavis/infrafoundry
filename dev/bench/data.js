@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794917310751,
+  "lastUpdate": 1794917960588,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2740,6 +2740,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009844735565400738",
             "extra": "mean: 77.95396254182663 usec\nrounds: 13722"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0e4023b96f9b506f94205fb0d138a049f9628004",
+          "message": "fix: make opnsense ha sync skip line fit destroy (merges PR #1448, addresses #1446)\n\nThe skip line said \"apply changed nothing\" even when the run was a\ndestroy, since both paths share run_ha_sync_after_apply. Reword it to\n\"HA sync skipped: nothing changed\" and update the provider docs list.\n\nAddresses #1446\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T12:18:12Z",
+          "tree_id": "c407952d59b5d700a3ad6b72c209fb374b558c71",
+          "url": "https://github.com/endavis/infrafoundry/commit/0e4023b96f9b506f94205fb0d138a049f9628004"
+        },
+        "date": 1794917959884,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.912134873520365,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00018783566276924025",
+            "extra": "mean: 20.035207921561476 msec\nrounds: 51"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7951.765390752343,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001027299996108404",
+            "extra": "mean: 125.75823743026537 usec\nrounds: 8453"
           }
         ]
       }
