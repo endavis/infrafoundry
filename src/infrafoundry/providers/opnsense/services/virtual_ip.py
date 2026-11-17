@@ -28,7 +28,12 @@ Field schema (probe-derived, recorded here so a follow-up doesn't need
 to re-probe). All write fields are simple strings on the wire:
 
 - Required (every mode): ``interface``, ``mode``, ``address``,
-  ``network`` (CIDR mask, e.g. ``"24"``).
+  ``network``. In YAML ``network`` is the CIDR mask (``"24"``); on the
+  wire ``network`` is the COMBINED ``"<address>/<bits>"`` (OPNsense splits
+  it into the model fields ``subnet`` and ``subnet_bits``). ``address``
+  in the payload is a volatile field the model ignores. In ``searchItem``
+  rows ``address`` is the combined ``"a/b"`` and ``subnet`` /
+  ``subnet_bits`` carry the parts; ``getItem`` returns ``network`` combined.
 - Required (CARP only): ``password``, ``vhid``.
 - Optional (CARP): ``advbase`` (default ``"1"``), ``advskew`` (default
   ``"0"``), ``peer`` (unicast IPv4 peer), ``peer6`` (unicast IPv6 peer),
@@ -74,7 +79,7 @@ from infrafoundry.core.provider import ResourceConfig
 
 from .. import endpoints
 from ._nested_emit import emit_nested_list_yaml
-from .base import BaseService
+from .base import BaseService, raise_on_failed_write
 
 # Allowed values for the ``mode`` discriminator. ``ipalias`` (NOT
 # ``alias``) — the issue body's draft was wrong; the live probe is
@@ -167,7 +172,8 @@ class VirtualIPConfig:
         """Serialize to the ``addItem``/``setItem`` envelope.
 
         Returns:
-            ``{"vip": {<fields>}}``. Booleans are stringified to
+            ``{"vip": {<fields>}}``. ``network`` is sent combined as
+            ``"<address>/<bits>"``. Booleans are stringified to
             ``"0"``/``"1"``; ``description`` maps to ``descr``. The
             operator-facing ``name`` is intentionally NOT sent.
         """
@@ -175,7 +181,7 @@ class VirtualIPConfig:
             "interface": self.interface,
             "mode": self.mode,
             "address": self.address,
-            "network": self.network,
+            "network": f"{self.address}/{self.network}",
             "descr": self.description,
         }
 
@@ -328,16 +334,43 @@ def _needs_update(have: LiveVirtualIP, want: VirtualIPConfig) -> bool:
     on read, so any non-empty ``want.password`` would otherwise force a
     spurious update on every run. Operators rotate CARP passwords by
     supplying a new value alongside another field change (or by
-    explicitly destroying + re-creating the VIP).
+    explicitly destroying + re-creating the VIP). ``address`` is identity
+    (and combined in live rows), so it is skipped; ``network`` is compared
+    in its combined ``"<address>/<bits>"`` form.
     """
     payload = want.to_payload()["vip"]
     for key, want_value in payload.items():
-        if key == "password":
+        if key in ("password", "address"):
+            continue
+        if key == "network":
+            have_addr, have_bits = _split_address_network(have.raw)
+            have_value = f"{have_addr}/{have_bits}" if have_bits else have_addr
+            if str(want_value) != have_value:
+                return True
             continue
         have_value = _normalize_field(have.raw.get(key))
         if str(want_value) != have_value:
             return True
     return False
+
+
+def _split_address_network(item: dict[str, Any]) -> tuple[str, str]:
+    """Return ``(bare address, prefix bits)`` from a ``searchItem`` row or ``getItem`` item.
+
+    Prefers ``subnet`` + ``subnet_bits``, then a combined ``network``
+    (``"a/b"``), then a combined ``address`` (``"a/b"``); otherwise
+    ``(address, "")``.
+    """
+    subnet = _normalize_field(item.get("subnet"))
+    bits = _normalize_field(item.get("subnet_bits"))
+    if subnet:
+        return subnet, bits
+    for key in ("network", "address"):
+        value = _normalize_field(item.get(key))
+        if "/" in value:
+            addr, _, mask = value.rpartition("/")
+            return addr, mask
+    return _normalize_field(item.get("address")), ""
 
 
 def _normalize_field(value: Any) -> str:
@@ -591,12 +624,17 @@ class VirtualIPService(BaseService):
 
         Returns:
             API response dict (typically ``{"result": "saved", "uuid": ...}``).
+
+        Raises:
+            APIError: If OPNsense rejected the write (``result: failed``).
         """
-        return self.client.request(
+        response = self.client.request(
             endpoints.VIP.add.method,
             endpoints.VIP.add.path(),
             data=vip.to_payload(),
         )
+        raise_on_failed_write(response, f"add virtual ip {vip.address}/{vip.network}")
+        return response
 
     def update(self, uuid: str, vip: VirtualIPConfig) -> dict[str, Any]:
         """Update an existing virtual IP by UUID.
@@ -607,12 +645,17 @@ class VirtualIPService(BaseService):
 
         Returns:
             API response dict.
+
+        Raises:
+            APIError: If OPNsense rejected the write (``result: failed``).
         """
-        return self.client.request(
+        response = self.client.request(
             endpoints.VIP.update.method,
             endpoints.VIP.update.path(uuid=uuid),
             data=vip.to_payload(),
         )
+        raise_on_failed_write(response, f"update virtual ip {vip.address}/{vip.network}")
+        return response
 
     def delete(self, uuid: str) -> dict[str, Any]:
         """Delete a virtual IP by UUID.
@@ -622,10 +665,15 @@ class VirtualIPService(BaseService):
 
         Returns:
             API response dict (typically ``{"result": "deleted"}``).
+
+        Raises:
+            APIError: If OPNsense rejected the delete (``result: failed``).
         """
-        return self.client.request(
+        response = self.client.request(
             endpoints.VIP.delete.method, endpoints.VIP.delete.path(uuid=uuid)
         )
+        raise_on_failed_write(response, f"delete virtual ip {uuid}")
+        return response
 
     def reconfigure(self) -> dict[str, Any]:
         """Apply pending virtual-IP changes (commit staged config).
@@ -732,7 +780,7 @@ def _row_to_live(row: dict[str, Any]) -> LiveVirtualIP:
     uuid = str(row.get("uuid", ""))
     interface = _normalize_field(row.get("interface"))
     mode = _normalize_field(row.get("mode"))
-    address = _normalize_field(row.get("address"))
+    address, _bits = _split_address_network(row)
     vhid = _normalize_field(row.get("vhid"))
     return LiveVirtualIP(
         uuid=uuid,
@@ -774,11 +822,12 @@ def _live_to_export_config(get_response: dict[str, Any]) -> dict[str, Any]:
     item = get_response.get("vip", {}) if isinstance(get_response, dict) else {}
     mode = _normalize_field(item.get("mode")) or "ipalias"
 
+    address, bits = _split_address_network(item)
     config: dict[str, Any] = {
         "mode": mode,
         "interface": _normalize_field(item.get("interface")),
-        "address": _normalize_field(item.get("address")),
-        "network": _normalize_field(item.get("network")),
+        "address": address,
+        "network": bits,
         "description": _normalize_field(item.get("descr")),
         "enabled": True,
     }
