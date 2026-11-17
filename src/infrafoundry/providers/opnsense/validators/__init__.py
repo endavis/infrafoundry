@@ -78,6 +78,9 @@ from infrafoundry.providers.opnsense.validators.unbound_settings_validator impor
     UnboundSettingsValidator,
 )
 from infrafoundry.providers.opnsense.validators.unbound_validator import UnboundValidator
+from infrafoundry.providers.opnsense.validators.virtual_ip_topology_validator import (
+    VirtualIPTopologyValidator,  # #1391
+)
 from infrafoundry.providers.opnsense.validators.virtual_ip_validator import VirtualIPValidator
 from infrafoundry.providers.opnsense.validators.vlan_validator import VLANValidator
 
@@ -116,6 +119,7 @@ __all__ = [
     "UnboundSettingsValidator",
     "UnboundValidator",
     "VLANValidator",
+    "VirtualIPTopologyValidator",  # #1391
     "VirtualIPValidator",
     "XRefIndex",
     "build_xref_index",

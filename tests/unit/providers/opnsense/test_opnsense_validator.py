@@ -349,6 +349,46 @@ class TestValidateReferences:
         call = validator.kea_subnet_autocollect_validator.validate.call_args
         assert call.args[0].resources == [v4]
 
+    def test_dispatches_virtual_ip_topology(self, validator: OPNsenseValidator) -> None:
+        """The topology validator receives the VIPs and an xref index (#1391)."""
+        validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
+            return_value={
+                "api_url": "https://opnsense.example.com",
+                "api_key": "key",
+                "api_secret": "secret",
+            }
+        )
+        validator.api_validator.fetch_json = MagicMock(return_value=None)  # type: ignore[method-assign]
+        validator.virtual_ip_topology_validator = MagicMock()
+        vip = ResourceConfig(
+            name="v", type="interfaces.virtual_ips", provider="opnsense", config={}
+        )
+        other = ResourceConfig(name="g", type="system.groups", provider="opnsense", config={})
+
+        validator.validate_references([vip, other])
+
+        context = validator.virtual_ip_topology_validator.validate.call_args.args[0]
+        assert context.virtual_ips == [vip]
+        assert context.index is not None
+
+    def test_offline_runs_topology_without_credentials(self, report: MagicMock) -> None:
+        """``validate_offline`` runs the topology validator with no API access (#1391)."""
+        offline = OPNsenseValidator(make_env_config(), report)
+        offline.api_validator.get_credentials = MagicMock()  # type: ignore[method-assign]
+        offline.api_validator.fetch_json = MagicMock()  # type: ignore[method-assign]
+        offline.virtual_ip_topology_validator = MagicMock()
+        vip = ResourceConfig(
+            name="v", type="interfaces.virtual_ips", provider="opnsense", config={}
+        )
+
+        offline.validate_offline([vip])
+
+        context = offline.virtual_ip_topology_validator.validate.call_args.args[0]
+        assert context.virtual_ips == [vip]
+        assert context.index is not None
+        offline.api_validator.get_credentials.assert_not_called()
+        offline.api_validator.fetch_json.assert_not_called()
+
     def test_dispatches_monit(self, validator: OPNsenseValidator) -> None:
         """The monit validator receives only the ``monit.*`` slice (#791)."""
         validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]
