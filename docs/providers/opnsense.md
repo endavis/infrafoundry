@@ -298,6 +298,21 @@ foundry infra apply --env <env> --firewall fw-b
 
 **CARP pair check.** With `ha_backup: fw-b` on `fw-a`, `infra doctor` also reads the CARP state on `fw-b` through its own credentials and compares every VIP by `vhid` and subnet. MASTER on `fw-a` and BACKUP on `fw-b` passes. A VIP missing on `fw-b`, MASTER on both nodes, or any other state is an error. If `fw-b` cannot be read the result is a warning. The per-node CARP health check still runs for each firewall. See [ADR-0024](../decisions/0024-opnsense-firewalls-are-provider-instances-several-per-environment.md).
 
+## Firmware Updates
+
+`system.firmware` can update the box to the latest minor release before it installs plugins. Set `update: true`; `update_timeout` (seconds, default `1800`) covers the update job and the reboot wait. Without `update`, nothing changes and no update endpoint is called.
+
+```yaml
+opnsense:
+  system:
+    firmware:
+      update: true
+      plugins:
+        - os-acme-client
+```
+
+`infra plan` runs a firmware check and lists a pending update as a change. **An update can reboot the firewall**; the plan warns when OPNsense expects one. `infra apply` starts the update, waits for the job and the reboot, confirms the new version, then installs plugins and writes settings. Major upgrades are not supported. Settings such as `mirror`, `type` and `reboot` written in the same apply take effect from the next update. Details: [System firmware update (#1452)](../development/opnsense-resource-coverage.md#system-firmware-update-1452).
+
 ## Endpoint and Version Check
 
 During `infra plan` (and so `infra apply`) and `infra doctor`, the box's OPNsense version is read and each type's endpoints are checked against it (`check_endpoint_support`). A type whose endpoints that version lacks is reported as an error, and an unreadable setting or unknown version is reported as a warning. See [Endpoint registry and version check](../development/opnsense-resource-coverage.md#endpoint-registry-and-version-check-1239).
@@ -344,6 +359,7 @@ foundry infra plan --env <env> -r trusted-hosts
 ## Troubleshooting
 
 - **A plugin-backed type fails because the plugin is missing.** See the "Plugin not installed" subsections of [ACME client](../development/opnsense-resource-coverage.md#acme-client-790) and [Tailscale](../development/opnsense-resource-coverage.md#tailscale-787) in the coverage document. `system.firmware` installs the plugins.
+- **A firmware update fails or times out.** The error carries the tail of the firmware log. Raise `update_timeout` if the box was still rebooting, and check the box before re-applying; a second apply continues from the current version.
 - **Connection or authentication errors.** See [IF-API-002](../reference/errors.md#if-api-002-connection-failed) and [IF-API-003](../reference/errors.md#if-api-003-authentication-failed), and run `foundry infra doctor --env <env> -P opnsense`.
 - **Unsupported resource type.** See [Unsupported types](#unsupported-types).
 - **Anything else.** See [Troubleshooting Common Errors](../guides/troubleshooting.md).

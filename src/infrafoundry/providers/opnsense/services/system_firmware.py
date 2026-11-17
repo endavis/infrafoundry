@@ -38,12 +38,27 @@ Endpoint surface (26.1; #1149):
   the job is no longer running (or on timeout) it raises ``APIError`` with
   the log tail, so apply cannot report success for an install that did not
   happen (#1238).
+- ``POST core/firmware/check`` — start a firmware check job (#1452); it
+  refreshes the package catalogue and does not change the release.
+- ``GET core/firmware/status`` — the cached check result: ``status``
+  (``update``/``upgrade``/``none``/``error``), ``upgrade_packages``,
+  ``product_id``, ``product_version``, ``status_reboot`` (#1452).
+- ``POST core/firmware/update`` — start the minor update (#1452). It takes
+  no version argument and reboots the box by itself when needed; apply
+  waits on ``upgradestatus`` and re-reads ``firmware/info``. Only with
+  ``update: true``. Not yet verified live.
+- ``core/firmware/upgrade`` (major) and ``core/firmware/reboot`` are never
+  registered or called.
 - ``POST core/firmware/remove|lock/<plugin_name>`` — not tested; the apply
   path NEVER calls them.
 
 Field schema:
 
 - ``plugins`` — list of plugin names that should be installed.
+- ``update`` — opt-in bool: apply the pending minor firmware update before
+  plugin installs (#1452). Never written to the box.
+- ``update_timeout`` — seconds the update job plus reboot wait may take
+  (default 1800).
 - ``mirror``, ``flavour``, ``type``, ``subscription``, ``reboot`` —
   settings fields. Only the keys present in YAML are compared or written,
   so an omitted ``mirror`` is never blanked.
@@ -54,10 +69,14 @@ from __future__ import annotations
 import logging
 import re
 import time
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
-from infrafoundry.core.exceptions import APIError
+import httpx
+from opnsense_openapi import APIResponseError
+
+from infrafoundry.core.exceptions import APIError, AuthenticationError
 from infrafoundry.core.provider import ResourceConfig
 
 from ..api_client import OPNsenseClient, SystemClient
@@ -74,7 +93,22 @@ _URL_RE = re.compile(r"[A-Za-z][A-Za-z0-9+.\-]*://\S+")
 _URL_TRAILING = ".,;:)]}'\""
 _MASK = "***"
 
+_CHECK_TIMEOUT_SECONDS = 300.0
+_CHECK_POLL_INTERVAL_SECONDS = 3.0
+_UPDATE_TIMEOUT_SECONDS = 1800
+_UPDATE_POLL_INTERVAL_SECONDS = 10.0
+_IN_PROGRESS_STATES = ("running", "reboot")
+
 _SETTINGS_FIELDS = ("mirror", "flavour", "type", "subscription", "reboot")
+
+
+@dataclass(frozen=True)
+class PendingUpdate:
+    """A minor firmware update the box reports as available (#1452)."""
+
+    from_version: str
+    to_version: str
+    reboot: bool
 
 
 class SystemFirmwareService(BaseService):
@@ -205,6 +239,203 @@ class SystemFirmwareService(BaseService):
                     self._subscription_or_none(),
                 )
             time.sleep(interval)
+
+    # ------------------------------------------------------------------
+    # Firmware update (#1452)
+    # ------------------------------------------------------------------
+
+    def desired_update(self, resource: ResourceConfig) -> tuple[bool, int]:
+        """Read ``update`` and ``update_timeout`` from the YAML.
+
+        Args:
+            resource: ``system.firmware`` ``ResourceConfig``.
+
+        Returns:
+            ``(update_enabled, update_timeout_seconds)``; update is off and the
+            timeout 1800 s unless set.
+        """
+        config = resource.config
+        enabled = _is_truthy(config.get("update"))
+        raw = config.get("update_timeout")
+        timeout = raw if isinstance(raw, int) and not isinstance(raw, bool) and raw > 0 else None
+        return enabled, timeout if timeout is not None else _UPDATE_TIMEOUT_SECONDS
+
+    def current_version(self) -> str:
+        """Return ``product_version`` from ``core/firmware/info`` (``""`` if absent)."""
+        info = self.get_firmware_info()
+        return _str(info.get("product_version")) if isinstance(info, dict) else ""
+
+    def check_for_updates(
+        self,
+        *,
+        timeout: float = _CHECK_TIMEOUT_SECONDS,
+        interval: float = _CHECK_POLL_INTERVAL_SECONDS,
+    ) -> dict[str, Any]:
+        """Run a firmware check, wait for the job and return the cached status.
+
+        The check job never changes the release. Like the plugin install wait,
+        two consecutive non-running observations end the wait, which guards
+        against a stale "done" status left by an earlier job.
+
+        Args:
+            timeout: Seconds to wait for the check job.
+            interval: Seconds between polls.
+
+        Returns:
+            Raw response of ``core/firmware/status``.
+
+        Raises:
+            APIError: If the check job does not finish within ``timeout``.
+        """
+        response = self.system_client.check_firmware()
+        raise_on_failed_write(response, "start the firmware check")
+        deadline = time.monotonic() + timeout
+        idle_polls = 0
+        while True:
+            status = self.get_upgrade_status()
+            if isinstance(status, dict) and status.get("status") == "running":
+                idle_polls = 0
+            else:
+                idle_polls += 1
+                if idle_polls >= 2:
+                    return self.system_client.get_firmware_status()
+            if time.monotonic() >= deadline:
+                raise APIError(
+                    f"OPNsense firmware check timed out after {timeout:g}s",
+                    provider="opnsense",
+                )
+            time.sleep(interval)
+
+    def status_problem(self, status: Any) -> str | None:
+        """Return why a ``firmware/status`` response cannot be trusted, else ``None``.
+
+        ``status == "error"`` carries ``status_msg``; ``none`` without
+        ``all_packages`` means no check result is cached yet.
+        """
+        if not isinstance(status, dict):
+            return "firmware status response is not an object"
+        state = status.get("status")
+        if state == "error":
+            msg = _sanitize_log(_str(status.get("status_msg")), self._subscription_or_none())
+            return f"firmware check reported an error: {msg or 'no message'}"
+        if state == "none" and "all_packages" not in status:
+            return "firmware check returned no result (no check data cached)"
+        return None
+
+    def pending_update(self, status: dict[str, Any]) -> PendingUpdate | None:
+        """Return the pending minor update from a ``firmware/status`` response.
+
+        Only ``status == "update"`` counts; ``upgrade`` (major) and ``none``
+        return ``None``. The target version is the ``new_version`` of the
+        ``upgrade_packages`` row named ``product_id``, else the current one.
+
+        Args:
+            status: Output of ``core/firmware/status``.
+
+        Returns:
+            The pending update, or ``None``.
+        """
+        if not isinstance(status, dict) or status.get("status") != "update":
+            return None
+        current = _str(status.get("product_version"))
+        target = current
+        product_id = _str(status.get("product_id"))
+        rows = status.get("upgrade_packages")
+        if isinstance(rows, list):
+            for row in rows:
+                if isinstance(row, dict) and product_id and _str(row.get("name")) == product_id:
+                    target = _str(row.get("new_version")) or current
+                    break
+        return PendingUpdate(
+            from_version=current,
+            to_version=target,
+            reboot=_str(status.get("status_reboot")) == "1",
+        )
+
+    def start_update(self) -> dict[str, Any]:
+        """Start the minor firmware update job.
+
+        Returns:
+            API response of the update request.
+
+        Raises:
+            APIError: If the request is rejected.
+        """
+        response = self.system_client.update_firmware()
+        raise_on_failed_write(response, "start the firmware update")
+        return response
+
+    def wait_for_update(
+        self,
+        expected: str,
+        *,
+        timeout: float = _UPDATE_TIMEOUT_SECONDS,
+        interval: float = _UPDATE_POLL_INTERVAL_SECONDS,
+    ) -> None:
+        """Wait until the box runs ``expected``, through any reboot it starts.
+
+        Each round reads ``upgradestatus``. ``running`` and ``reboot`` mean the
+        update is in progress, and so do transient transport or API errors
+        (the web GUI restarts, the box reboots). Any other status triggers a
+        read of ``firmware/info``: the expected ``product_version`` is
+        success; otherwise it counts as an idle poll and two in a row are a
+        failure (the second guards against a stale "done").
+
+        Args:
+            expected: The version the update should reach.
+            timeout: Seconds for the job and the reboot wait together.
+            interval: Seconds between polls.
+
+        Raises:
+            AuthenticationError: If the box rejects the credentials.
+            APIError: On timeout, or when the job ended without reaching
+                ``expected``. The message carries the sanitised log tail.
+        """
+        deadline = time.monotonic() + timeout
+        idle_polls = 0
+        last_log = ""
+        while True:
+            in_progress = False
+            try:
+                status = self.get_upgrade_status()
+                state = status.get("status") if isinstance(status, dict) else None
+                log = status.get("log") if isinstance(status, dict) else None
+                if isinstance(log, str) and log.strip():
+                    last_log = log
+                if state in _IN_PROGRESS_STATES:
+                    in_progress = True
+                elif self.current_version() == expected:
+                    if "Partial update failure" in last_log:
+                        logger.warning(
+                            "system.firmware: the update reached %s but the firmware log "
+                            "reports a partial update failure",
+                            expected,
+                        )
+                    return
+            except AuthenticationError:
+                raise
+            except (httpx.TransportError, APIResponseError, APIError) as exc:
+                logger.debug("system.firmware: update poll error %s", type(exc).__name__)
+                in_progress = True
+            if in_progress:
+                idle_polls = 0
+            else:
+                idle_polls += 1
+                if idle_polls >= 2:
+                    raise self._update_error(
+                        f"the update ended but the box does not run {expected}", last_log
+                    )
+            if time.monotonic() >= deadline:
+                raise self._update_error(
+                    f"timed out after {timeout:g}s waiting for {expected}", last_log
+                )
+            time.sleep(interval)
+
+    def _update_error(self, reason: str, log: str) -> APIError:
+        """Build the ``APIError`` for a firmware update that did not complete."""
+        return _firmware_log_error(
+            f"OPNsense firmware update failed: {reason}", log, self._subscription_or_none()
+        )
 
     def _subscription_or_none(self) -> str | None:
         """Read the configured subscription for log masking; ``None`` on any failure."""
@@ -397,19 +628,22 @@ def _sanitize_log(text: str, subscription: str | None = None) -> str:
     return _URL_RE.sub(_mask_url, text)
 
 
+def _firmware_log_error(message: str, log: Any, subscription: str | None = None) -> APIError:
+    """Build an ``APIError`` carrying the sanitised tail of a firmware job log."""
+    tail = ""
+    if isinstance(log, str):
+        tail = _sanitize_log("\n".join(log.strip().splitlines()[-_LOG_TAIL_LINES:]), subscription)
+    detail = f"; firmware log tail:\n{tail}" if tail else "; no firmware log available"
+    return APIError(f"{message}{detail}", response=tail or None, provider="opnsense")
+
+
 def _install_error(
     name: str, reason: str, status: Any, subscription: str | None = None
 ) -> APIError:
     """Build the ``APIError`` for a plugin install that did not complete."""
     log = status.get("log") if isinstance(status, dict) else None
-    tail = ""
-    if isinstance(log, str):
-        tail = _sanitize_log("\n".join(log.strip().splitlines()[-_LOG_TAIL_LINES:]), subscription)
-    detail = f"; firmware log tail:\n{tail}" if tail else "; no firmware log available"
-    return APIError(
-        f"OPNsense did not install firmware plugin {name}: {reason}{detail}",
-        response=tail or None,
-        provider="opnsense",
+    return _firmware_log_error(
+        f"OPNsense did not install firmware plugin {name}: {reason}", log, subscription
     )
 
 

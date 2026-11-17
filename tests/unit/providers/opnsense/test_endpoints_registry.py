@@ -362,3 +362,19 @@ def test_carp_pair_health_endpoints_are_doctor_endpoints() -> None:
     for ep in (endpoints.DIAGNOSTICS_VIP_STATUS, endpoints.HASYNC_STATUS_VERSION):
         assert ep in endpoints.DOCTOR_ENDPOINTS
         assert ep in endpoints.registered_endpoints()
+
+
+def test_firmware_update_endpoints_are_registered_and_major_ones_are_not() -> None:
+    types = endpoints.RESOURCE_TYPE_ENDPOINTS["system.firmware"]
+    for endpoint in (
+        endpoints.FIRMWARE_CHECK,
+        endpoints.FIRMWARE_STATUS,
+        endpoints.FIRMWARE_UPDATE,
+        endpoints.FIRMWARE_UPGRADESTATUS,
+    ):
+        assert endpoint in types
+        assert endpoint in endpoints.registered_endpoints()
+    paths = {e.template for e in endpoints.registered_endpoints()}
+    assert "core/firmware/upgrade" not in paths
+    assert "core/firmware/reboot" not in paths
+    assert "core/firmware/poweroff" not in paths

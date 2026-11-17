@@ -545,6 +545,9 @@ FIRMWARE_GET = Endpoint("GET", "core/firmware/get")
 FIRMWARE_SET = Endpoint("POST", "core/firmware/set")
 FIRMWARE_INSTALL = Endpoint("POST", "core/firmware/install/{name}")
 FIRMWARE_UPGRADESTATUS = Endpoint("GET", "core/firmware/upgradestatus")
+FIRMWARE_CHECK = Endpoint("POST", "core/firmware/check")
+FIRMWARE_STATUS = Endpoint("GET", "core/firmware/status")
+FIRMWARE_UPDATE = Endpoint("POST", "core/firmware/update")
 FIRMWARE_REMOVE = Endpoint("POST", "core/firmware/remove/{name}")
 FIRMWARE_LOCK = Endpoint("POST", "core/firmware/lock/{name}")
 TUNABLES_GET = Endpoint("GET", "core/tunables/get")
@@ -585,6 +588,9 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
         FIRMWARE_SET,
         FIRMWARE_INSTALL,
         FIRMWARE_UPGRADESTATUS,
+        FIRMWARE_CHECK,
+        FIRMWARE_STATUS,
+        FIRMWARE_UPDATE,
     ),
     "system.remotebackup": (GDRIVEBACKUP_GET, GDRIVEBACKUP_SET),
     "system.tuning": (TUNABLES_GET, TUNABLES_ADD, TUNABLES_SET, TUNABLES_RECONFIGURE),
