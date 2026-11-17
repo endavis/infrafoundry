@@ -214,7 +214,7 @@ def run_ha_sync_after_apply(
     if options.mode == "off":
         return "HA sync after apply disabled (ha_sync_after_apply: false)"
     if options.mode == "changed" and not changed:
-        return "HA sync skipped: apply changed nothing"
+        return "HA sync skipped: nothing changed"
 
     client = BaseService.client_from_environment(
         env_name, provider_name, config_dir, timeout=options.timeout

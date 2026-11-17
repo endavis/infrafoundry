@@ -180,7 +180,7 @@ class TestRunHaSync:
             env.get_provider_settings.return_value = {}
             line = run_ha_sync_after_apply("env", "opnsense", Path("cfg"), False)
         factory.assert_not_called()
-        assert line == "HA sync skipped: apply changed nothing"
+        assert line == "HA sync skipped: nothing changed"
 
     def test_always_syncs_without_changes(self) -> None:
         line, client = _run({"ha_sync_after_apply": "always"}, changed=False)

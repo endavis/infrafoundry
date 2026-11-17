@@ -226,7 +226,7 @@ When the firewall is the primary of an HA pair, an apply also has to push the co
 The apply prints one status line, or one of these skips:
 
 - `HA sync after apply disabled (ha_sync_after_apply: false)`
-- `HA sync skipped: apply changed nothing`
+- `HA sync skipped: nothing changed`
 - `HA sync skipped: no synchronize_to_ip on this node`
 
 When the preflight or the sync fails, the apply fails with an error that names the backup address and the endpoint and quotes the endpoint's message, for example `HA sync to backup 192.0.2.2 failed at core/hasync_status/version: <message>`. A timeout or connection error names the backup, the endpoint and `ha_sync_timeout`.
