@@ -8,6 +8,9 @@ InfraFoundry manages the primary node only, so the role is inferred: a node with
 A node with CARP VIPs and no sync target has an unknown role (backup, or a primary
 that never syncs), so only the checks that hold for any role are applied.
 
+A node that another firewall's entry names as its ``ha_backup`` (#1470) is a declared
+backup: every VIP is expected BACKUP, MASTER is an error, and the role is not inferred.
+
 A both-MASTER split cannot be seen from one node. What this reports is a node that
 is not MASTER on every VIP, mixed MASTER/BACKUP VIPs, VIPs in INIT or DISABLED,
 CARP disabled, and an unreachable peer (where a split cannot be ruled out).
@@ -75,7 +78,7 @@ class CarpHealthValidator(SpecializedValidator[OPNsenseValidationContext]):
 
         states = [_text(row.get("status")).upper() for row in rows]
         if rows:
-            self._check_vips(rows, states, target)
+            self._check_vips(rows, states, target, context.ha_primary_label)
             carp = status.get("carp")
             if isinstance(carp, dict):
                 self._check_carp_block(carp)
@@ -87,7 +90,48 @@ class CarpHealthValidator(SpecializedValidator[OPNsenseValidationContext]):
     def _add(self, name: str, passed: bool, message: str, level: ValidationLevel) -> None:
         self.report.add_check(check_name=name, passed=passed, message=message, level=level)
 
-    def _check_vips(self, rows: list[dict[str, Any]], states: list[str], target: str) -> None:
+    def _check_backup_vips(
+        self, rows: list[dict[str, Any]], states: list[str], primary: str
+    ) -> None:
+        self._add(
+            "opnsense_carp_role",
+            True,
+            f"Declared ha_backup of '{primary}': expected BACKUP on every CARP VIP",
+            ValidationLevel.INFO,
+        )
+        for index, (row, state) in enumerate(zip(rows, states, strict=True), start=1):
+            label = (
+                f"CARP VIP {_text(row.get('subnet'))} vhid {_text(row.get('vhid'))} "
+                f"on {_text(row.get('interface'))}"
+            )
+            name = f"opnsense_carp_vip_{index}"
+            if state == "BACKUP":
+                self._add(name, True, f"{label}: BACKUP", ValidationLevel.INFO)
+            elif state == "MASTER":
+                self._add(
+                    name,
+                    False,
+                    f"{label}: MASTER, expected BACKUP on the ha_backup of {primary}",
+                    ValidationLevel.ERROR,
+                )
+            else:
+                self._add(
+                    name,
+                    False,
+                    f"{label}: {state or 'unknown'}, expected MASTER or BACKUP",
+                    ValidationLevel.ERROR,
+                )
+
+    def _check_vips(
+        self,
+        rows: list[dict[str, Any]],
+        states: list[str],
+        target: str,
+        primary: str = "",
+    ) -> None:
+        if primary:
+            self._check_backup_vips(rows, states, primary)
+            return
         if not target:
             self._add(
                 "opnsense_carp_role",

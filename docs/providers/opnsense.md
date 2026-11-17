@@ -296,7 +296,7 @@ foundry infra apply --env <env> --firewall fw-b
 
 **Environment overrides apply to the primary only.** `OPNSENSE_*` variables do not redirect the other firewalls; with `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE` set, a warning says they are ignored for them.
 
-**CARP pair check.** With `ha_backup: fw-b` on `fw-a`, `infra doctor` also reads the CARP state on `fw-b` through its own credentials and compares every VIP by `vhid` and subnet. MASTER on `fw-a` and BACKUP on `fw-b` passes. A VIP missing on `fw-b`, MASTER on both nodes, or any other state is an error. If `fw-b` cannot be read the result is a warning. The per-node CARP health check still runs for each firewall. See [ADR-0024](../decisions/0024-opnsense-firewalls-are-provider-instances-several-per-environment.md).
+**CARP pair check.** With `ha_backup: fw-b` on `fw-a`, `infra doctor` also reads the CARP state on `fw-b` through its own credentials and compares every VIP by `vhid` and subnet. MASTER on `fw-a` and BACKUP on `fw-b` passes. A VIP missing on `fw-b`, MASTER on both nodes, or any other state is an error. If `fw-b` cannot be read the result is a warning. The per-node CARP health check still runs for each firewall. A firewall that another entry names as its `ha_backup` is checked as a backup: every VIP is expected BACKUP, a MASTER VIP is an error, and there is no role warning or split check. See [ADR-0024](../decisions/0024-opnsense-firewalls-are-provider-instances-several-per-environment.md).
 
 ## Firmware Updates
 

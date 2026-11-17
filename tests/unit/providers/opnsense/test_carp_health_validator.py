@@ -32,11 +32,16 @@ def _run(
     peer: HaPeerCheck | None = None,
     carp: dict[str, Any] | None = None,
     status: dict[str, Any] | None = None,
+    primary: str = "",
 ) -> ValidationReport:
     report = ValidationReport()
     live = status if status is not None else {"rows": rows, "carp": carp or CARP_OK}
     ctx = OPNsenseValidationContext(
-        resources=[], live_carp_status=live, live_sync_target=target, peer_check=peer
+        resources=[],
+        live_carp_status=live,
+        live_sync_target=target,
+        peer_check=peer,
+        ha_primary_label=primary,
     )
     CarpHealthValidator(report).validate(ctx)
     return report
@@ -162,3 +167,45 @@ def test_malformed_rows_are_skipped() -> None:
 
 def test_rows_not_a_list() -> None:
     assert _run([], status={"rows": "x", "carp": CARP_OK}).results == []
+
+
+def test_declared_backup_all_backup_passes_without_warning() -> None:
+    report = _run([_row("BACKUP"), _row("BACKUP", 2)], primary="fw-a")
+    results = _by_name(report)
+    assert results["opnsense_carp_role"].passed
+    assert "fw-a" in results["opnsense_carp_role"].message
+    assert results["opnsense_carp_vip_1"].passed
+    assert not report.has_errors()
+    assert not report.has_warnings()
+
+
+def test_declared_backup_master_vip_is_an_error() -> None:
+    report = _run([_row("MASTER")], primary="fw-a")
+    result = _by_name(report)["opnsense_carp_vip_1"]
+    assert result.level is ValidationLevel.ERROR
+    assert "expected BACKUP on the ha_backup of fw-a" in result.message
+
+
+def test_declared_backup_mixed_has_no_split_result() -> None:
+    report = _run([_row("BACKUP"), _row("MASTER", 2)], primary="fw-a")
+    names = _by_name(report)
+    assert "opnsense_carp_split" not in names
+    assert names["opnsense_carp_vip_2"].level is ValidationLevel.ERROR
+
+
+def test_declared_backup_init_is_an_error() -> None:
+    report = _run([_row("INIT")], primary="fw-a")
+    assert _by_name(report)["opnsense_carp_vip_1"].level is ValidationLevel.ERROR
+
+
+def test_declared_backup_with_sync_target_still_checks_the_peer() -> None:
+    report = _run(
+        [_row("BACKUP")], target=PEER, peer=HaPeerCheck(ok=True, answered=True), primary="fw-a"
+    )
+    results = _by_name(report)
+    assert results["opnsense_ha_peer"].passed
+    assert results["opnsense_carp_vip_1"].passed
+
+
+def test_declared_backup_with_no_rows_is_silent() -> None:
+    assert _run([], primary="fw-a").results == []

@@ -30,6 +30,7 @@ from infrafoundry.providers.opnsense.firewalls import (
     firewall_label,
     firewall_settings,
     ha_backup_name,
+    ha_primary_name,
     validate_firewalls_settings,
 )
 from infrafoundry.providers.opnsense.services.carp_status import CarpStatusService  # #1393
@@ -307,6 +308,7 @@ class OPNsenseValidator:
                 live_carp_status=carp_status,
                 live_sync_target=sync_target,
                 peer_check=peer_check,
+                ha_primary_label=ha_primary_name(self.env_config, self.provider_name) or "",
             )
         )
         self._validate_carp_pair(carp_status, options.timeout)

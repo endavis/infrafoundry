@@ -74,6 +74,8 @@ class OPNsenseValidationContext(ValidationContext):
             None when no pair is declared or the peer was unreadable.
         node_label: Firewall name of the node ``live_carp_status`` came from.
         peer_label: Firewall name of the ``ha_backup`` node.
+        ha_primary_label: Firewall whose ``ha_backup`` is this node (#1470), or an empty
+            string when this node is not a declared backup.
     """
 
     aliases: list[ResourceConfig] = field(default_factory=list)
@@ -110,3 +112,4 @@ class OPNsenseValidationContext(ValidationContext):
     peer_carp_status: dict[str, Any] | None = None
     node_label: str = ""
     peer_label: str = ""
+    ha_primary_label: str = ""

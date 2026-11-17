@@ -1046,7 +1046,7 @@ After a successful apply or destroy (#1442) the provider calls `core/hasync_stat
 - `POST core/hasync_status/version`: called only when a sync target is set. It reads state and writes nothing.
 - `diagnostics/interface/carpStatus/*` is a write. It is never called and never registered.
 
-**Role is inferred, with no new setting.** InfraFoundry manages the primary only. A node with `synchronizetoip` set is the sync source, so every VIP is expected to be MASTER. A node with CARP rows and no sync target has an unknown role, so one warning (`opnsense_carp_role`) is reported and only the checks that hold for any role apply.
+**Role is inferred, with no new setting.** InfraFoundry manages the primary only. A node with `synchronizetoip` set is the sync source, so every VIP is expected to be MASTER. A node with CARP rows and no sync target has an unknown role, so one warning (`opnsense_carp_role`) is reported and only the checks that hold for any role apply. A node that another firewall's entry names as its `ha_backup` (#1470) is a declared backup instead: it gets an info `opnsense_carp_role` naming the primary, every VIP is expected BACKUP (a MASTER VIP is an error `opnsense_carp_vip_<n>`), and there is no role warning and no split check.
 
 | Finding | Severity | Check |
 | :--- | :--- | :--- |

@@ -121,6 +121,26 @@ def ha_backup_name(settings_or_env_config: Any, provider_name: str) -> str | Non
     return backup if isinstance(backup, str) and backup else None
 
 
+def ha_primary_name(settings_or_env_config: Any, provider_name: str) -> str | None:
+    """Return the firewall whose entry names this one as its ``ha_backup``, if any.
+
+    ``None`` for a flat config, an undeclared node, or an entry naming itself.
+    """
+    settings = _raw_settings(settings_or_env_config, provider_name)
+    firewalls = _firewalls_map(settings)
+    if settings is None or firewalls is None:
+        return None
+    name = _instance_for(settings, provider_name)
+    if name is None:
+        return None
+    for other, entry in firewalls.items():
+        if other == name or not isinstance(entry, dict):
+            continue
+        if entry.get(HA_BACKUP_KEY) == name:
+            return str(other)
+    return None
+
+
 def validate_firewalls_settings(settings: dict[str, Any] | None) -> list[str]:
     """Return the shape errors in ``provider_settings.opnsense`` (empty when valid).
 
