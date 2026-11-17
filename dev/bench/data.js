@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794915988038,
+  "lastUpdate": 1794916622124,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2664,6 +2664,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006158125487477085",
             "extra": "mean: 61.027706887882125 usec\nrounds: 17843"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "934768c05d6aedbfb4428cf0fa5b1ebfddb64754",
+          "message": "fix: resolve opnsense virtual ip interfaces against managed assignments (merges PR #1444, addresses #1441)\n\nVirtualIPValidator read context.managed_interface_names, which the\nvalidator never populated, so a VIP on a config-only interface\nassignment was reported as an unknown interface. Read\ninterface_assignment_names instead and drop the unused context field.\nAdd a regression test that goes through OPNsenseValidator.\n\nAddresses #1441\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T11:55:53Z",
+          "tree_id": "b9e19781b99df72cc274761467bc69d18ccbdc51",
+          "url": "https://github.com/endavis/infrafoundry/commit/934768c05d6aedbfb4428cf0fa5b1ebfddb64754"
+        },
+        "date": 1794916621548,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 48.65987090370757,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005160357095007269",
+            "extra": "mean: 20.550814900000205 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7837.823169586497,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011259825163611866",
+            "extra": "mean: 127.58644567031709 usec\nrounds: 8338"
           }
         ]
       }
