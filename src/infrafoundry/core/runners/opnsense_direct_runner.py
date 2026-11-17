@@ -60,6 +60,9 @@ from infrafoundry.core.types import ResourceOutcome
 logger = logging.getLogger(__name__)
 
 _FIRMWARE_TYPE = "system.firmware"
+# Types a fresh box needs before its firmware update: the gateway depends on its interface
+# assignments, which depend on the VLANs (#1458).
+_PRE_FIRMWARE_TYPES = ("interfaces.vlans", "interfaces.assignments", "routing.gateways")
 
 
 class _Deferred:
@@ -743,6 +746,28 @@ class OPNsenseDirectRunner(BaseRunner):
                     return True
         return False
 
+    @staticmethod
+    def _forward_order(
+        selected: list[tuple[str, type[Any], list[ResourceConfig]]], update_run: bool
+    ) -> list[tuple[str, type[Any], list[ResourceConfig]]]:
+        """Order the forward pass of ``apply`` (#1458).
+
+        Args:
+            selected: Dispatched types in table order.
+            update_run: Whether ``system.firmware`` has ``update: true`` in the run.
+
+        Returns:
+            ``selected`` unchanged without a firmware update. With one, the pre-firmware
+            types (VLANs, assignments, gateways) first, then ``system.firmware``, then every
+            other type in table order.
+        """
+        if not update_run:
+            return selected
+        by_name = {entry[0]: entry for entry in selected}
+        head = [by_name[name] for name in (*_PRE_FIRMWARE_TYPES, _FIRMWARE_TYPE) if name in by_name]
+        first = {entry[0] for entry in head}
+        return head + [entry for entry in selected if entry[0] not in first]
+
     def _unsupported_by_type(
         self, provider: ProviderBase, env_name: str, resource_types: list[str]
     ) -> dict[str, list[str]]:
@@ -935,7 +960,9 @@ class OPNsenseDirectRunner(BaseRunner):
                 elif outcome is not None:
                     return ApplyResult(success=False, error=outcome)
 
-        for type_name, manager_cls, typed_resources in selected:
+        # With a firmware update in the run, the gateway step goes first so a fresh box has
+        # a route to fetch the update, then the update, then the rest (#1458).
+        for type_name, manager_cls, typed_resources in self._forward_order(selected, update_run):
             if type_name in deferred:
                 continue
             outcome = run_forward(type_name, manager_cls, typed_resources)
