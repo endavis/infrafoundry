@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794918310652,
+  "lastUpdate": 1794919991655,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2816,6 +2816,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004387407841856631",
             "extra": "mean: 77.4366246777775 usec\nrounds: 13591"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ea0efa9ea026e44a27faad6b5e5df6e79bcd9316",
+          "message": "feat: add an optional sync nic to the opnsense-vm blueprint (merges PR #1454, addresses #1451)\n\nAdd sync_bridge, sync_vlan, sync_ip and sync_prefix inputs. When\nsync_bridge is set, vm.yaml adds a third e1000 NIC (em2) and the\nbootstrap PHP assigns it as opt1 (SYNC) with a static address and pass\nrules for pfsync and HTTPS config sync from the sync subnet. Without\nsync_bridge the VM and bootstrap are unchanged.\n\nAddresses #1451\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T12:51:46Z",
+          "tree_id": "fa2cacd14b7f0a56dc840f6e27984fc1a59f1551",
+          "url": "https://github.com/endavis/infrafoundry/commit/ea0efa9ea026e44a27faad6b5e5df6e79bcd9316"
+        },
+        "date": 1794919990663,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 59.695544875442565,
+            "unit": "iter/sec",
+            "range": "stddev: 0.001045179107299796",
+            "extra": "mean: 16.75166885714076 msec\nrounds: 63"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10696.98642658899,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007316989624668761",
+            "extra": "mean: 93.4842730579098 usec\nrounds: 12100"
           }
         ]
       }
