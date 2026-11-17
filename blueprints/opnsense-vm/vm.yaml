@@ -37,3 +37,10 @@ vms:
 # {% if wan_vlan %}
         tag: {{ wan_vlan }}
 # {% endif %}
+# {% if sync_bridge %}
+      - bridge: "{{ sync_bridge }}"
+        model: e1000        # em2 — SYNC (opt1)
+# {% if sync_vlan %}
+        tag: {{ sync_vlan }}
+# {% endif %}
+# {% endif %}
