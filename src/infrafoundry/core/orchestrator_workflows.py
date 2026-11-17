@@ -841,6 +841,7 @@ class PlanOrchestrator(HookExecutionMixin):
                                     runner_result,
                                     provider_name=provider_name,
                                     phase="plan",
+                                    runner_name=tool_name,
                                 )
 
                                 # Surface the runner's plan to the operator. The
@@ -1628,6 +1629,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                             runner_result,
                             provider_name=provider_name,
                             phase="destroy",
+                            runner_name=tool_name,
                         )
 
                         # Verify state: defense-in-depth check for the case

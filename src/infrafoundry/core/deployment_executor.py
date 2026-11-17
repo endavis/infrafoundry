@@ -522,6 +522,7 @@ class DeploymentExecutor:
                     run_result,
                     provider_name=provider_name,
                     phase="apply",
+                    runner_name=tool_name,
                 )
                 self._record_released_resources(
                     run_result.get("released_resources"),

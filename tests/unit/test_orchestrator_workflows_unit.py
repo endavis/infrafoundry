@@ -1099,6 +1099,84 @@ def test_destroy_orchestrator_raises_on_runner_failure(console: Console) -> None
     assert any(call[0][1] == DeploymentStatus.FAILED for call in status_calls)
 
 
+def test_destroy_non_terraform_runner_failure_is_deployment_error(console: Console) -> None:
+    """A failing non-Terraform runner raises DeploymentError (not TerraformError)."""
+    from infrafoundry.core.exceptions import DeploymentError, TerraformError
+
+    state_manager = MagicMock()
+    state_manager.create_deployment.return_value = 40
+    state_manager.track_resource.return_value = MagicMock(id=1, terraform_id=None)
+    event_manager = MagicMock()
+
+    tf_runner = MagicMock()
+    tf_runner.priority = 0
+    tf_runner.is_iac_runner = True
+    tf_runner.destroy = MagicMock(
+        return_value={
+            "success": False,
+            "exit_code": 1,
+            "stderr": "Error: Instance cannot be destroyed",
+            "error": "Instance cannot be destroyed",
+        }
+    )
+    tf_runner.verify_destroyed = MagicMock(return_value=[])
+
+    runner_registry = MagicMock()
+    runner_registry.list_runners.return_value = ["opnsense_direct"]
+
+    provider = MagicMock()
+    providers = cast("dict[str, ProviderBase]", {"proxmox": provider})
+
+    resources = [_resource("vm1")]
+
+    def load_resources(env: str) -> Any:
+        return resources, {"proxmox": resources}
+
+    orchestrator = DestroyOrchestrator(
+        console,
+        state_manager,
+        event_manager,
+        runner_registry,
+        get_providers=lambda: providers,
+        load_resources=load_resources,
+        iter_provider_batches=lambda rbp, filt, rev, env: [
+            ProviderResourceBatch("proxmox", rbp["proxmox"], 1)
+        ],
+        get_current_user=lambda: "tester",
+    )
+    orchestrator.runners = cast("dict[str, BaseRunner]", {"opnsense_direct": tf_runner})
+
+    with pytest.raises(DeploymentError) as excinfo:
+        orchestrator.destroy(
+            env_name="dev",
+            resource_filter=None,
+            auto_approve=True,
+            confirm_callback=lambda: True,
+        )
+
+    assert "Instance cannot be destroyed" in str(excinfo.value)
+    assert not isinstance(excinfo.value, TerraformError)
+    assert "opnsense_direct destroy failed" in str(excinfo.value)
+    assert excinfo.value.context["exit_code"] == 1
+
+    failed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_FAILED
+    ]
+    completed_calls = [
+        call
+        for call in event_manager.emit_event.call_args_list
+        if call[0][0] == EventType.RUNNER_COMPLETED
+    ]
+    assert len(failed_calls) == 1
+    assert len(completed_calls) == 0
+
+    # Deployment marked FAILED
+    status_calls = state_manager.update_deployment_status.call_args_list
+    assert any(call[0][1] == DeploymentStatus.FAILED for call in status_calls)
+
+
 def test_destroy_orchestrator_raises_when_resource_remains_in_state(console: Console) -> None:
     """Defense-in-depth: success=True but state still has the resource -> TerraformError."""
     from infrafoundry.core.exceptions import TerraformError
