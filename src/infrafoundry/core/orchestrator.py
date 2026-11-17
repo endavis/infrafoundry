@@ -40,6 +40,7 @@ from infrafoundry.core.provider import (
     unsupported_resource_message,
     unsupported_resource_reason,
 )
+from infrafoundry.core.provider_instances import register_instance_providers
 from infrafoundry.core.provider_registry_service import ProviderRegistryService
 from infrafoundry.core.requirements.manager import RequirementsManager
 from infrafoundry.core.runners import RunnerRegistry
@@ -285,6 +286,13 @@ class Orchestrator:
     ) -> tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]:
         """Load all resources for an environment and group them by provider."""
         all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+        try:
+            env_config = self.config_manager.load_environment(env_name)
+        except FileNotFoundError:
+            # No settings.yaml: nothing to declare firewalls in.
+            pass
+        else:
+            register_instance_providers(self.providers, env_config.provider_settings)
         resources_by_provider: dict[str, list[ResourceConfig]] = {}
         for resource in all_resources:
             resources_by_provider.setdefault(resource.provider, []).append(resource)

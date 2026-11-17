@@ -39,6 +39,7 @@ import httpx
 from infrafoundry.core.exceptions import APIError, InvalidConfigurationError
 
 from .. import endpoints
+from ..firewalls import firewall_settings
 from .base import BaseService
 from .hasync_settings import HasyncSettingsService
 from .openvpn_instances import flatten_option
@@ -207,8 +208,8 @@ def run_ha_sync_after_apply(
     """
     from infrafoundry.core.config import ConfigManager
 
-    settings = (
-        ConfigManager(config_dir).load_environment(env_name).get_provider_settings(provider_name)
+    settings = firewall_settings(
+        ConfigManager(config_dir).load_environment(env_name), provider_name
     )
     options = resolve_ha_sync_options(settings)
     if options.mode == "off":

@@ -7,6 +7,7 @@ from infrafoundry.core.orchestrator import Orchestrator
 from ...decorators import with_orchestrator
 from ...progress import OperationTimer
 from ...utils import console
+from ._firewall import FIREWALL_HELP, expand_provider_filter
 
 
 @click.command()
@@ -35,6 +36,12 @@ from ...utils import console
         "dependencies pointing at filtered-out providers are silently skipped "
         "for this run."
     ),
+)
+@click.option(
+    "--firewall",
+    "firewall",
+    multiple=True,
+    help=FIREWALL_HELP,
 )
 @click.option(
     "--enforce-policies",
@@ -67,12 +74,13 @@ def plan(
     resource: tuple[str, ...],
     package_name: str | None,
     provider: tuple[str, ...],
+    firewall: tuple[str, ...],
     enforce_policies: bool,
     add_only: bool,
     verbose: bool,
 ) -> None:
     """Plan infrastructure changes."""
-    if sum(bool(x) for x in (package_name, resource, provider)) > 1:
+    if sum(bool(x) for x in (package_name, resource, provider or firewall)) > 1:
         raise click.UsageError("--package, --resource, and --provider are mutually exclusive")
 
     resource_filter: list[str] | None = None
@@ -81,7 +89,7 @@ def plan(
     elif resource:
         resource_filter = list(resource)
 
-    provider_filter: list[str] | None = list(provider) if provider else None
+    provider_filter = expand_provider_filter(orchestrator, env, provider, firewall)
 
     with OperationTimer() as timer:
         orchestrator.plan(

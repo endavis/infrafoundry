@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from infrafoundry.core.config.package_loader import (
+    FIREWALL_FILE_KEY,
     NESTED_PROVIDER_NAMESPACE,
     PackageLoader,
 )
@@ -89,7 +90,9 @@ class ResourceCentricLoader:
         if isinstance(data, dict):
             nested = data.get(NESTED_PROVIDER_NAMESPACE)
             if isinstance(nested, dict):
-                extra_keys = [k for k in data if k != NESTED_PROVIDER_NAMESPACE]
+                extra_keys = [
+                    k for k in data if k not in (NESTED_PROVIDER_NAMESPACE, FIREWALL_FILE_KEY)
+                ]
                 if extra_keys:
                     raise InvalidConfigurationError(
                         f"{config_file}: cannot mix nested "
@@ -97,7 +100,10 @@ class ResourceCentricLoader:
                         f"keys (found: {sorted(extra_keys)!r}). Use one format per file."
                     )
                 return self._package_loader._parse_nested_provider_format(
-                    nested, NESTED_PROVIDER_NAMESPACE, str(config_file)
+                    nested,
+                    NESTED_PROVIDER_NAMESPACE,
+                    str(config_file),
+                    firewall=data.get(FIREWALL_FILE_KEY),
                 )
 
         if "resources" not in data:
@@ -123,11 +129,17 @@ class ResourceCentricLoader:
             # Include name in config for template convenience
             config["name"] = item["name"]
 
+            provider = item["provider"]
+            if item.get("firewall") is not None:
+                provider = self._package_loader._entry_firewall_provider(
+                    item, provider, str(config_file), str(item["type"])
+                )
+
             resources.append(
                 ResourceConfig(
                     name=item["name"],
                     type=str(item["type"]),
-                    provider=item["provider"],
+                    provider=provider,
                     config=config,
                     import_id=item.get("import_id"),
                 )

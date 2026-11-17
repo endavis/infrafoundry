@@ -532,6 +532,12 @@ pytest_add_cli_args_test_selection = [
     "tests/test_properties.py",
     "tests/test_provider_mixins.py",
     "tests/test_sops.py",
+    "tests/unit/test_cli_firewall_filter.py",
+    "tests/unit/test_execution_planner_instances.py",
+    "tests/unit/test_firewall_selection_loader.py",
+    "tests/unit/test_orchestrator_firewall_instances.py",
+    "tests/unit/test_provider_instances.py",
+    "tests/unit/test_validation_output_labels.py",
 ]
 # mutmut passes -x to pytest itself. --assert=plain skips assertion rewriting,
 # which mutmut has no use for: it reads only whether the tests pass.

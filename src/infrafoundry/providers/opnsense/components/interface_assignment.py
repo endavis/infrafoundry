@@ -39,6 +39,7 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
 
 from ..extensions.interface_assignments import SshTarget, build_ssh_target, installer
+from ..firewalls import allows_env_override, firewall_settings
 from ..services._credentials import resolve_ssh_settings
 from ..services.interface_assignment import (
     Diff,
@@ -374,7 +375,7 @@ class InterfaceAssignmentManager(BaseComponentManager):
         """
         config_manager = ConfigManager(self.config_dir)
         env_config = config_manager.load_environment(env_name)
-        return dict(env_config.get_provider_settings(provider_name) or {})
+        return dict(firewall_settings(env_config, provider_name) or {})
 
     def _resolve_ssh_target(self, env_name: str, provider_name: str) -> SshTarget:
         """Resolve the installer's SSH target from the env's provider settings.
@@ -393,7 +394,10 @@ class InterfaceAssignmentManager(BaseComponentManager):
         Raises:
             RuntimeError: If no SSH host resolves, or the port / key is invalid.
         """
-        ssh = resolve_ssh_settings(self._load_provider_settings(env_name, provider_name))
+        ssh = resolve_ssh_settings(
+            self._load_provider_settings(env_name, provider_name),
+            allow_env_override=allows_env_override(provider_name),
+        )
         if not ssh.host:
             raise RuntimeError(_SSH_PREFLIGHT_MESSAGE)
         return build_ssh_target(ssh.host, user=ssh.user, port=ssh.port, key=ssh.key)

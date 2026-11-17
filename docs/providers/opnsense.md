@@ -236,7 +236,67 @@ When the preflight or the sync fails, the apply fails with an error that names t
 !!! warning "Errors while pushing the config are not reported"
     OPNsense's `exec_sync` always answers `{"status": "done"}`, so a failure while pushing the config to the backup is not visible to InfraFoundry. A successful apply means the endpoints answered `ok`, not that the backup holds the config. Check the backup after the first sync.
 
-`destroy` does not sync to the backup.
+## Several firewalls per environment
+
+One environment can manage more than one firewall, for example an HA pair or two independent firewalls. List them under `firewalls:` and name the primary:
+
+```yaml
+provider_settings:
+  opnsense:
+    verify_ssl: true            # shared default; an entry may override it
+    primary: fw-a
+    firewalls:
+      fw-a:
+        api_url: https://fw-a.example.com
+        api_key: secret://env_secrets/opnsense/fw_a_key
+        api_secret: secret://env_secrets/opnsense/fw_a_secret
+        ha_backup: fw-b         # compare CARP state with fw-b in `infra doctor`
+      fw-b:
+        api_url: https://fw-b.example.com
+        api_key: secret://env_secrets/opnsense/fw_b_key
+        api_secret: secret://env_secrets/opnsense/fw_b_secret
+        ha_sync_after_apply: false
+```
+
+| Key | Meaning |
+|-----|---------|
+| `firewalls` | Map of firewall name to its settings: `api_url`, `api_key`, `api_secret`, `ssh_*`, `verify_ssl`, `proxy`, `ha_sync_after_apply`, `ha_sync_timeout` and `ha_backup` |
+| `primary` | Name of the primary firewall. Required with more than one entry |
+| `ha_backup` | On an entry: the firewall that is its HA backup. Enables the CARP pair check in `infra doctor` |
+
+Top-level `verify_ssl`, `proxy`, `ssh_user`, `ssh_port`, `ssh_key`, `ha_sync_after_apply` and `ha_sync_timeout` are shared defaults; an entry overrides them. Combining `firewalls:` with a top-level `api_url`, `api_key`, `api_secret` or `ssh_host` is an error, and so is a `primary` or `ha_backup` that names no entry. Firewall names are lowercase letters, digits and `-`, 1 to 32 characters. The flat shape above is unchanged and means one unnamed firewall.
+
+**Which firewall a resource goes to.** The most specific selection wins:
+
+1. a `firewall:` key on the entry (in a list entry, or on a resource-centric item);
+2. a top-level `firewall:` beside `opnsense:` in the file;
+3. `firewall:` in the package's `infrafoundry.yml`;
+4. the primary.
+
+```yaml
+# envs/<env>/opnsense/fw-b-settings.yaml
+firewall: fw-b
+opnsense:
+  hasync:
+    settings:
+      synchronize_to_ip: 192.0.2.1
+```
+
+Settings that exist once per node (`hasync.settings`, `interfaces.assignments`, interface addresses) go in a file or package with `firewall: fw-b` and, for the primary, in a default one. Resources that OPNsense carries to the backup through HA sync default to the primary.
+
+**Each firewall is its own provider.** The primary keeps the provider id `opnsense`; every other firewall is `opnsense@<name>`. So a resource name can repeat on two firewalls (`lan` on both), but twice on one firewall is still a duplicate. The managed set and deletes are per firewall, the HA sync runs once per firewall, and checks such as CARP `vhid` reuse see only that firewall's resources. Firewalls apply one after another: the primary first, then the others (the reverse on destroy). Turning a flat configuration into a `firewalls:` map keeps its state: the primary's rows stay under `opnsense`. The rows of another firewall are under `opnsense@<name>`, so `state list --provider opnsense` lists the primary only.
+
+**Selecting firewalls on the command line.** `infra plan`, `apply`, `destroy` and `doctor` take a repeatable `--firewall <name>`. `-P opnsense` selects every firewall that has resources. `--firewall` cannot be combined with `-p` or `-r`.
+
+```bash
+foundry infra apply --env <env> --firewall fw-b
+```
+
+**Output.** With `firewalls:` declared, runner lines read `opnsense_direct[fw-b]: ...` and `plan` and `doctor` messages start with `[fw-b] `. A flat configuration prints as before.
+
+**Environment overrides apply to the primary only.** `OPNSENSE_*` variables do not redirect the other firewalls; with `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE` set, a warning says they are ignored for them.
+
+**CARP pair check.** With `ha_backup: fw-b` on `fw-a`, `infra doctor` also reads the CARP state on `fw-b` through its own credentials and compares every VIP by `vhid` and subnet. MASTER on `fw-a` and BACKUP on `fw-b` passes. A VIP missing on `fw-b`, MASTER on both nodes, or any other state is an error. If `fw-b` cannot be read the result is a warning. The per-node CARP health check still runs for each firewall. See [ADR-0024](../decisions/0024-opnsense-firewalls-are-provider-instances-several-per-environment.md).
 
 ## Endpoint and Version Check
 

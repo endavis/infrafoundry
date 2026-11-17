@@ -10,6 +10,9 @@ from infrafoundry.providers.opnsense.validators.alias_validator import AliasVali
 from infrafoundry.providers.opnsense.validators.carp_health_validator import (
     CarpHealthValidator,  # #1393
 )
+from infrafoundry.providers.opnsense.validators.carp_pair_validator import (
+    CarpPairValidator,  # #1450
+)
 from infrafoundry.providers.opnsense.validators.cron_jobs_validator import CronJobsValidator
 from infrafoundry.providers.opnsense.validators.firewall_categories_validator import (
     FirewallCategoryValidator,
@@ -95,6 +98,7 @@ __all__ = [
     "AcmeClientValidator",
     "AliasValidator",
     "CarpHealthValidator",  # #1393
+    "CarpPairValidator",  # #1450
     "CronJobsValidator",
     "FirewallCategoryValidator",
     "FirewallRuleValidator",

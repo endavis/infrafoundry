@@ -70,6 +70,10 @@ class OPNsenseValidationContext(ValidationContext):
         live_carp_status: ``diagnostics/interface/getVipStatus`` reply, or None when unread.
         live_sync_target: The live ``synchronizetoip`` value, or an empty string.
         peer_check: Result of the HA peer version call, or None when no call was made.
+        peer_carp_status: ``getVipStatus`` reply of the ``ha_backup`` firewall (#1450), or
+            None when no pair is declared or the peer was unreadable.
+        node_label: Firewall name of the node ``live_carp_status`` came from.
+        peer_label: Firewall name of the ``ha_backup`` node.
     """
 
     aliases: list[ResourceConfig] = field(default_factory=list)
@@ -103,3 +107,6 @@ class OPNsenseValidationContext(ValidationContext):
     live_carp_status: dict[str, Any] | None = None
     live_sync_target: str = ""
     peer_check: HaPeerCheck | None = None
+    peer_carp_status: dict[str, Any] | None = None
+    node_label: str = ""
+    peer_label: str = ""

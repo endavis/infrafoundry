@@ -5,10 +5,11 @@ import logging
 import warnings
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any, ClassVar, override
+from typing import Any, ClassVar, Self, override
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.provider_instances import qualified_provider_id
 from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
@@ -16,6 +17,7 @@ from infrafoundry.core.provider_mixins import (
 )
 from infrafoundry.core.validation import ValidationReport
 
+from .firewalls import firewall_label
 from .validator import OPNsenseValidator
 
 logger = logging.getLogger(__name__)
@@ -114,16 +116,71 @@ class OPNsenseProvider(
         ),
     }
 
-    def __init__(self, config_dir: Path, output_dir: Path) -> None:
-        """Initialize OPNsense provider."""
-        super().__init__("opnsense", config_dir, output_dir)
+    def __init__(self, config_dir: Path, output_dir: Path, firewall: str | None = None) -> None:
+        """Initialize OPNsense provider.
+
+        Args:
+            config_dir: Configuration directory.
+            output_dir: Output directory for generated files.
+            firewall: Firewall name for a provider instance (#1450). The provider is
+                then named ``opnsense@<firewall>``; the default is the plain primary.
+        """
+        super().__init__(
+            "opnsense" if firewall is None else qualified_provider_id("opnsense", firewall),
+            config_dir,
+            output_dir,
+        )
+        self._firewall = firewall
+        self._label_cache: dict[str, str | None] = {}
         # Use TemplateRendererMixin to set up Jinja2 environment
         self._setup_template_environment()
         # Add base64 encoding filter for Ansible templates
         self.jinja_env.filters["b64encode"] = lambda s: base64.b64encode(s.encode()).decode()
         # Register migrate extractors for the CLI ``config migrate`` command.
         # Must run after ``self.config_dir`` is set by ProviderBase.__init__.
-        self._register_extractors()
+        # Extractors are keyed by the plain provider name and bound to ``config_dir``,
+        # which every instance shares, so only the base provider registers them.
+        if firewall is None:
+            self._register_extractors()
+
+    def spawn_instance(self, name: str) -> Self:
+        """Return a provider for the named firewall instance (#1450).
+
+        Args:
+            name: Firewall name from ``provider_settings.opnsense.firewalls``.
+
+        Returns:
+            A new provider named ``opnsense@<name>`` sharing this provider's directories.
+        """
+        instance = type(self)(self.config_dir, self.base_output_dir, firewall=name)
+        current = getattr(self, "_current_environment", None)
+        if current:
+            instance.set_environment(current)
+        return instance
+
+    def firewall_label(self, env_name: str) -> str | None:
+        """Return the firewall name for output labels, or ``None`` for a flat config (#1450).
+
+        Duck-typed hook read by ``OPNsenseDirectRunner`` and the validators. The result
+        is cached per environment.
+
+        Args:
+            env_name: Environment whose settings declare the firewalls.
+
+        Returns:
+            The firewall name when ``firewalls:`` is declared (the primary included).
+        """
+        if env_name not in self._label_cache:
+            from infrafoundry.core.config import ConfigManager
+
+            try:
+                env_config = ConfigManager(self.config_dir).load_environment(env_name)
+            except (FileNotFoundError, OSError):
+                label = None
+            else:
+                label = firewall_label(env_config, self.name)
+            self._label_cache[env_name] = label
+        return self._label_cache[env_name]
 
     def _register_extractors(self) -> None:
         """Register per-component extractors with the global registry.
@@ -573,7 +630,7 @@ class OPNsenseProvider(
         """
         from .services.kea_dhcp import KeaDHCPService
 
-        service = KeaDHCPService.from_environment(env_name, "opnsense", self.config_dir)
+        service = KeaDHCPService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def _reconfigure_unbound(self, env_name: str) -> None:
@@ -593,7 +650,7 @@ class OPNsenseProvider(
         """
         from .services.unbound_host_override import UnboundHostOverrideService
 
-        service = UnboundHostOverrideService.from_environment(env_name, "opnsense", self.config_dir)
+        service = UnboundHostOverrideService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def _reconfigure_radvd(self, env_name: str) -> None:
@@ -611,7 +668,7 @@ class OPNsenseProvider(
         """
         from .services.radvd import RadvdService
 
-        service = RadvdService.from_environment(env_name, "opnsense", self.config_dir)
+        service = RadvdService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def _reconfigure_cron(self, env_name: str) -> None:
@@ -628,7 +685,7 @@ class OPNsenseProvider(
         """
         from .services.cron_jobs import CronJobsService
 
-        service = CronJobsService.from_environment(env_name, "opnsense", self.config_dir)
+        service = CronJobsService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def _reconfigure_openvpn(self, env_name: str) -> None:
@@ -644,7 +701,7 @@ class OPNsenseProvider(
         """
         from .services.openvpn_instances import OpenVpnInstanceService
 
-        service = OpenVpnInstanceService.from_environment(env_name, "opnsense", self.config_dir)
+        service = OpenVpnInstanceService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def _reconfigure_tunables(self, env_name: str) -> None:
@@ -659,7 +716,7 @@ class OPNsenseProvider(
         """
         from .services.system_tuning import SystemTuningService
 
-        service = SystemTuningService.from_environment(env_name, "opnsense", self.config_dir)
+        service = SystemTuningService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def _reconfigure_interfaces_settings(self, env_name: str) -> None:
@@ -676,7 +733,7 @@ class OPNsenseProvider(
         """
         from .services.interfaces_settings import InterfacesSettingsService
 
-        service = InterfacesSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service = InterfacesSettingsService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def _reconfigure_syslog(self, env_name: str) -> None:
@@ -691,7 +748,7 @@ class OPNsenseProvider(
         """
         from .services.syslog_settings import SyslogSettingsService
 
-        service = SyslogSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service = SyslogSettingsService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def post_apply_hook(self, env_name: str, changed: bool) -> str:
@@ -724,7 +781,7 @@ class OPNsenseProvider(
         """
         from .services.hasync_settings import HasyncSettingsService
 
-        service = HasyncSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service = HasyncSettingsService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def _apply_source_nat(self, env_name: str) -> None:
@@ -739,7 +796,7 @@ class OPNsenseProvider(
         """
         from .services.source_nat import SourceNatService
 
-        service = SourceNatService.from_environment(env_name, "opnsense", self.config_dir)
+        service = SourceNatService.from_environment(env_name, self.name, self.config_dir)
         service.apply()
 
     def _reconfigure_acmeclient(self, env_name: str) -> None:
@@ -754,7 +811,7 @@ class OPNsenseProvider(
         """
         from .services.acmeclient_settings import AcmeClientSettingsService
 
-        service = AcmeClientSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service = AcmeClientSettingsService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def _reconfigure_tailscale(self, env_name: str) -> None:
@@ -770,7 +827,7 @@ class OPNsenseProvider(
         """
         from .services.tailscale_settings import TailscaleSettingsService
 
-        service = TailscaleSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service = TailscaleSettingsService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def _reconfigure_monit(self, env_name: str) -> None:
@@ -785,7 +842,7 @@ class OPNsenseProvider(
         """
         from .services.monit_settings import MonitSettingsService
 
-        service = MonitSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service = MonitSettingsService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     def _reconfigure_hostdiscovery(self, env_name: str) -> None:
@@ -801,7 +858,7 @@ class OPNsenseProvider(
         """
         from .services.hostdiscovery import HostDiscoveryService
 
-        service = HostDiscoveryService.from_environment(env_name, "opnsense", self.config_dir)
+        service = HostDiscoveryService.from_environment(env_name, self.name, self.config_dir)
         service.reconfigure()
 
     # All OPNsense components are now managed by ``OPNsenseDirectRunner``
@@ -936,13 +993,38 @@ class OPNsenseProvider(
             "monit.services": ["monit.tests"],
         }
 
+    def _run_labelled(
+        self,
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+        checks: Callable[[OPNsenseValidator], None],
+    ) -> None:
+        """Run ``checks`` for this firewall, labelling its new results (#1450).
+
+        With ``firewalls:`` declared, every result the checks add gets a
+        ``[<firewall>] `` message prefix so a report with several firewalls says
+        which one each line is about. A flat configuration is left untouched.
+
+        Args:
+            env_config: Environment configuration.
+            report: Report the validator adds to.
+            checks: Callable running the checks on the per-firewall validator.
+        """
+        validator = OPNsenseValidator(env_config, report, provider_name=self.name)
+        start = len(report.results)
+        checks(validator)
+        label = firewall_label(env_config, self.name)
+        if label is None:
+            return
+        for result in report.results[start:]:
+            result.message = f"[{label}] {result.message}"
+
     @override
     def validate_connectivity(
         self, env_config: EnvironmentConfig, report: ValidationReport
     ) -> None:
         """Validate connectivity to OPNsense API."""
-        validator = OPNsenseValidator(env_config, report)
-        validator.validate_connectivity()
+        self._run_labelled(env_config, report, lambda v: v.validate_connectivity())
 
     @override
     def validate_references(
@@ -952,10 +1034,13 @@ class OPNsenseProvider(
         report: ValidationReport,
     ) -> None:
         """Validate that referenced OPNsense resources exist."""
-        validator = OPNsenseValidator(env_config, report)
-        validator.validate_references(resources)
-        validator.validate_endpoint_support(resources)
-        validator.validate_ha_health()  # #1393
+
+        def checks(validator: OPNsenseValidator) -> None:
+            validator.validate_references(resources)
+            validator.validate_endpoint_support(resources)
+            validator.validate_ha_health()  # #1393
+
+        self._run_labelled(env_config, report, checks)
 
     def validate_references_in_context(
         self,
@@ -965,10 +1050,13 @@ class OPNsenseProvider(
         report: ValidationReport,
     ) -> None:
         """Validate *resources*, resolving names against *reference_resources* (#1133)."""
-        validator = OPNsenseValidator(env_config, report)
-        validator.validate_references(resources, reference_resources)
-        validator.validate_endpoint_support(resources)
-        validator.validate_ha_health()  # #1393
+
+        def checks(validator: OPNsenseValidator) -> None:
+            validator.validate_references(resources, reference_resources)
+            validator.validate_endpoint_support(resources)
+            validator.validate_ha_health()  # #1393
+
+        self._run_labelled(env_config, report, checks)
 
     def validate_offline(
         self,
@@ -981,7 +1069,9 @@ class OPNsenseProvider(
 
         Endpoint support is not checked here: the direct runner's plan already does.
         """
-        OPNsenseValidator(env_config, report).validate_offline(resources, reference_resources)
+        self._run_labelled(
+            env_config, report, lambda v: v.validate_offline(resources, reference_resources)
+        )
 
     def reset_kea_dhcpv4(self, env_name: str) -> None:
         """Reset (delete) all Kea DHCPv4 configuration.

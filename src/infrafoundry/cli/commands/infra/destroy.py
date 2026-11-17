@@ -7,6 +7,7 @@ from infrafoundry.core.orchestrator import Orchestrator
 from ...decorators import with_orchestrator
 from ...progress import OperationTimer
 from ...utils import console
+from ._firewall import FIREWALL_HELP, expand_provider_filter
 
 
 @click.command()
@@ -37,6 +38,12 @@ from ...utils import console
     ),
 )
 @click.option(
+    "--firewall",
+    "firewall",
+    multiple=True,
+    help=FIREWALL_HELP,
+)
+@click.option(
     "--lock-timeout",
     type=int,
     default=0,
@@ -61,11 +68,12 @@ def destroy(
     resource: tuple[str, ...],
     package_name: str | None,
     provider: tuple[str, ...],
+    firewall: tuple[str, ...],
     lock_timeout: int,
     lock_ttl: int,
 ) -> None:
     """Destroy infrastructure."""
-    if sum(bool(x) for x in (package_name, resource, provider)) > 1:
+    if sum(bool(x) for x in (package_name, resource, provider or firewall)) > 1:
         raise click.UsageError("--package, --resource, and --provider are mutually exclusive")
 
     resource_filter: list[str] | None = None
@@ -74,15 +82,15 @@ def destroy(
     elif resource:
         resource_filter = list(resource)
 
-    provider_filter: list[str] | None = list(provider) if provider else None
+    provider_filter = expand_provider_filter(orchestrator, env, provider, firewall)
 
     if not auto_approve:
         if package_name:
             resource_desc = f" (package: {package_name})"
         elif resource:
             resource_desc = f" (resources: {', '.join(resource)})"
-        elif provider:
-            resource_desc = f" (providers: {', '.join(provider)})"
+        elif provider or firewall:
+            resource_desc = f" (providers: {', '.join(provider_filter or [])})"
         else:
             resource_desc = ""
         console.warning(f"About to DESTROY infrastructure for environment: {env}{resource_desc}")

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from infrafoundry.core.config.package_loader import (
+    FIREWALL_FILE_KEY,
     NESTED_PROVIDER_NAMESPACE,
     PackageLoader,
 )
@@ -81,7 +82,9 @@ class ProviderCentricLoader:
         if isinstance(data, dict):
             nested = data.get(NESTED_PROVIDER_NAMESPACE)
             if isinstance(nested, dict):
-                extra_keys = [k for k in data if k != NESTED_PROVIDER_NAMESPACE]
+                extra_keys = [
+                    k for k in data if k not in (NESTED_PROVIDER_NAMESPACE, FIREWALL_FILE_KEY)
+                ]
                 if extra_keys:
                     raise InvalidConfigurationError(
                         f"{resource_path}: cannot mix nested "
@@ -89,7 +92,10 @@ class ProviderCentricLoader:
                         f"keys (found: {sorted(extra_keys)!r}). Use one format per file."
                     )
                 return self._package_loader._parse_nested_provider_format(
-                    nested, NESTED_PROVIDER_NAMESPACE, str(resource_path)
+                    nested,
+                    NESTED_PROVIDER_NAMESPACE,
+                    str(resource_path),
+                    firewall=data.get(FIREWALL_FILE_KEY),
                 )
 
         # Extract resource type from filename

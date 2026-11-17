@@ -120,6 +120,7 @@ _warned_urls_lock = threading.Lock()
 _warned_urls: set[str] = set()
 # Warnings already emitted about SSH host redirects / ignored env hosts.
 _warned_ssh: set[str] = set()
+_INSTANCE_WARNING_KEY = "instance-ignores-env-override"
 
 
 @dataclass(frozen=True)
@@ -162,6 +163,8 @@ def _parse_verify_ssl(env_value: str, default: bool) -> bool:
 
 def resolve_credentials(
     provider_settings: dict[str, Any],
+    *,
+    allow_env_override: bool = True,
 ) -> tuple[str, str, str, bool, str | None]:
     """Resolve OPNsense client credentials, honoring env-var overrides if gated.
 
@@ -184,6 +187,9 @@ def resolve_credentials(
             and optional ``proxy``; missing keys default to empty string
             (``api_url``, ``api_key``, ``api_secret``, ``proxy``) or ``True``
             (``verify_ssl``).
+        allow_env_override: ``False`` for a non-primary firewall (#1450): the
+            ``OPNSENSE_*`` env vars are ignored, so the instance keeps its own
+            endpoint, and a WARNING names the ignored gate once per process.
 
     Returns:
         Tuple ``(api_url, api_key, api_secret, verify_ssl, proxy)`` ready to
@@ -195,7 +201,10 @@ def resolve_credentials(
     settings_verify = bool(provider_settings.get("verify_ssl", True))
     settings_proxy = str(provider_settings.get("proxy") or "")
 
-    if not gate_active():
+    if not allow_env_override and gate_active():
+        _warn_instance_ignores_override_once()
+
+    if not allow_env_override or not gate_active():
         return (
             settings_url,
             settings_key,
@@ -217,6 +226,19 @@ def resolve_credentials(
         _warn_once_about_redirect(api_url)
 
     return (api_url, api_key, api_secret, verify_ssl, proxy or None)
+
+
+def _warn_instance_ignores_override_once() -> None:
+    """Warn once per process that env overrides apply only to the primary firewall."""
+    with _warned_urls_lock:
+        if _INSTANCE_WARNING_KEY in _warned_ssh:
+            return
+        _warned_ssh.add(_INSTANCE_WARNING_KEY)
+    logger.warning(
+        "%s is set, but the OPNSENSE_* overrides apply only to the primary firewall; "
+        "other firewalls keep the endpoint in provider_settings.opnsense.firewalls",
+        GATE_ENV_VAR,
+    )
 
 
 def _warn_once_about_redirect(resolved_url: str) -> None:
@@ -256,18 +278,34 @@ def _warn_ssh_once(message: str, host: str) -> None:
     logger.warning(message, host, GATE_ENV_VAR)
 
 
-def resolve_ssh_settings(provider_settings: dict[str, Any]) -> SshSettings:
+def resolve_ssh_settings(
+    provider_settings: dict[str, Any], *, allow_env_override: bool = True
+) -> SshSettings:
     """Resolve the SSH target fields for the controller installer.
 
     Args:
         provider_settings: The OPNsense entry of the env's
             ``provider_settings`` dict. Optional keys: ``ssh_host``,
             ``ssh_user``, ``ssh_port``, ``ssh_key``, plus ``api_url``.
+        allow_env_override: ``False`` for a non-primary firewall (#1450): the
+            ``OPNSENSE_*`` env vars are ignored, so the SSH target comes from
+            the firewall's own settings.
 
     Returns:
         ``SshSettings``; ``host`` is empty when no host could be resolved.
     """
-    api_url = resolve_credentials(provider_settings)[0]
+    api_url = resolve_credentials(provider_settings, allow_env_override=allow_env_override)[0]
+    if not allow_env_override:
+        host = (
+            str(provider_settings.get("ssh_host") or "").strip()
+            or (urlparse(api_url).hostname or "").strip()
+        )
+        return SshSettings(
+            host=host,
+            user=str(provider_settings.get("ssh_user") or "").strip() or "root",
+            port=str(provider_settings.get("ssh_port") or "").strip() or "22",
+            key=str(provider_settings.get("ssh_key") or "").strip(),
+        )
     settings_host = str(provider_settings.get("ssh_host") or "").strip()
     fallback_host = settings_host or (urlparse(api_url).hostname or "").strip()
     env_host = os.environ.get(SSH_HOST_ENV_VAR, "").strip()
