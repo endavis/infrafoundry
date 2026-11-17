@@ -169,14 +169,16 @@ requirements:
 
 **When it is checked.** `foundry infra plan`, `infra apply` and `infra destroy` check the
 requirements of every blueprint used by the packages in scope. That is the whole environment,
-narrowed by `--package` or `--provider`. An unmet requirement stops the run with error
+narrowed by `--package`, `--provider` or `--resource`. With `--resource`, only the blueprints
+whose packages declare a targeted resource are checked, and a resource that comes from no
+blueprint needs none. An unmet requirement stops the run with error
 `IF-PACKAGE-002`, which names the package, the blueprints that need it, and the command that
 installs it. `foundry config doctor` reports the same check for every environment.
 
 **Installing them.** Nothing is installed during a run. Install every unmet requirement in scope
 with `foundry deps sync --env <env>`, or one at a time with the command the error prints.
 `foundry deps check --env <env>` shows the status without installing anything. Both take
-`--package` and `--provider`; see [CLI Reference — Deps Group](../usage/cli-reference.md#deps-group-foundry-deps).
+`--package`, `--provider` and `--resource`; see [CLI Reference — Deps Group](../usage/cli-reference.md#deps-group-foundry-deps).
 
 `deps sync` installs Python packages with `uv pip install` into the interpreter running
 InfraFoundry, and collections with `ansible-galaxy collection install --upgrade -r <file>`.

@@ -7,7 +7,7 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 from ...decorators import with_orchestrator
 from ...utils import console
-from ._common import render_report, resolve_scope, scope_options
+from ._common import render_report, resolve_scope, resource_scope, scope_options
 
 
 @click.command()
@@ -20,6 +20,7 @@ def sync(
     env: str,
     package_name: str | None,
     provider: tuple[str, ...],
+    resource: tuple[str, ...],
     dry_run: bool,
 ) -> None:
     """Install the unmet requirements of the blueprints in scope.
@@ -37,7 +38,7 @@ def sync(
     """
     package_filter, provider_filter = resolve_scope(package_name, provider)
     result = orchestrator.requirements_manager.sync(
-        env, package_filter, provider_filter, dry_run=dry_run
+        env, package_filter, provider_filter, dry_run=dry_run, **resource_scope(resource)
     )
 
     if not result.steps:

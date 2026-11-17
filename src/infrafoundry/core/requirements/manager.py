@@ -96,7 +96,7 @@ class RequirementsManager(BaseManager):
 
     Requirements come from the ``requirements:`` block of each blueprint that a
     package in scope references. Scope is the environment, narrowed by the same
-    package and provider filters that ``infra plan``/``apply``/``destroy`` take.
+    package, provider and resource filters that ``infra plan``/``apply``/``destroy`` take.
     """
 
     def __init__(
@@ -126,6 +126,7 @@ class RequirementsManager(BaseManager):
         env_name: str,
         package_filter: str | None = None,
         provider_filter: list[str] | None = None,
+        resource_filter: list[str] | None = None,
     ) -> list[str]:
         """Return the blueprints referenced by the packages in scope.
 
@@ -133,17 +134,33 @@ class RequirementsManager(BaseManager):
             env_name: Environment name
             package_filter: Only the package with this name
             provider_filter: Only packages targeting one of these providers
+            resource_filter: Only packages that declare one of these resources
 
         Returns:
             Distinct blueprint names, sorted
         """
         names: set[str] = set()
-        for provider, manifest in self.config_manager.list_package_manifests(env_name):
+        if resource_filter:
+            candidates = [
+                (provider, manifest, resources)
+                for provider, manifest, resources in (
+                    self.config_manager.list_blueprint_package_resources(env_name)
+                )
+            ]
+        else:
+            candidates = [
+                (provider, manifest, None)
+                for provider, manifest in self.config_manager.list_package_manifests(env_name)
+            ]
+        wanted = set(resource_filter or ())
+        for provider, manifest, resources in candidates:
             if not manifest.blueprint:
                 continue
             if package_filter is not None and manifest.name != package_filter:
                 continue
             if provider_filter is not None and provider not in provider_filter:
+                continue
+            if wanted and resources is not None and not (wanted & resources):
                 continue
             names.add(manifest.blueprint)
         return sorted(names)
@@ -153,6 +170,7 @@ class RequirementsManager(BaseManager):
         env_name: str,
         package_filter: str | None = None,
         provider_filter: list[str] | None = None,
+        resource_filter: list[str] | None = None,
     ) -> RequirementsReport:
         """Check every requirement of the blueprints in scope.
 
@@ -160,6 +178,7 @@ class RequirementsManager(BaseManager):
             env_name: Environment name
             package_filter: Only the package with this name
             provider_filter: Only packages targeting one of these providers
+            resource_filter: Only packages that declare one of these resources
 
         Returns:
             The status of each distinct requirement
@@ -170,7 +189,9 @@ class RequirementsManager(BaseManager):
         python: dict[PythonRequirement, list[str]] = {}
         collections: dict[CollectionRequirement, tuple[list[str], list[str]]] = {}
         resolver = self.config_manager.blueprint_resolver
-        for name in self.blueprints_in_scope(env_name, package_filter, provider_filter):
+        for name in self.blueprints_in_scope(
+            env_name, package_filter, provider_filter, resource_filter
+        ):
             declared: BlueprintRequirements = resolver.resolve(name)["requirements"]
             for py_req in declared.python:
                 python.setdefault(py_req, []).append(name)
@@ -211,6 +232,7 @@ class RequirementsManager(BaseManager):
         env_name: str,
         package_filter: str | None = None,
         provider_filter: list[str] | None = None,
+        resource_filter: list[str] | None = None,
     ) -> RequirementsReport:
         """Check requirements and raise if any is unmet.
 
@@ -218,6 +240,7 @@ class RequirementsManager(BaseManager):
             env_name: Environment name
             package_filter: Only the package with this name
             provider_filter: Only packages targeting one of these providers
+            resource_filter: Only packages that declare one of these resources
 
         Returns:
             The report, when every requirement is met
@@ -225,7 +248,7 @@ class RequirementsManager(BaseManager):
         Raises:
             MissingRequirementsError: If any requirement is unmet
         """
-        report = self.check(env_name, package_filter, provider_filter)
+        report = self.check(env_name, package_filter, provider_filter, resource_filter)
         if report.unmet:
             message = report.format_unmet()
             self._log_error(message)
@@ -239,6 +262,7 @@ class RequirementsManager(BaseManager):
         env_name: str,
         package_filter: str | None = None,
         provider_filter: list[str] | None = None,
+        resource_filter: list[str] | None = None,
         *,
         dry_run: bool = False,
         run: Runner | None = None,
@@ -250,6 +274,7 @@ class RequirementsManager(BaseManager):
             env_name: Environment name
             package_filter: Only the package with this name
             provider_filter: Only packages targeting one of these providers
+            resource_filter: Only packages that declare one of these resources
             dry_run: Plan the install commands without running them
             run: Runs one install command; defaults to :func:`subprocess.run`
             which: Locates ``uv`` and ``ansible-galaxy``
@@ -261,7 +286,7 @@ class RequirementsManager(BaseManager):
             RequirementInstallError: If a tool is missing or an install fails
             MissingRequirementsError: If requirements are still unmet afterwards
         """
-        report = self.check(env_name, package_filter, provider_filter)
+        report = self.check(env_name, package_filter, provider_filter, resource_filter)
         steps = tuple(plan_install(report.unmet))
         if not steps or dry_run:
             return SyncResult(steps=steps, report=report, dry_run=dry_run)
@@ -273,7 +298,7 @@ class RequirementsManager(BaseManager):
         # New distributions are on disk; drop the import system's stale caches
         # so the re-check finds them.
         importlib.invalidate_caches()
-        after = self.check(env_name, package_filter, provider_filter)
+        after = self.check(env_name, package_filter, provider_filter, resource_filter)
         if after.unmet:
             raise MissingRequirementsError(
                 "Installed, but still unmet:\n" + after.format_unmet(),

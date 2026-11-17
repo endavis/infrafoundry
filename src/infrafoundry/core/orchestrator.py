@@ -591,7 +591,9 @@ class Orchestrator:
             ConfigValidationError: If a provider's offline validation finds
                 errors; ``apply`` inherits this too.
         """
-        self.requirements_manager.ensure(env_name, package_filter, provider_filter)
+        self.requirements_manager.ensure(
+            env_name, package_filter, provider_filter, **_resource_scope(resource_filter)
+        )
         return self.plan_orchestrator.plan(
             env_name,
             dry_run,
@@ -793,7 +795,9 @@ class Orchestrator:
                 requirements. Checked before the lock is taken, since
                 ``before_destroy`` handlers may need them.
         """
-        self.requirements_manager.ensure(env_name, package_filter, provider_filter)
+        self.requirements_manager.ensure(
+            env_name, package_filter, provider_filter, **_resource_scope(resource_filter)
+        )
         locked_by = _build_lock_holder_id()
         with environment_lock(
             self.state_manager,
@@ -853,3 +857,8 @@ def _build_lock_holder_id() -> str:
     except Exception:
         host = "unknown"
     return f"{user}@{host}:{os.getpid()}"
+
+
+def _resource_scope(resource_filter: list[str] | None) -> dict[str, list[str]]:
+    """Keyword arguments narrowing the requirements check to the targeted resources."""
+    return {"resource_filter": resource_filter} if resource_filter else {}

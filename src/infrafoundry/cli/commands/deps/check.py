@@ -8,7 +8,7 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 from ...decorators import with_orchestrator
 from ...utils import console
-from ._common import render_report, resolve_scope, scope_options
+from ._common import render_report, resolve_scope, resource_scope, scope_options
 
 
 @click.command()
@@ -20,6 +20,7 @@ def check(
     env: str,
     package_name: str | None,
     provider: tuple[str, ...],
+    resource: tuple[str, ...],
 ) -> None:
     """Check that the blueprints in scope have their requirements installed.
 
@@ -33,7 +34,9 @@ def check(
         foundry deps check --env prod --package ontap-cluster
     """
     package_filter, provider_filter = resolve_scope(package_name, provider)
-    report = orchestrator.requirements_manager.check(env, package_filter, provider_filter)
+    report = orchestrator.requirements_manager.check(
+        env, package_filter, provider_filter, **resource_scope(resource)
+    )
 
     console.header(f"Blueprint requirements for {env}")
     render_report(report)

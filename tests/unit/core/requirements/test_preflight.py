@@ -59,6 +59,18 @@ def test_unmet_requirements_stop_the_run_before_any_provider_work(
     orchestrator.destroy_orchestrator.destroy.assert_not_called()  # type: ignore[attr-defined]
 
 
+@pytest.mark.parametrize("operation", ["plan", "apply", "destroy"])
+def test_the_resource_filter_narrows_the_requirements_check(tmp_path: Path, operation: str) -> None:
+    orchestrator = _orchestrator(tmp_path)
+
+    with pytest.raises(MissingRequirementsError):
+        getattr(orchestrator, operation)("prod", resource_filter=["fw-alias"])
+
+    orchestrator.requirements_manager.ensure.assert_called_once_with(  # type: ignore[attr-defined]
+        "prod", None, None, resource_filter=["fw-alias"]
+    )
+
+
 def test_destroy_checks_requirements_before_taking_the_lock(tmp_path: Path) -> None:
     orchestrator = _orchestrator(tmp_path)
 

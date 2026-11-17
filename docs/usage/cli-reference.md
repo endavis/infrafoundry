@@ -865,7 +865,8 @@ foundry policy list --env prod
 Blueprints declare the Python packages and Ansible collections they need in a `requirements:`
 block; see [Configuration Blueprints — The `requirements:` Block](../configuration/blueprints.md#the-requirements-block).
 Both commands cover the blueprints used by the packages in scope: the whole environment, narrowed
-by `--package` or `--provider`, as in `infra plan`.
+by `--package`, `--provider` or `--resource`, as in `infra plan`. With `--resource`, only the
+blueprints whose packages declare a named resource are checked.
 
 ### `deps check`
 
@@ -878,7 +879,7 @@ foundry deps check --env prod --package ontap-cluster
 ```
 
 **Options:** `-e/--env TEXT` (required), `-p/--package TEXT`, `-P/--provider TEXT` (repeatable;
-mutually exclusive with `--package`)
+mutually exclusive with `--package`), `-r/--resource TEXT` (repeatable)
 
 ### `deps sync`
 
@@ -894,7 +895,7 @@ foundry deps sync --env prod
 ```
 
 **Options:** `-e/--env TEXT` (required), `-p/--package TEXT`, `-P/--provider TEXT` (repeatable;
-mutually exclusive with `--package`), `--dry-run`
+mutually exclusive with `--package`), `-r/--resource TEXT` (repeatable), `--dry-run`
 
 `uv sync` removes packages that are not in `uv.lock`, including these, unless run with
 `--inexact`. Re-run `deps sync` after it.
