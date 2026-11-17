@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794916622124,
+  "lastUpdate": 1794917310751,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2702,6 +2702,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011259825163611866",
             "extra": "mean: 127.58644567031709 usec\nrounds: 8338"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c445297e3e1db534b726e9fef2354cb1e9683a00",
+          "message": "feat: trigger opnsense ha config sync after destroy (merges PR #1445, addresses #1442)\n\nOPNsenseDirectRunner.destroy now calls the provider's post_apply_hook once\nafter all deletes, so the HA backup loses destroyed objects. It honors the\nsame ha_sync_after_apply and ha_sync_timeout settings and skips without a\nsync target. A sync failure fails the destroy with the endpoint's message.\n\nAddresses #1442\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T12:07:14Z",
+          "tree_id": "056dc81c7f6f50cfdf34b9ff256b68643822b51f",
+          "url": "https://github.com/endavis/infrafoundry/commit/c445297e3e1db534b726e9fef2354cb1e9683a00"
+        },
+        "date": 1794917310234,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 72.52659552218896,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004015574698015804",
+            "extra": "mean: 13.788045513511765 msec\nrounds: 74"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12828.084261443984,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009844735565400738",
+            "extra": "mean: 77.95396254182663 usec\nrounds: 13722"
           }
         ]
       }
