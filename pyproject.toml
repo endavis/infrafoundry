@@ -536,6 +536,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_execution_planner_instances.py",
     "tests/unit/test_firewall_selection_loader.py",
     "tests/unit/test_orchestrator_firewall_instances.py",
+    "tests/unit/test_orchestrator_firewall_generation.py",
     "tests/unit/test_provider_instances.py",
     "tests/unit/test_validation_output_labels.py",
 ]

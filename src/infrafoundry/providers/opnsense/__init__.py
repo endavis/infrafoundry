@@ -17,7 +17,7 @@ from infrafoundry.core.provider_mixins import (
 )
 from infrafoundry.core.validation import ValidationReport
 
-from .firewalls import firewall_label
+from .firewalls import allows_env_override, firewall_label, firewall_settings
 from .validator import OPNsenseValidator
 
 logger = logging.getLogger(__name__)
@@ -297,9 +297,21 @@ class OPNsenseProvider(
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* env vars for OPNsense provider."""
         return self.build_terraform_env_vars(
-            provider_name="opnsense",
+            provider_name=self.name,
             mapping=self._OPNSENSE_TFVARS_MAPPING,
         )
+
+    @override
+    def _terraform_provider_settings(
+        self, env_config: EnvironmentConfig, provider_name: str
+    ) -> dict[str, Any] | None:
+        """Return this firewall's own settings, not the raw ``opnsense`` mapping."""
+        return firewall_settings(env_config, provider_name)
+
+    @override
+    def _allows_settings_env_override(self, provider_name: str) -> bool:
+        """Allow gated env overrides for the primary firewall only (ADR-0024)."""
+        return allows_env_override(provider_name)
 
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
@@ -1085,7 +1097,7 @@ class OPNsenseProvider(
         from .components.kea_dhcp import KeaDHCPManager
 
         manager = KeaDHCPManager(self.config_dir)
-        manager.reset_dhcpv4(env_name, "opnsense")
+        manager.reset_dhcpv4(env_name, self.name)
 
     def reset_kea_dhcpv6(self, env_name: str) -> None:
         """Reset (delete) all Kea DHCPv6 configuration.
@@ -1099,7 +1111,7 @@ class OPNsenseProvider(
         from .components.kea_dhcp import KeaDHCPManager
 
         manager = KeaDHCPManager(self.config_dir)
-        manager.reset_dhcpv6(env_name, "opnsense")
+        manager.reset_dhcpv6(env_name, self.name)
 
     def migrate_kea_dhcp(self, env_name: str) -> str:
         """Migrate current Kea DHCP configuration to InfraFoundry YAML.

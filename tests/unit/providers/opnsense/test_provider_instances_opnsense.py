@@ -177,3 +177,94 @@ def test_check_endpoint_support_resolves_the_instance(tmp_path: Path, firewall: 
         _provider(tmp_path, firewall).check_endpoint_support("dev", ["firewall.rules"])
     expected = "opnsense" if firewall is None else f"opnsense@{firewall}"
     assert factory.call_args.args[1] == expected
+
+
+class TestInstanceGeneration:
+    """Non-primary firewalls generate files from the shared templates (#1462)."""
+
+    def _gen(self, tmp_path: Path, firewall: str | None) -> OPNsenseProvider:
+        provider = OPNsenseProvider(
+            config_dir=tmp_path / "cfg", output_dir=tmp_path / "out", firewall=firewall
+        )
+        provider.set_environment("dev")
+        return provider
+
+    def test_terraform_is_generated_for_an_instance(self, tmp_path: Path) -> None:
+        self._gen(tmp_path, "fw-b").generate_terraform([])
+        out = tmp_path / "out" / "dev" / "terraform" / "opnsense@fw-b"
+        assert "browningluke/opnsense" in (out / "provider.tf").read_text()
+        assert (out / "variables.tf").exists()
+        assert (out / "outputs.tf").exists()
+
+    def test_ansible_is_generated_for_an_instance(self, tmp_path: Path) -> None:
+        self._gen(tmp_path, "fw-b").generate_ansible([])
+        out = tmp_path / "out" / "dev" / "ansible" / "opnsense@fw-b"
+        assert (out / "playbook.yml").exists()
+        assert (out / "inventory.yml").exists()
+
+    def test_instances_do_not_touch_the_primarys_files_or_state(self, tmp_path: Path) -> None:
+        self._gen(tmp_path, None).generate_terraform([])
+        primary = tmp_path / "out" / "dev" / "terraform" / "opnsense"
+        state_file = primary / "terraform.tfstate"
+        state_file.write_text("{}")
+        self._gen(tmp_path, "fw-b").generate_terraform([])
+        assert (primary / "provider.tf").exists()
+        assert state_file.read_text() == "{}"
+        assert (tmp_path / "out" / "dev" / "terraform" / "opnsense@fw-b" / "provider.tf").exists()
+
+
+class TestTerraformEnvVars:
+    """Each firewall feeds Terraform its own endpoint (#1462)."""
+
+    def _vars(
+        self, tmp_path: Path, settings: dict[str, Any], firewall: str | None
+    ) -> dict[str, str]:
+        env = make_env_config(provider_settings={"opnsense": settings})
+        with patch.object(OPNsenseProvider, "_load_environment_config", return_value=env):
+            return _provider(tmp_path, firewall).get_terraform_env_vars()
+
+    def test_primary_and_instance_get_their_own_url(self, tmp_path: Path) -> None:
+        assert (
+            self._vars(tmp_path, MULTI, None)["TF_VAR_opnsense_api_url"]
+            == "https://fw-a.example.com"
+        )
+        assert (
+            self._vars(tmp_path, MULTI, "fw-b")["TF_VAR_opnsense_api_url"]
+            == "https://fw-b.example.com"
+        )
+
+    def test_env_override_reaches_only_the_primary(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("INFRAFOUNDRY_ALLOW_ENV_OVERRIDE", "1")
+        monkeypatch.setenv("OPNSENSE_API_URL", "https://override.example.net")
+        assert (
+            self._vars(tmp_path, MULTI, None)["TF_VAR_opnsense_api_url"]
+            == "https://override.example.net"
+        )
+        assert (
+            self._vars(tmp_path, MULTI, "fw-b")["TF_VAR_opnsense_api_url"]
+            == "https://fw-b.example.com"
+        )
+
+    def test_flat_settings_are_unchanged(self, tmp_path: Path) -> None:
+        flat = {"api_url": "https://fw.example.com", "api_key": "k", "api_secret": "s"}
+        assert self._vars(tmp_path, flat, None) == {
+            "TF_VAR_opnsense_api_url": "https://fw.example.com",
+            "TF_VAR_opnsense_api_key": "k",
+            "TF_VAR_opnsense_api_secret": "s",
+        }
+
+
+class TestKeaReset:
+    @pytest.mark.parametrize(
+        ("firewall", "expected"), [(None, "opnsense"), ("fw-b", "opnsense@fw-b")]
+    )
+    def test_reset_targets_the_providers_own_name(
+        self, tmp_path: Path, firewall: str | None, expected: str
+    ) -> None:
+        with patch("infrafoundry.providers.opnsense.components.kea_dhcp.KeaDHCPManager") as mgr:
+            _provider(tmp_path, firewall).reset_kea_dhcpv4("dev")
+            _provider(tmp_path, firewall).reset_kea_dhcpv6("dev")
+        mgr.return_value.reset_dhcpv4.assert_called_once_with("dev", expected)
+        mgr.return_value.reset_dhcpv6.assert_called_once_with("dev", expected)
