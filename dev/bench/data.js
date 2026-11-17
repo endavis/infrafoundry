@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794937670988,
+  "lastUpdate": 1794940022519,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3196,6 +3196,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000988976573526522",
             "extra": "mean: 129.02521048214427 usec\nrounds: 8338"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "063c86be758c41c54e8a6b6cf010c8f69ad61291",
+          "message": "fix: scope the blueprint requirements check to the targeted resources (merges PR #1475, addresses #1461)\n\nfix: scope the blueprint requirements check to targeted resources\n\nThe requirements preflight narrowed by package and provider only, so\n`-r/--resource` still checked every blueprint in the environment and an\nunrelated blueprint's missing package blocked the run. Pass the resource\nfilter through ensure/check/sync and keep only blueprints whose packages\ndeclare a targeted resource. `deps check` and `deps sync` gain -r/--resource.\n\nAddresses #1461\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T18:25:58Z",
+          "tree_id": "4a7cc243e5812022f63bffd5b255389f5943a395",
+          "url": "https://github.com/endavis/infrafoundry/commit/063c86be758c41c54e8a6b6cf010c8f69ad61291"
+        },
+        "date": 1794940021769,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 92.63312929008782,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0008967869676032461",
+            "extra": "mean: 10.795273868687113 msec\nrounds: 99"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15642.244954402031,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000003335638552713203",
+            "extra": "mean: 63.929442539421466 usec\nrounds: 16681"
           }
         ]
       }
