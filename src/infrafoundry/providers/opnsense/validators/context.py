@@ -14,6 +14,23 @@ from infrafoundry.core.validation import ValidationContext
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex
 
 
+@dataclass(frozen=True)
+class HaPeerCheck:
+    """Outcome of the ``core/hasync_status/version`` call to the HA peer (#1393).
+
+    Attributes:
+        ok: Whether the call returned without an error.
+        message: The error message when ``ok`` is false, else an empty string.
+        version: The peer's firmware version when the reply carries one.
+        answered: Whether the peer returned a non-empty ``response``.
+    """
+
+    ok: bool
+    message: str = ""
+    version: str | None = None
+    answered: bool = False
+
+
 @dataclass(frozen=True, kw_only=True)
 class OPNsenseValidationContext(ValidationContext):
     """Inputs for the OPNsense validators.
@@ -51,6 +68,9 @@ class OPNsenseValidationContext(ValidationContext):
         existing_hasync_sync_items: Sync items the box offers (live option keys).
         managed_gateways: ``gateway`` resources managed in the configuration.
         index: Dotted-type cross-reference index, or None when not built.
+        live_carp_status: ``diagnostics/interface/getVipStatus`` reply, or None when unread.
+        live_sync_target: The live ``synchronizetoip`` value, or an empty string.
+        peer_check: Result of the HA peer version call, or None when no call was made.
     """
 
     aliases: list[ResourceConfig] = field(default_factory=list)
@@ -82,3 +102,6 @@ class OPNsenseValidationContext(ValidationContext):
     existing_hasync_sync_items: set[str] = field(default_factory=set)
     managed_gateways: list[ResourceConfig] | None = None
     index: XRefIndex | None = None
+    live_carp_status: dict[str, Any] | None = None
+    live_sync_target: str = ""
+    peer_check: HaPeerCheck | None = None

@@ -352,6 +352,18 @@ def test_opnsense_provider_offline_does_not_check_endpoint_support(tmp_path: Pat
     endpoint.assert_not_called()
 
 
+def test_opnsense_provider_offline_does_not_check_ha_health(tmp_path: Path) -> None:
+    provider = OPNsenseProvider(tmp_path, tmp_path)
+    with patch.object(OPNsenseValidator, "validate_ha_health") as health:
+        provider.validate_offline(
+            [_subnet_with_conflict()],
+            [_subnet_with_conflict()],
+            EnvironmentConfig(name="t"),
+            ValidationReport(),
+        )
+    health.assert_not_called()
+
+
 def test_opnsense_references_still_run_live_validators() -> None:
     validator = OPNsenseValidator(EnvironmentConfig(name="t"), ValidationReport())
     validator.api_validator.get_credentials = MagicMock(  # type: ignore[method-assign]

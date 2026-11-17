@@ -47,3 +47,12 @@ def test_validate_references_runs_the_endpoint_check(tmp_path: Path) -> None:
         _provider(tmp_path).validate_references([], env_config, report)
         _provider(tmp_path).validate_references_in_context([], [], env_config, report)
     assert validator_cls.return_value.validate_endpoint_support.call_count == 2
+
+
+def test_validate_references_runs_the_ha_health_check(tmp_path: Path) -> None:
+    env_config = make_env_config(provider_settings={"opnsense": {}})
+    report = ValidationReport()
+    with patch("infrafoundry.providers.opnsense.OPNsenseValidator") as validator_cls:
+        _provider(tmp_path).validate_references([], env_config, report)
+        _provider(tmp_path).validate_references_in_context([], [], env_config, report)
+    assert validator_cls.return_value.validate_ha_health.call_count == 2

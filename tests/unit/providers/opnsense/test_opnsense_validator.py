@@ -1,6 +1,6 @@
 """Unit tests for OPNsense OPNsenseValidator orchestration."""
 
-from typing import Any
+from typing import Any, ClassVar
 from unittest.mock import MagicMock
 
 import pytest
@@ -948,3 +948,124 @@ class TestAcmeclientWiring:
             account,
             settings,
         ]
+
+
+class TestValidateHaHealth:
+    """``validate_ha_health`` reads CARP and HA peer state, read-only (#1393)."""
+
+    _V = "infrafoundry.providers.opnsense.validator"
+    _VIPS: ClassVar[dict[str, Any]] = {
+        "rows": [
+            {"interface": "lan", "vhid": "1", "subnet": "198.51.100.1", "status": "MASTER"},
+        ],
+        "carp": {"demotion": "0", "allow": "1", "maintenancemode": False},
+    }
+
+    @staticmethod
+    def _settings(**extra: Any) -> Any:
+        return make_env_config(
+            provider_settings={
+                "opnsense": {
+                    "api_url": "https://opnsense.example.com",
+                    "api_key": "test-key",
+                    "api_secret": "test-secret",
+                    **extra,
+                }
+            },
+        )
+
+    @staticmethod
+    def _client(target: str, version: Any = None) -> MagicMock:
+        replies: dict[str, Any] = {
+            "diagnostics/interface/getVipStatus": TestValidateHaHealth._VIPS,
+            "core/hasync/get": {"hasync": {"synchronizetoip": target}},
+            "core/hasync_status/version": version if version is not None else {"response": False},
+        }
+        client = MagicMock()
+        client.request.side_effect = lambda method, path, *a, **k: replies[path]
+        return client
+
+    def _run(self, env: Any, client: MagicMock) -> ValidationReport:
+        from unittest.mock import patch
+
+        report = ValidationReport()
+        with patch(f"{self._V}.OPNsenseClient", return_value=client) as cls:
+            OPNsenseValidator(env, report).validate_ha_health()
+        self.last_cls = cls
+        return report
+
+    @staticmethod
+    def _paths(client: MagicMock) -> list[str]:
+        return [c.args[1] for c in client.request.call_args_list]
+
+    def test_missing_credentials_adds_nothing(self) -> None:
+        client = self._client("")
+        report = self._run(make_env_config(provider_settings={}), client)
+        client.request.assert_not_called()
+        assert report.results == []
+
+    def test_no_sync_target_skips_the_peer_call(self) -> None:
+        client = self._client("")
+        report = self._run(self._settings(), client)
+        assert "core/hasync_status/version" not in self._paths(client)
+        assert report.results[0].check_name == "opnsense_carp_role"
+
+    def test_sync_target_calls_version_with_configured_timeout(self) -> None:
+        reply = {"response": {"firmware": {"_my_version": "26.1.11"}}}
+        client = self._client("192.0.2.2", reply)
+        report = self._run(self._settings(ha_sync_timeout=120), client)
+        assert "core/hasync_status/version" in self._paths(client)
+        assert self.last_cls.call_args.kwargs["timeout"] == 120
+        peer = {r.check_name: r for r in report.results}["opnsense_ha_peer"]
+        assert peer.passed
+        assert "26.1.11" in peer.message
+
+    def test_product_version_fallback(self) -> None:
+        client = self._client("192.0.2.2", {"response": {"product_version": "26.1.9"}})
+        report = self._run(self._settings(), client)
+        peer = {r.check_name: r for r in report.results}["opnsense_ha_peer"]
+        assert "26.1.9" in peer.message
+
+    def test_version_api_error_is_an_error(self) -> None:
+        from infrafoundry.core.exceptions import APIError
+
+        client = self._client("192.0.2.2")
+        base = client.request.side_effect
+
+        def request(method: str, path: str, *a: Any, **k: Any) -> Any:
+            if path == "core/hasync_status/version":
+                raise APIError("peer is down", response="", provider="opnsense")
+            return base(method, path)
+
+        client.request.side_effect = request
+        report = self._run(self._settings(), client)
+        peer = {r.check_name: r for r in report.results}["opnsense_ha_peer"]
+        assert not peer.passed
+        assert "peer is down" in peer.message
+
+    @pytest.mark.parametrize("error", ["api", "transport"])
+    def test_read_failure_is_one_warning(self, error: str) -> None:
+        import httpx
+
+        from infrafoundry.core.exceptions import APIError
+
+        client = MagicMock()
+        client.request.side_effect = (
+            APIError("boom", response="", provider="opnsense")
+            if error == "api"
+            else httpx.ConnectError("down")
+        )
+        report = self._run(self._settings(), client)
+        assert [r.check_name for r in report.results] == ["opnsense_carp_status_read"]
+        assert report.results[0].level.name == "WARNING"
+
+    def test_invalid_timeout_is_an_error_and_skips_calls(self) -> None:
+        client = self._client("192.0.2.2")
+        report = self._run(self._settings(ha_sync_timeout=0), client)
+        client.request.assert_not_called()
+        assert [r.check_name for r in report.results] == ["opnsense_ha_sync_settings"]
+
+    def test_never_requests_carp_status_writes(self) -> None:
+        client = self._client("192.0.2.2", {"response": {}})
+        self._run(self._settings(), client)
+        assert all("carpStatus" not in p for p in self._paths(client))

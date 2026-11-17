@@ -421,6 +421,9 @@ HASYNC_RECONFIGURE = Endpoint("POST", "core/hasync/reconfigure")
 # --- HA config sync after apply (#1390) ---
 HASYNC_STATUS_VERSION = Endpoint("POST", "core/hasync_status/version")
 HASYNC_STATUS_RESTART_ALL = Endpoint("POST", "core/hasync_status/restartAll")
+# --- CARP pair health (#1393) ---
+# Read-only. Never register ``diagnostics/interface/carpStatus/*``: it is a write.
+DIAGNOSTICS_VIP_STATUS = Endpoint("GET", "diagnostics/interface/getVipStatus")
 # In-tree plugin controller: not in stock specs (see the module docstring).
 ASSIGN_SETTINGS = _crud(
     "interfaces/assign_settings",
@@ -744,6 +747,8 @@ DOCTOR_ENDPOINTS: tuple[Endpoint, ...] = (
     GATEWAY.search,
     UNBOUND_HOST_OVERRIDE.search,
     HASYNC_GET,  # #1389: the live validator reads the pfsync interface and sync-item options
+    DIAGNOSTICS_VIP_STATUS,  # #1393: CARP VIP state
+    HASYNC_STATUS_VERSION,  # #1393: HA peer reachability
 )
 
 #: Endpoints the provider's post-apply HA sync calls (#1390).

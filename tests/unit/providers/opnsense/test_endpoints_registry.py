@@ -355,3 +355,10 @@ def test_monit_endpoints_are_stock_and_never_toggle_or_start() -> None:
         ("POST", "monit/settings/set"),
         ("POST", "monit/service/reconfigure"),
     }
+
+
+def test_carp_pair_health_endpoints_are_doctor_endpoints() -> None:
+    assert endpoints.DIAGNOSTICS_VIP_STATUS.method == "GET"
+    for ep in (endpoints.DIAGNOSTICS_VIP_STATUS, endpoints.HASYNC_STATUS_VERSION):
+        assert ep in endpoints.DOCTOR_ENDPOINTS
+        assert ep in endpoints.registered_endpoints()
