@@ -419,11 +419,24 @@ def test_bootstrap_php_with_sync_assigns_opt1_and_adds_rules_before_save() -> No
     assert "$sync->addChild('if', $s['interface']);" in php
     assert "$sync->addChild('ipaddr', $s['ip']);" in php
     assert "$pfsync_rule->addChild('protocol', 'pfsync');" in php
+    assert "$xmlrpc_destination->addChild('network', 'opt1ip');" in php
+    assert "$xmlrpc_destination->addChild('address'" not in php
     assert "$xmlrpc_destination->addChild('port', '443');" in php
     assert php.count("addChild('rule')") == 3
     [_, encoded] = re.findall(r"base64_decode\('([A-Za-z0-9+/=]+)'\)", php)
     assert json.loads(base64.b64decode(encoded)) == SYNC
     assert php.index("$xmlrpc_rule") < php.index("Config::getInstance()->save();")
+
+
+def test_sync_rule_destination_is_the_same_for_any_sync_address() -> None:
+    def destination_lines(php: str) -> list[str]:
+        return [line for line in php.splitlines() if "$xmlrpc_destination" in line]
+
+    first = destination_lines(_sync_php(ip="192.0.2.10"))
+    second = destination_lines(_sync_php(ip="192.0.2.11"))
+
+    assert first == second
+    assert "192.0.2" not in "".join(first)
 
 
 def test_bootstrap_php_with_sync_and_api_allow_lan_has_four_rules() -> None:

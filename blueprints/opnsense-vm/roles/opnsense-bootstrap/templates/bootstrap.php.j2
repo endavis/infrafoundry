@@ -103,10 +103,10 @@ $xmlrpc_rule->addChild('type', 'pass');
 $xmlrpc_rule->addChild('interface', 'opt1');
 $xmlrpc_rule->addChild('ipprotocol', 'inet');
 $xmlrpc_rule->addChild('protocol', 'tcp');
-$xmlrpc_rule->addChild('descr', 'infrafoundry bootstrap: config sync (HTTPS) on the sync address');
+$xmlrpc_rule->addChild('descr', 'infrafoundry bootstrap: config sync (HTTPS) on the interface address');
 $xmlrpc_rule->addChild('source')->addChild('network', 'opt1');
 $xmlrpc_destination = $xmlrpc_rule->addChild('destination');
-$xmlrpc_destination->addChild('address', $s['ip']);
+$xmlrpc_destination->addChild('network', 'opt1ip');
 $xmlrpc_destination->addChild('port', '443');
 {% endif %}
 

@@ -42,7 +42,9 @@ reach the API. The OPNsense provider can then manage it with no manual steps.
      with `api_allow_lan: true`, a second one to the LAN address;
    - with `sync_bridge` set, `em2` assigned as `opt1` (description `SYNC`)
      with `sync_ip`/`sync_prefix`, plus two pass rules on it: pfsync, and TCP
-     443 to `sync_ip` for config sync, both from the sync subnet. The OPNsense
+     443 to the interface's own address (`opt1ip`) for config sync, both from
+     the sync subnet. The destination is symbolic, so it stays correct when HA
+     rule sync copies the primary's rules to the backup. The OPNsense
      provider can then use `pfsync_interface: opt1` with no manual step.
 
    When `disk_size` is above 0, the script first runs a best-effort grow step
@@ -161,6 +163,9 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 - The bootstrap runs once, on create. On a box that is already bootstrapped,
   the default credentials are rejected and the bootstrap fails; destroy and
   re-apply to start over.
+- The bootstrap rule is written once, on create. An existing VM built before
+  the sync rule used `opt1ip` needs a rebuild, or a managed rule that replaces
+  the bootstrap one.
 - Nothing secret is written to the Proxmox host. The rendered PHP reaches the
   expect process only through its environment, and the expect log is paused
   while it is sent.
