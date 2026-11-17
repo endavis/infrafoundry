@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794930256935,
+  "lastUpdate": 1794936761830,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3082,6 +3082,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009636027706480924",
             "extra": "mean: 127.17508659142496 usec\nrounds: 8338"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5fcfd4b0c2979108834b1be9ef9de8611582b443",
+          "message": "fix: run terraform non-interactively so missing variables fail fast (merges PR #1471, addresses #1467)\n\nfix: pass -input=false and close stdin for terraform runner commands\n\nTerraform prompts on stdin for a required variable with no value, so a\nplan or apply with a missing TF_VAR hung and held the state lock. Add\n-input=false to init, plan, apply and destroy, and give every runner\nsubprocess stdin=DEVNULL as defence in depth. Commands that reject the\nflag (state, validate, show, version) get only the stdin change.\n\nAddresses #1467\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T17:31:33Z",
+          "tree_id": "f6253618e094debb70e0644df6451648ba4f6085",
+          "url": "https://github.com/endavis/infrafoundry/commit/5fcfd4b0c2979108834b1be9ef9de8611582b443"
+        },
+        "date": 1794936761140,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 73.72536588220413,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006616068435950887",
+            "extra": "mean: 13.563852658225745 msec\nrounds: 79"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14520.211121140983,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000003999845438132879",
+            "extra": "mean: 68.86952205151003 usec\nrounds: 16144"
           }
         ]
       }
