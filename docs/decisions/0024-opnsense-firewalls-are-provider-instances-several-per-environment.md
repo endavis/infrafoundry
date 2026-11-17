@@ -26,6 +26,7 @@ Each extra firewall is its own **provider instance**. The primary firewall keeps
 - **Environment overrides:** `INFRAFOUNDRY_ALLOW_ENV_OVERRIDE` and the `OPNSENSE_*` variables apply only to the primary. An instance ignores them and a WARNING is logged once per process, so one override cannot retarget every firewall to the same endpoint.
 - **Execution:** the executor already runs one batch per provider id, so each firewall plans, applies and destroys in its own batch, with its own managed set, deletes and `post_apply_hook` (HA sync). `ExecutionPlanner` orders an instance right after its base provider (reverse on destroy).
 - **CLI:** the core provider filter still matches ids exactly. A CLI helper expands `-P opnsense` to the primary plus every declared instance that has resources, and a repeatable `--firewall <name>` selects exact firewalls. `--firewall` is mutually exclusive with `-p` and `-r`.
+- **Generated files:** per instance id (`terraform/opnsense@<name>/`, own local state); templates are resolved by provider type, not instance id (#1462). Terraform variables come from the firewall's own settings.
 - **Output:** runner lines read `opnsense_direct[<name>]: ...` and doctor and offline results carry a `[<name>] ` prefix, only when `firewalls:` is declared. Flat configurations print as before.
 - **Pair check:** a firewall entry may set `ha_backup: <name>`. `infra doctor` then reads `getVipStatus` on both nodes, each through its own client, and a `CarpPairValidator` compares every VIP by `(vhid, subnet)`. MASTER on this node with BACKUP on the backup passes. A VIP missing on the backup, MASTER on both, or any other state is an ERROR. An unreadable backup is a WARNING. The per-node `CarpHealthValidator` still runs for each firewall.
 
@@ -41,6 +42,7 @@ Alternatives rejected:
 ## Related Issues
 
 - Issue #1450: support more than one opnsense firewall per environment
+- Issue #1462: non-primary firewalls failed Terraform generation on the instance name
 - Issue #1442: trigger OPNsense HA config sync after destroy
 - Issue #1393: CARP health in infra doctor
 

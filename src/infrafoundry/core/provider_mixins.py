@@ -19,6 +19,7 @@ from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.credential_override import resolve_settings
 from infrafoundry.core.exceptions import TemplateError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.provider_instances import split_provider_id
 from infrafoundry.core.security.file_utils import secure_write
 
 _RESOURCE_DECL_RE = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
@@ -133,7 +134,7 @@ class TemplateRendererMixin:
             )
 
         # Determine template directory
-        provider_dir = Path(__file__).parent.parent / "providers" / self.name
+        provider_dir = Path(__file__).parent.parent / "providers" / split_provider_id(self.name)[0]
         if template_subdir:
             self.template_dir = provider_dir / template_subdir
         else:
@@ -603,10 +604,11 @@ class TerraformGeneratorMixin:
             return {}
 
         result: dict[str, str] = {}
-        provider_settings = env_config.get_provider_settings(provider_name)
+        provider_settings = self._terraform_provider_settings(env_config, provider_name)
         if provider_settings:
             # Gated <PROVIDER>_<KEY> env vars can redirect the apply (#783).
-            provider_settings = resolve_settings(provider_name, provider_settings, mapping)
+            if self._allows_settings_env_override(provider_name):
+                provider_settings = resolve_settings(provider_name, provider_settings, mapping)
             if resolve_secret_uris:
                 provider_settings = self._resolve_settings_secret_uris(
                     env_config, provider_settings
@@ -878,6 +880,16 @@ class TerraformGeneratorMixin:
 
         return cast(dict[str, list[ResourceConfig]], group_resources(resources))
 
+    def _terraform_provider_settings(
+        self, env_config: EnvironmentConfig, provider_name: str
+    ) -> dict[str, Any] | None:
+        """Return the settings that feed ``TF_VAR_*``; override for per-instance settings."""
+        return env_config.get_provider_settings(provider_name)
+
+    def _allows_settings_env_override(self, provider_name: str) -> bool:
+        """Return whether gated env vars may override the settings (default: yes)."""
+        return True
+
     def render_provider_and_variables(
         self,
         *,
@@ -889,19 +901,21 @@ class TerraformGeneratorMixin:
 
         Args:
             provider_template: Template name for provider configuration. Defaults to
-                ``{self.name}/provider.tf.j2`` when omitted.
+                ``<provider type>/provider.tf.j2`` when omitted (the ``@<name>``
+                instance suffix is dropped).
             variables_template: Template name for variables. Defaults to
-                ``{self.name}/variables.tf.j2`` when omitted.
+                ``<provider type>/variables.tf.j2`` when omitted.
             variables_context: Context passed to the variables template.
         """
         provider = cast("_TerraformProviderProtocol", self)
 
         self.render_and_write_terraform(
-            provider_template or f"{provider.name}/provider.tf.j2",
+            provider_template or f"{split_provider_id(provider.name)[0]}/provider.tf.j2",
             output_name="provider.tf",
         )
 
-        variables_template_name = variables_template or f"{provider.name}/variables.tf.j2"
+        provider_type = split_provider_id(provider.name)[0]
+        variables_template_name = variables_template or f"{provider_type}/variables.tf.j2"
         self.render_and_write_terraform(
             variables_template_name,
             context=variables_context or {},
@@ -919,11 +933,11 @@ class TerraformGeneratorMixin:
         Args:
             resources_by_type: Resources grouped by type for templating.
             template_name: Optional template override. Defaults to
-                ``{self.name}/outputs.tf.j2``.
+                ``<provider type>/outputs.tf.j2``.
         """
         provider = cast("_TerraformProviderProtocol", self)
         self.render_and_write_terraform(
-            template_name or f"{provider.name}/outputs.tf.j2",
+            template_name or f"{split_provider_id(provider.name)[0]}/outputs.tf.j2",
             context={"resources_by_type": resources_by_type},
             output_name="outputs.tf",
         )
