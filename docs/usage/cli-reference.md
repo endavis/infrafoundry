@@ -773,6 +773,9 @@ foundry state backend migrate --env prod --auto-approve
 - `validate` -- `-e/--env TEXT` (required)
 - `migrate` -- `-e/--env TEXT` (required), `--from [local|s3|gcs|azurerm|postgres|remote]`, `--to [local|s3|gcs|azurerm|postgres|remote]`, `--auto-approve`
 
+!!! note
+    `migrate` is not yet implemented. When several providers share a remote backend, each gets its own state location; to move existing state to it, run `terraform init -migrate-state` in `generated/<env>/terraform/<provider>/`. See [Several Providers in One Environment](../architecture/state-management.md#several-providers-in-one-environment).
+
 ### `state audit`
 
 View and export audit trail for compliance.

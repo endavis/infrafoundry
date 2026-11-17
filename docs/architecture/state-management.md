@@ -259,6 +259,46 @@ terraform {
 }
 ```
 
+### Several Providers in One Environment
+
+Backend settings are one per environment, but each provider renders its own `backend.tf`. To keep
+their remote states apart, InfraFoundry derives the location per provider
+([ADR-0025](../decisions/0025-remote-state-locations-are-derived-per-provider-when-several-share-an-environment.md)):
+
+1. **One provider renders a backend:** the configured location is used as written.
+2. **Two or more render one:** each gets its provider id (for example `opnsense@fw-b`) in the location.
+3. **Pin:** `backend.bare_key_provider` names the one provider that keeps the configured location. It must be a provider with resources in the environment.
+4. **Placeholder:** a `{provider}` token in the location field replaces the automatic rule, for single and multi-provider environments alike.
+5. **Local backend:** untouched.
+
+| Backend | Field | Automatic location for `opnsense@fw-b` |
+| :--- | :--- | :--- |
+| `s3`, `azurerm` | `key` | `infra/dev/terraform.tfstate` becomes `infra/dev/opnsense@fw-b/terraform.tfstate` |
+| `gcs` | `prefix` | `infra/dev/` becomes `infra/dev/opnsense@fw-b` |
+| `remote` | `workspaces.name` | `dev` becomes `dev-opnsense-fw-b` |
+| `remote` | `workspaces.prefix` | `infra-` becomes `infra-opnsense-fw-b-` |
+| `postgres` | `schema_name` | `tf` becomes `tf_opnsense_fw_b` |
+
+The set of providers comes from the environment's configured resources, so `infra plan -P x` renders
+the same location as a full plan. Adding a second provider therefore moves the first provider's
+location. In any multi-provider environment set `bare_key_provider` or use `{provider}` for a stable
+location.
+
+Nothing moves existing state. When the automatic rule changes a location, the run prints a warning
+with the provider, the old and the new location. To keep the existing state, run
+`terraform init -migrate-state` in `generated/<env>/terraform/<provider>/` after `plan`, or pin that
+provider with `bare_key_provider`. `foundry state backend migrate` is still a stub and does not do this.
+
+```yaml
+backend:
+  type: s3
+  bare_key_provider: opnsense
+  s3:
+    bucket: example-tfstate
+    key: infra/dev/terraform.tfstate
+    region: us-east-1
+```
+
 ### Backend Reconfiguration
 
 InfraFoundry automatically detects backend configuration changes and triggers reconfiguration:

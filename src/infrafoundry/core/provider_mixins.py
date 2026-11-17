@@ -9,7 +9,7 @@ import logging
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, Template, TemplateNotFound
@@ -439,6 +439,12 @@ class TerraformGeneratorMixin:
     """
 
     _TFVARS_HEADER = "# Configuration from settings.yaml\n"
+
+    #: False for a provider that never calls ``render_backend`` (it is not a state peer).
+    renders_terraform_backend: ClassVar[bool] = True
+
+    #: Providers of the environment that render a backend; injected by the orchestrator.
+    backend_peer_ids: frozenset[str] = frozenset()
 
     if TYPE_CHECKING:
         # Declare expected attributes for type checking
@@ -974,8 +980,13 @@ class TerraformGeneratorMixin:
         if not is_valid:
             raise ValueError(f"Invalid backend configuration: {error}")
 
-        # Get backend configuration dict
-        backend_dict = backend_config.get_backend_config()
+        # Per-provider state location (#1464)
+        from infrafoundry.core.backend_keys import resolve_backend_location
+
+        provider_id = str(getattr(self, "name", ""))
+        backend_dict = resolve_backend_location(
+            backend_config, provider_id, self.backend_peer_ids
+        ).config
 
         # Render backend.tf using common template
         # Template is in src/infrafoundry/templates/common/backend.tf.j2

@@ -1,6 +1,7 @@
 """Core orchestration for infrastructure deployment."""
 
 import getpass
+import logging
 import os
 import socket
 from collections.abc import Callable
@@ -11,7 +12,9 @@ from typing import Any
 from rich.console import Console
 
 from infrafoundry.core.audit import AuditLogger
+from infrafoundry.core.backend_keys import assign_backend_peers, migration_warning
 from infrafoundry.core.config import ConfigManager
+from infrafoundry.core.config.backend_config import BackendConfig
 from infrafoundry.core.dependencies import DependencyGraph
 from infrafoundry.core.deployment_executor import DeploymentExecutor, default_max_workers
 from infrafoundry.core.drift_detector import DriftDetector
@@ -47,6 +50,9 @@ from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import StateManager
 from infrafoundry.core.state.lock_context import environment_lock
+from infrafoundry.core.warnings import emit_warning
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -286,6 +292,7 @@ class Orchestrator:
     ) -> tuple[list[ResourceConfig], dict[str, list[ResourceConfig]]]:
         """Load all resources for an environment and group them by provider."""
         all_resources = self.config_manager.get_all_resources_all_providers(env_name)
+        backend: BackendConfig | None = None
         try:
             env_config = self.config_manager.load_environment(env_name)
         except FileNotFoundError:
@@ -293,9 +300,18 @@ class Orchestrator:
             pass
         else:
             register_instance_providers(self.providers, env_config.provider_settings)
+            if isinstance(env_config.backend, BackendConfig):
+                backend = env_config.backend
         resources_by_provider: dict[str, list[ResourceConfig]] = {}
         for resource in all_resources:
             resources_by_provider.setdefault(resource.provider, []).append(resource)
+
+        # Tell each provider which providers share the environment's remote state (#1464)
+        for location in assign_backend_peers(self.providers, resources_by_provider, backend):
+            message = migration_warning(location)
+            self.console.print(f"[yellow]Warning: {message}[/yellow]")
+            logger.warning(message)
+            emit_warning("backend_state_key", message)
 
         # Register package events discovered during resource loading
         package_events = self.config_manager.get_package_events()

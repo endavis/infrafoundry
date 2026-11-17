@@ -99,6 +99,22 @@ class BackendConfig(BaseModel):
     remote: TerraformCloudBackendConfig | None = None
     local: LocalBackendConfig | None = None
 
+    bare_key_provider: str | None = Field(
+        default=None,
+        description=(
+            "Provider id that keeps the configured state location when several providers "
+            "render a backend; the others get a per-provider location"
+        ),
+    )
+
+    @field_validator("bare_key_provider")
+    @classmethod
+    def reject_empty_pin(cls, v: str | None) -> str | None:
+        """Reject an empty ``bare_key_provider``."""
+        if v is not None and not v.strip():
+            raise ValueError("bare_key_provider must not be empty")
+        return v
+
     @field_validator("type", mode="before")
     @classmethod
     def normalize_type(cls, v: str | BackendType) -> BackendType:

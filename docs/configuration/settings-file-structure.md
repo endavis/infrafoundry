@@ -100,6 +100,7 @@ Each environment uses a single SOPS-encrypted `settings.yaml` to define metadata
   - `providers` (optional, list[str]): List of provider names to enable. If omitted, all registered providers are enabled.
   - `backend` (optional, dict): Terraform backend configuration for state management. Enables remote state storage and locking for team collaboration. See [State Management](../architecture/state-management.md#backend-configuration) for details.
     - `type` (required if backend specified): Backend type - `s3`, `gcs`, `azurerm`, `postgres`, `remote` (Terraform Cloud), or `local`
+    - `bare_key_provider` (optional, str): When several providers of the environment render a remote backend, each gets its own state location; this provider keeps the configured one. Use a `{provider}` token in the location field to choose the location yourself. See [Several Providers in One Environment](../architecture/state-management.md#several-providers-in-one-environment).
     - Type-specific fields:
       - **S3:** `bucket` (required), `key`, `region` (required), `dynamodb_table` (for locking), `encrypt`, `kms_key_id`, `profile`, `role_arn`
       - **GCS:** `bucket` (required), `prefix`, `credentials`, `encryption_key`
