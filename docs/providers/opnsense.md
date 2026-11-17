@@ -220,6 +220,8 @@ The check tests connectivity to the API (`validate_connectivity`), that referenc
 
 `infra doctor` also warns when a `kea.dhcp4.subnets` entry sets `auto_collect: true` together with `routers`, `dns_servers` or `ntp_servers`. Saving the Kea DHCPv4 settings re-runs auto-collect and overwrites those values; set `auto_collect: false` to keep them. See [Kea DHCPv4 high availability](../development/opnsense-resource-coverage.md#kea-dhcpv4-high-availability-1392).
 
+`infra plan`, `infra apply` and `infra doctor` warn when a CARP `vhid` is reused on more than one interface, and fail when a CARP virtual IP lies outside the static subnet of its interface in config (or outside the subnet of an `ipalias` virtual IP on that interface). The subnet check is skipped when the interface address is not static in config, and for `ipalias` and `proxyarp` virtual IPs.
+
 That warning also appears on `infra plan` and `infra apply`, which run the OPNsense checks that need no API access. The checks that compare against the live box (aliases, interfaces, gateways, Unbound overrides) remain doctor-only. See [Validation during plan and apply](../usage/validation.md#validation-during-plan-and-apply).
 
 ## Examples

@@ -50,6 +50,7 @@ from infrafoundry.providers.opnsense.validators import (
     UnboundHostAliasValidator,
     UnboundSettingsValidator,
     UnboundValidator,
+    VirtualIPTopologyValidator,  # #1391
     VirtualIPValidator,
     VLANValidator,
     build_xref_index,
@@ -122,6 +123,7 @@ class OPNsenseValidator:
         self.kea_reservation_validator = KeaReservationValidator(report)
         self.kea_ha_validator = KeaHAValidator(report)  # #1392
         self.kea_subnet_autocollect_validator = KeaSubnetAutoCollectValidator(report)  # #1432
+        self.virtual_ip_topology_validator = VirtualIPTopologyValidator(report)  # #1391
         self.radvd_validator = RadvdValidator(report)
         self.cron_jobs_validator = CronJobsValidator(report)
         self.trust_validator = TrustValidator(report)
@@ -461,6 +463,7 @@ class OPNsenseValidator:
         self.kea_subnet_autocollect_validator.validate(
             replace(context, resources=resource_refs["kea_dhcp4_subnets"])
         )
+        self.virtual_ip_topology_validator.validate(context)  # #1391
         self.monit_validator.validate(replace(context, resources=resource_refs["monit"]))
         self.system_firmware_validator.validate(
             replace(context, resources=resource_refs["system_firmware"])
