@@ -55,7 +55,7 @@ DEFAULT_ALERT_EVENT_TYPES = aiqum_setup.DEFAULT_ALERT_EVENT_TYPES
 # ---------------------------------------------------------------------------
 # Fixtures and helpers
 # ---------------------------------------------------------------------------
-BASE_URL = "https://192.168.1.50"
+BASE_URL = "https://198.51.100.50"
 
 
 def _make_client() -> Any:
@@ -77,7 +77,7 @@ def _mock_urlopen_response(status: int = 200, body: bytes = b"") -> MagicMock:
 def _make_config(alert_email: str = "") -> dict[str, Any]:
     """Build a minimal config dict for main()."""
     return {
-        "ip_address": "192.168.1.50",
+        "ip_address": "198.51.100.50",
         "aiqum_admin_password": "newpass",
         "aiqum_admin_user": "umadmin",
         "aiqum_admin_email": "admin@example.com",
@@ -545,7 +545,7 @@ class TestMainClusterStep:
 # ---------------------------------------------------------------------------
 # Tests: ONTAP DNS pre-check (#1168)
 # ---------------------------------------------------------------------------
-AIQUM_IP = "192.168.1.50"
+AIQUM_IP = "198.51.100.50"
 
 
 def _dns_response(
@@ -586,8 +586,8 @@ class TestDnsPacket:
 
     def test_parse_answer_with_compression_pointer_and_cname(self) -> None:
         query = aiqum_setup.build_dns_query("aiqum", 7)
-        response = _dns_response(query, [AIQUM_IP, "172.21.0.9"], extra_cname=True)
-        assert aiqum_setup.parse_dns_a_records(response, 7) == [AIQUM_IP, "172.21.0.9"]
+        response = _dns_response(query, [AIQUM_IP, "203.0.113.9"], extra_cname=True)
+        assert aiqum_setup.parse_dns_a_records(response, 7) == [AIQUM_IP, "203.0.113.9"]
 
     def test_parse_nxdomain_returns_empty(self) -> None:
         query = aiqum_setup.build_dns_query("aiqum", 7)
@@ -612,15 +612,15 @@ class TestDnsPacket:
 
         def sendto(packet: bytes, addr: tuple[str, int]) -> None:
             sent.append(packet)
-            assert addr == ("192.168.1.1", 53)
+            assert addr == ("198.51.100.1", 53)
 
         def recvfrom(size: int) -> tuple[bytes, tuple[str, int]]:
-            return _dns_response(sent[0], [AIQUM_IP]), ("192.168.1.1", 53)
+            return _dns_response(sent[0], [AIQUM_IP]), ("198.51.100.1", 53)
 
         sock.sendto.side_effect = sendto
         sock.recvfrom.side_effect = recvfrom
         with patch("aiqum_initial_setup.socket.socket", return_value=sock):
-            assert aiqum_setup.query_dns_a("192.168.1.1", "aiqum") == [AIQUM_IP]
+            assert aiqum_setup.query_dns_a("198.51.100.1", "aiqum") == [AIQUM_IP]
         sock.settimeout.assert_called_once_with(aiqum_setup.DNS_QUERY_TIMEOUT)
 
     def test_query_dns_a_timeout_is_oserror(self) -> None:
@@ -631,7 +631,7 @@ class TestDnsPacket:
             patch("aiqum_initial_setup.socket.socket", return_value=sock),
             pytest.raises(OSError),
         ):
-            aiqum_setup.query_dns_a("192.168.1.1", "aiqum")
+            aiqum_setup.query_dns_a("198.51.100.1", "aiqum")
 
 
 class TestCheckOntapResolvesAiqum:
@@ -648,7 +648,7 @@ class TestCheckOntapResolvesAiqum:
             return [AIQUM_IP] if name == "aiqum.lab.example" else []
 
         with (
-            self._rest(["192.168.1.1"], ["lab.example"]) as urlopen_mock,
+            self._rest(["198.51.100.1"], ["lab.example"]) as urlopen_mock,
             patch("aiqum_initial_setup.query_dns_a", side_effect=fake),
         ):
             verdict, detail = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
@@ -660,32 +660,32 @@ class TestCheckOntapResolvesAiqum:
 
     def test_wrong_ip_returns_false(self) -> None:
         with (
-            self._rest(["192.168.1.1"], []),
-            patch("aiqum_initial_setup.query_dns_a", return_value=["10.9.9.9"]),
+            self._rest(["198.51.100.1"], []),
+            patch("aiqum_initial_setup.query_dns_a", return_value=["192.0.2.9"]),
         ):
             verdict, message = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
         assert verdict is False
         assert "'aiqum'" in message
-        assert "192.168.1.1" in message
+        assert "198.51.100.1" in message
         assert "ontappass" not in message
 
     def test_no_answer_returns_false(self) -> None:
         with (
-            self._rest(["192.168.1.1", "192.168.1.2"], ["lab.example"]),
+            self._rest(["198.51.100.1", "198.51.100.2"], ["lab.example"]),
             patch("aiqum_initial_setup.query_dns_a", return_value=[]),
         ):
             verdict, message = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
         assert verdict is False
-        assert "192.168.1.2" in message
+        assert "198.51.100.2" in message
 
     def test_second_server_can_match(self) -> None:
         def fake(server: str, name: str, timeout: float = 3) -> list[str]:
-            if server == "192.168.1.1":
+            if server == "198.51.100.1":
                 raise TimeoutError("timed out")
             return [AIQUM_IP]
 
         with (
-            self._rest(["192.168.1.1", "192.168.1.2"], []),
+            self._rest(["198.51.100.1", "198.51.100.2"], []),
             patch("aiqum_initial_setup.query_dns_a", side_effect=fake),
         ):
             verdict, _ = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
@@ -716,12 +716,12 @@ class TestCheckOntapResolvesAiqum:
 
     def test_all_servers_unreachable_is_inconclusive(self) -> None:
         with (
-            self._rest(["192.168.1.1"], ["lab.example"]),
+            self._rest(["198.51.100.1"], ["lab.example"]),
             patch("aiqum_initial_setup.query_dns_a", side_effect=TimeoutError("timed out")),
         ):
             verdict, reason = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
         assert verdict is None
-        assert "192.168.1.1" in reason
+        assert "198.51.100.1" in reason
 
     def test_missing_vm_name_is_skipped(self) -> None:
         with patch("aiqum_initial_setup.urlopen") as urlopen_mock:

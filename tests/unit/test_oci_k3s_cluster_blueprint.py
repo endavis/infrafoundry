@@ -60,10 +60,10 @@ def test_oci_k3s_cluster_example_loads_blueprint(loader: PackageLoader) -> None:
     assert variables["control_memory_gb"] == 8
     assert variables["control_boot_volume_gb"] == 50
     assert variables["worker_boot_volume_gb"] == 50
-    assert variables["vcn_cidr"] == "172.21.0.0/16"
+    assert variables["vcn_cidr"] == "192.0.2.0/24"
     assert variables["vcn_name"] == "k3s-vcn"
-    assert variables["control_subnet_cidr"] == "172.21.0.0/24"
-    assert variables["worker_subnet_cidr"] == "10.0.1.0/24"
+    assert variables["control_subnet_cidr"] == "192.0.2.0/25"
+    assert variables["worker_subnet_cidr"] == "198.51.100.0/24"
     assert variables["k3s_oci_firewall_fix"] is True
 
     # Default workers list has 2 entries
@@ -105,26 +105,26 @@ def test_oci_k3s_cluster_example_network_configs(loader: PackageLoader) -> None:
 
     vcn = next(r for r in resources if r.type == "vcn")
     assert vcn.name == "k3s-vcn"
-    assert vcn.config["cidr_block"] == "172.21.0.0/16"
+    assert vcn.config["cidr_block"] == "192.0.2.0/24"
     assert vcn.config["dns_label"] == "k3svcn"
     assert vcn.config["internet_gateway"] is True
     assert vcn.config["nat_gateway"] is True
     # Security list must allow intra-VCN traffic
     ingress_sources = {rule["source"] for rule in vcn.config["security_list"]["ingress_rules"]}
-    assert "172.21.0.0/16" in ingress_sources
+    assert "192.0.2.0/24" in ingress_sources
 
     subnets_by_name = {r.name: r for r in resources if r.type == "subnet"}
     assert set(subnets_by_name) == {"k3s-control-subnet", "k3s-worker-subnet"}
 
     control_subnet = subnets_by_name["k3s-control-subnet"].config
     assert control_subnet["vcn"] == "k3s-vcn"
-    assert control_subnet["cidr_block"] == "172.21.0.0/24"
+    assert control_subnet["cidr_block"] == "192.0.2.0/25"
     assert control_subnet["dns_label"] == "ctrl"
     assert control_subnet["public"] is True
 
     worker_subnet = subnets_by_name["k3s-worker-subnet"].config
     assert worker_subnet["vcn"] == "k3s-vcn"
-    assert worker_subnet["cidr_block"] == "10.0.1.0/24"
+    assert worker_subnet["cidr_block"] == "198.51.100.0/24"
     assert worker_subnet["dns_label"] == "work"
     assert worker_subnet["public"] is False
 

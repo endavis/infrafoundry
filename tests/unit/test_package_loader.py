@@ -545,7 +545,7 @@ resources:
     name: ontap-node-01
     config:
       subnet_ref: opt1-servers
-      ip_address: "172.20.10.201"
+      ip_address: "192.0.2.201"
 """
         pkg_dir = _create_package(
             temp_dir,
@@ -964,7 +964,7 @@ class TestBlueprintIntegration:
             "inv-bp",
             {
                 "name": "inv-bp",
-                "defaults": {"host_ip": "172.21.0.1"},
+                "defaults": {"host_ip": "198.51.100.1"},
                 "inventory": {
                     "groups": {
                         "servers": {
@@ -999,7 +999,7 @@ class TestBlueprintIntegration:
         with open(inventory_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
-        assert data["groups"]["servers"]["hosts"]["server-01"]["ansible_host"] == "172.21.0.1"
+        assert data["groups"]["servers"]["hosts"]["server-01"]["ansible_host"] == "198.51.100.1"
 
     def test_package_inventory_overrides_blueprint(self, temp_dir: Path) -> None:
         """Package's own inventory overrides blueprint inventory."""
@@ -1010,7 +1010,7 @@ class TestBlueprintIntegration:
             "inv-override-bp",
             {
                 "name": "inv-override-bp",
-                "defaults": {"host_ip": "172.21.0.1"},
+                "defaults": {"host_ip": "198.51.100.1"},
                 "inventory": {"groups": {"blueprint_group": {"hosts": {"bp-host": {}}}}},
             },
         )
@@ -1101,9 +1101,9 @@ class TestBlueprintIntegration:
             "variables:\n"
             "  workers:\n"
             "    - name: worker-01\n"
-            "      ip: 172.21.0.11\n"
+            "      ip: 198.51.100.11\n"
             "    - name: worker-02\n"
-            "      ip: 172.21.0.12\n"
+            "      ip: 198.51.100.12\n"
         )
 
         loader.load_package(pkg_dir, "proxmox", "dev")
@@ -1114,8 +1114,8 @@ class TestBlueprintIntegration:
             data = yaml.safe_load(f)
         hosts = data["groups"]["k3s_workers"]["hosts"]
         assert set(hosts.keys()) == {"worker-01", "worker-02"}
-        assert hosts["worker-01"]["ansible_host"] == "172.21.0.11"
-        assert hosts["worker-02"]["ansible_host"] == "172.21.0.12"
+        assert hosts["worker-01"]["ansible_host"] == "198.51.100.11"
+        assert hosts["worker-02"]["ansible_host"] == "198.51.100.12"
 
     def test_package_inventory_with_loop(self, temp_dir: Path) -> None:
         """Package-level inventory with `{% for %}` expands using package variables."""
@@ -1161,7 +1161,7 @@ class TestBlueprintIntegration:
         (blueprint_dir / "blueprint.yaml").write_text(
             "name: raw-inherit-bp\n"
             "defaults:\n"
-            "  host_ip: 172.21.0.99\n"
+            "  host_ip: 198.51.100.99\n"
             "inventory:\n"
             "  groups:\n"
             "    only:\n"
@@ -1188,7 +1188,7 @@ class TestBlueprintIntegration:
         assert inventory_path.exists()
         with open(inventory_path, encoding="utf-8") as f:
             data = yaml.safe_load(f)
-        assert data["groups"]["only"]["hosts"]["sole"]["ansible_host"] == "172.21.0.99"
+        assert data["groups"]["only"]["hosts"]["sole"]["ansible_host"] == "198.51.100.99"
 
     def test_secrets_override_blueprint_defaults(self, temp_dir: Path) -> None:
         """Secrets take priority over both blueprint defaults and package vars."""
@@ -1314,7 +1314,7 @@ class TestHandlerConfigTagging:
                     "groups": {
                         "all": {
                             "hosts": {
-                                "host-01": {"ansible_host": "172.21.0.5"},
+                                "host-01": {"ansible_host": "198.51.100.5"},
                             }
                         }
                     }

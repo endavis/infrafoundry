@@ -9,7 +9,7 @@ that previously ran under ``generate_terraform()``.
 Mirrors :mod:`.kea_dhcp6_subnet` line-for-line; differences are flagged inline:
 
 - Identity is the natural key ``subnet`` (the IPv4 CIDR string, e.g.,
-  ``10.0.10.0/24``).
+  ``192.0.2.0/24``).
 - DHCP options are nested under ``option_data`` on the wire (``routers``,
   ``domain_name_servers``, ``ntp_servers``, ``domain_search``,
   ``domain_name``), as in DHCPv6; only ``option_data_autocollect`` is flat.
@@ -522,7 +522,7 @@ def _build_subnet_payload(resource: ResourceConfig) -> dict[str, Any]:
         subnet_data["interface"] = config["interface"]
 
     # Pools is a newline-separated string of ranges. The legacy terraform
-    # template accepted plain string entries (e.g., "192.168.1.10-192.168.1.99"),
+    # template accepted plain string entries (e.g., "198.51.100.10-198.51.100.99"),
     # not the dict-with-range shape DHCPv6 uses.
     if "pools" in config:
         pool_strings: list[str] = []

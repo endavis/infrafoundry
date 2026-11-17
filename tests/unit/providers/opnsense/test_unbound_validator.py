@@ -31,7 +31,7 @@ def test_validate_valid_override(validator: UnboundValidator, report: MagicMock)
         config={
             "hostname": "web",
             "domain": "example.com",
-            "server": "192.168.1.10",
+            "server": "192.0.2.10",
         },
     )
 
@@ -208,7 +208,7 @@ def test_validate_multiple_resources(validator: UnboundValidator, report: MagicM
             config={
                 "hostname": "web",
                 "domain": "example.com",
-                "server": "192.168.1.10",
+                "server": "192.0.2.10",
             },
         ),
         ResourceConfig(
@@ -218,7 +218,7 @@ def test_validate_multiple_resources(validator: UnboundValidator, report: MagicM
             config={
                 "hostname": "mail",
                 "domain": "example.com",
-                "server": "192.168.1.20",
+                "server": "192.0.2.20",
             },
         ),
     ]
@@ -239,7 +239,7 @@ def test_validate_mixed_valid_and_invalid(validator: UnboundValidator, report: M
             config={
                 "hostname": "web",
                 "domain": "example.com",
-                "server": "192.168.1.10",
+                "server": "192.0.2.10",
             },
         ),
         ResourceConfig(

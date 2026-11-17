@@ -67,13 +67,13 @@ class TestValidateReferences:
                 name="my-vcn",
                 type="vcn",
                 provider="oci",
-                config={"cidr_block": "172.21.0.0/16"},
+                config={"cidr_block": "192.0.2.0/24"},
             ),
             ResourceConfig(
                 name="my-subnet",
                 type="subnet",
                 provider="oci",
-                config={"vcn": "my-vcn", "cidr_block": "172.21.0.0/24"},
+                config={"vcn": "my-vcn", "cidr_block": "192.0.2.0/25"},
             ),
         ]
 
@@ -94,7 +94,7 @@ class TestValidateReferences:
                 name="my-subnet",
                 type="subnet",
                 provider="oci",
-                config={"vcn": "nonexistent-vcn", "cidr_block": "172.21.0.0/24"},
+                config={"vcn": "nonexistent-vcn", "cidr_block": "192.0.2.0/25"},
             ),
         ]
 
@@ -116,7 +116,7 @@ class TestValidateReferences:
                 name="my-subnet",
                 type="subnet",
                 provider="oci",
-                config={"vcn": "my-vcn", "cidr_block": "172.21.0.0/24"},
+                config={"vcn": "my-vcn", "cidr_block": "192.0.2.0/25"},
             ),
             ResourceConfig(
                 name="my-instance",
@@ -167,7 +167,7 @@ class TestValidateReferences:
                 name="my-vcn",
                 type="vcn",
                 provider="oci",
-                config={"cidr_block": "172.21.0.0/16"},
+                config={"cidr_block": "192.0.2.0/24"},
             ),
         ]
 
@@ -209,19 +209,19 @@ class TestValidateReferences:
                 name="vcn-1",
                 type="vcn",
                 provider="oci",
-                config={"cidr_block": "172.21.0.0/16"},
+                config={"cidr_block": "192.0.2.0/24"},
             ),
             ResourceConfig(
                 name="subnet-1",
                 type="subnet",
                 provider="oci",
-                config={"vcn": "vcn-1", "cidr_block": "10.0.1.0/24"},
+                config={"vcn": "vcn-1", "cidr_block": "198.51.100.0/24"},
             ),
             ResourceConfig(
                 name="subnet-2",
                 type="subnet",
                 provider="oci",
-                config={"vcn": "vcn-1", "cidr_block": "172.21.2.0/24"},
+                config={"vcn": "vcn-1", "cidr_block": "192.0.2.128/25"},
             ),
             ResourceConfig(
                 name="instance-1",
@@ -299,7 +299,7 @@ class TestValidateAPIReferences:
                 name="my-vcn",
                 type="vcn",
                 provider="oci",
-                config={"cidr_block": "172.21.0.0/16"},
+                config={"cidr_block": "192.0.2.0/24"},
             ),
         ]
 
@@ -339,7 +339,7 @@ class TestValidateAPIReferences:
                 name="my-vcn",
                 type="vcn",
                 provider="oci",
-                config={"cidr_block": "172.21.0.0/16"},
+                config={"cidr_block": "192.0.2.0/24"},
             ),
         ]
 

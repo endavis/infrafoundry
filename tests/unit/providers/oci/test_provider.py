@@ -69,7 +69,7 @@ def test_generate_terraform_creates_files(provider: OCIProvider, tmp_dirs: Any) 
             type="vcn",
             provider="oci",
             config={
-                "cidr_block": "172.21.0.0/16",
+                "cidr_block": "192.0.2.0/24",
                 "dns_label": "testvcn",
                 "internet_gateway": True,
             },
@@ -80,7 +80,7 @@ def test_generate_terraform_creates_files(provider: OCIProvider, tmp_dirs: Any) 
             provider="oci",
             config={
                 "vcn": "test-vcn",
-                "cidr_block": "172.21.0.0/24",
+                "cidr_block": "192.0.2.0/25",
                 "dns_label": "public",
                 "public": True,
             },
@@ -120,7 +120,7 @@ def test_generate_terraform_vcn_content(provider: OCIProvider, tmp_dirs: Any) ->
             type="vcn",
             provider="oci",
             config={
-                "cidr_block": "172.21.0.0/16",
+                "cidr_block": "192.0.2.0/24",
                 "dns_label": "myvcn",
             },
         ),
@@ -131,7 +131,7 @@ def test_generate_terraform_vcn_content(provider: OCIProvider, tmp_dirs: Any) ->
     terraform_dir = output_dir / "test" / "terraform" / "oci"
     vcn_content = (terraform_dir / "vcn.tf").read_text()
     assert "oci_core_vcn" in vcn_content
-    assert "172.21.0.0/16" in vcn_content
+    assert "192.0.2.0/24" in vcn_content
     assert "myvcn" in vcn_content
 
 
@@ -149,7 +149,7 @@ def test_generate_terraform_instance_with_shape_config(
             provider="oci",
             config={
                 "vcn": "test-vcn",
-                "cidr_block": "172.21.0.0/24",
+                "cidr_block": "192.0.2.0/25",
                 "public": True,
             },
         ),
@@ -349,7 +349,7 @@ def test_provider_terraform_provider_content(provider: OCIProvider, tmp_dirs: An
             name="test-vcn",
             type="vcn",
             provider="oci",
-            config={"cidr_block": "172.21.0.0/16"},
+            config={"cidr_block": "192.0.2.0/24"},
         ),
     ]
 
@@ -398,7 +398,7 @@ def test_generate_terraform_with_nat_gateway(provider: OCIProvider, tmp_dirs: An
             type="vcn",
             provider="oci",
             config={
-                "cidr_block": "172.21.0.0/16",
+                "cidr_block": "192.0.2.0/24",
                 "internet_gateway": True,
                 "nat_gateway": True,
             },
@@ -409,7 +409,7 @@ def test_generate_terraform_with_nat_gateway(provider: OCIProvider, tmp_dirs: An
             provider="oci",
             config={
                 "vcn": "k3s-vcn",
-                "cidr_block": "172.21.0.0/24",
+                "cidr_block": "192.0.2.0/25",
                 "public": True,
             },
         ),
@@ -419,7 +419,7 @@ def test_generate_terraform_with_nat_gateway(provider: OCIProvider, tmp_dirs: An
             provider="oci",
             config={
                 "vcn": "k3s-vcn",
-                "cidr_block": "10.0.1.0/24",
+                "cidr_block": "198.51.100.0/24",
                 "public": False,
             },
         ),
@@ -481,7 +481,7 @@ def test_generate_ansible_filters_non_instances(provider: OCIProvider, tmp_dirs:
             name="my-vcn",
             type="vcn",
             provider="oci",
-            config={"cidr_block": "172.21.0.0/16"},
+            config={"cidr_block": "192.0.2.0/24"},
         ),
         ResourceConfig(
             name="my-instance",

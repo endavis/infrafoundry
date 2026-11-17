@@ -71,12 +71,12 @@ class TestVCNTemplate:
                 name="test-vcn",
                 type="vcn",
                 provider="oci",
-                config={"cidr_block": "172.21.0.0/16", "dns_label": "testvcn"},
+                config={"cidr_block": "192.0.2.0/24", "dns_label": "testvcn"},
             )
         ]
         content = provider.render_template("oci/vcn.tf.j2", {"vcns": vcns, "subnets": []})
         assert 'resource "oci_core_vcn" "test_vcn"' in content
-        assert "172.21.0.0/16" in content
+        assert "192.0.2.0/24" in content
         assert "testvcn" in content
 
     def test_renders_internet_gateway(self, provider: OCIProvider) -> None:
@@ -87,7 +87,7 @@ class TestVCNTemplate:
                 type="vcn",
                 provider="oci",
                 config={
-                    "cidr_block": "172.21.0.0/16",
+                    "cidr_block": "192.0.2.0/24",
                     "internet_gateway": True,
                 },
             )
@@ -106,7 +106,7 @@ class TestVCNTemplate:
                 provider="oci",
                 config={
                     "vcn": "my-vcn",
-                    "cidr_block": "10.0.1.0/24",
+                    "cidr_block": "198.51.100.0/24",
                     "dns_label": "mysub",
                     "public": True,
                 },
@@ -114,7 +114,7 @@ class TestVCNTemplate:
         ]
         content = provider.render_template("oci/vcn.tf.j2", {"vcns": [], "subnets": subnets})
         assert 'resource "oci_core_subnet" "my_subnet"' in content
-        assert "10.0.1.0/24" in content
+        assert "198.51.100.0/24" in content
         assert "mysub" in content
         assert "prohibit_public_ip_on_vnic = false" in content
 
@@ -127,7 +127,7 @@ class TestVCNTemplate:
                 provider="oci",
                 config={
                     "vcn": "my-vcn",
-                    "cidr_block": "172.21.2.0/24",
+                    "cidr_block": "192.0.2.128/25",
                     "public": False,
                 },
             )
@@ -143,7 +143,7 @@ class TestVCNTemplate:
                 type="vcn",
                 provider="oci",
                 config={
-                    "cidr_block": "172.21.0.0/16",
+                    "cidr_block": "192.0.2.0/24",
                     "nat_gateway": True,
                 },
             )
@@ -162,7 +162,7 @@ class TestVCNTemplate:
                 type="vcn",
                 provider="oci",
                 config={
-                    "cidr_block": "172.21.0.0/16",
+                    "cidr_block": "192.0.2.0/24",
                     "internet_gateway": True,
                     "nat_gateway": True,
                 },
@@ -175,7 +175,7 @@ class TestVCNTemplate:
                 provider="oci",
                 config={
                     "vcn": "my-vcn",
-                    "cidr_block": "10.0.1.0/24",
+                    "cidr_block": "198.51.100.0/24",
                     "public": False,
                 },
             )
@@ -191,7 +191,7 @@ class TestVCNTemplate:
                 type="vcn",
                 provider="oci",
                 config={
-                    "cidr_block": "172.21.0.0/16",
+                    "cidr_block": "192.0.2.0/24",
                     "internet_gateway": True,
                 },
             )
@@ -203,7 +203,7 @@ class TestVCNTemplate:
                 provider="oci",
                 config={
                     "vcn": "my-vcn",
-                    "cidr_block": "10.0.1.0/24",
+                    "cidr_block": "198.51.100.0/24",
                     "public": False,
                 },
             )
@@ -219,7 +219,7 @@ class TestVCNTemplate:
                 type="vcn",
                 provider="oci",
                 config={
-                    "cidr_block": "172.21.0.0/16",
+                    "cidr_block": "192.0.2.0/24",
                     "security_list": {
                         "ingress_rules": [
                             {
@@ -384,7 +384,7 @@ class TestOutputsTemplate:
                     name="my-vcn",
                     type="vcn",
                     provider="oci",
-                    config={"cidr_block": "172.21.0.0/16"},
+                    config={"cidr_block": "192.0.2.0/24"},
                 )
             ]
         }
@@ -402,7 +402,7 @@ class TestOutputsTemplate:
                     name="pub-subnet",
                     type="subnet",
                     provider="oci",
-                    config={"vcn": "my-vcn", "cidr_block": "172.21.0.0/24"},
+                    config={"vcn": "my-vcn", "cidr_block": "192.0.2.0/25"},
                 )
             ]
         }

@@ -157,7 +157,7 @@ Verification via direct `getItem`:
     'description': 'spike-test (re-bound)',
     'enable': True,
     'spoofMac': None,
-    'ipv4Type': 'static', 'ipv4Address': '10.99.99.1', 'ipv4Subnet': 24,
+    'ipv4Type': 'static', 'ipv4Address': '192.0.2.1', 'ipv4Subnet': 24,
     'ipv6Type': 'track-interface', 'ipv6Track': 'wan'
 }}
 ```
@@ -316,7 +316,7 @@ After SCP, the install script restarts `configd` and `php_fpm` so OPNsense's MVC
 | :--- | :--- | :--- |
 | `setItem` re-binds `optN` to a different kernel device without losing the logical name | ✅ verified (see "setItem re-bind" in run log). `opt9` re-bound from `em0` to `em1` in place; logical name preserved; round-trip plan = 0/0/0/0. |
 | Explicit `name: opt9` on `addItem` is accepted by OPNsense's downstream code (GUI, watchers) | ✅ verified. Apply with `name: opt9` succeeded; subsequent `getItem('opt9')` returned the assignment; the GUI's Interfaces → Assignments page renders `opt9` correctly. No watcher errors observed. |
-| `getItem` round-trips the assign payload faithfully | ✅ verified. After apply with `ipv4Type: static, ipv4Address: 10.99.99.1, ipv4Subnet: 24, ipv6Type: track-interface, ipv6Track: wan`, `getItem` returned all five fields exactly as posted. The Python spike's `_needs_update` only compares `device`+`description` today; field-for-field deep equality across IPv4/IPv6 dicts is a known gap (see Friction points). |
+| `getItem` round-trips the assign payload faithfully | ✅ verified. After apply with `ipv4Type: static, ipv4Address: 192.0.2.1, ipv4Subnet: 24, ipv6Type: track-interface, ipv6Track: wan`, `getItem` returned all five fields exactly as posted. The Python spike's `_needs_update` only compares `device`+`description` today; field-for-field deep equality across IPv4/IPv6 dicts is a known gap (see Friction points). |
 | `searchItem` returns the same set of interfaces as `interfacesInfo` | ✅ verified. `searchItem` returned 4 baseline rows (`lan`/`lo0`/`wan`/`opt1`) → 5 after add (`opt9`) → 4 after delete. `interfacesInfo` agreed on the same set throughout. `searchItem` carries richer fields (per-row IPv4/IPv6 typed); useful when the spike needs the desired-shape representation rather than the rendered live state. |
 | IPv6 dual-stack (static IPv4 + track-interface IPv6) round-trips | ✅ verified. `opt9` fixture sets both; post-apply `getItem` returns both stacks; round-trip plan = 0/0/0/0. |
 

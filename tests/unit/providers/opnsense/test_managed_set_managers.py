@@ -292,7 +292,7 @@ class TestKeaReservations:
         return {"uuid": uuid, self._id_field(family): ident, "subnet": subnet_uuid}
 
     def _cidr(self, family: str) -> str:
-        return "10.0.10.0/24" if family == "4" else "2001:db8:10::/64"
+        return "192.0.2.0/24" if family == "4" else "2001:db8:10::/64"
 
     def _managed(self, family: str, name: str, ident: str, **extra: Any) -> ResourceConfig:
         return _row(

@@ -13,7 +13,7 @@ from infrafoundry.core.exceptions import SchemaValidationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.proxmox import ProxmoxProvider
 
-PEERS = ["172.20.10.100", "172.20.10.101", "172.20.10.102"]
+PEERS = ["192.0.2.100", "192.0.2.101", "192.0.2.102"]
 DEPENDS = "depends_on = [proxmox_sdn_applier.apply]"
 
 
@@ -82,7 +82,7 @@ class TestRendering:
         sdn = files["sdn.tf"]
 
         assert 'resource "proxmox_sdn_zone_vxlan" "demonet"' in sdn
-        assert 'peers = ["172.20.10.100", "172.20.10.101", "172.20.10.102"]' in sdn
+        assert 'peers = ["192.0.2.100", "192.0.2.101", "192.0.2.102"]' in sdn
         assert "mtu   = 8950" in sdn
         assert 'nodes = ["node1", "node3"]' in sdn
         assert 'resource "proxmox_sdn_vnet" "demolan"' in sdn

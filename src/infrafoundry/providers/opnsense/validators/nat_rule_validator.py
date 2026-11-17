@@ -587,7 +587,7 @@ def _looks_like_ip_or_cidr(value: str) -> bool:
 
     Handles both v4 and v6, both single-address and CIDR forms. ``strict=False``
     on ``ip_network`` accepts host bits being set in the address portion of a
-    CIDR (e.g., ``172.21.0.5/24``), matching what operators commonly write.
+    CIDR (e.g., ``192.0.2.5/24``), matching what operators commonly write.
     """
     try:
         ipaddress.ip_address(value)

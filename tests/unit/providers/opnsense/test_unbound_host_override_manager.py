@@ -44,7 +44,7 @@ def _resource(
     hostname: str = "web",
     domain: str = "example.com",
     rr: str = "A",
-    server: str = "192.168.1.10",
+    server: str = "192.0.2.10",
     mxprio: str = "",
     mx: str = "",
     lock: bool = False,
@@ -74,7 +74,7 @@ def _live(
     hostname: str = "web",
     domain: str = "example.com",
     rr: str = "A",
-    server: str = "192.168.1.10",
+    server: str = "192.0.2.10",
 ) -> LiveUnboundHostOverride:
     return LiveUnboundHostOverride(
         uuid=uuid,
@@ -101,7 +101,7 @@ def _override(name: str, **overrides: Any) -> UnboundHostOverrideConfig:
         hostname=overrides.get("hostname", "web"),
         domain=overrides.get("domain", "example.com"),
         rr=overrides.get("rr", "A"),
-        server=overrides.get("server", "192.168.1.10"),
+        server=overrides.get("server", "192.0.2.10"),
         description=overrides.get("description", ""),
         enabled=overrides.get("enabled", True),
         mxprio=overrides.get("mxprio", ""),
@@ -402,7 +402,7 @@ class TestGetResourceIds:
         # of each; tuple match keeps them distinct.
         manager = UnboundHostOverrideManager(tmp_path)
         resources = [
-            _resource("web-a", hostname="web", rr="A", server="192.168.1.10"),
+            _resource("web-a", hostname="web", rr="A", server="192.0.2.10"),
             _resource("web-aaaa", hostname="web", rr="AAAA", server="2001:db8::10"),
         ]
         live = [

@@ -86,7 +86,7 @@ vms:
 ansible_vars:
   tailscale_auth_key: "{{ vault_tailscale_auth_key }}"
   tailscale_advertise_routes:
-    - "172.20.100.0/24"
+    - "192.0.2.0/24"
     - "10.0.0.0/8"
 ```
 

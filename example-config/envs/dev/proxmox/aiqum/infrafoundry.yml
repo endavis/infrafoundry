@@ -20,7 +20,7 @@ variables:
   disk_storage: local-lvm
 
   # --- Network ---
-  ip_address: "192.168.1.50"
+  ip_address: "198.51.100.50"
   dhcp_subnet: my-subnet
 
   # --- AIQUM ---

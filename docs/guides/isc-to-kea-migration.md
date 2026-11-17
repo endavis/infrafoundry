@@ -65,14 +65,14 @@ foundry config migrate --env prod --provider opnsense --component isc_to_kea --d
       type: kea_subnet
       name: lan-dhcp
       config:
-        cidr: 172.21.0.0/24
-        gateway: 172.21.0.1
+        cidr: 192.0.2.0/24
+        gateway: 192.0.2.1
         pools:
-          - start: 172.21.0.10
-            end: 172.21.0.200
+          - start: 192.0.2.10
+            end: 192.0.2.200
         reservations:
           - mac: "AA:BB:CC:DD:EE:FF"
-            ip: 172.21.0.50
+            ip: 192.0.2.50
             hostname: host-01
   ```
 

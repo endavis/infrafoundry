@@ -42,7 +42,7 @@ class TestBackendValidation:
         """Valid NFS backend should not trigger an error."""
         validator.validate(
             ProxmoxConfigContext(
-                storage=[_storage(backend="nfs", server="192.168.1.1", export="/export/vol2")]
+                storage=[_storage(backend="nfs", server="192.0.2.1", export="/export/vol2")]
             )
         )
         # Only the CIFS username warning should NOT be present; no errors
@@ -56,7 +56,7 @@ class TestBackendValidation:
                 storage=[
                     _storage(
                         backend="cifs",
-                        server="192.168.1.1",
+                        server="192.0.2.1",
                         share="backups",
                         username="admin",
                     )
@@ -106,7 +106,7 @@ class TestNFSValidation:
     def test_missing_export(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """NFS without export should trigger an error."""
         validator.validate(
-            ProxmoxConfigContext(storage=[_storage(backend="nfs", server="192.168.1.1")])
+            ProxmoxConfigContext(storage=[_storage(backend="nfs", server="192.0.2.1")])
         )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("export" in c["message"] for c in error_calls)
@@ -115,7 +115,7 @@ class TestNFSValidation:
         """Valid NFS config should not trigger errors."""
         validator.validate(
             ProxmoxConfigContext(
-                storage=[_storage(backend="nfs", server="192.168.1.1", export="/export/vol2")]
+                storage=[_storage(backend="nfs", server="192.0.2.1", export="/export/vol2")]
             )
         )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
@@ -136,7 +136,7 @@ class TestCIFSValidation:
     def test_missing_share(self, validator: StorageConfigValidator, report: MagicMock) -> None:
         """CIFS without share should trigger an error."""
         validator.validate(
-            ProxmoxConfigContext(storage=[_storage(backend="cifs", server="192.168.1.1")])
+            ProxmoxConfigContext(storage=[_storage(backend="cifs", server="192.0.2.1")])
         )
         error_calls = [c[1] for c in report.add_check.call_args_list if c[1].get("passed") is False]
         assert any("share" in c["message"] for c in error_calls)
@@ -147,7 +147,7 @@ class TestCIFSValidation:
         """CIFS without username should trigger a warning."""
         validator.validate(
             ProxmoxConfigContext(
-                storage=[_storage(backend="cifs", server="192.168.1.1", share="backups")]
+                storage=[_storage(backend="cifs", server="192.0.2.1", share="backups")]
             )
         )
         warning_calls = [
@@ -167,7 +167,7 @@ class TestCIFSValidation:
                 storage=[
                     _storage(
                         backend="cifs",
-                        server="192.168.1.1",
+                        server="192.0.2.1",
                         share="backups",
                         username="admin",
                     )
@@ -188,7 +188,7 @@ class TestCIFSValidation:
                 storage=[
                     _storage(
                         backend="cifs",
-                        server="192.168.1.1",
+                        server="192.0.2.1",
                         share="backups",
                         username="admin",
                     )

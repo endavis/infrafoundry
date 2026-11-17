@@ -317,7 +317,7 @@ class TestContentHost:
     def test_network_cidr_passes(self, validator: AliasValidator, report: ValidationReport) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                aliases=[_alias("ok", type="network", content=["10.0.0.0/8"])]
+                aliases=[_alias("ok", type="network", content=["192.0.2.0/24"])]
             )
         )
         assert not _failures(report, "alias_ok_content_0")

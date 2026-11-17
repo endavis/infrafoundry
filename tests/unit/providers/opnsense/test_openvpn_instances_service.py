@@ -113,7 +113,7 @@ class TestParser:
             {"enabled": "yes"},
             {"remote": []},
             {"remote": [1]},
-            {"route": "10.0.0.0/8"},
+            {"route": "192.0.2.0/24"},
             {"route": ["a,b"]},
             {"lock": "x"},
             {"update_password": "x"},

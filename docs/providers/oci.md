@@ -85,7 +85,7 @@ envs/prod/oci/
 ```yaml
 vcn:
   - name: my-vcn
-    cidr_block: "172.21.0.0/16"
+    cidr_block: "192.0.2.0/24"
     dns_label: "myvcn"              # optional, max 15 chars
     internet_gateway: true           # creates IGW + public route table
     security_list:                   # optional
@@ -114,7 +114,7 @@ vcn:
 subnet:
   - name: public-subnet
     vcn: my-vcn                     # references a VCN by name
-    cidr_block: "172.21.0.0/24"
+    cidr_block: "192.0.2.0/25"
     dns_label: "public"
     public: true                    # allow public IPs
 ```

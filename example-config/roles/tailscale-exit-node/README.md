@@ -141,7 +141,7 @@ vms:
     clone: ubuntu-22-04-template
     cores: 2
     memory: 2048
-    ipconfig: ip=172.20.100.20/24,gw=172.20.100.1
+    ipconfig: ip=192.0.2.20/24,gw=192.0.2.1
 
     ansible_roles:
       - common
@@ -162,7 +162,7 @@ vms:
     clone: ubuntu-22-04-template
     cores: 2
     memory: 2048
-    ipconfig: ip=172.20.100.20/24,gw=172.20.100.1
+    ipconfig: ip=192.0.2.20/24,gw=192.0.2.1
 
     ansible_roles:
       - tailscale-exit-node
@@ -183,7 +183,7 @@ Route specific subnets through this exit node:
 ansible_vars:
   tailscale_auth_key: "{{ vault_tailscale_auth_key }}"
   tailscale_advertise_routes:
-    - "172.20.100.0/24"  # Local LAN
+    - "192.0.2.0/24"  # Local LAN
     - "10.0.0.0/8"        # Internal network
 ```
 

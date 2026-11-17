@@ -51,7 +51,7 @@ class TestProxmoxTemplates:
                 "memory": 8192,
                 "disk": {"size": "50G", "type": "scsi", "storage": "local-lvm"},
                 "network": {"model": "virtio", "bridge": "vmbr0", "tag": 100},
-                "ipconfig": "ip=192.168.1.10/24,gw=192.168.1.1",
+                "ipconfig": "ip=192.0.2.10/24,gw=192.0.2.1",
                 "onboot": True,
                 "agent": 1,
                 "tags": ["web", "production"],
@@ -138,7 +138,7 @@ class TestProxmoxTemplates:
         assert "100" in content  # VLAN ID
 
         # Check IP configuration and startup flags
-        assert "192.168.1.10" in content
+        assert "192.0.2.10" in content
         assert "boot" in content  # on_boot keyword
         assert "agent" in content
 
@@ -411,7 +411,7 @@ class TestOPNsenseTemplates:
             config={
                 "name": "web-servers",
                 "type": "host",
-                "content": ["192.168.1.10", "192.168.1.11"],
+                "content": ["192.0.2.10", "192.0.2.11"],
                 "description": "Production web servers",
             },
         )

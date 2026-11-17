@@ -333,7 +333,7 @@ class TestFieldTypes:
     ) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                assignments=[_resource("lan", ipv4={"mode": "static", "address": "172.21.0.1/24"})],
+                assignments=[_resource("lan", ipv4={"mode": "static", "address": "192.0.2.1/24"})],
                 vlan_names=set(),
                 existing_interfaces={"vtnet1": {}},
             )

@@ -45,7 +45,7 @@ def _one_to_one_resource(name: str, *, lock: bool = False) -> ResourceConfig:
         "kind": "one_to_one",
         "interface": "wan",
         "external": "198.51.100.10",
-        "source_net": "172.21.0.10",
+        "source_net": "192.0.2.10",
     }
     if lock:
         config["lock"] = True
@@ -56,7 +56,7 @@ def _port_forward_resource(name: str, *, lock: bool = False) -> ResourceConfig:
     config: dict[str, Any] = {
         "kind": "port_forward",
         "interface": "wan",
-        "target": "172.21.0.10",
+        "target": "192.0.2.10",
         "local_port": "8080",
         "description": f"{name} desc",
     }
@@ -218,7 +218,7 @@ class TestApply:
                     name="b",
                     kind="port_forward",
                     interface="wan",
-                    target="172.21.0.10",
+                    target="192.0.2.10",
                     local_port="8080",
                 ),
             ]

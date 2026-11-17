@@ -26,16 +26,16 @@ variables:
   disk_storage: local-lvm
 
   # --- Proxmox hosts (for serial console access) ---
-  node1_host: "192.168.1.10"
-  node2_host: "192.168.1.11"
+  node1_host: "198.51.100.10"
+  node2_host: "198.51.100.11"
 
   # --- Cluster ---
   cluster_name: ontap-sim
   cluster_mgmt_ip: "192.0.2.220"
-  cluster_mgmt_gateway: "192.168.1.1"
+  cluster_mgmt_gateway: "198.51.100.1"
   node01_mgmt_ip: "192.0.2.221"
-  node02_mgmt_ip: "192.168.1.222"
-  node_mgmt_gateway: "192.168.1.1"
+  node02_mgmt_ip: "198.51.100.222"
+  node_mgmt_gateway: "198.51.100.1"
   ontap_password: "changeme123"
   dns_domain: "lab.local"
 
@@ -48,7 +48,7 @@ variables:
 
   # --- NFS Export Policy ---
   nfs_export_policy: nfs_data
-  nfs_client_match: "192.168.1.0/24"
+  nfs_client_match: "198.51.100.0/24"
 
   # --- Volumes ---
   nfs_vol_name: NFS_VOL
@@ -57,10 +57,10 @@ variables:
   cifs_vol_aggregate: aggr1_node02
 
   # --- DNS & NTP ---
-  dns_nameserver: "192.168.1.1"
-  ntp_server: "192.168.1.1"
+  dns_nameserver: "198.51.100.1"
+  ntp_server: "198.51.100.1"
 
   # --- DHCP ---
   dhcp_subnet: my-subnet
   node01_ip: "192.0.2.221"
-  node02_ip: "192.168.1.222"
+  node02_ip: "198.51.100.222"

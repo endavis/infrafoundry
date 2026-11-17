@@ -209,10 +209,10 @@ class TestPayloadShape:
         assert "ipv6Track" not in assign
 
     def test_static_ipv4_payload(self) -> None:
-        cfg = _cfg(ipv4_type="static", ipv4_address="172.21.0.1", ipv4_subnet=24)
+        cfg = _cfg(ipv4_type="static", ipv4_address="192.0.2.1", ipv4_subnet=24)
         assign = cfg.to_payload()["assign"]
         assert assign["ipv4Type"] == "static"
-        assert assign["ipv4Address"] == "172.21.0.1"
+        assert assign["ipv4Address"] == "192.0.2.1"
         assert assign["ipv4Subnet"] == 24
 
     def test_track_ipv6_payload(self) -> None:
@@ -261,12 +261,12 @@ class TestConfigsFromResources:
                 _resource(
                     "opt5",
                     device="em0",
-                    ipv4={"type": "static", "address": "172.21.0.1", "subnet": 24},
+                    ipv4={"type": "static", "address": "192.0.2.1", "subnet": 24},
                 )
             ]
         )
         assert result[0].ipv4_type == "static"
-        assert result[0].ipv4_address == "172.21.0.1"
+        assert result[0].ipv4_address == "192.0.2.1"
         assert result[0].ipv4_subnet == 24
 
     def test_typed_ipv6_track_parses(self) -> None:
@@ -302,7 +302,7 @@ class TestConfigsFromResources:
                 _resource(
                     "opt5",
                     device="em0",
-                    ipv4={"type": "static", "address": "172.21.0.1", "subnet": 24},
+                    ipv4={"type": "static", "address": "192.0.2.1", "subnet": 24},
                     ipv6={"type": "track-interface", "track": "wan"},
                 )
             ]
@@ -393,7 +393,7 @@ class TestConfigsFromResources:
             interface_assignment_configs_from_resources([bad])
 
     def test_ipv4_subnet_out_of_range(self) -> None:
-        bad = _resource("opt5", ipv4={"type": "static", "address": "172.21.0.1", "subnet": 64})
+        bad = _resource("opt5", ipv4={"type": "static", "address": "192.0.2.1", "subnet": 64})
         with pytest.raises(ValueError, match="out of range 1-32"):
             interface_assignment_configs_from_resources([bad])
 
@@ -403,7 +403,7 @@ class TestConfigsFromResources:
             interface_assignment_configs_from_resources([bad])
 
     def test_ipv4_address_with_dhcp_rejected(self) -> None:
-        bad = _resource("opt5", ipv4={"type": "dhcp", "address": "172.21.0.1"})
+        bad = _resource("opt5", ipv4={"type": "dhcp", "address": "192.0.2.1"})
         with pytest.raises(ValueError, match=r"only valid"):
             interface_assignment_configs_from_resources([bad])
 
@@ -481,13 +481,13 @@ class TestRowToLiveAssignment:
             device="vtnet1",
             description="LAN",
             is_physical=True,
-            ipv4={"ipaddr": "172.21.0.1", "subnet": "24"},
+            ipv4={"ipaddr": "192.0.2.1", "subnet": "24"},
             mtu=1500,
         )
         live = _row_to_live_assignment(row)
         assert live.identifier == "lan"
         assert live.device == "vtnet1"
-        assert live.ipv4["ipaddr"] == "172.21.0.1"
+        assert live.ipv4["ipaddr"] == "192.0.2.1"
         assert live.mtu == 1500
 
     def test_string_mtu_coerced(self) -> None:
@@ -722,27 +722,27 @@ class TestNeedsUpdate:
 
     def test_ipv4_type_change_none_to_static(self) -> None:
         live = _live()  # ipv4 = {}
-        want = _cfg(ipv4_type="static", ipv4_address="172.21.0.1", ipv4_subnet=24)
+        want = _cfg(ipv4_type="static", ipv4_address="192.0.2.1", ipv4_subnet=24)
         assert _needs_update(live, want) is True
 
     def test_ipv4_type_change_dhcp_to_static(self) -> None:
         live = _live(ipv4={"ipaddr": "dhcp"})
-        want = _cfg(ipv4_type="static", ipv4_address="172.21.0.1", ipv4_subnet=24)
+        want = _cfg(ipv4_type="static", ipv4_address="192.0.2.1", ipv4_subnet=24)
         assert _needs_update(live, want) is True
 
     def test_ipv4_type_change_static_to_dhcp(self) -> None:
-        live = _live(ipv4={"ipaddr": "172.21.0.1", "subnet": "24"})
+        live = _live(ipv4={"ipaddr": "192.0.2.1", "subnet": "24"})
         want = _cfg(ipv4_type="dhcp")
         assert _needs_update(live, want) is True
 
     def test_ipv4_address_change(self) -> None:
-        live = _live(ipv4={"ipaddr": "172.21.0.1", "subnet": "24"})
-        want = _cfg(ipv4_type="static", ipv4_address="172.21.0.2", ipv4_subnet=24)
+        live = _live(ipv4={"ipaddr": "192.0.2.1", "subnet": "24"})
+        want = _cfg(ipv4_type="static", ipv4_address="192.0.2.2", ipv4_subnet=24)
         assert _needs_update(live, want) is True
 
     def test_ipv4_subnet_change(self) -> None:
-        live = _live(ipv4={"ipaddr": "172.21.0.1", "subnet": "24"})
-        want = _cfg(ipv4_type="static", ipv4_address="172.21.0.1", ipv4_subnet=28)
+        live = _live(ipv4={"ipaddr": "192.0.2.1", "subnet": "24"})
+        want = _cfg(ipv4_type="static", ipv4_address="192.0.2.1", ipv4_subnet=28)
         assert _needs_update(live, want) is True
 
     def test_ipv6_type_change_none_to_track(self) -> None:
@@ -775,13 +775,13 @@ class TestNeedsUpdate:
         # and confirm _needs_update reports no change. Closes the
         # gap explicitly flagged in the spike's docstring.
         live = _live(
-            ipv4={"ipaddr": "172.21.0.1", "subnet": "24"},
+            ipv4={"ipaddr": "192.0.2.1", "subnet": "24"},
             ipv6={"ipaddrv6": "track6", "track6-interface": "wan"},
         )
         # Manually construct `want` to mirror the live state exactly.
         want = _cfg(
             ipv4_type="static",
-            ipv4_address="172.21.0.1",
+            ipv4_address="192.0.2.1",
             ipv4_subnet=24,
             ipv6_type="track-interface",
             ipv6_track="wan",
@@ -810,10 +810,10 @@ class TestNeedsUpdate:
 
 class TestParseLiveToConfig:
     def test_static_v4_only(self) -> None:
-        live = _live(ipv4={"ipaddr": "172.21.0.1", "subnet": "24"})
+        live = _live(ipv4={"ipaddr": "192.0.2.1", "subnet": "24"})
         cfg = _parse_live_to_config(live)
         assert cfg.ipv4_type == "static"
-        assert cfg.ipv4_address == "172.21.0.1"
+        assert cfg.ipv4_address == "192.0.2.1"
         assert cfg.ipv4_subnet == 24
         assert cfg.ipv6_type == "none"
 
@@ -827,7 +827,7 @@ class TestParseLiveToConfig:
 
     def test_dual_stack(self) -> None:
         live = _live(
-            ipv4={"ipaddr": "172.21.0.1", "subnet": "24"},
+            ipv4={"ipaddr": "192.0.2.1", "subnet": "24"},
             ipv6={"ipaddrv6": "fd00::1", "subnetv6": "64"},
         )
         cfg = _parse_live_to_config(live)
@@ -874,7 +874,7 @@ class TestParseLiveToConfig:
             _parse_live_to_config(live)
 
     def test_static_v4_missing_subnet_raises(self) -> None:
-        live = _live(ipv4={"ipaddr": "172.21.0.1"})
+        live = _live(ipv4={"ipaddr": "192.0.2.1"})
         with pytest.raises(ValueError, match="subnet"):
             _parse_live_to_config(live)
 
@@ -1077,7 +1077,7 @@ class TestExportToYaml:
                     identifier="lan",
                     device="vtnet1",
                     description="LAN",
-                    ipv4={"ipaddr": "172.21.0.1", "subnet": "24"},
+                    ipv4={"ipaddr": "192.0.2.1", "subnet": "24"},
                 ),
                 _row(
                     identifier="wan",

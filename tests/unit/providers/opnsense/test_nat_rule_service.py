@@ -91,7 +91,7 @@ def _one_to_one(
     description: str = "",
     interface: str = "wan",
     external: str = "198.51.100.10",
-    source_net: str = "172.21.0.10",
+    source_net: str = "203.0.113.10",
     destination_net: str = "any",
     sequence: int = 100,
     lock: bool = False,
@@ -117,7 +117,7 @@ def _port_forward(
     name: str,
     *,
     description: str = "",
-    target: str = "172.21.0.10",
+    target: str = "203.0.113.10",
     interface: str = "wan",
     sequence: int = 100,
     lock: bool = False,
@@ -313,7 +313,7 @@ class TestOneToOnePayload:
             description="DMZ srv",
             interface="wan",
             external="198.51.100.42",
-            source_net="10.20.30.40",
+            source_net="192.0.2.40",
             destination_net="any",
             type_="binat",
             natreflection="enable",
@@ -325,7 +325,7 @@ class TestOneToOnePayload:
         assert inner["interface"] == "wan"
         assert inner["type"] == "binat"
         assert inner["external"] == "198.51.100.42"
-        assert inner["source_net"] == "10.20.30.40"
+        assert inner["source_net"] == "192.0.2.40"
         assert inner["destination_net"] == "any"
         assert inner["natreflection"] == "enable"
         assert inner["description"] == "DMZ srv [infrafoundry:dmz]"
@@ -356,13 +356,13 @@ class TestPortForwardPayload:
         # ``source_net`` etc. that outbound and 1:1 use).
         rule = _port_forward(
             "web",
-            source_net="172.21.0.0/24",
+            source_net="203.0.113.0/24",
             source_port="1024:65535",
             destination_net="wanip",
             destination_port="80",
         )
         inner = rule.to_payload()["rule"]
-        assert inner["source.network"] == "172.21.0.0/24"
+        assert inner["source.network"] == "203.0.113.0/24"
         assert inner["source.port"] == "1024:65535"
         assert inner["source.not"] == "0"
         assert inner["destination.network"] == "wanip"
@@ -398,9 +398,9 @@ class TestPortForwardPayload:
     def test_descr_wire_key_carries_identity_tag(self) -> None:
         # DNat schema uses ``descr``, not ``description``. Identity-tag
         # suffix is added at serialization, same as outbound + 1:1.
-        rule = _port_forward("web", description="HTTP -> 172.21.0.10")
+        rule = _port_forward("web", description="HTTP -> 203.0.113.10")
         inner = rule.to_payload()["rule"]
-        assert inner["descr"] == "HTTP -> 172.21.0.10 [infrafoundry:web]"
+        assert inner["descr"] == "HTTP -> 203.0.113.10 [infrafoundry:web]"
         assert "description" not in inner
 
     def test_empty_description_yields_tag_only_in_descr(self) -> None:
@@ -648,7 +648,7 @@ class TestPortForwardDiff:
         assert diff.adds[0].kind == "port_forward"
 
     def test_no_update_when_port_forward_payload_matches(self) -> None:
-        rule = _port_forward("web", target="172.21.0.10", interface="wan", local_port="8080")
+        rule = _port_forward("web", target="203.0.113.10", interface="wan", local_port="8080")
         payload_inner = rule.to_payload()["rule"]
         live_raw: dict[str, Any] = {"uuid": "u1", **payload_inner}
         live = LiveNATRule(
@@ -662,7 +662,7 @@ class TestPortForwardDiff:
         assert diff.is_empty
 
     def test_update_when_port_forward_target_changes(self) -> None:
-        rule_have = _port_forward("web", target="172.21.0.10", local_port="8080")
+        rule_have = _port_forward("web", target="203.0.113.10", local_port="8080")
         live_raw = {"uuid": "u1", **rule_have.to_payload()["rule"]}
         live = LiveNATRule(
             uuid="u1",
@@ -671,12 +671,12 @@ class TestPortForwardDiff:
             description="",
             raw=live_raw,
         )
-        rule_want = _port_forward("web", target="172.21.0.99", local_port="8080")
+        rule_want = _port_forward("web", target="203.0.113.99", local_port="8080")
         diff = compute_diff([rule_want], [live])
         assert len(diff.updates) == 1
         live_record, want = diff.updates[0]
         assert live_record.uuid == "u1"
-        assert want.target == "172.21.0.99"
+        assert want.target == "203.0.113.99"
 
     def test_managed_port_forward_with_no_desired_is_deleted(self) -> None:
         live = _live("u1", "stale", "port_forward")
@@ -702,7 +702,7 @@ class TestPortForwardDiff:
             "u1",
             "ssh-fwd",
             "port_forward",
-            raw_overrides={"target": "172.21.0.5", "interface": "wan"},
+            raw_overrides={"target": "203.0.113.5", "interface": "wan"},
         )
         rule = _port_forward("ssh-fwd", target="changed", lock=True)
         diff = compute_diff([rule], [live])
@@ -797,7 +797,7 @@ class TestConfigsFromResourcesOneToOne:
                 "kind": "one_to_one",
                 "interface": "wan",
                 "external": "198.51.100.10",
-                "source_net": "172.21.0.10",
+                "source_net": "203.0.113.10",
             },
         )
         result = nat_rule_configs_from_resources([r])
@@ -847,24 +847,24 @@ class TestConfigsFromResourcesPortForward:
             {
                 "kind": "port_forward",
                 "interface": "wan",
-                "target": "172.21.0.10",
+                "target": "203.0.113.10",
                 "local_port": "8080",
                 "destination_net": "wanip",
                 "destination_port": "80",
                 "protocol": "tcp",
-                "description": "HTTP -> 172.21.0.10",
+                "description": "HTTP -> 203.0.113.10",
             },
         )
         result = nat_rule_configs_from_resources([r])
         assert len(result) == 1
         cfg = result[0]
         assert cfg.kind == "port_forward"
-        assert cfg.target == "172.21.0.10"
+        assert cfg.target == "203.0.113.10"
         assert cfg.local_port == "8080"
         assert cfg.destination_net == "wanip"
         assert cfg.destination_port == "80"
         assert cfg.protocol == "tcp"
-        assert cfg.description == "HTTP -> 172.21.0.10"
+        assert cfg.description == "HTTP -> 203.0.113.10"
 
     def test_port_forward_missing_target_rejected(self) -> None:
         r = _resource("bad", {"kind": "port_forward", "interface": "wan"})
@@ -876,7 +876,7 @@ class TestConfigsFromResourcesPortForward:
             "bad",
             {
                 "kind": "port_forward",
-                "target": "172.21.0.10",
+                "target": "203.0.113.10",
             },
         )
         with pytest.raises(ValueError, match="interface"):
@@ -888,7 +888,7 @@ class TestConfigsFromResourcesPortForward:
             {
                 "kind": "port_forward",
                 "interface": "wan",
-                "target": "172.21.0.10",
+                "target": "203.0.113.10",
                 "pass_action": "invalid",
             },
         )
@@ -901,7 +901,7 @@ class TestConfigsFromResourcesPortForward:
             {
                 "kind": "port_forward",
                 "interface": "wan",
-                "target": "172.21.0.10",
+                "target": "203.0.113.10",
                 "poolopts": "not-an-algorithm",
             },
         )
@@ -916,7 +916,7 @@ class TestConfigsFromResourcesPortForward:
             {
                 "kind": "port_forward",
                 "interface": "wan",
-                "target": "172.21.0.10",
+                "target": "203.0.113.10",
                 "natreflection": "enable",
             },
         )
@@ -930,7 +930,7 @@ class TestConfigsFromResourcesPortForward:
             {
                 "kind": "port_forward",
                 "interface": "wan",
-                "target": "172.21.0.10",
+                "target": "203.0.113.10",
                 "natreflection": "purenat",
             },
         )
@@ -943,7 +943,7 @@ class TestConfigsFromResourcesPortForward:
             {
                 "kind": "port_forward",
                 "interface": "wan",
-                "target": "172.21.0.10",
+                "target": "203.0.113.10",
                 "pass_action": "pass",
             },
         )
@@ -956,7 +956,7 @@ class TestConfigsFromResourcesPortForward:
             {
                 "kind": "port_forward",
                 "interface": "wan",
-                "target": "172.21.0.10",
+                "target": "203.0.113.10",
                 "nordr": "true",  # string, not bool
             },
         )
@@ -1633,7 +1633,7 @@ class TestExportToYaml:
                         "uuid": "u4",
                         "descr": "Web fwd [infrafoundry:web-fwd]",
                         "interface": "wan",
-                        "target": "172.21.0.10",
+                        "target": "203.0.113.10",
                         "local-port": "8080",
                         "disabled": "0",
                         "source.network": "any",

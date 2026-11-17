@@ -32,14 +32,14 @@ def _reservation(name: str, hostname: str, ip: str) -> ResourceConfig:
 class TestHostsToForget:
     def test_vm_name_and_its_reservation_ip(self) -> None:
         vm = _vm("k3s-server")
-        everything = [vm, _reservation("k3s-server-dhcp", "k3s-server", "10.0.1.10")]
+        everything = [vm, _reservation("k3s-server-dhcp", "k3s-server", "192.0.2.10")]
 
-        assert hosts_to_forget([vm], everything) == {JUMP: ["k3s-server", "10.0.1.10"]}
+        assert hosts_to_forget([vm], everything) == {JUMP: ["k3s-server", "192.0.2.10"]}
 
     def test_package_without_jumphost_is_skipped(self) -> None:
         vm = _vm("plain", jumphost="")
 
-        assert hosts_to_forget([vm], [vm, _reservation("plain", "plain", "10.0.1.11")]) == {}
+        assert hosts_to_forget([vm], [vm, _reservation("plain", "plain", "192.0.2.11")]) == {}
 
     def test_no_matching_reservation_gives_the_name_only(self) -> None:
         vm = _vm("oci-node")
@@ -49,10 +49,10 @@ class TestHostsToForget:
     def test_entries_are_deduplicated_across_resources(self) -> None:
         """aiqum names its reservation after the VM, so both may be destroyed."""
         vm = _vm("aiqum")
-        reservation = _reservation("aiqum", "aiqum", "10.0.1.12")
+        reservation = _reservation("aiqum", "aiqum", "192.0.2.12")
 
         assert hosts_to_forget([vm, reservation], [vm, reservation]) == {
-            JUMP: ["aiqum", "10.0.1.12"]
+            JUMP: ["aiqum", "192.0.2.12"]
         }
 
     def test_each_jumphost_gets_its_own_list(self) -> None:
@@ -80,13 +80,13 @@ class TestForgetOnJumphost:
     def test_one_ssh_call_removes_every_host(self) -> None:
         run = _Run()
 
-        assert forget_on_jumphost(JUMP, ["vm1", "10.0.1.10"], run=run) is None
+        assert forget_on_jumphost(JUMP, ["vm1", "192.0.2.10"], run=run) is None
 
         assert run.argv[0] == "ssh"
         assert "BatchMode=yes" in run.argv
         assert run.argv[-2] == JUMP
         assert "ssh-keygen -R vm1 " in run.argv[-1]
-        assert "ssh-keygen -R 10.0.1.10 " in run.argv[-1]
+        assert "ssh-keygen -R 192.0.2.10 " in run.argv[-1]
 
     def test_hosts_are_shell_quoted(self) -> None:
         run = _Run()

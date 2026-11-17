@@ -10,10 +10,10 @@ vms:
     clone: ubuntu-22-04-template
     cores: 2
     memory: 4096
-    ipconfig: ip=172.20.100.10/24,gw=172.20.100.1
+    ipconfig: ip=192.0.2.10/24,gw=192.0.2.1
     ssh_user: ubuntu
     tags: [ansible, webserver]
-    
+
     ansible_roles:
       - common
       - webserver
@@ -27,14 +27,14 @@ vms:
     clone: ubuntu-22-04-template
     cores: 4
     memory: 8192
-    ipconfig: ip=172.20.100.11/24,gw=172.20.100.1
+    ipconfig: ip=192.0.2.11/24,gw=192.0.2.1
     ssh_user: ubuntu
     tags: [ansible, database]
 
     ansible_roles:
       - common
       - database
-    
+
     ansible_tasks:
       - name: Create application database
         module: postgresql_db
@@ -54,7 +54,7 @@ vms:
     clone: ubuntu-22-04-template
     cores: 2
     memory: 4096
-    ipconfig: ip=172.20.100.12/24,gw=172.20.100.1
+    ipconfig: ip=192.0.2.12/24,gw=192.0.2.1
     ssh_user: ubuntu
     tags: [ansible, app]
 
@@ -62,7 +62,7 @@ vms:
       - common
       - nodejs
       - nginx
-    
+
     ansible_vars:
       nodejs_version: "18.x"
       app_port: 3000

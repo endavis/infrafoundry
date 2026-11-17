@@ -455,7 +455,7 @@ class TestNetReferences:
     ) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                firewall_rules=[_rule("ok", source_net="172.21.0.1")],
+                firewall_rules=[_rule("ok", source_net="198.51.100.1")],
                 alias_names=set(),
                 interface_assignment_names=set(),
                 gateway_names=set(),
@@ -471,7 +471,7 @@ class TestNetReferences:
     ) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                firewall_rules=[_rule("ok", destination_net="172.21.0.0/24")],
+                firewall_rules=[_rule("ok", destination_net="198.51.100.0/24")],
                 alias_names=set(),
                 interface_assignment_names=set(),
                 gateway_names=set(),

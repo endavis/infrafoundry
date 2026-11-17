@@ -90,7 +90,7 @@ class AssignSettingsController extends ApiControllerBase
      *     "enable": true,                // Optional: defaults to false (disabled)
      *     "spoofMac": "00:11:...",       // Optional
      *     "ipv4Type": "static",          // Optional: "static"|"dhcp"|"none"; defaults "none"
-     *     "ipv4Address": "10.1.2.3",     // Required if ipv4Type is "static"
+     *     "ipv4Address": "192.0.2.3",     // Required if ipv4Type is "static"
      *     "ipv4Subnet": 24,              // Required if ipv4Type is "static"
      *     "ipv6Type": "track-interface", // Optional: "static"|"dhcp"|"track-interface"|"none"
      *     "ipv6Address": "fd00:...",     // Required if ipv6Type is "static"

@@ -38,7 +38,7 @@ TAILNET="${INFRAFOUNDRY_VAR_tailnet:-}"
 K3S_VERSION="${INFRAFOUNDRY_VAR_k3s_version:-}"
 K3S_SERVER_ARGS="${INFRAFOUNDRY_VAR_k3s_server_args:-}"
 K3S_OCI_FIREWALL_FIX="${INFRAFOUNDRY_VAR_k3s_oci_firewall_fix:-true}"
-K3S_VCN_CIDR="${INFRAFOUNDRY_VAR_vcn_cidr:-172.21.0.0/16}"
+K3S_VCN_CIDR="${INFRAFOUNDRY_VAR_vcn_cidr:-192.0.2.0/24}"
 KUBECONFIG_LOCAL=$(eval echo "${INFRAFOUNDRY_VAR_kubeconfig_local_path}")
 
 # --- Read worker list from the JSON-serialized package vars via python3 ---

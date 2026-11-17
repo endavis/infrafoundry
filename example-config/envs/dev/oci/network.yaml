@@ -3,7 +3,7 @@
 
 vcn:
   - name: dev-vcn
-    cidr_block: "172.21.0.0/16"
+    cidr_block: "192.0.2.0/24"
     dns_label: "devvcn"
     internet_gateway: true
     security_list:
@@ -30,7 +30,7 @@ vcn:
             min: 443
             max: 443
         # Kubernetes API
-        - source: "172.21.0.0/16"
+        - source: "192.0.2.0/24"
           protocol: "6"
           tcp_options:
             min: 6443
@@ -39,12 +39,12 @@ vcn:
 subnet:
   - name: public-subnet
     vcn: dev-vcn
-    cidr_block: "172.21.0.0/24"
+    cidr_block: "192.0.2.0/25"
     dns_label: "public"
     public: true
 
   - name: private-subnet
     vcn: dev-vcn
-    cidr_block: "10.0.1.0/24"
+    cidr_block: "198.51.100.0/24"
     dns_label: "private"
     public: false

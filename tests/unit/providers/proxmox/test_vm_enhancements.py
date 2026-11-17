@@ -215,7 +215,7 @@ class TestISOBoot:
         vms = [
             _make_vm(
                 iso="local:iso/ubuntu-24.04.iso",
-                ipconfig="ip=192.168.1.10/24,gw=192.168.1.1",
+                ipconfig="ip=192.0.2.10/24,gw=192.0.2.1",
                 ssh_user="ubuntu",
             )
         ]

@@ -34,7 +34,7 @@ def _resource(
     *,
     type: str = "forward",
     domain: str = "",
-    server: str = "172.21.0.53",
+    server: str = "192.0.2.53",
     port: int | str = 53,
     lock: bool = False,
 ) -> ResourceConfig:
@@ -55,7 +55,7 @@ def _live(
     *,
     type: str = "forward",
     domain: str = "",
-    server: str = "172.21.0.53",
+    server: str = "192.0.2.53",
     port: str = "53",
 ) -> LiveUnboundForward:
     return LiveUnboundForward(
@@ -84,7 +84,7 @@ def _forward(name: str, **overrides: Any) -> UnboundForwardConfig:
         name=name,
         type=overrides.get("type", "forward"),
         domain=overrides.get("domain", ""),
-        server=overrides.get("server", "172.21.0.53"),
+        server=overrides.get("server", "192.0.2.53"),
         port=overrides.get("port", "53"),
         enabled=overrides.get("enabled", True),
     )
@@ -193,7 +193,7 @@ class TestApply:
     def test_apply_emits_delete_outcome_with_synthetic_name(self, tmp_path: Path) -> None:
         manager = UnboundForwardManager(tmp_path)
         resources: list[ResourceConfig] = []
-        live = _live("u1", type="forward", domain="x.example", server="172.21.0.99", port="53")
+        live = _live("u1", type="forward", domain="x.example", server="192.0.2.99", port="53")
         diff = Diff(deletes=[live])
         service_mock = _make_service_mock(
             diff=diff, apply_counts={"created": 0, "updated": 0, "deleted": 1}
@@ -204,10 +204,10 @@ class TestApply:
         outcomes = result["resource_outcomes"]
         assert len(outcomes) == 1
         assert outcomes[0].action == "delete"
-        assert outcomes[0].resource_name == "forward-forward-x-example-172-21-0-99-53"
+        assert outcomes[0].resource_name == "forward-forward-x-example-192-0-2-99-53"
         assert (
             outcomes[0].address
-            == "opnsense_unbound_forward.forward-forward-x-example-172-21-0-99-53"
+            == "opnsense_unbound_forward.forward-forward-x-example-192-0-2-99-53"
         )
 
     def test_apply_threads_add_only(self, tmp_path: Path) -> None:
@@ -263,10 +263,10 @@ class TestDestroy:
 
     def test_destroy_matches_by_natural_key(self, tmp_path: Path) -> None:
         manager = UnboundForwardManager(tmp_path)
-        resources = [_resource("foo", server="172.21.0.53")]
+        resources = [_resource("foo", server="192.0.2.53")]
         live = [
-            _live("u1", server="172.21.0.53"),
-            _live("u2", server="172.21.0.99"),
+            _live("u1", server="192.0.2.53"),
+            _live("u2", server="192.0.2.99"),
         ]
         service_mock = _make_service_mock(live=live)
         with patch(SERVICE_PATH) as svc_cls:
@@ -285,12 +285,12 @@ class TestGetResourceIds:
     def test_maps_names_to_uuids_by_tuple(self, tmp_path: Path) -> None:
         manager = UnboundForwardManager(tmp_path)
         resources = [
-            _resource("foo", server="172.21.0.53"),
-            _resource("bar", server="172.21.0.99"),
+            _resource("foo", server="192.0.2.53"),
+            _resource("bar", server="192.0.2.99"),
         ]
         live = [
-            _live("u1", server="172.21.0.53"),
-            _live("u2", server="172.21.0.99"),
+            _live("u1", server="192.0.2.53"),
+            _live("u2", server="192.0.2.99"),
         ]
         service_mock = _make_service_mock(live=live)
         with patch(SERVICE_PATH) as svc_cls:
@@ -301,10 +301,10 @@ class TestGetResourceIds:
     def test_omits_resources_with_no_live_match(self, tmp_path: Path) -> None:
         manager = UnboundForwardManager(tmp_path)
         resources = [
-            _resource("foo", server="172.21.0.53"),
-            _resource("missing", server="172.21.0.111"),
+            _resource("foo", server="192.0.2.53"),
+            _resource("missing", server="192.0.2.111"),
         ]
-        live = [_live("u1", server="172.21.0.53")]
+        live = [_live("u1", server="192.0.2.53")]
         service_mock = _make_service_mock(live=live)
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service_mock
@@ -320,7 +320,7 @@ class TestGetResourceIds:
 class TestListAndMigrate:
     def test_list_returns_live_forwards(self, tmp_path: Path) -> None:
         manager = UnboundForwardManager(tmp_path)
-        live = [_live("u1"), _live("u2", server="172.21.0.99")]
+        live = [_live("u1"), _live("u2", server="192.0.2.99")]
         service_mock = _make_service_mock(live=live)
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service_mock

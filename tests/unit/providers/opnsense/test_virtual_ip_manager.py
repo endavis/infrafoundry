@@ -43,7 +43,7 @@ def _resource(
     *,
     interface: str = "lan",
     mode: str = "ipalias",
-    address: str = "172.21.0.10",
+    address: str = "192.0.2.10",
     network: str = "24",
     lock: bool = False,
     extras: dict[str, Any] | None = None,
@@ -69,7 +69,7 @@ def _live(
     *,
     interface: str = "lan",
     mode: str = "ipalias",
-    address: str = "172.21.0.10",
+    address: str = "192.0.2.10",
     vhid: str = "",
 ) -> LiveVirtualIP:
     return LiveVirtualIP(
@@ -94,7 +94,7 @@ def _vip(name: str, **overrides: Any) -> VirtualIPConfig:
         name=name,
         interface=overrides.get("interface", "lan"),
         mode=overrides.get("mode", "ipalias"),
-        address=overrides.get("address", "172.21.0.10"),
+        address=overrides.get("address", "192.0.2.10"),
         network=overrides.get("network", "24"),
         description=overrides.get("description", ""),
         enabled=overrides.get("enabled", True),
@@ -241,7 +241,7 @@ class TestApply:
     def test_apply_emits_delete_outcome_with_synthetic_name(self, tmp_path: Path) -> None:
         manager = VirtualIPManager(tmp_path)
         resources: list[ResourceConfig] = []
-        live = _live("u1", interface="lan", mode="ipalias", address="172.16.0.10")
+        live = _live("u1", interface="lan", mode="ipalias", address="198.51.100.10")
         diff = Diff(deletes=[live])
         service_mock = _make_service_mock(
             diff=diff, apply_counts={"created": 0, "updated": 0, "deleted": 1}
@@ -256,8 +256,8 @@ class TestApply:
         assert len(outcomes) == 1
         assert outcomes[0].action == "delete"
         # Synthetic ``vip-<mode>-<iface>-<addr>`` form.
-        assert outcomes[0].resource_name == "vip-ipalias-lan-172-16-0-10"
-        assert outcomes[0].address == "opnsense_virtual_ip.vip-ipalias-lan-172-16-0-10"
+        assert outcomes[0].resource_name == "vip-ipalias-lan-198-51-100-10"
+        assert outcomes[0].address == "opnsense_virtual_ip.vip-ipalias-lan-198-51-100-10"
 
     def test_apply_threads_add_only(self, tmp_path: Path) -> None:
         manager = VirtualIPManager(tmp_path)
@@ -332,12 +332,12 @@ class TestGetResourceIds:
     def test_maps_names_to_uuids_by_tuple(self, tmp_path: Path) -> None:
         manager = VirtualIPManager(tmp_path)
         resources = [
-            _resource("foo", address="172.21.0.10"),
-            _resource("bar", address="172.21.0.20"),
+            _resource("foo", address="192.0.2.10"),
+            _resource("bar", address="192.0.2.20"),
         ]
         live = [
-            _live("u1", address="172.21.0.10"),
-            _live("u2", address="172.21.0.20"),
+            _live("u1", address="192.0.2.10"),
+            _live("u2", address="192.0.2.20"),
         ]
         service_mock = _make_service_mock(live=live)
         with (
@@ -351,10 +351,10 @@ class TestGetResourceIds:
     def test_omits_resources_with_no_live_match(self, tmp_path: Path) -> None:
         manager = VirtualIPManager(tmp_path)
         resources = [
-            _resource("foo", address="172.21.0.10"),
-            _resource("missing", address="192.168.0.10"),
+            _resource("foo", address="192.0.2.10"),
+            _resource("missing", address="203.0.113.10"),
         ]
-        live = [_live("u1", address="172.21.0.10")]
+        live = [_live("u1", address="192.0.2.10")]
         service_mock = _make_service_mock(live=live)
         with (
             patch(SERVICE_PATH) as svc_cls,
@@ -373,7 +373,7 @@ class TestGetResourceIds:
 class TestListAndMigrate:
     def test_list_returns_live_vips(self, tmp_path: Path) -> None:
         manager = VirtualIPManager(tmp_path)
-        live = [_live("u1"), _live("u2", address="172.21.0.20")]
+        live = [_live("u1"), _live("u2", address="192.0.2.20")]
         service_mock = _make_service_mock(live=live)
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service_mock
@@ -528,7 +528,7 @@ class TestDeletesOnly:
     def test_deletes_only_drops_adds_and_updates(self, tmp_path: Path) -> None:
         manager = VirtualIPManager(tmp_path)
         live_keep = _live("u-keep")
-        live_gone = _live("u-gone", address="172.16.0.10")
+        live_gone = _live("u-gone", address="198.51.100.10")
         diff = Diff(
             adds=[_vip("new")],
             updates=[(live_keep, _vip("keep"))],

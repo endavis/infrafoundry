@@ -41,7 +41,7 @@ disc: Any = _load()
 
 FULL_VARS: dict[str, Any] = {
     "cluster_name": "lab",
-    "cluster_mgmt_ip": "172.21.0.80",
+    "cluster_mgmt_ip": "192.0.2.80",
     "ontap_password": PASSWORD,
     "console_client_id": "cid",
     "console_client_secret": SECRET,
@@ -160,8 +160,8 @@ def test_choose_one() -> None:
 def test_find_existing_matches_name_or_address() -> None:
     cfg = disc.load_config(FULL_VARS)
     by_name = {"name": "lab", "publicId": "p1"}
-    by_ip = {"name": "other", "ontapClusterProperties": {"clusterAddress": "172.21.0.80"}}
-    other = {"name": "other", "ontapClusterProperties": {"clusterAddress": "172.21.0.81"}}
+    by_ip = {"name": "other", "ontapClusterProperties": {"clusterAddress": "192.0.2.80"}}
+    other = {"name": "other", "ontapClusterProperties": {"clusterAddress": "192.0.2.81"}}
     assert disc.find_existing([other, by_name], cfg) is by_name
     assert disc.find_existing([by_ip], cfg) is by_ip
     assert disc.find_existing([other, {"name": "x", "ontapClusterProperties": None}], cfg) is None
@@ -173,7 +173,7 @@ def test_build_discover_body() -> None:
         "name": "lab",
         "description": "ONTAP cluster lab (added by InfraFoundry)",
         "location": "ON_PREM",
-        "clusterAddress": "172.21.0.80",
+        "clusterAddress": "192.0.2.80",
         "clusterUserName": "admin",
         "clusterPassword": PASSWORD,
         "tenantId": "ws-1",
@@ -183,7 +183,7 @@ def test_build_discover_body() -> None:
 def test_discover_adds_cluster_through_the_agent(fake: FakeConsole) -> None:
     msg = disc.discover(disc.load_config(FULL_VARS))
 
-    assert "added cluster 172.21.0.80" in msg
+    assert "added cluster 192.0.2.80" in msg
     assert "ws-1" in msg
     assert [b["tenantId"] for b in _posts(fake)] == ["ws-1"]
     onprem = [r for r in fake.requests if r[1].startswith("/occm/api/onprem")]
@@ -240,7 +240,7 @@ def _run_script(
 
 
 def test_main_skips_without_inputs() -> None:
-    result = _run_script("http://127.0.0.1:9", {"cluster_mgmt_ip": "172.21.0.80"})
+    result = _run_script("http://127.0.0.1:9", {"cluster_mgmt_ip": "192.0.2.80"})
     assert result.returncode == 0
     assert "skipping" in result.stdout
 
@@ -265,7 +265,7 @@ def test_remove_deletes_matches_by_name_and_address(fake: FakeConsole) -> None:
         {
             "name": "renamed",
             "publicId": "OnPrem-2",
-            "ontapClusterProperties": {"clusterAddress": "172.21.0.80"},
+            "ontapClusterProperties": {"clusterAddress": "192.0.2.80"},
         },
         {"name": "other", "publicId": "OnPrem-3"},
     ]
@@ -294,7 +294,7 @@ def test_remove_with_no_match_makes_no_delete(fake: FakeConsole) -> None:
 
 
 def test_main_remove_skips_without_inputs() -> None:
-    result = _run_script("http://127.0.0.1:9", {"cluster_mgmt_ip": "172.21.0.80"}, "--remove")
+    result = _run_script("http://127.0.0.1:9", {"cluster_mgmt_ip": "192.0.2.80"}, "--remove")
     assert result.returncode == 0
     assert "skipping" in result.stdout
 

@@ -33,14 +33,14 @@ class TestInventoryTemplate:
                 provider="proxmox",
                 config={
                     "name": "ts-vm",
-                    "ipconfig": "ip=192.168.1.100/24",
+                    "ipconfig": "ip=192.0.2.100/24",
                     "ansible_host": custom_host,
                 },
             )
         ]
         content = provider.render_template("proxmox/inventory.yml.j2", {"resources": resources})
         assert custom_host in content
-        assert "192.168.1.100" not in content
+        assert "192.0.2.100" not in content
 
     def test_ansible_host_falls_back_to_ipconfig(self, provider: ProxmoxProvider) -> None:
         """Test ansible_host falls back to ipconfig when not overridden."""
@@ -51,12 +51,12 @@ class TestInventoryTemplate:
                 provider="proxmox",
                 config={
                     "name": "regular-vm",
-                    "ipconfig": "ip=172.21.0.50/24",
+                    "ipconfig": "ip=198.51.100.50/24",
                 },
             )
         ]
         content = provider.render_template("proxmox/inventory.yml.j2", {"resources": resources})
-        assert "172.21.0.50" in content
+        assert "198.51.100.50" in content
 
     def test_ansible_host_no_ipconfig_no_override(self, provider: ProxmoxProvider) -> None:
         """Test CHANGEME fallback when no ansible_host and no ipconfig."""

@@ -33,7 +33,7 @@ from infrafoundry.providers.opnsense.validators.static_route_validator import (
 
 def _route(name: str, **overrides: Any) -> ResourceConfig:
     config: dict[str, Any] = {
-        "network": "172.21.0.0/24",
+        "network": "198.51.100.0/24",
         "gateway": "WAN_DHCP",
     }
     config.update(overrides)
@@ -74,7 +74,7 @@ class TestNetwork:
     ) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                static_routes=[_route("ok", network="172.21.0.0/24")],
+                static_routes=[_route("ok", network="198.51.100.0/24")],
                 managed_gateways=[],
                 gateway_names=set(),
                 existing_gateways={"WAN_DHCP"},
@@ -156,10 +156,10 @@ class TestNetwork:
     def test_host_bits_set_v4_fails(
         self, validator: StaticRouteValidator, report: ValidationReport
     ) -> None:
-        # ``172.21.0.1/24`` has host bits set; ``strict=True`` rejects it.
+        # ``198.51.100.1/24`` has host bits set; ``strict=True`` rejects it.
         validator.validate(
             OPNsenseValidationContext(
-                static_routes=[_route("bad", network="172.21.0.1/24")],
+                static_routes=[_route("bad", network="198.51.100.1/24")],
                 managed_gateways=[],
                 gateway_names=set(),
                 existing_gateways={"WAN_DHCP"},
@@ -234,7 +234,7 @@ class TestGateway:
             name="bad",
             type="routing.static",
             provider="opnsense",
-            config={"network": "172.21.0.0/24"},
+            config={"network": "198.51.100.0/24"},
         )
         validator.validate(
             OPNsenseValidationContext(
@@ -284,7 +284,7 @@ class TestProtocolMatch:
     ) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                static_routes=[_route("ok", network="172.21.0.0/24", gateway="my-wan")],
+                static_routes=[_route("ok", network="198.51.100.0/24", gateway="my-wan")],
                 managed_gateways=[_gw("my-wan", protocol="inet")],
                 gateway_names={"my-wan"},
                 existing_gateways=set(),
@@ -310,7 +310,7 @@ class TestProtocolMatch:
     ) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                static_routes=[_route("bad", network="172.21.0.0/24", gateway="my-wan6")],
+                static_routes=[_route("bad", network="198.51.100.0/24", gateway="my-wan6")],
                 managed_gateways=[_gw("my-wan6", protocol="inet6")],
                 gateway_names={"my-wan6"},
                 existing_gateways=set(),
@@ -337,7 +337,7 @@ class TestProtocolMatch:
         # ``WAN_DHCP6`` is heuristically v6 (trailing ``6``).
         validator.validate(
             OPNsenseValidationContext(
-                static_routes=[_route("bad", network="172.21.0.0/24", gateway="WAN_DHCP6")],
+                static_routes=[_route("bad", network="198.51.100.0/24", gateway="WAN_DHCP6")],
                 managed_gateways=[],
                 gateway_names=set(),
                 existing_gateways={"WAN_DHCP6"},
@@ -364,7 +364,7 @@ class TestProtocolMatch:
     ) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                static_routes=[_route("ok", network="172.21.0.0/24", gateway="WAN_DHCP")],
+                static_routes=[_route("ok", network="198.51.100.0/24", gateway="WAN_DHCP")],
                 managed_gateways=[],
                 gateway_names=set(),
                 existing_gateways={"WAN_DHCP"},
@@ -486,8 +486,8 @@ class TestEdgeCases:
             OPNsenseValidationContext(
                 static_routes=[
                     _route("a"),
-                    _route("b", network="172.16.0.0/24"),
-                    _route("c", network="192.168.0.0/24"),
+                    _route("b", network="203.0.113.0/24"),
+                    _route("c", network="192.0.2.128/25"),
                 ],
                 managed_gateways=[],
                 gateway_names=set(),

@@ -312,7 +312,7 @@ class TestApply:
     ) -> None:
         # WAN-443 / LAN-SSH case: the API host is not where sshd listens.
         provider_settings.update(
-            {"api_url": "https://172.20.99.1", "ssh_host": "172.20.10.250", "ssh_user": "admin"}
+            {"api_url": "https://192.0.2.1", "ssh_host": "198.51.100.250", "ssh_user": "admin"}
         )
         manager = InterfaceAssignmentManager(tmp_path)
         service_mock = _make_service_mock(diff=Diff(adds=[_cfg("opt5")]))
@@ -324,7 +324,7 @@ class TestApply:
             manager.apply("test-env", [_resource("opt5")])
         inst.ensure_installed.assert_called_once()
         target = inst.ensure_installed.call_args.args[0]
-        assert target.host == "172.20.10.250"
+        assert target.host == "198.51.100.250"
         assert target.user == "admin"
 
     def test_apply_ignores_ungated_env_ssh_host(

@@ -71,7 +71,7 @@ def test_example_renders_vm_and_dhcp(loader: PackageLoader) -> None:
         "system/hostname",
     ]
     dhcp = next(r for r in resources if r.type == "kea.dhcp4.reservations")
-    assert dhcp.config["ip_address"] == "192.168.1.51"
+    assert dhcp.config["ip_address"] == "192.0.2.51"
     assert dhcp.config["hostname"] == "console-connector"
 
 
@@ -107,7 +107,7 @@ def test_balloon_is_rendered_when_set(tmp_path: Path) -> None:
               vmid: 230
               target_node: node1
               disk_storage: local-lvm
-              ip_address: "192.168.1.60"
+              ip_address: "192.0.2.60"
               dhcp_subnet: s
               memory: 14336
               balloon: 8192
@@ -140,7 +140,7 @@ def test_missing_required_input_fails(tmp_path: Path) -> None:
               vmid: 230
               target_node: node1
               disk_storage: local-lvm
-              ip_address: "192.168.1.60"
+              ip_address: "192.0.2.60"
               dhcp_subnet: s
             """
         )
@@ -251,7 +251,7 @@ def test_sha256_is_a_required_input(tmp_path: Path) -> None:
               vmid: 230
               target_node: node1
               disk_storage: local-lvm
-              ip_address: "192.168.1.60"
+              ip_address: "192.0.2.60"
               dhcp_subnet: s
               console_agent_url_base: "https://web/cc"
               console_agent_installer: NetApp_Console_Agent_Cloud_v4.0.0

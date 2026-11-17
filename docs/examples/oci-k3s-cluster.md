@@ -26,11 +26,11 @@ This example demonstrates:
 ```
                     ┌─────────────────────────────────────────────────────┐
                     │                    OCI VCN                          │
-                    │                  172.21.0.0/16                        │
+                    │                  192.0.2.0/24                       │
                     │                                                     │
     Internet        │  ┌─────────────────┐    ┌─────────────────────┐    │
         │           │  │  Public Subnet  │    │   Private Subnet    │    │
-        │           │  │   172.21.0.0/24   │    │    10.0.1.0/24      │    │
+        │           │  │   192.0.2.0/25  │    │   198.51.100.0/24   │    │
         ▼           │  │                 │    │                     │    │
    ┌────────┐       │  │ ┌─────────────┐ │    │ ┌─────────────────┐ │    │
    │Internet│◄──────┼──┤ │k3s-control  │ │    │ │  k3s-worker-0   │ │    │
@@ -215,7 +215,7 @@ Variables:
 - `kubeconfig_local_path`: Where to save kubeconfig (default: `~/.kube/k3s-cluster.yaml`)
 - `k3s_version`: Specific version (default: latest)
 - `k3s_server_args`: Additional server arguments
-- `k3s_vcn_cidr`: VCN CIDR for iptables rules (default: `172.21.0.0/16`)
+- `k3s_vcn_cidr`: VCN CIDR for iptables rules (default: `192.0.2.0/24`)
 - `k3s_oci_firewall_fix`: Enable OCI firewall fix (default: `true`)
 
 ### k3s-agent
@@ -230,7 +230,7 @@ Variables:
 - `k3s_control_host`: Inventory name of control plane (required)
 - `k3s_version`: Should match server version
 - `k3s_agent_args`: Additional agent arguments
-- `k3s_vcn_cidr`: VCN CIDR for iptables rules (default: `172.21.0.0/16`)
+- `k3s_vcn_cidr`: VCN CIDR for iptables rules (default: `192.0.2.0/24`)
 - `k3s_oci_firewall_fix`: Enable OCI firewall fix (default: `true`)
 
 ## Resource Usage
@@ -286,7 +286,7 @@ ansible_vars:
 ```bash
 # Check if VXLAN rule exists
 ssh ubuntu@<node> 'sudo iptables -L INPUT -n | grep 8472'
-# Should show: ACCEPT udp -- 172.21.0.0/16 0.0.0.0/0 udp dpt:8472
+# Should show: ACCEPT udp -- 192.0.2.0/24 0.0.0.0/0 udp dpt:8472
 ```
 
 **Fix:** Re-run Ansible to apply iptables rules:

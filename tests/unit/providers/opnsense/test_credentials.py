@@ -484,12 +484,12 @@ class TestResolveSshSettings:
             monkeypatch.delenv(var, raising=False)
 
     def test_host_defaults_to_api_url_host(self) -> None:
-        ssh = resolve_ssh_settings({"api_url": "https://172.20.99.1:8443"})
-        assert ssh == SshSettings(host="172.20.99.1", user="root", port="22", key="")
+        ssh = resolve_ssh_settings({"api_url": "https://192.0.2.1:8443"})
+        assert ssh == SshSettings(host="192.0.2.1", user="root", port="22", key="")
 
     def test_ssh_host_beats_api_url_host(self) -> None:
-        ssh = resolve_ssh_settings({"api_url": "https://172.20.99.1", "ssh_host": "172.20.10.250"})
-        assert ssh.host == "172.20.10.250"
+        ssh = resolve_ssh_settings({"api_url": "https://192.0.2.1", "ssh_host": "198.51.100.250"})
+        assert ssh.host == "198.51.100.250"
 
     def test_user_port_key_from_settings(self) -> None:
         ssh = resolve_ssh_settings(
@@ -524,8 +524,8 @@ class TestResolveSshSettings:
         monkeypatch.setenv(GATE_ENV_VAR, "1")
         monkeypatch.setenv(SSH_HOST_ENV_VAR, "203.0.113.9")
         with caplog.at_level(logging.WARNING, logger=CREDENTIALS_LOGGER):
-            first = resolve_ssh_settings({"api_url": "https://fw.test", "ssh_host": "172.21.0.1"})
-            resolve_ssh_settings({"api_url": "https://fw.test", "ssh_host": "172.21.0.1"})
+            first = resolve_ssh_settings({"api_url": "https://fw.test", "ssh_host": "198.51.100.1"})
+            resolve_ssh_settings({"api_url": "https://fw.test", "ssh_host": "198.51.100.1"})
         assert first.host == "203.0.113.9"
         warnings = [r for r in caplog.records if r.name == CREDENTIALS_LOGGER]
         assert len(warnings) == 1

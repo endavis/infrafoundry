@@ -39,7 +39,7 @@ def _v4_reservation(name: str, **overrides: Any) -> ResourceConfig:
     """Build a ``kea.dhcp4.reservations`` resource with sensible defaults."""
     config: dict[str, Any] = {
         "hw_address": "aa:bb:cc:dd:ee:01",
-        "ip_address": "10.0.10.50",
+        "ip_address": "192.0.2.50",
         "hostname": name,
     }
     config.update(overrides)
@@ -67,7 +67,7 @@ def _v6_reservation(name: str, **overrides: Any) -> ResourceConfig:
     )
 
 
-def _v4_subnet(name: str, *, subnet: str = "10.0.10.0/24") -> ResourceConfig:
+def _v4_subnet(name: str, *, subnet: str = "192.0.2.0/24") -> ResourceConfig:
     return ResourceConfig(
         name=name,
         type="kea.dhcp4.subnets",
@@ -116,7 +116,7 @@ class TestSubnetRefV4:
     def test_subnet_ref_resolves_to_managed_v4_subnet(
         self, validator: KeaReservationValidator, report: ValidationReport
     ) -> None:
-        v4_subnet = _v4_subnet("lan-dhcp", subnet="10.0.10.0/24")
+        v4_subnet = _v4_subnet("lan-dhcp", subnet="192.0.2.0/24")
         reservation = _v4_reservation("server1", subnet_ref="lan-dhcp")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(
@@ -134,7 +134,7 @@ class TestSubnetRefV4:
     def test_subnet_ref_unknown_v4_emits_error(
         self, validator: KeaReservationValidator, report: ValidationReport
     ) -> None:
-        v4_subnet = _v4_subnet("lan-dhcp", subnet="10.0.10.0/24")
+        v4_subnet = _v4_subnet("lan-dhcp", subnet="192.0.2.0/24")
         reservation = _v4_reservation("server1", subnet_ref="missing-subnet")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(
@@ -226,7 +226,7 @@ class TestWrongVersionCross:
     def test_v6_reservation_subnet_ref_pointing_at_v4_subnet_errors(
         self, validator: KeaReservationValidator, report: ValidationReport
     ) -> None:
-        v4_subnet = _v4_subnet("lan-dhcp", subnet="10.0.10.0/24")
+        v4_subnet = _v4_subnet("lan-dhcp", subnet="192.0.2.0/24")
         reservation = _v6_reservation("server1-v6", subnet_ref="lan-dhcp")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(
@@ -326,7 +326,7 @@ class TestFieldPresence:
             provider="opnsense",
             config={
                 "hw_address": "aa:bb:cc:dd:ee:01",
-                "ip_address": "10.0.10.50",
+                "ip_address": "192.0.2.50",
             },
         )
         index = build_xref_index([reservation])
@@ -347,9 +347,9 @@ class TestFieldPresence:
     def test_both_present_and_agree_passes(
         self, validator: KeaReservationValidator, report: ValidationReport
     ) -> None:
-        # subnet_ref resolves to "10.0.10.0/24"; subnet literal matches.
-        v4_subnet = _v4_subnet("lan", subnet="10.0.10.0/24")
-        reservation = _v4_reservation("server1", subnet_ref="lan", subnet="10.0.10.0/24")
+        # subnet_ref resolves to "192.0.2.0/24"; subnet literal matches.
+        v4_subnet = _v4_subnet("lan", subnet="192.0.2.0/24")
+        reservation = _v4_reservation("server1", subnet_ref="lan", subnet="192.0.2.0/24")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(
             OPNsenseValidationContext(
@@ -366,8 +366,8 @@ class TestFieldPresence:
     def test_both_present_and_disagree_errors(
         self, validator: KeaReservationValidator, report: ValidationReport
     ) -> None:
-        v4_subnet = _v4_subnet("lan", subnet="10.0.10.0/24")
-        reservation = _v4_reservation("server1", subnet_ref="lan", subnet="10.0.20.0/24")
+        v4_subnet = _v4_subnet("lan", subnet="192.0.2.0/24")
+        reservation = _v4_reservation("server1", subnet_ref="lan", subnet="198.51.100.0/24")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(
             OPNsenseValidationContext(
@@ -394,7 +394,7 @@ class TestDottedPath:
         self, validator: KeaReservationValidator, report: ValidationReport
     ) -> None:
         # Cross-plugin absolute form: "kea.dhcp4.subnets.web".
-        v4_subnet = _v4_subnet("web", subnet="10.0.10.0/24")
+        v4_subnet = _v4_subnet("web", subnet="192.0.2.0/24")
         reservation = _v4_reservation("server1", subnet_ref="kea.dhcp4.subnets.web")
         index = build_xref_index([v4_subnet, reservation])
         validator.validate(

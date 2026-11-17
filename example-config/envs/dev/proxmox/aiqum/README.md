@@ -20,7 +20,7 @@ foundry infra destroy --env dev --package aiqum
 
 - Cloning the `rocky9-template` blueprint VM (`template_vmid: 901`)
 - Placing the VM on `node1` with `local-lvm` storage
-- A static DHCP reservation at `192.168.1.50` on the `my-subnet` Kea subnet
+- A static DHCP reservation at `192.0.2.50` on the `my-subnet` Kea subnet
 - Running the post-deploy event handler against an example jumphost and
   ONTAP cluster (replace the placeholder hosts and `CHANGE_ME` secrets
   before applying)

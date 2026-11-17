@@ -32,7 +32,7 @@ from infrafoundry.providers.opnsense.services.static_route import (
 def _resource(
     name: str,
     *,
-    network: str = "172.21.0.0/24",
+    network: str = "192.0.2.0/24",
     gateway: str = "WAN_DHCP",
     lock: bool = False,
 ) -> ResourceConfig:
@@ -49,7 +49,7 @@ def _resource(
 def _live(
     uuid: str,
     *,
-    network: str = "172.21.0.0/24",
+    network: str = "192.0.2.0/24",
     gateway: str = "WAN_DHCP",
 ) -> LiveStaticRoute:
     return LiveStaticRoute(
@@ -69,7 +69,7 @@ def _live(
 def _route(name: str, **overrides: Any) -> StaticRouteConfig:
     return StaticRouteConfig(
         name=name,
-        network=overrides.get("network", "172.21.0.0/24"),
+        network=overrides.get("network", "192.0.2.0/24"),
         gateway=overrides.get("gateway", "WAN_DHCP"),
         enabled=overrides.get("enabled", True),
     )
@@ -178,7 +178,7 @@ class TestApply:
     def test_apply_emits_delete_outcome_with_synthetic_name(self, tmp_path: Path) -> None:
         manager = StaticRouteManager(tmp_path)
         resources: list[ResourceConfig] = []
-        live = _live("u1", network="172.16.0.0/24", gateway="WAN_DHCP")
+        live = _live("u1", network="198.51.100.0/24", gateway="WAN_DHCP")
         diff = Diff(deletes=[live])
         service_mock = _make_service_mock(
             diff=diff, apply_counts={"created": 0, "updated": 0, "deleted": 1}
@@ -191,8 +191,8 @@ class TestApply:
         assert outcomes[0].action == "delete"
         # Live records carry no operator-facing name; address uses the
         # synthetic ``route-<network>-via-<gateway>`` form.
-        assert outcomes[0].resource_name == "route-172-16-0-0-24-via-wan_dhcp"
-        assert outcomes[0].address == "opnsense_static_route.route-172-16-0-0-24-via-wan_dhcp"
+        assert outcomes[0].resource_name == "route-198-51-100-0-24-via-wan_dhcp"
+        assert outcomes[0].address == "opnsense_static_route.route-198-51-100-0-24-via-wan_dhcp"
 
     def test_apply_threads_add_only(self, tmp_path: Path) -> None:
         manager = StaticRouteManager(tmp_path)
@@ -250,10 +250,10 @@ class TestDestroy:
         # that two tuples that don't match each other don't accidentally
         # collide on names.
         manager = StaticRouteManager(tmp_path)
-        resources = [_resource("foo", network="172.21.0.0/24", gateway="WAN_DHCP")]
+        resources = [_resource("foo", network="192.0.2.0/24", gateway="WAN_DHCP")]
         live = [
-            _live("u1", network="172.21.0.0/24", gateway="WAN_DHCP"),
-            _live("u2", network="172.16.0.0/24", gateway="WAN_DHCP"),
+            _live("u1", network="192.0.2.0/24", gateway="WAN_DHCP"),
+            _live("u2", network="198.51.100.0/24", gateway="WAN_DHCP"),
         ]
         service_mock = _make_service_mock(live=live)
         with patch(SERVICE_PATH) as svc_cls:
@@ -273,12 +273,12 @@ class TestGetResourceIds:
     def test_maps_names_to_uuids_by_tuple(self, tmp_path: Path) -> None:
         manager = StaticRouteManager(tmp_path)
         resources = [
-            _resource("foo", network="172.21.0.0/24", gateway="WAN_DHCP"),
-            _resource("bar", network="172.16.0.0/24", gateway="WAN_DHCP"),
+            _resource("foo", network="192.0.2.0/24", gateway="WAN_DHCP"),
+            _resource("bar", network="198.51.100.0/24", gateway="WAN_DHCP"),
         ]
         live = [
-            _live("u1", network="172.21.0.0/24", gateway="WAN_DHCP"),
-            _live("u2", network="172.16.0.0/24", gateway="WAN_DHCP"),
+            _live("u1", network="192.0.2.0/24", gateway="WAN_DHCP"),
+            _live("u2", network="198.51.100.0/24", gateway="WAN_DHCP"),
         ]
         service_mock = _make_service_mock(live=live)
         with patch(SERVICE_PATH) as svc_cls:
@@ -289,10 +289,10 @@ class TestGetResourceIds:
     def test_omits_resources_with_no_live_match(self, tmp_path: Path) -> None:
         manager = StaticRouteManager(tmp_path)
         resources = [
-            _resource("foo", network="172.21.0.0/24", gateway="WAN_DHCP"),
-            _resource("missing", network="192.168.0.0/24", gateway="WAN_DHCP"),
+            _resource("foo", network="192.0.2.0/24", gateway="WAN_DHCP"),
+            _resource("missing", network="203.0.113.0/25", gateway="WAN_DHCP"),
         ]
-        live = [_live("u1", network="172.21.0.0/24", gateway="WAN_DHCP")]
+        live = [_live("u1", network="192.0.2.0/24", gateway="WAN_DHCP")]
         service_mock = _make_service_mock(live=live)
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service_mock
@@ -308,7 +308,7 @@ class TestGetResourceIds:
 class TestListAndMigrate:
     def test_list_returns_live_routes(self, tmp_path: Path) -> None:
         manager = StaticRouteManager(tmp_path)
-        live = [_live("u1"), _live("u2", network="172.16.0.0/24")]
+        live = [_live("u1"), _live("u2", network="198.51.100.0/24")]
         service_mock = _make_service_mock(live=live)
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service_mock
@@ -335,7 +335,7 @@ class TestDeletesOnly:
     def test_deletes_only_drops_adds_and_updates(self, tmp_path: Path) -> None:
         manager = StaticRouteManager(tmp_path)
         live_keep = _live("u-keep")
-        live_gone = _live("u-gone", network="10.9.0.0/24")
+        live_gone = _live("u-gone", network="203.0.113.128/25")
         diff = Diff(
             adds=[_route("new")],
             updates=[(live_keep, _route("keep"))],

@@ -55,7 +55,7 @@ def _port_forward(name: str, **overrides: Any) -> ResourceConfig:
     config: dict[str, Any] = {
         "kind": "port_forward",
         "interface": "wan",
-        "target": "172.21.0.10",
+        "target": "192.0.2.10",
     }
     config.update(overrides)
     return ResourceConfig(name=name, type="firewall.nat", provider="opnsense", config=config)
@@ -353,7 +353,7 @@ class TestNetReferences:
     ) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                nat_rules=[_outbound("ok", source_net="172.21.0.1")],
+                nat_rules=[_outbound("ok", source_net="192.0.2.1")],
                 alias_names=set(),
                 interface_assignment_names=set(),
                 existing_interfaces={"wan": {}},
@@ -367,7 +367,7 @@ class TestNetReferences:
     ) -> None:
         validator.validate(
             OPNsenseValidationContext(
-                nat_rules=[_outbound("ok", source_net="172.21.0.0/24")],
+                nat_rules=[_outbound("ok", source_net="192.0.2.0/24")],
                 alias_names=set(),
                 interface_assignment_names=set(),
                 existing_interfaces={"wan": {}},
@@ -586,7 +586,7 @@ class TestPortForwardValidation:
             name="bad",
             type="firewall.nat",
             provider="opnsense",
-            config={"kind": "port_forward", "target": "172.21.0.10"},
+            config={"kind": "port_forward", "target": "192.0.2.10"},
         )
         validator.validate(
             OPNsenseValidationContext(

@@ -51,7 +51,7 @@ def sample_resources() -> list[Any]:
     r1.provider = "proxmox"
     r1.resource_type = "vm"
     r1.state = ResourceState.ACTIVE
-    r1.config = {"ip_address": "172.20.10.206", "target_node": "node1"}
+    r1.config = {"ip_address": "192.0.2.206", "target_node": "node1"}
     r1.updated_at = datetime(2026, 4, 12, 14, 30, 0)
 
     r2 = Mock()
@@ -59,7 +59,7 @@ def sample_resources() -> list[Any]:
     r2.provider = "proxmox"
     r2.resource_type = "vm"
     r2.state = ResourceState.ACTIVE
-    r2.config = {"ip_address": "172.20.10.203", "target_node": "node1"}
+    r2.config = {"ip_address": "192.0.2.203", "target_node": "node1"}
     r2.updated_at = datetime(2026, 4, 11, 9, 15, 0)
 
     r3 = Mock()
@@ -93,7 +93,7 @@ def test_deployed_shows_deployment_info(
     assert "2026-04-12 16:48" in result.output
     assert "endavis" in result.output
     assert "aiqum" in result.output
-    assert "172.20.10.206" in result.output
+    assert "192.0.2.206" in result.output
     assert "node1" in result.output
     assert "dhcp-aiqum" in result.output
     assert "2026-04-12 14:30" in result.output
@@ -264,7 +264,7 @@ def test_deployed_alternative_ip_keys(
     r1.provider = "custom"
     r1.resource_type = "server"
     r1.state = ResourceState.ACTIVE
-    r1.config = {"address": "172.21.0.5", "node": "node3"}
+    r1.config = {"address": "198.51.100.5", "node": "node3"}
     r1.updated_at = datetime(2026, 4, 13, 12, 0, 0)
 
     mock_orchestrator.state_manager.get_deployment_history.return_value = [sample_deployment]
@@ -274,5 +274,5 @@ def test_deployed_alternative_ip_keys(
         result = cli_runner.invoke(main, ["infra", "deployed", "--env", "prod"])
 
     assert result.exit_code == 0, f"Exit code {result.exit_code}. Output: {result.output}"
-    assert "172.21.0.5" in result.output
+    assert "198.51.100.5" in result.output
     assert "node3" in result.output

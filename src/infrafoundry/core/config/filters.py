@@ -86,10 +86,10 @@ def cidr_ip(value: str) -> str:
     """Extract the IP address from a CIDR notation string.
 
     Args:
-        value: CIDR string (e.g., ``"172.21.0.1/24"``).
+        value: CIDR string (e.g., ``"192.0.2.1/24"``).
 
     Returns:
-        The IP portion (e.g., ``"172.21.0.1"``).
+        The IP portion (e.g., ``"192.0.2.1"``).
     """
     return value.split("/")[0]
 
@@ -98,7 +98,7 @@ def cidr_prefix(value: str) -> str:
     """Extract the prefix length from a CIDR notation string.
 
     Args:
-        value: CIDR string (e.g., ``"172.21.0.1/24"``).
+        value: CIDR string (e.g., ``"192.0.2.1/24"``).
 
     Returns:
         The prefix length as a string (e.g., ``"24"``).

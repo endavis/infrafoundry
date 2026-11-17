@@ -95,7 +95,7 @@ def _reservation(name: str, ref: str, mac: str) -> ResourceConfig:
         name=name,
         type=RESERVATIONS,
         provider="opnsense",
-        config={"subnet_ref": ref, "hw_address": mac, "ip_address": "10.0.1.5"},
+        config={"subnet_ref": ref, "hw_address": mac, "ip_address": "192.0.2.5"},
     )
 
 
@@ -129,14 +129,14 @@ def test_managed_reservation_is_deleted_before_its_subnet_and_unmanaged_blocks(
     provider: MagicMock,
 ) -> None:
     fake = FakeKea(
-        {"u-a": "10.0.1.0/24", "u-b": "172.21.2.0/24"},
+        {"u-a": "192.0.2.0/24", "u-b": "198.51.100.0/24"},
         [
-            {"uuid": "r-a", "subnet": "u-a", "hw_address": "aa:aa", "ip_address": "10.0.1.5"},
-            {"uuid": "r-h", "subnet": "u-b", "hw_address": "hh:hh", "ip_address": "172.21.2.5"},
+            {"uuid": "r-a", "subnet": "u-a", "hw_address": "aa:aa", "ip_address": "192.0.2.5"},
+            {"uuid": "r-h", "subnet": "u-b", "hw_address": "hh:hh", "ip_address": "198.51.100.5"},
         ],
     )
     managed = {
-        SUBNETS: [_subnet("a", "10.0.1.0/24"), _subnet("b", "172.21.2.0/24")],
+        SUBNETS: [_subnet("a", "192.0.2.0/24"), _subnet("b", "198.51.100.0/24")],
         RESERVATIONS: [_reservation("ra", "a", "aa:aa")],
     }
 
@@ -144,23 +144,23 @@ def test_managed_reservation_is_deleted_before_its_subnet_and_unmanaged_blocks(
 
     assert result["success"] is True
     # Subnet A's reservation goes first, while A is still live; then A itself.
-    assert fake.log == ["delete_reservation aa:aa", "delete_subnet 10.0.1.0/24"]
+    assert fake.log == ["delete_reservation aa:aa", "delete_subnet 192.0.2.0/24"]
     assert fake.orphans() == []
     # B is kept because of the hand-made reservation, which is untouched.
-    assert fake.subnets == {"u-b": "172.21.2.0/24"}
+    assert fake.subnets == {"u-b": "198.51.100.0/24"}
     assert [r["hw_address"] for r in fake.reservations] == ["hh:hh"]
     released = {(r["resource_type"], r["name"]) for r in result["released_resources"]}
     assert released == {(RESERVATIONS, "ra"), (SUBNETS, "a")}
     printed = [str(c.args[0]) for c in console.print.call_args_list]
-    assert any("[yellow]" in p and "172.21.2.0/24" in p and "hh:hh" in p for p in printed)
+    assert any("[yellow]" in p and "198.51.100.0/24" in p and "hh:hh" in p for p in printed)
 
 
 def test_plan_reports_the_blocked_subnet(provider: MagicMock) -> None:
     fake = FakeKea(
-        {"u-b": "172.21.2.0/24"},
-        [{"uuid": "r-h", "subnet": "u-b", "hw_address": "hh:hh", "ip_address": "172.21.2.5"}],
+        {"u-b": "198.51.100.0/24"},
+        [{"uuid": "r-h", "subnet": "u-b", "hw_address": "hh:hh", "ip_address": "198.51.100.5"}],
     )
-    managed = {SUBNETS: [_subnet("b", "172.21.2.0/24")]}
+    managed = {SUBNETS: [_subnet("b", "198.51.100.0/24")]}
     runner = OPNsenseDirectRunner()
     runner.console = MagicMock()
     with (
@@ -174,10 +174,10 @@ def test_plan_reports_the_blocked_subnet(provider: MagicMock) -> None:
 
 def test_new_subnet_and_reservation_on_it_are_still_added_in_order(provider: MagicMock) -> None:
     fake = FakeKea({}, [])
-    yaml = [_subnet("n", "10.0.9.0/24"), _reservation("rn", "n", "nn:nn")]
+    yaml = [_subnet("n", "203.0.113.0/24"), _reservation("rn", "n", "nn:nn")]
 
     result, _ = _run(provider, fake, yaml, {})
 
     assert result["success"] is True
-    assert fake.log == ["ensure_enabled", "add_subnet 10.0.9.0/24", "add_reservation nn:nn"]
+    assert fake.log == ["ensure_enabled", "add_subnet 203.0.113.0/24", "add_reservation nn:nn"]
     assert fake.reservations[0]["subnet"] == "new-sub-1"

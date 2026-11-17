@@ -68,11 +68,11 @@ def test_subnet_cidr_keys() -> None:
             name="a",
             type="kea.dhcp4.subnets",
             provider="opnsense",
-            config={"subnet": "172.21.0.0/24"},
+            config={"subnet": "192.0.2.0/24"},
         ),
         ResourceConfig(name="b", type="kea.dhcp4.subnets", provider="opnsense", config={}),
     ]
-    assert subnet_cidr_keys(rows) == {"172.21.0.0/24"}
+    assert subnet_cidr_keys(rows) == {"192.0.2.0/24"}
     assert subnet_cidr_keys(None) is None
     assert subnet_cidr_keys([]) == set()
 
@@ -103,10 +103,10 @@ def test_subnet_rows_without_a_cidr_are_reported_as_unresolved() -> None:
             name="a",
             type="kea.dhcp4.subnets",
             provider="opnsense",
-            config={"subnet": "172.21.0.0/24"},
+            config={"subnet": "192.0.2.0/24"},
         ),
         ResourceConfig(name="b", type="kea.dhcp4.subnets", provider="opnsense", config={}),
     ]
     unresolved: set[str] = set()
-    assert subnet_cidr_keys(rows, unresolved) == {"172.21.0.0/24"}
+    assert subnet_cidr_keys(rows, unresolved) == {"192.0.2.0/24"}
     assert unresolved == {"b"}

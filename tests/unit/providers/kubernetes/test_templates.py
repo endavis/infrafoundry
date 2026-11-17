@@ -705,7 +705,7 @@ class TestManifestsTemplate:
                         "spec": {
                             "hostname": "oci-k3s-subnet-router",
                             "subnetRouter": {
-                                "advertiseRoutes": ["172.21.0.0/16"],
+                                "advertiseRoutes": ["192.0.2.0/24"],
                             },
                             "tags": ["tag:k8s"],
                         },
@@ -721,7 +721,7 @@ class TestManifestsTemplate:
         assert '"kind"       = "Connector"' in content
         assert "hostname:" in content
         assert "oci-k3s-subnet-router" in content
-        assert "172.21.0.0/16" in content
+        assert "192.0.2.0/24" in content
 
     def test_renders_manifest_with_labels(self, provider: KubernetesProvider) -> None:
         """Test manifest with labels and annotations."""

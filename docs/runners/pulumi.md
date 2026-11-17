@@ -89,7 +89,7 @@ This makes it functionally equivalent to TerraformRunner in terms of capabilitie
         node: pve01
         cores: 4
         memory: 16384
-        ipconfig: ip=172.21.0.5/24,gw=172.21.0.1
+        ipconfig: ip=192.0.2.5/24,gw=192.0.2.1
   ```
 
 - **Run Pulumi commands manually for debugging:**

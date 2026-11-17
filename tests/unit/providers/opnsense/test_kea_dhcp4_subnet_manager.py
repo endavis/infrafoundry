@@ -33,7 +33,7 @@ from infrafoundry.providers.opnsense.components.kea_dhcp4_subnet import (
 # ---------------------------------------------------------------------------
 
 
-def _subnet(name: str, *, subnet: str = "10.0.10.0/24", **overrides: Any) -> ResourceConfig:
+def _subnet(name: str, *, subnet: str = "192.0.2.0/24", **overrides: Any) -> ResourceConfig:
     config: dict[str, Any] = {
         "subnet": subnet,
         "interface": overrides.pop("interface", "opt1"),
@@ -98,11 +98,11 @@ class TestPlan:
     def test_plan_update_when_fields_differ(self, tmp_path: Path) -> None:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "interface": "opt1",
                         "description": "old desc",
                     }
@@ -129,14 +129,14 @@ class TestPlan:
         """
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "interface": "opt1",
                         "description": "vlan10 desc",
-                        "option_data": {"domain_name_servers": "192.168.1.1"},
+                        "option_data": {"domain_name_servers": "192.0.2.101"},
                     }
                 }
             },
@@ -146,27 +146,27 @@ class TestPlan:
             # Operator updates DNS servers (e.g., points at new resolvers).
             diff = manager.plan(
                 "test-env",
-                [_subnet("vlan10", dns_servers=["192.168.1.10", "192.168.1.11"])],
+                [_subnet("vlan10", dns_servers=["192.0.2.110", "192.0.2.111"])],
             )
         assert diff.adds == []
         assert len(diff.updates) == 1
         uuid, payload = diff.updates[0]
         assert uuid == "u1"
         # 26.1 wire shape: DHCP options nested under option_data (#1165).
-        assert payload["option_data"]["domain_name_servers"] == "192.168.1.10,192.168.1.11"
+        assert payload["option_data"]["domain_name_servers"] == "192.0.2.110,192.0.2.111"
 
     def test_plan_update_when_ntp_servers_differ_cutover_regression(self, tmp_path: Path) -> None:
         """Cutover-regression case: NTP server drift detected as an update."""
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "interface": "opt1",
                         "description": "vlan10 desc",
-                        "option_data": {"ntp_servers": "192.168.1.1"},
+                        "option_data": {"ntp_servers": "192.0.2.101"},
                     }
                 }
             },
@@ -175,21 +175,21 @@ class TestPlan:
             svc_cls.from_environment.return_value = service
             diff = manager.plan(
                 "test-env",
-                [_subnet("vlan10", ntp_servers=["172.21.0.123"])],
+                [_subnet("vlan10", ntp_servers=["192.0.2.123"])],
             )
         assert diff.adds == []
         assert len(diff.updates) == 1
         _, payload = diff.updates[0]
-        assert payload["option_data"]["ntp_servers"] == "172.21.0.123"
+        assert payload["option_data"]["ntp_servers"] == "192.0.2.123"
 
     def test_plan_no_change_when_fields_match(self, tmp_path: Path) -> None:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "interface": "opt1",
                         "description": "vlan10 desc",
                     }
@@ -205,13 +205,13 @@ class TestPlan:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
             existing=[
-                {"subnet": "10.0.10.0/24", "uuid": "u1"},
-                {"subnet": "10.0.99.0/24", "uuid": "u9"},
+                {"subnet": "192.0.2.0/24", "uuid": "u1"},
+                {"subnet": "203.0.113.192/26", "uuid": "u9"},
             ],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "interface": "opt1",
                         "description": "vlan10 desc",
                     }
@@ -224,19 +224,19 @@ class TestPlan:
         assert len(diff.deletes) == 1
         uuid, addr = diff.deletes[0]
         assert uuid == "u9"
-        assert addr == "10.0.99.0/24"
+        assert addr == "203.0.113.192/26"
 
     def test_plan_add_only_suppresses_deletes(self, tmp_path: Path) -> None:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
             existing=[
-                {"subnet": "10.0.10.0/24", "uuid": "u1"},
-                {"subnet": "10.0.99.0/24", "uuid": "u9"},
+                {"subnet": "192.0.2.0/24", "uuid": "u1"},
+                {"subnet": "203.0.113.192/26", "uuid": "u9"},
             ],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "interface": "opt1",
                         "description": "vlan10 desc",
                     }
@@ -262,7 +262,7 @@ class TestInterfaceNotReturnedByLiveApi:
     def _plan(live: dict[str, Any], **overrides: Any) -> Any:
         manager = KeaDHCPv4SubnetManager(Path("."))
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
             get_responses={"u1": {"subnet4": live}},
         )
         with patch(SERVICE_PATH) as svc_cls:
@@ -270,18 +270,18 @@ class TestInterfaceNotReturnedByLiveApi:
             return manager.plan("test-env", [_subnet("vlan10", interface="lan", **overrides)])
 
     def test_absent_live_interface_is_not_drift(self) -> None:
-        diff = self._plan({"subnet": "10.0.10.0/24", "description": "vlan10 desc"})
+        diff = self._plan({"subnet": "192.0.2.0/24", "description": "vlan10 desc"})
         assert diff.updates == []
 
     def test_present_but_different_live_interface_still_updates(self) -> None:
         diff = self._plan(
-            {"subnet": "10.0.10.0/24", "interface": "opt1", "description": "vlan10 desc"}
+            {"subnet": "192.0.2.0/24", "interface": "opt1", "description": "vlan10 desc"}
         )
         assert len(diff.updates) == 1
         assert diff.updates[0][1]["interface"] == "lan"
 
     def test_other_field_differing_still_updates_without_live_interface(self) -> None:
-        diff = self._plan({"subnet": "10.0.10.0/24", "description": "old"})
+        diff = self._plan({"subnet": "192.0.2.0/24", "description": "old"})
         assert len(diff.updates) == 1
         assert diff.updates[0][1]["interface"] == "lan"
 
@@ -298,7 +298,7 @@ class TestApply:
         # Outgoing payload: subnet/interface/description, no leaked __name__.
         sent = service.add_dhcpv4_subnet.call_args.args[0]
         assert "__name__" not in sent
-        assert sent["subnet"] == "10.0.10.0/24"
+        assert sent["subnet"] == "192.0.2.0/24"
 
         assert result["resources_created"] == 1
         outcomes = result["resource_outcomes"]
@@ -313,11 +313,11 @@ class TestApply:
     def test_apply_updates_subnet_when_fields_differ(self, tmp_path: Path) -> None:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "interface": "opt1",
                         "description": "old desc",
                     }
@@ -344,13 +344,13 @@ class TestApply:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
             existing=[
-                {"subnet": "10.0.10.0/24", "uuid": "u1"},
-                {"subnet": "10.0.99.0/24", "uuid": "u9"},
+                {"subnet": "192.0.2.0/24", "uuid": "u1"},
+                {"subnet": "203.0.113.192/26", "uuid": "u9"},
             ],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "interface": "opt1",
                         "description": "vlan10 desc",
                     }
@@ -365,15 +365,15 @@ class TestApply:
         assert result["resources_deleted"] == 1
         outcome = result["resource_outcomes"][0]
         assert outcome.action == "delete"
-        assert outcome.resource_name == "subnet-10.0.99.0/24"
+        assert outcome.resource_name == "subnet-203.0.113.192/26"
         service.reconfigure.assert_not_called()
 
     def test_apply_calls_ensure_dhcpv4_enabled_with_sorted_interfaces(self, tmp_path: Path) -> None:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(existing=[])
         resources = [
-            _subnet("vlan10", subnet="10.0.10.0/24", interface="opt2"),
-            _subnet("vlan20", subnet="10.0.20.0/24", interface="opt1"),
+            _subnet("vlan10", subnet="192.0.2.0/24", interface="opt2"),
+            _subnet("vlan20", subnet="203.0.113.128/26", interface="opt1"),
         ]
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service
@@ -392,7 +392,7 @@ class TestApply:
     def test_apply_threads_add_only(self, tmp_path: Path) -> None:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.99.0/24", "uuid": "u9"}],
+            existing=[{"subnet": "203.0.113.192/26", "uuid": "u9"}],
         )
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service
@@ -405,11 +405,11 @@ class TestApply:
         """Re-applying a no-change YAML produces 0/0/0 (the round-trip property)."""
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "interface": "opt1",
                         "description": "vlan10 desc",
                     }
@@ -433,7 +433,7 @@ class TestDestroy:
     def test_destroy_deletes_matching_subnets(self, tmp_path: Path) -> None:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
         )
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service
@@ -462,8 +462,8 @@ class TestGetResourceIds:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
             existing=[
-                {"subnet": "10.0.10.0/24", "uuid": "u1"},
-                {"subnet": "10.0.20.0/24", "uuid": "u2"},
+                {"subnet": "192.0.2.0/24", "uuid": "u1"},
+                {"subnet": "203.0.113.128/26", "uuid": "u2"},
             ],
         )
         with patch(SERVICE_PATH) as svc_cls:
@@ -471,8 +471,8 @@ class TestGetResourceIds:
             result = manager.get_resource_ids(
                 "test-env",
                 [
-                    _subnet("vlan10", subnet="10.0.10.0/24"),
-                    _subnet("vlan20", subnet="10.0.20.0/24"),
+                    _subnet("vlan10", subnet="192.0.2.0/24"),
+                    _subnet("vlan20", subnet="203.0.113.128/26"),
                 ],
             )
         assert result == {"vlan10": "u1", "vlan20": "u2"}
@@ -480,15 +480,15 @@ class TestGetResourceIds:
     def test_omits_resources_with_no_live_match(self, tmp_path: Path) -> None:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
         )
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service
             result = manager.get_resource_ids(
                 "test-env",
                 [
-                    _subnet("vlan10", subnet="10.0.10.0/24"),
-                    _subnet("vlan99", subnet="10.0.99.0/24"),
+                    _subnet("vlan10", subnet="192.0.2.0/24"),
+                    _subnet("vlan99", subnet="203.0.113.192/26"),
                 ],
             )
         assert result == {"vlan10": "u1"}
@@ -506,18 +506,18 @@ class TestOptionDataWireShape:
         payload = _build_subnet_payload(
             _subnet(
                 "test-lan",
-                routers=["172.20.99.1"],
-                dns_servers=["172.20.10.1", "172.20.10.2"],
-                ntp_servers=["172.20.99.1"],
+                routers=["203.0.113.1"],
+                dns_servers=["203.0.113.11", "203.0.113.12"],
+                ntp_servers=["203.0.113.1"],
                 domain_search=["example.net"],
                 domain_name="example.net",
             )
         )
 
         assert payload["option_data"] == {
-            "routers": "172.20.99.1",
-            "domain_name_servers": "172.20.10.1,172.20.10.2",
-            "ntp_servers": "172.20.99.1",
+            "routers": "203.0.113.1",
+            "domain_name_servers": "203.0.113.11,203.0.113.12",
+            "ntp_servers": "203.0.113.1",
             "domain_search": "example.net",
             "domain_name": "example.net",
         }
@@ -533,11 +533,11 @@ class TestOptionDataWireShape:
         # The fw-test case: created through the API, routers left empty.
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "description": "vlan10 desc",
                         "option_data": {"routers": {"": {"value": "", "selected": 1}}},
                     }
@@ -546,24 +546,24 @@ class TestOptionDataWireShape:
         )
         with patch(SERVICE_PATH) as svc_cls:
             svc_cls.from_environment.return_value = service
-            diff = manager.plan("test-env", [_subnet("vlan10", routers=["10.0.10.1"])])
+            diff = manager.plan("test-env", [_subnet("vlan10", routers=["192.0.2.1"])])
 
         assert len(diff.updates) == 1
-        assert diff.updates[0][1]["option_data"] == {"routers": "10.0.10.1"}
+        assert diff.updates[0][1]["option_data"] == {"routers": "192.0.2.1"}
 
     def test_matching_live_options_need_no_update_in_any_order(self, tmp_path: Path) -> None:
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "interface": "opt1",
                         "description": "vlan10 desc",
                         "option_data": {
-                            "routers": _selected("10.0.10.1"),
-                            "domain_name_servers": _selected("10.0.10.2", "10.0.10.1"),
+                            "routers": _selected("192.0.2.1"),
+                            "domain_name_servers": _selected("192.0.2.2", "192.0.2.1"),
                             "domain_name": "lab.local",
                         },
                     }
@@ -577,8 +577,8 @@ class TestOptionDataWireShape:
                 [
                     _subnet(
                         "vlan10",
-                        routers=["10.0.10.1"],
-                        dns_servers=["10.0.10.2", "10.0.10.1"],
+                        routers=["192.0.2.1"],
+                        dns_servers=["192.0.2.2", "192.0.2.1"],
                         domain_name="lab.local",
                     )
                 ],
@@ -590,16 +590,16 @@ class TestOptionDataWireShape:
         # Prod subnets: options filled in the GUI, YAML relies on auto_collect.
         manager = KeaDHCPv4SubnetManager(tmp_path)
         service = _make_service_mock(
-            existing=[{"subnet": "10.0.10.0/24", "uuid": "u1"}],
+            existing=[{"subnet": "192.0.2.0/24", "uuid": "u1"}],
             get_responses={
                 "u1": {
                     "subnet4": {
-                        "subnet": "10.0.10.0/24",
+                        "subnet": "192.0.2.0/24",
                         "interface": "opt1",
                         "description": "vlan10 desc",
                         "option_data": {
-                            "routers": _selected("10.0.10.1"),
-                            "domain_name_servers": _selected("10.0.10.1"),
+                            "routers": _selected("192.0.2.1"),
+                            "domain_name_servers": _selected("192.0.2.1"),
                         },
                     }
                 }
@@ -621,16 +621,16 @@ class TestExportReadsDottedOptionKeys:
         from infrafoundry.providers.opnsense.services.kea_dhcp import KeaDHCPService
 
         service = KeaDHCPService(MagicMock())
-        # Shape of a live searchSubnet row on fw-prod (172.20.20.0/24).
+        # Shape of a live searchSubnet row on fw-prod (198.51.100.0/24).
         row = {
-            "subnet": "172.20.20.0/24",
+            "subnet": "198.51.100.0/24",
             "description": "opt2 network",
-            "pools": "172.20.20.100-172.20.20.199",
+            "pools": "198.51.100.100-198.51.100.199",
             "option_data_autocollect": "1",
-            "option_data.routers": "172.20.20.1",
-            "option_data.domain_name_servers": "172.20.20.1,172.20.10.1",
+            "option_data.routers": "198.51.100.1",
+            "option_data.domain_name_servers": "198.51.100.1,203.0.113.11",
             "option_data.domain_name": "example.net",
-            "option_data.ntp_servers": "172.20.20.1",
+            "option_data.ntp_servers": "198.51.100.1",
         }
         with (
             patch.object(service, "search_dhcpv4_subnets", return_value=[row]),
@@ -641,10 +641,10 @@ class TestExportReadsDottedOptionKeys:
             doc = yaml.safe_load(service.export_to_yaml())
 
         [subnet] = doc["opnsense"]["kea"]["dhcp4"]["subnets"]
-        assert subnet["config"]["routers"] == ["172.20.20.1"]
-        assert subnet["config"]["dns_servers"] == ["172.20.20.1", "172.20.10.1"]
+        assert subnet["config"]["routers"] == ["198.51.100.1"]
+        assert subnet["config"]["dns_servers"] == ["198.51.100.1", "203.0.113.11"]
         assert subnet["config"]["domain_name"] == "example.net"
-        assert subnet["config"]["ntp_servers"] == ["172.20.20.1"]
+        assert subnet["config"]["ntp_servers"] == ["198.51.100.1"]
 
 
 class TestDropNonRoundTripSubnet4Fields:

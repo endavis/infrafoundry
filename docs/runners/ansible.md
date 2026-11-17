@@ -82,8 +82,8 @@ The Ansible runner configures provisioned resources by generating inventory and 
   ansible_vars:
     webserver_port: 8080
     upstream_servers:
-      - 172.21.0.5
-      - 172.21.0.6
+      - 192.0.2.5
+      - 192.0.2.6
   ```
 
 ## Related Documentation

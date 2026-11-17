@@ -81,14 +81,14 @@ class ISCDHCPService(BaseService):
         # {
         #     "lan": {
         #         "enable": "1",
-        #         "range": {"from": "192.168.1.100", "to": "192.168.1.200"},
+        #         "range": {"from": "192.0.2.100", "to": "192.0.2.200"},
         #         "defaultleasetime": "7200",
         #         "maxleasetime": "86400",
-        #         "gateway": "192.168.1.1",
+        #         "gateway": "192.0.2.1",
         #         "domain": "example.local",
-        #         "dnsserver": ["192.168.1.1", "8.8.8.8"],
-        #         "ntpserver": ["192.168.1.1"],
-        #         "subnet": "192.168.1.0",
+        #         "dnsserver": ["192.0.2.1", "8.8.8.8"],
+        #         "ntpserver": ["192.0.2.1"],
+        #         "subnet": "192.0.2.0",
         #         "subnet_bits": "24"
         #     }
         # }
@@ -114,7 +114,7 @@ class ISCDHCPService(BaseService):
         #     "lan": [
         #         {
         #             "mac": "00:11:22:33:44:55",
-        #             "ipaddr": "192.168.1.50",
+        #             "ipaddr": "192.0.2.50",
         #             "hostname": "server01",
         #             "descr": "Main Server"
         #         }

@@ -76,7 +76,7 @@ class TestStorageValidationWiring:
         storage = _storage(
             "stor01-infra",
             type="nfs",  # wrong key — should be ``backend``
-            server="172.20.10.50",
+            server="192.0.2.50",
             export="/export/vol1",
         )
         with pytest.raises(SchemaValidationError) as exc_info:
@@ -90,7 +90,7 @@ class TestStorageValidationWiring:
         storage = _storage(
             "stor01-infra",
             backend="nfs",
-            server="172.20.10.50",
+            server="192.0.2.50",
             export="/export/vol1",
             content_types=["bogus"],
         )
@@ -166,7 +166,7 @@ class TestValidConfigPasses:
         storage = _storage(
             "stor01-infra",
             backend="nfs",
-            server="172.20.10.50",
+            server="192.0.2.50",
             export="/export/vol1",
         )
         vm = _vm("web01")
@@ -212,7 +212,7 @@ class TestWarningsDoNotBlock:
         storage = _storage(
             "backup-share",
             backend="cifs",
-            server="172.20.10.50",
+            server="192.0.2.50",
             share="backups",
             # username omitted intentionally — validator emits WARNING, not ERROR
         )

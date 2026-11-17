@@ -75,7 +75,7 @@ class TestAuditEntry:
             action="apply_completed",
             status="success",
             message="Applied 5 resources successfully",
-            ip_address="192.168.1.100",
+            ip_address="192.0.2.100",
             changes_summary={"added": 3, "changed": 2, "destroyed": 0},
             request_metadata={"cli_args": ["apply", "--env", "prod"]},
             checksum="abc123def456",

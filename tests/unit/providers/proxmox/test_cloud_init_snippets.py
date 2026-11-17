@@ -61,13 +61,13 @@ class TestSnippetPassthrough:
         _write_snippet(
             snippet_dir,
             "storage/nfs",
-            'mounts:\n  - ["172.21.0.1:/export", "/mnt", "nfs", "defaults", "0", "0"]\n',
+            'mounts:\n  - ["192.0.2.1:/export", "/mnt", "nfs", "defaults", "0", "0"]\n',
         )
         vm = _make_vm(cloud_init_snippets=["storage/nfs"])
         result = provider._process_cloud_init_snippets(vm)
         assert "cloud_init_user_data" in result.config
         assert "mounts:" in result.config["cloud_init_user_data"]
-        assert "172.21.0.1:/export" in result.config["cloud_init_user_data"]
+        assert "192.0.2.1:/export" in result.config["cloud_init_user_data"]
 
     def test_write_files_preserved(self, provider: ProxmoxProvider, snippet_dir: Path) -> None:
         """write_files directive should be included in user-data."""
@@ -174,7 +174,7 @@ class TestSnippetMerging:
         _write_snippet(
             snippet_dir,
             "storage/nfs",
-            'mounts:\n  - ["172.21.0.1:/data", "/mnt", "nfs"]\n',
+            'mounts:\n  - ["192.0.2.1:/data", "/mnt", "nfs"]\n',
         )
         vm = _make_vm(cloud_init_snippets=["users/admin", "packages/base", "storage/nfs"])
         result = provider._process_cloud_init_snippets(vm)
@@ -278,7 +278,7 @@ class TestTemplateRendering:
         _write_snippet(
             snippet_dir,
             "storage/nfs",
-            'mounts:\n  - ["172.21.0.1:/export", "/mnt", "nfs"]\n',
+            'mounts:\n  - ["192.0.2.1:/export", "/mnt", "nfs"]\n',
         )
         vm = _make_vm(
             cloud_init_snippets=["storage/nfs"],
@@ -288,7 +288,7 @@ class TestTemplateRendering:
         processed = provider._normalize_vm_config(processed)
         content = provider.render_template("proxmox/vms.tf.j2", {"vms": [processed]})
         assert "mounts:" in content
-        assert "172.21.0.1:/export" in content
+        assert "192.0.2.1:/export" in content
 
     def test_ip_config_alongside_user_data(
         self, provider: ProxmoxProvider, snippet_dir: Path

@@ -43,7 +43,7 @@ from infrafoundry.providers.opnsense.services.static_route import (
 def _route(
     name: str,
     *,
-    network: str = "172.21.0.0/24",
+    network: str = "192.0.2.0/24",
     gateway: str = "WAN_DHCP",
     enabled: bool = True,
     description: str = "",
@@ -62,7 +62,7 @@ def _route(
 def _live(
     uuid: str,
     *,
-    network: str = "172.21.0.0/24",
+    network: str = "192.0.2.0/24",
     gateway: str = "WAN_DHCP",
     raw_overrides: dict[str, Any] | None = None,
 ) -> LiveStaticRoute:
@@ -95,12 +95,12 @@ class TestPayload:
     def test_payload_field_set(self) -> None:
         route = _route(
             "lan-via-wan",
-            network="172.21.0.0/24",
+            network="192.0.2.0/24",
             gateway="WAN_DHCP",
             description="reach the LAN",
         )
         inner = route.to_payload()["route"]
-        assert inner["network"] == "172.21.0.0/24"
+        assert inner["network"] == "192.0.2.0/24"
         assert inner["gateway"] == "WAN_DHCP"
         assert inner["descr"] == "reach the LAN"
 
@@ -127,16 +127,16 @@ class TestPayload:
 
 class TestDiffKey:
     def test_diff_key_is_tuple(self) -> None:
-        route = _route("foo", network="172.21.0.0/24", gateway="WAN_DHCP")
-        assert route.diff_key == ("172.21.0.0/24", "WAN_DHCP")
+        route = _route("foo", network="192.0.2.0/24", gateway="WAN_DHCP")
+        assert route.diff_key == ("192.0.2.0/24", "WAN_DHCP")
 
     def test_live_diff_key_is_tuple(self) -> None:
-        live = _live("u1", network="172.21.0.0/24", gateway="WAN_DHCP")
-        assert live.diff_key == ("172.21.0.0/24", "WAN_DHCP")
+        live = _live("u1", network="192.0.2.0/24", gateway="WAN_DHCP")
+        assert live.diff_key == ("192.0.2.0/24", "WAN_DHCP")
 
     def test_yaml_name_does_not_affect_diff_key(self) -> None:
-        a = _route("name-one", network="172.21.0.0/24", gateway="WAN_DHCP")
-        b = _route("name-two", network="172.21.0.0/24", gateway="WAN_DHCP")
+        a = _route("name-one", network="192.0.2.0/24", gateway="WAN_DHCP")
+        b = _route("name-two", network="192.0.2.0/24", gateway="WAN_DHCP")
         assert a.diff_key == b.diff_key
 
 
@@ -159,7 +159,7 @@ class TestComputeDiffAdds:
     def test_new_route_adds(self) -> None:
         diff = compute_diff([_route("foo")], [])
         assert len(diff.adds) == 1
-        assert diff.adds[0].network == "172.21.0.0/24"
+        assert diff.adds[0].network == "192.0.2.0/24"
         assert diff.adds[0].gateway == "WAN_DHCP"
 
 
@@ -169,14 +169,14 @@ class TestComputeDiffUpdates:
         route = _route("foo", description="new description")
         live_raw: dict[str, Any] = {
             "uuid": "u1",
-            "network": "172.21.0.0/24",
+            "network": "192.0.2.0/24",
             "gateway": "WAN_DHCP",
             "disabled": "0",
             "descr": "old description",
         }
         live = LiveStaticRoute(
             uuid="u1",
-            network="172.21.0.0/24",
+            network="192.0.2.0/24",
             gateway="WAN_DHCP",
             raw=live_raw,
         )
@@ -190,14 +190,14 @@ class TestComputeDiffUpdates:
         route = _route("foo", enabled=False)
         live_raw: dict[str, Any] = {
             "uuid": "u1",
-            "network": "172.21.0.0/24",
+            "network": "192.0.2.0/24",
             "gateway": "WAN_DHCP",
             "disabled": "0",
             "descr": "",
         }
         live = LiveStaticRoute(
             uuid="u1",
-            network="172.21.0.0/24",
+            network="192.0.2.0/24",
             gateway="WAN_DHCP",
             raw=live_raw,
         )
@@ -209,7 +209,7 @@ class TestComputeDiffUpdates:
         live_raw: dict[str, Any] = {"uuid": "u1", **route.to_payload()["route"]}
         live = LiveStaticRoute(
             uuid="u1",
-            network="172.21.0.0/24",
+            network="192.0.2.0/24",
             gateway="WAN_DHCP",
             raw=live_raw,
         )
@@ -223,7 +223,7 @@ class TestComputeDiffUpdates:
         live_raw: dict[str, Any] = {"uuid": "u1", **route.to_payload()["route"]}
         live = LiveStaticRoute(
             uuid="u1",
-            network="172.21.0.0/24",
+            network="192.0.2.0/24",
             gateway="WAN_DHCP",
             raw=live_raw,
         )
@@ -233,8 +233,8 @@ class TestComputeDiffUpdates:
     def test_changing_gateway_is_delete_plus_add(self) -> None:
         # Identity tuple changed — old record has no YAML counterpart
         # (delete) and new tuple has no live counterpart (add).
-        old_live = _live("u1", network="172.21.0.0/24", gateway="WAN_DHCP")
-        new_route = _route("foo", network="172.21.0.0/24", gateway="ALT_GW")
+        old_live = _live("u1", network="192.0.2.0/24", gateway="WAN_DHCP")
+        new_route = _route("foo", network="192.0.2.0/24", gateway="ALT_GW")
         diff = compute_diff([new_route], [old_live])
         assert len(diff.adds) == 1
         assert diff.adds[0].gateway == "ALT_GW"
@@ -257,14 +257,14 @@ class TestComputeDiffDeletes:
         route = _route("foo", description="changed")
         live_raw: dict[str, Any] = {
             "uuid": "u1",
-            "network": "172.21.0.0/24",
+            "network": "192.0.2.0/24",
             "gateway": "WAN_DHCP",
             "disabled": "0",
             "descr": "old",
         }
         live = LiveStaticRoute(
             uuid="u1",
-            network="172.21.0.0/24",
+            network="192.0.2.0/24",
             gateway="WAN_DHCP",
             raw=live_raw,
         )
@@ -277,14 +277,14 @@ class TestComputeDiffLocked:
         route = _route("survival", description="locked", lock=True)
         live_raw: dict[str, Any] = {
             "uuid": "u1",
-            "network": "172.21.0.0/24",
+            "network": "192.0.2.0/24",
             "gateway": "WAN_DHCP",
             "disabled": "0",
             "descr": "drift!",
         }
         live = LiveStaticRoute(
             uuid="u1",
-            network="172.21.0.0/24",
+            network="192.0.2.0/24",
             gateway="WAN_DHCP",
             raw=live_raw,
         )
@@ -310,11 +310,11 @@ class TestComputeDiffLocked:
         # when they have no live counterpart and there's another live
         # to delete.
         route = _route("locked-name", lock=True)
-        live_other = _live("u2", network="172.16.0.0/24", gateway="WAN_DHCP")
+        live_other = _live("u2", network="198.51.100.0/24", gateway="WAN_DHCP")
         diff = compute_diff([route], [live_other])
-        # The other live (172.16/24) should still be deleted.
+        # The other live (198.51.100.0/24) should still be deleted.
         assert len(diff.deletes) == 1
-        assert diff.deletes[0].network == "172.16.0.0/24"
+        assert diff.deletes[0].network == "198.51.100.0/24"
 
 
 class TestDiffIsEmpty:
@@ -362,13 +362,13 @@ class TestNormalizeField:
     def test_select_dict_extracts_selected_key(self) -> None:
         # getroute returns gateway as a select dict.
         value = {
-            "WAN_DHCP": {"value": "WAN_DHCP - 172.21.0.1", "selected": 1},
+            "WAN_DHCP": {"value": "WAN_DHCP - 192.0.2.1", "selected": 1},
             "WAN_DHCP6": {"value": "WAN_DHCP6 - fe80::1", "selected": 0},
         }
         assert _normalize_field(value) == "WAN_DHCP"
 
     def test_select_dict_no_selection_returns_empty(self) -> None:
-        value = {"WAN_DHCP": {"value": "WAN_DHCP - 172.21.0.1", "selected": 0}}
+        value = {"WAN_DHCP": {"value": "WAN_DHCP - 192.0.2.1", "selected": 0}}
         assert _normalize_field(value) == ""
 
 
@@ -382,7 +382,7 @@ class TestConfigsFromResources:
         r = _resource(
             "lan-via-wan",
             {
-                "network": "172.21.0.0/24",
+                "network": "192.0.2.0/24",
                 "gateway": "WAN_DHCP",
                 "description": "lan",
             },
@@ -391,14 +391,14 @@ class TestConfigsFromResources:
         assert len(result) == 1
         cfg = result[0]
         assert cfg.name == "lan-via-wan"
-        assert cfg.network == "172.21.0.0/24"
+        assert cfg.network == "192.0.2.0/24"
         assert cfg.gateway == "WAN_DHCP"
         assert cfg.description == "lan"
 
     def test_default_enabled_true(self) -> None:
         r = _resource(
             "foo",
-            {"network": "172.21.0.0/24", "gateway": "WAN_DHCP"},
+            {"network": "192.0.2.0/24", "gateway": "WAN_DHCP"},
         )
         cfg = static_route_configs_from_resources([r])[0]
         assert cfg.enabled is True
@@ -406,7 +406,7 @@ class TestConfigsFromResources:
     def test_explicit_enabled_false(self) -> None:
         r = _resource(
             "foo",
-            {"network": "172.21.0.0/24", "gateway": "WAN_DHCP", "enabled": False},
+            {"network": "192.0.2.0/24", "gateway": "WAN_DHCP", "enabled": False},
         )
         cfg = static_route_configs_from_resources([r])[0]
         assert cfg.enabled is False
@@ -414,7 +414,7 @@ class TestConfigsFromResources:
     def test_lock_passthrough(self) -> None:
         r = _resource(
             "foo",
-            {"network": "172.21.0.0/24", "gateway": "WAN_DHCP", "lock": True},
+            {"network": "192.0.2.0/24", "gateway": "WAN_DHCP", "lock": True},
         )
         cfg = static_route_configs_from_resources([r])[0]
         assert cfg.lock is True
@@ -430,19 +430,19 @@ class TestConfigsFromResources:
             static_route_configs_from_resources([r])
 
     def test_missing_gateway_rejected(self) -> None:
-        r = _resource("bad", {"network": "172.21.0.0/24"})
+        r = _resource("bad", {"network": "192.0.2.0/24"})
         with pytest.raises(ValueError, match="gateway"):
             static_route_configs_from_resources([r])
 
     def test_empty_gateway_rejected(self) -> None:
-        r = _resource("bad", {"network": "172.21.0.0/24", "gateway": ""})
+        r = _resource("bad", {"network": "192.0.2.0/24", "gateway": ""})
         with pytest.raises(ValueError, match="gateway"):
             static_route_configs_from_resources([r])
 
     def test_non_string_description_rejected(self) -> None:
         r = _resource(
             "bad",
-            {"network": "172.21.0.0/24", "gateway": "WAN_DHCP", "description": 12345},
+            {"network": "192.0.2.0/24", "gateway": "WAN_DHCP", "description": 12345},
         )
         with pytest.raises(ValueError, match="description"):
             static_route_configs_from_resources([r])
@@ -450,7 +450,7 @@ class TestConfigsFromResources:
     def test_non_bool_enabled_rejected(self) -> None:
         r = _resource(
             "bad",
-            {"network": "172.21.0.0/24", "gateway": "WAN_DHCP", "enabled": "yes"},
+            {"network": "192.0.2.0/24", "gateway": "WAN_DHCP", "enabled": "yes"},
         )
         with pytest.raises(ValueError, match="enabled"):
             static_route_configs_from_resources([r])
@@ -458,7 +458,7 @@ class TestConfigsFromResources:
     def test_non_bool_lock_rejected(self) -> None:
         r = _resource(
             "bad",
-            {"network": "172.21.0.0/24", "gateway": "WAN_DHCP", "lock": "yes"},
+            {"network": "192.0.2.0/24", "gateway": "WAN_DHCP", "lock": "yes"},
         )
         with pytest.raises(ValueError, match="lock"):
             static_route_configs_from_resources([r])
@@ -468,7 +468,7 @@ class TestConfigsFromResources:
             name="bad",
             type="routing.static",
             provider="opnsense",
-            config={"network": "172.21.0.0/24", "gateway": "WAN_DHCP"},
+            config={"network": "192.0.2.0/24", "gateway": "WAN_DHCP"},
         )
         # Bypass pydantic — guard the service-side defensive check.
         r.config = "not-a-dict"  # type: ignore[assignment]
@@ -476,7 +476,7 @@ class TestConfigsFromResources:
             static_route_configs_from_resources([r])
 
     def test_non_static_routes_resources_ignored(self) -> None:
-        sr = _resource("ok", {"network": "172.21.0.0/24", "gateway": "WAN_DHCP"})
+        sr = _resource("ok", {"network": "192.0.2.0/24", "gateway": "WAN_DHCP"})
         other = ResourceConfig(name="x", type="firewall.aliases", provider="opnsense", config={})
         result = static_route_configs_from_resources([sr, other])
         assert len(result) == 1
@@ -492,14 +492,14 @@ class TestRowToLive:
     def test_basic_row(self) -> None:
         row = {
             "uuid": "u1",
-            "network": "172.21.0.0/24",
+            "network": "192.0.2.0/24",
             "gateway": "WAN_DHCP",
             "descr": "lan",
             "disabled": "0",
         }
         live = _row_to_live(row)
         assert live.uuid == "u1"
-        assert live.network == "172.21.0.0/24"
+        assert live.network == "192.0.2.0/24"
         assert live.gateway == "WAN_DHCP"
         assert live.raw == row
 
@@ -514,7 +514,7 @@ class TestRowToLive:
         # the helper handles the option-dict case if it ever changes.
         row = {
             "uuid": "u1",
-            "network": "172.21.0.0/24",
+            "network": "192.0.2.0/24",
             "gateway": {"WAN_DHCP": {"value": "x", "selected": 1}},
         }
         live = _row_to_live(row)
@@ -528,8 +528,8 @@ class TestRowToLive:
 
 class TestSynthesizeName:
     def test_v4_cidr(self) -> None:
-        live = _live("u1", network="172.21.0.0/24", gateway="WAN_DHCP")
-        assert _synthesize_name(live) == "route-172-21-0-0-24-via-wan_dhcp"
+        live = _live("u1", network="192.0.2.0/24", gateway="WAN_DHCP")
+        assert _synthesize_name(live) == "route-192-0-2-0-24-via-wan_dhcp"
 
     def test_v6_cidr(self) -> None:
         live = _live("u1", network="2001:db8::/32", gateway="WAN_DHCP6")
@@ -537,8 +537,8 @@ class TestSynthesizeName:
         assert _synthesize_name(live) == "route-2001-db8---32-via-wan_dhcp6"
 
     def test_lowercase(self) -> None:
-        live = _live("u1", network="172.21.0.0/24", gateway="MyGW")
-        assert _synthesize_name(live) == "route-172-21-0-0-24-via-mygw"
+        live = _live("u1", network="192.0.2.0/24", gateway="MyGW")
+        assert _synthesize_name(live) == "route-192-0-2-0-24-via-mygw"
 
 
 # ---------------------------------------------------------------------------
@@ -559,9 +559,9 @@ class TestServiceSearch:
         client = MagicMock()
         client.request.return_value = {
             "rows": [
-                {"uuid": "u1", "network": "172.21.0.0/24", "gateway": "WAN_DHCP"},
+                {"uuid": "u1", "network": "192.0.2.0/24", "gateway": "WAN_DHCP"},
                 "not-a-dict",  # filtered out
-                {"uuid": "u2", "network": "172.16.0.0/24", "gateway": "WAN_DHCP"},
+                {"uuid": "u2", "network": "198.51.100.0/24", "gateway": "WAN_DHCP"},
             ]
         }
         svc = StaticRouteService(client)
@@ -586,11 +586,11 @@ class TestServiceSearch:
 class TestServiceGet:
     def test_get_uses_get_verb(self) -> None:
         client = MagicMock()
-        client.request.return_value = {"route": {"network": "172.21.0.0/24"}}
+        client.request.return_value = {"route": {"network": "192.0.2.0/24"}}
         svc = StaticRouteService(client)
         result = svc.get("u1")
         client.request.assert_called_once_with("GET", "routes/routes/getroute/u1")
-        assert result == {"route": {"network": "172.21.0.0/24"}}
+        assert result == {"route": {"network": "192.0.2.0/24"}}
 
 
 class TestServiceWriteOps:
@@ -639,7 +639,7 @@ class TestApplyDiff:
         client = MagicMock()
         client.request.return_value = {"result": "saved"}
         svc = StaticRouteService(client)
-        diff = Diff(adds=[_route("foo"), _route("bar", network="172.16.0.0/24")])
+        diff = Diff(adds=[_route("foo"), _route("bar", network="198.51.100.0/24")])
         counts = svc.apply_diff(diff)
         endpoints = [c.args[1] for c in client.request.call_args_list]
         assert endpoints.count("routes/routes/addroute") == 2
@@ -665,7 +665,7 @@ class TestApplyDiff:
         diff = Diff(
             deletes=[
                 _live("u1"),
-                _live("u2", network="172.16.0.0/24"),
+                _live("u2", network="198.51.100.0/24"),
             ]
         )
         counts = svc.apply_diff(diff)
@@ -680,8 +680,8 @@ class TestApplyDiff:
         client.request.return_value = {"result": "saved"}
         svc = StaticRouteService(client)
         live_for_update = _live("u1")
-        live_for_delete = _live("u2", network="172.16.0.0/24")
-        new = _route("new", network="192.168.0.0/24")
+        live_for_delete = _live("u2", network="198.51.100.0/24")
+        new = _route("new", network="203.0.113.0/24")
         update_target = _route("foo", description="changed")
         diff = Diff(
             adds=[new],
@@ -718,7 +718,7 @@ class TestExportToYaml:
                 "rows": [
                     {
                         "uuid": "u1",
-                        "network": "172.21.0.0/24",
+                        "network": "192.0.2.0/24",
                         "gateway": "WAN_DHCP",
                         "descr": "lan",
                         "disabled": "0",
@@ -728,9 +728,9 @@ class TestExportToYaml:
             # getroute/u1
             {
                 "route": {
-                    "network": "172.21.0.0/24",
+                    "network": "192.0.2.0/24",
                     "gateway": {
-                        "WAN_DHCP": {"value": "WAN_DHCP - 172.21.0.1", "selected": 1},
+                        "WAN_DHCP": {"value": "WAN_DHCP - 192.0.2.1", "selected": 1},
                         "WAN_DHCP6": {"value": "WAN_DHCP6 - fe80::1", "selected": 0},
                     },
                     "descr": "lan",
@@ -741,9 +741,9 @@ class TestExportToYaml:
         svc = StaticRouteService(client)
         text = svc.export_to_yaml()
         # Synthetic name appears.
-        assert "route-172-21-0-0-24-via-wan_dhcp" in text
+        assert "route-192-0-2-0-24-via-wan_dhcp" in text
         # Field decoding worked.
-        assert "network: 172.21.0.0/24" in text
+        assert "network: 192.0.2.0/24" in text
         assert "gateway: WAN_DHCP" in text
         assert "description: lan" in text
         assert "enabled: true" in text
@@ -763,7 +763,7 @@ class TestLiveToExportConfig:
             "route": {
                 "network": "2001:db8::/32",
                 "gateway": {
-                    "WAN_DHCP": {"value": "WAN_DHCP - 172.21.0.1", "selected": 0},
+                    "WAN_DHCP": {"value": "WAN_DHCP - 192.0.2.1", "selected": 0},
                     "WAN_DHCP6": {"value": "WAN_DHCP6 - fe80::1", "selected": 1},
                 },
                 "descr": "v6 route",
@@ -808,7 +808,7 @@ class TestEnabledField261:
 
     def test_export_reads_enabled(self) -> None:
         cfg = _live_to_export_config(
-            {"route": {"network": "172.21.0.0/24", "gateway": "WAN_DHCP", "enabled": "0"}}
+            {"route": {"network": "192.0.2.0/24", "gateway": "WAN_DHCP", "enabled": "0"}}
         )
         assert cfg["enabled"] is False
 
@@ -824,9 +824,7 @@ class TestApplyDiffRejectedWrite:
         }
         svc = StaticRouteService(client)
 
-        with pytest.raises(
-            APIError, match=r"add static route 172\.21\.0\.0/24.*Option not in list"
-        ):
+        with pytest.raises(APIError, match=r"add static route 192\.0\.2\.0/24.*Option not in list"):
             svc.apply_diff(Diff(adds=[_route("foo")]))
 
         endpoints = [c.args[1] for c in client.request.call_args_list]

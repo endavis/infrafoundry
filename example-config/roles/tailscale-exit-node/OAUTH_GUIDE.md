@@ -93,7 +93,7 @@ vms:
     clone: ubuntu-22-04-template
     cores: 2
     memory: 2048
-    ipconfig: ip=172.20.100.20/24,gw=172.20.100.1
+    ipconfig: ip=192.0.2.20/24,gw=192.0.2.1
 
     ansible_roles:
       - tailscale-exit-node
@@ -166,7 +166,7 @@ ansible_vars:
   tailscale_oauth_client_id: "{{ vault_tailscale_oauth_client_id }}"
   tailscale_oauth_client_secret: "{{ vault_tailscale_oauth_client_secret }}"
   tailscale_advertise_routes:
-    - "172.20.100.0/24"
+    - "192.0.2.0/24"
     - "10.0.0.0/8"
 ```
 

@@ -260,12 +260,12 @@ class TestResolverIntegration:
             {"secrets": {"opnsense": {"carp_passwords": {"lan_carp_1": "s3kr1t"}}}},
         )
         config = {
-            "address": "172.21.0.1",
+            "address": "192.0.2.1",
             "password": "secret://env_secrets/opnsense/carp_passwords/lan_carp_1",
             "vhid": "1",
         }
         resolved = resolver.resolve_config(config)
-        assert resolved["address"] == "172.21.0.1"
+        assert resolved["address"] == "192.0.2.1"
         assert resolved["password"] == "s3kr1t"
         assert resolved["vhid"] == "1"
         resolver.close()

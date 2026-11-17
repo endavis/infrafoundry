@@ -307,7 +307,7 @@ class TestProxmoxConfigExporter:
         mock_response.raise_for_status = Mock()
         mock_response.json.return_value = {
             "data": [
-                {"iface": "vmbr0", "type": "bridge", "cidr": "172.21.0.1/24"},
+                {"iface": "vmbr0", "type": "bridge", "cidr": "192.0.2.1/24"},
                 {"iface": "eth0", "type": "eth", "cidr": ""},  # Should be filtered out
             ]
         }

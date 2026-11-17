@@ -1002,7 +1002,7 @@ def _uho_resource(name: str) -> ResourceConfig:
         name=name,
         type="unbound.host_overrides",
         provider="opnsense",
-        config={"hostname": "web", "domain": "example.com", "server": "192.168.1.10"},
+        config={"hostname": "web", "domain": "example.com", "server": "192.0.2.10"},
     )
 
 
@@ -1020,7 +1020,7 @@ def _ufwd_resource(name: str) -> ResourceConfig:
         name=name,
         type="unbound.forwards",
         provider="opnsense",
-        config={"server": "172.21.0.53"},
+        config={"server": "192.0.2.53"},
     )
 
 
@@ -1314,7 +1314,7 @@ class TestUnboundReconfigureCoalescing:
 # ---------------------------------------------------------------------------
 
 
-def _kea_subnet(name: str, *, subnet: str = "10.0.10.0/24") -> ResourceConfig:
+def _kea_subnet(name: str, *, subnet: str = "198.51.100.0/24") -> ResourceConfig:
     """Helper for ``kea.dhcp4.subnets`` resources."""
     return ResourceConfig(
         name=name,
@@ -1333,7 +1333,7 @@ def _kea_reservation(name: str) -> ResourceConfig:
         config={
             "subnet_ref": "lan-dhcp",
             "hw_address": "aa:bb:cc:dd:ee:01",
-            "ip_address": "10.0.10.50",
+            "ip_address": "198.51.100.50",
             "hostname": name,
         },
     )
@@ -1351,8 +1351,8 @@ class TestSiblingResourceThreading:
             SIBLING_RESOURCE_TYPE = "kea.dhcp4.subnets"
 
         all_resources = [
-            _kea_subnet("lan-dhcp", subnet="10.0.10.0/24"),
-            _kea_subnet("guest-dhcp", subnet="10.0.20.0/24"),
+            _kea_subnet("lan-dhcp", subnet="198.51.100.0/24"),
+            _kea_subnet("guest-dhcp", subnet="203.0.113.0/24"),
             _kea_reservation("server1"),
             _vlan_resource("v1", "igb0", 10),
         ]
@@ -1385,7 +1385,7 @@ class TestSiblingResourceThreading:
         """The runner threads kea.dhcp4.subnets into the reservation manager."""
         runner = OPNsenseDirectRunner()
         all_resources = [
-            _kea_subnet("lan-dhcp", subnet="10.0.10.0/24"),
+            _kea_subnet("lan-dhcp", subnet="198.51.100.0/24"),
             _kea_reservation("server1"),
         ]
 
@@ -2135,7 +2135,7 @@ class TestDeletePhase:
         self, provider_with_env: MagicMock
     ) -> None:
         diff = Diff()
-        diff.blocked = [("u", "172.21.0.0/24", ["aa:bb 172.21.0.5"])]  # type: ignore[attr-defined]
+        diff.blocked = [("u", "192.0.2.0/24", ["aa:bb 192.0.2.5"])]  # type: ignore[attr-defined]
         diff.warnings = ["not deleting y"]  # type: ignore[attr-defined]
         cls, _ = _scoped_manager("managed_set", diff=diff)
         provider_with_env.get_direct_api_resource_types.return_value = {"kea.dhcp4.subnets": cls}

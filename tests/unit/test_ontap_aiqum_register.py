@@ -43,7 +43,7 @@ aq: Any = _load()
 
 FULL_VARS: dict[str, Any] = {
     "cluster_name": "lab",
-    "cluster_mgmt_ip": "172.21.0.80",
+    "cluster_mgmt_ip": "192.0.2.80",
     "ontap_password": ONTAP_PW,
     "aiqum_address": "aiqum.example",
     "aiqum_admin_password": ADMIN_PW,
@@ -141,7 +141,7 @@ def test_load_config_requires_cluster_details(missing: str) -> None:
 def test_build_add_body() -> None:
     cfg = aq.load_config({**FULL_VARS, "aiqum_cluster_user": "svc"})
     assert aq.build_add_body(cfg) == {
-        "address": "172.21.0.80",
+        "address": "192.0.2.80",
         "username": "svc",
         "password": ONTAP_PW,
         "port": 443,
@@ -151,9 +151,9 @@ def test_build_add_body() -> None:
 
 def test_find_matching_by_address_or_name() -> None:
     cfg = aq.load_config(FULL_VARS)
-    by_ip = {"address": "172.21.0.80", "key": "k1"}
-    by_name = {"address": "172.21.0.99", "name": "lab", "key": "k2"}
-    other = {"address": "172.21.0.5", "name": "x", "key": "k3"}
+    by_ip = {"address": "192.0.2.80", "key": "k1"}
+    by_name = {"address": "192.0.2.99", "name": "lab", "key": "k2"}
+    other = {"address": "192.0.2.5", "name": "x", "key": "k3"}
     assert aq.find_matching([by_ip, by_name, other], cfg) == [by_ip, by_name]
 
 
@@ -162,18 +162,18 @@ def test_register_posts_with_basic_auth(fake: tuple[FakeAIQUM, str]) -> None:
 
     msg = aq.register(_cfg(address))
 
-    assert "added cluster 172.21.0.80" in msg
+    assert "added cluster 192.0.2.80" in msg
     ((path, headers, body),) = _calls(state, "POST")
     assert path == "/api/admin/datasources/clusters"
     expected = base64.b64encode(f"umadmin:{ADMIN_PW}".encode()).decode()
     assert headers["authorization"] == f"Basic {expected}"
-    assert body["address"] == "172.21.0.80"
+    assert body["address"] == "192.0.2.80"
     assert body["password"] == ONTAP_PW
 
 
 def test_register_is_noop_when_present(fake: tuple[FakeAIQUM, str]) -> None:
     state, address = fake
-    state.clusters = [{"address": "172.21.0.80", "name": "lab", "key": "k1"}]
+    state.clusters = [{"address": "192.0.2.80", "name": "lab", "key": "k1"}]
 
     msg = aq.register(_cfg(address))
 
@@ -191,9 +191,9 @@ def test_register_treats_409_as_ok(fake: tuple[FakeAIQUM, str]) -> None:
 def test_remove_deletes_only_matching(fake: tuple[FakeAIQUM, str]) -> None:
     state, address = fake
     state.clusters = [
-        {"address": "172.21.0.80", "name": "a", "key": "k1"},
-        {"address": "172.21.0.99", "name": "lab", "key": "k2"},
-        {"address": "172.21.0.5", "name": "other", "key": "k3"},
+        {"address": "192.0.2.80", "name": "a", "key": "k1"},
+        {"address": "192.0.2.99", "name": "lab", "key": "k2"},
+        {"address": "192.0.2.5", "name": "other", "key": "k3"},
     ]
 
     msg = aq.remove(_cfg(address))
@@ -208,7 +208,7 @@ def test_remove_deletes_only_matching(fake: tuple[FakeAIQUM, str]) -> None:
 
 def test_remove_with_nothing_to_remove(fake: tuple[FakeAIQUM, str]) -> None:
     state, address = fake
-    state.clusters = [{"address": "172.21.0.5", "name": "other", "key": "k3"}]
+    state.clusters = [{"address": "192.0.2.5", "name": "other", "key": "k3"}]
 
     assert "nothing to do" in aq.remove(_cfg(address))
     assert _calls(state, "DELETE") == []
@@ -236,7 +236,7 @@ def test_main_without_package_vars_fails() -> None:
 
 @pytest.mark.parametrize("args", [(), ("--remove",)])
 def test_main_skips_without_inputs(args: tuple[str, ...]) -> None:
-    result = _run({"cluster_mgmt_ip": "172.21.0.80"}, *args)
+    result = _run({"cluster_mgmt_ip": "192.0.2.80"}, *args)
     assert result.returncode == 0
     assert "skipping" in result.stdout
 
@@ -311,7 +311,7 @@ def test_cleanup_script_skips_without_inputs(tmp_path: Path) -> None:
     env = {
         **os.environ,
         "INFRAFOUNDRY_BLUEPRINT_DIR": str(BLUEPRINT),
-        "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"cluster_mgmt_ip": "172.21.0.80"}),
+        "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"cluster_mgmt_ip": "192.0.2.80"}),
     }
     result = subprocess.run(
         ["bash", str(SCRIPTS / "ontap-destroy-cleanup.sh")],

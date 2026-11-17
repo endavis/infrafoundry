@@ -550,7 +550,7 @@ def _is_valid_ip_or_cidr(value: str) -> bool:
         pass
     try:
         # ``strict=False`` allows host bits set, matching OPNsense's
-        # acceptance of e.g. ``192.168.1.10/24`` for host aliases.
+        # acceptance of e.g. ``192.0.2.10/24`` for host aliases.
         ipaddress.ip_network(value, strict=False)
         return True
     except ValueError:
