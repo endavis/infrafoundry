@@ -10,6 +10,7 @@ tags:
 # ADR-0014: OPNsense Direct-API Apply Mechanism
 
 **Date:** 2026-04-30
+**Amended:** 2026-11-17 (#1389) — `hasync.settings` per-component decision recorded (direct-REST against `core/hasync/*`; password as a secret, write-only when the box does not read it back)
 **Amended:** 2026-05-03 (#717, PR #718) — added second internal write path for resources with no native REST CRUD; records `interface_assignments` per-component decision
 **Amended:** 2026-05-03 (#720, PR #N) — Gates (2) and (3) cleared; production conversion of `interface_assignments` from no-op to live complete (full CRUD via the in-tree `AssignSettingsController.php` fork at `src/infrafoundry/providers/opnsense/extensions/interface_assignments/`). Spike deleted.
 **Amended:** 2026-05-04 (#722) — `static_routes` per-component decision recorded (stock direct-REST against `routes/routes/*route`; natural-key identity tuple `(network, gateway)`)
@@ -609,6 +610,19 @@ The dispatch order is settings, accounts, validations, actions, certs. Certs set
 - **Reconfigure:** both managers share the `kea_reconfigure` hook, one `kea/service/reconfigure` per apply. `kea.dhcp4.ha_peers` destroy reconfigures directly.
 - **Verified** by reads and live writes on a single test firewall: the peer write envelope and `delPeer` reply, `general` left untouched by a `dhcpv4.ha`-only `set`, the one-step disable, and the auto-collect re-run. **Not verified:** XMLRPC sync to a backup node.
 
+### `hasync.settings` (#1389, 2026-11-17)
+
+**Mechanism:** Direct-REST against the core `core/hasync/*` controller. One type, a singleton dict for System > High Availability > Settings (pfsync and XMLRPC sync). Destroy is a no-op.
+
+- **Endpoints:** `GET core/hasync/get`, `POST core/hasync/set` and `POST core/hasync/reconfigure`. All are `EndpointKind.STOCK` and listed in the 26.1.x specs.
+- **Write envelope:** `{"hasync": {...}}`, built from the whole flattened live object with the declared fields overwritten. The live `password` is never echoed, because echoing an empty or masked value could clear the stored one.
+- **Password:** a `secret://` URI resolved through `resolve_resource_secrets`. A readable live password is compared and written on a difference. An empty or masked one never counts as drift; the resolved password is still sent with `update_password: true` or when another declared field is written in the same apply. It is never logged, put in an exception message or shown in a plan map (`[REDACTED]`).
+- **Order and dependency:** `interfaces.assignments`; dispatched right after `interfaces.virtual_ips`. It joins the split delete phase like `hostdiscovery`, because its parent splits; destroy is a no-op, so nothing is deleted.
+- **Reconfigure:** the manager declares `FINALIZATION_HOOK = "hasync_reconfigure"`, so one `core/hasync/reconfigure` call fires per apply, only when the settings changed.
+- **Validation:** offline checks on plan; `pfsync_interface` and `sync_items` are checked against the live option maps in `infra doctor`, and the manager refuses an unknown value before any write.
+- **Migrate:** exports the declared fields; `password` is only a placeholder when the box holds one.
+- **Verified:** the endpoints in every bundled 26.1 spec and the `pfsyncversion` option keys (`1301`, `1400`) on a live read. **Verified on a test box** (throwaway secret, restored afterwards): one `set` plus one `reconfigure` (`ok`) per apply, `password` reads back in clear and a re-plan is a no-op, unknown `pfsync_interface` and `sync_items` are rejected by doctor and refused by apply before any write, migrate exports only the placeholder, and no secret text appears in any output. **Not verified:** XMLRPC sync to a real backup node; see [the coverage doc](../development/opnsense-resource-coverage.md#ha-sync-settings-1389).
+
 ### `monit.*` (#791, 2026-11-11)
 
 **Mechanism:** Direct-REST against the core `monit/*` MVC controllers. Four types: `monit.settings` (a singleton dict) and `monit.alerts`, `monit.tests` and `monit.services` (managed-set lists, [ADR-0018](0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)). Documented in [Monit (#791)](../development/opnsense-resource-coverage.md#monit-791). Monit ships with OPNsense, so every endpoint is `EndpointKind.STOCK`: the offline conformance test and the plan-time version check cover them, and there is no missing-plugin tolerance. Never registered: `toggle*`, `service/start|stop|restart|check` and `status/*`; the provider does not start or stop the service.
@@ -736,6 +750,8 @@ The validator (plan-time) accepts `secret://...` URIs as a valid placeholder wit
 
 **`tailscale.auth` (#787)** resolves `pre_auth_key` through the same `resolve_resource_secrets` helper; a literal is a validator ERROR, the strict convention of `system.users`, `openvpn.instances` and `openvpn.static_keys`.
 
+**`hasync.settings` (#1389)** resolves `password` through the same `resolve_resource_secrets` helper. A literal is a validator WARNING, the `virtual_ips` convention the issue asks for, rather than the ERROR of `tailscale.auth` and `system.users`.
+
 **Future-proofing:** if a follow-up direct-API resource needs secrets, that issue is the place to consolidate this pattern (e.g., generalize to runner-level pre-resolution rather than per-component manager). The current component-manager-level resolution is the smallest viable path.
 
 ### Runtime credential resolution (#741, 2026-05-05)
@@ -787,6 +803,7 @@ The runner integration via ADR-0010 protocols keeps the CLI surface consistent: 
 - Issue [#707](https://github.com/endavis/infrafoundry/issues/707): chore: write ADR-0014 codifying OPNsense direct-API apply mechanism (this ADR).
 - Issue [#1092](https://github.com/endavis/infrafoundry/issues/1092): feat: manage OPNsense global interface settings (`interfaces.settings`).
 - Issue [#1333](https://github.com/endavis/infrafoundry/issues/1333): bug: OPNsense outbound NAT rules duplicate on every apply when `snat_mode` is automatic; adds `firewall.source_nat`.
+- Issue [#1389](https://github.com/endavis/infrafoundry/issues/1389): feat: add the `hasync.settings` direct-API resource for OPNsense HA pairing.
 - Issue [#804](https://github.com/endavis/infrafoundry/issues/804): feat: add `syslog.settings` direct-API resource for the OPNsense local syslog daemon.
 - Issue [#792](https://github.com/endavis/infrafoundry/issues/792): feat: add `hostdiscovery` resource type for the OPNsense host discovery service.
 - Issue [#807](https://github.com/endavis/infrafoundry/issues/807): feat: add `trust.cas` and `trust.certs` direct-API resources for OPNsense.

@@ -18,12 +18,15 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.providers.opnsense import endpoints
 from infrafoundry.providers.opnsense.api_client import OPNsenseClient
+from infrafoundry.providers.opnsense.services.hasync_settings import live_options
 from infrafoundry.providers.opnsense.validators import (
     AcmeClientValidator,
     CronJobsValidator,
     FirewallCategoryValidator,  # #1286
     FirewallRuleValidator,
     GatewayValidator,
+    HasyncLiveValidator,  # #1389
+    HasyncValidator,  # #1389
     HostDiscoveryValidator,
     InterfaceAssignmentValidator,
     InterfacesSettingsValidator,
@@ -141,6 +144,8 @@ class OPNsenseValidator:
         self.unbound_settings_validator = UnboundSettingsValidator(report)
         self.interfaces_settings_validator = InterfacesSettingsValidator(report)
         self.syslog_settings_validator = SyslogSettingsValidator(report)  # #804
+        self.hasync_validator = HasyncValidator(report)  # #1389
+        self.hasync_live_validator = HasyncLiveValidator(report)  # #1389
         self.hostdiscovery_validator = HostDiscoveryValidator(report)
         self.source_nat_validator = SourceNatValidator(report)  # #1333
 
@@ -309,6 +314,14 @@ class OPNsenseValidator:
                 api_url, api_key, api_secret
             )
 
+            # #1389: the live pfsync interface and sync-item options, only when in scope
+            hasync_interfaces: set[str] = set()
+            hasync_items: set[str] = set()
+            if resource_refs["hasync"]:
+                hasync_interfaces, hasync_items = self._get_existing_hasync_options(
+                    api_url, api_key, api_secret
+                )
+
             context = self._build_context(
                 resources,
                 resource_refs,
@@ -318,6 +331,8 @@ class OPNsenseValidator:
                 existing_aliases=existing_aliases,
                 existing_gateways=existing_gateways,
                 existing_host_override_names=existing_unbound_host_overrides,
+                existing_hasync_interfaces=hasync_interfaces,
+                existing_hasync_sync_items=hasync_items,
             )
             self._run_live_validators(context, resource_refs)
             self._run_offline_validators(context, resource_refs)
@@ -342,6 +357,8 @@ class OPNsenseValidator:
         existing_aliases: dict[str, Any] | None = None,
         existing_gateways: set[str] | None = None,
         existing_host_override_names: set[str] | None = None,
+        existing_hasync_interfaces: set[str] | None = None,
+        existing_hasync_sync_items: set[str] | None = None,
     ) -> OPNsenseValidationContext:
         """Build the validation context; the ``existing_*`` fields stay empty offline."""
         return OPNsenseValidationContext(
@@ -367,6 +384,8 @@ class OPNsenseValidator:
             existing_aliases=existing_aliases or {},
             existing_gateways=existing_gateways or set(),
             existing_host_override_names=existing_host_override_names or set(),
+            existing_hasync_interfaces=existing_hasync_interfaces or set(),
+            existing_hasync_sync_items=existing_hasync_sync_items or set(),
             managed_gateways=reference_refs["gateways"],
             index=xref_index,
         )
@@ -419,6 +438,7 @@ class OPNsenseValidator:
             replace(context, resources=resource_refs["hostdiscovery"])
         )
         self.radvd_validator.validate(replace(context, resources=resource_refs["radvd"]))
+        self.hasync_live_validator.validate(replace(context, resources=resource_refs["hasync"]))
 
     def _run_offline_validators(
         self, context: OPNsenseValidationContext, resource_refs: dict[str, Any]
@@ -443,6 +463,7 @@ class OPNsenseValidator:
         self.syslog_settings_validator.validate(
             replace(context, resources=resource_refs["syslog_settings"])
         )
+        self.hasync_validator.validate(replace(context, resources=resource_refs["hasync"]))  # #1389
         # #1333
         self.source_nat_validator.validate(replace(context, resources=resource_refs["source_nat"]))
         self.kea_reservation_validator.validate(context)
@@ -525,6 +546,7 @@ class OPNsenseValidator:
         unbound_settings = [r for r in resources if r.type == "unbound.settings"]
         interfaces_settings = [r for r in resources if r.type == "interfaces.settings"]
         syslog_settings = [r for r in resources if r.type == "syslog.settings"]  # #804
+        hasync = [r for r in resources if r.type == "hasync.settings"]  # #1389
         hostdiscovery = [r for r in resources if r.type == "hostdiscovery"]
         source_nat = [r for r in resources if r.type == "firewall.source_nat"]  # #1333
         interface_assignments = [r for r in resources if r.type == "interfaces.assignments"]
@@ -579,6 +601,7 @@ class OPNsenseValidator:
             "unbound_settings": unbound_settings,
             "interfaces_settings": interfaces_settings,
             "syslog_settings": syslog_settings,  # #804
+            "hasync": hasync,  # #1389
             "hostdiscovery": hostdiscovery,
             "source_nat": source_nat,  # #1333
             "interface_assignments": interface_assignments,
@@ -786,6 +809,37 @@ class OPNsenseValidator:
             if isinstance(name, str) and name:
                 names.add(name)
         return names
+
+    def _get_existing_hasync_options(
+        self, api_url: str, api_key: str, api_secret: str
+    ) -> tuple[set[str], set[str]]:
+        """Get the live pfsync interface and sync-item option keys (#1389).
+
+        Used by the HA sync live validator, which checks ``pfsync_interface`` and
+        ``sync_items`` against them.
+
+        Args:
+            api_url: OPNsense API base URL
+            api_key: API key
+            api_secret: API secret
+
+        Returns:
+            ``(interface keys, sync item keys)``; both empty if the API call fails.
+        """
+        data = self.api_validator.fetch_json(
+            url=f"{api_url}/api/{endpoints.HASYNC_GET.path()}",
+            auth=(api_key, api_secret),
+            verify_ssl=False,
+            timeout=10,
+            method="GET",
+            check_name="opnsense_get_hasync",
+            error_message="Could not retrieve HA sync settings (status {status})",
+            error_level=ValidationLevel.WARNING,
+        )
+        hasync = data.get("hasync") if isinstance(data, dict) else None
+        if not isinstance(hasync, dict):
+            return set(), set()
+        return live_options(hasync, "pfsyncinterface"), live_options(hasync, "syncitems")
 
     def _get_existing_unbound_host_overrides(
         self, api_url: str, api_key: str, api_secret: str

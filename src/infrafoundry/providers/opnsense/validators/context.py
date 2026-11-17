@@ -47,6 +47,8 @@ class OPNsenseValidationContext(ValidationContext):
         existing_aliases: Aliases present on the live system.
         existing_gateways: Gateway names present on the live system.
         existing_host_override_names: Host override names present on the live system.
+        existing_hasync_interfaces: Interfaces the box offers for pfsync (live option keys).
+        existing_hasync_sync_items: Sync items the box offers (live option keys).
         managed_gateways: ``gateway`` resources managed in the configuration.
         index: Dotted-type cross-reference index, or None when not built.
     """
@@ -76,5 +78,7 @@ class OPNsenseValidationContext(ValidationContext):
     existing_aliases: dict[str, Any] = field(default_factory=dict)
     existing_gateways: set[str] = field(default_factory=set)
     existing_host_override_names: set[str] = field(default_factory=set)
+    existing_hasync_interfaces: set[str] = field(default_factory=set)
+    existing_hasync_sync_items: set[str] = field(default_factory=set)
     managed_gateways: list[ResourceConfig] | None = None
     index: XRefIndex | None = None

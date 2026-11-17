@@ -163,6 +163,14 @@ def test_syslog_settings_registers_the_settings_endpoints() -> None:
     assert endpoints.SYSLOG_RECONFIGURE in registered
 
 
+def test_hasync_settings_registers_its_endpoints() -> None:
+    registered = endpoints.RESOURCE_TYPE_ENDPOINTS["hasync.settings"]
+    assert endpoints.HASYNC_GET in registered
+    assert endpoints.HASYNC_SET in registered
+    assert endpoints.HASYNC_RECONFIGURE in registered
+    assert endpoints.HASYNC_GET in endpoints.DOCTOR_ENDPOINTS
+
+
 def test_source_nat_registers_get_set_apply() -> None:
     registered = endpoints.RESOURCE_TYPE_ENDPOINTS["firewall.source_nat"]
     assert endpoints.SOURCE_NAT_GET in registered

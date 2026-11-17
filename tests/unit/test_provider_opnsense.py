@@ -317,6 +317,28 @@ class TestOPNsenseResourceTypes:
             provider.get_finalization_hooks()["syslog_reconfigure"]("env")
         factory.return_value.reconfigure.assert_called_once_with()
 
+    def test_hasync_settings_is_supported_with_its_own_hook(
+        self, provider: OPNsenseProvider
+    ) -> None:
+        types = provider.get_direct_api_resource_types()
+        assert "hasync.settings" in provider.get_resource_types()
+        assert provider.get_dependencies()["hasync.settings"] == ["interfaces.assignments"]
+        keys = list(types)
+        assert keys.index("interfaces.assignments") < keys.index("hasync.settings")
+        assert keys.index("interfaces.virtual_ips") < keys.index("hasync.settings")
+        hook = types["hasync.settings"].FINALIZATION_HOOK
+        assert hook == "hasync_reconfigure"
+        assert hook in provider.get_finalization_hooks()
+        assert types["hasync.settings"].SPLIT_DELETE_PHASE is True
+
+    def test_hasync_hook_calls_the_service(self, provider: OPNsenseProvider) -> None:
+        with patch(
+            "infrafoundry.providers.opnsense.services.hasync_settings"
+            ".HasyncSettingsService.from_environment"
+        ) as factory:
+            provider.get_finalization_hooks()["hasync_reconfigure"]("env")
+        factory.return_value.reconfigure.assert_called_once_with()
+
     def test_source_nat_is_dispatched_before_nat_with_its_own_hook(
         self, provider: OPNsenseProvider
     ) -> None:

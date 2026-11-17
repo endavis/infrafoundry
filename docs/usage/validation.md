@@ -99,7 +99,7 @@ Checks that need the network stay in `infra doctor`. Rollback and destroy do not
 
 | Provider | Checked on plan and apply | Doctor only |
 | :--- | :--- | :--- |
-| `opnsense` | Every validator that does not read live state (Unbound, Kea, interface and syslog settings, source NAT, cron, trust, OpenVPN, categories, ACME, Tailscale, Monit, system, resource names, virtual IP VHID reuse and CARP subnet membership) | Aliases, interfaces, gateways and Unbound overrides read from the API; firewall rule, VLAN, assignment, NAT, gateway, route, virtual IP, host alias, host discovery and radvd checks that use them; endpoint support (the runner's plan checks it) |
+| `opnsense` | Every validator that does not read live state (Unbound, Kea, interface, syslog and HA sync settings, source NAT, cron, trust, OpenVPN, categories, ACME, Tailscale, Monit, system, resource names, virtual IP VHID reuse and CARP subnet membership) | Aliases, interfaces, gateways and Unbound overrides read from the API; firewall rule, VLAN, assignment, NAT, gateway, route, virtual IP, host alias, host discovery and radvd checks that use them; HA sync interface and sync items; endpoint support (the runner's plan checks it) |
 | `proxmox` | Tailscale schema, `terraform_secrets` references | Nodes, storage, bridges, templates and VMIDs from the cluster |
 | `oci` | Local cross-references, Tailscale schema, `terraform_secrets` references | OCI API checks |
 | `host` | Host schema, `terraform_secrets` references | SSH reachability (a host created earlier in the same apply cannot be reached at plan time) |

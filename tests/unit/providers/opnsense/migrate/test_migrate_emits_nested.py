@@ -1291,3 +1291,45 @@ class TestMigrateKeaHAEmitsNested:
         }
         parsed = _round_trip(yaml_text, "kea_dhcp4_ha_peers.yaml")
         assert {(r.name, r.type) for r in parsed} == {("fw-a", "kea.dhcp4.ha_peers")}
+
+
+class TestMigrateHasyncEmitsNested:
+    """Migrate emits ``hasync.settings`` at its nested path, password as a placeholder (#1389)."""
+
+    def test_settings_emit_nested(self, tmp_path: Path) -> None:
+        from infrafoundry.providers.opnsense.components.hasync_settings import (
+            HasyncSettingsManager,
+        )
+        from infrafoundry.providers.opnsense.services.hasync_settings import (
+            HasyncSettingsService,
+        )
+
+        fake_password = "FAKE-LIVE-PASSWORD-0001"
+        response = {
+            "hasync": {
+                "disablepreempt": "0",
+                "pfsyncinterface": {"": {"selected": 0}, "lan": {"selected": 1}},
+                "pfsyncpeerip": "192.0.2.2",
+                "pfsyncversion": {"1301": {"selected": 0}, "1400": {"selected": 1}},
+                "syncitems": {"rules": {"selected": 1}, "aliases": {"selected": 1}},
+                "username": "fw-test-sync",
+                "password": fake_password,
+            }
+        }
+        client = MagicMock()
+        client.request.side_effect = [response]
+        with patch(
+            "infrafoundry.providers.opnsense.components.hasync_settings.HasyncSettingsService"
+        ) as svc_cls:
+            svc_cls.from_environment.return_value = HasyncSettingsService(client)
+            yaml_text = str(HasyncSettingsManager(tmp_path).migrate("test-env"))
+        leaf = _assert_nested_path_present(yaml_text, "hasync.settings", expected_shape="dict")
+        assert leaf["password"] == "secret://env_secrets/opnsense/hasync/password"
+        assert leaf["sync_items"] == ["aliases", "rules"]
+        assert leaf["pfsync_version"] == "1400"
+        assert leaf["pfsync_interface"] == "lan"
+        assert leaf["disable_preempt"] is False
+        assert fake_password not in yaml_text
+        _assert_no_flat_resources_key(yaml_text)
+        parsed = _round_trip(yaml_text, "hasync.yaml")
+        assert {(r.name, r.type) for r in parsed} == {("hasync.settings", "hasync.settings")}

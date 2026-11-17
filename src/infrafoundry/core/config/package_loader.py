@@ -71,6 +71,7 @@ DOTTED_RESOURCE_SHAPES: dict[str, str] = {
     "unbound.settings": "dict",
     "interfaces.settings": "dict",
     "syslog.settings": "dict",  # #804
+    "hasync.settings": "dict",  # #1389
     "kea.dhcp4.subnets": "list",
     "kea.dhcp4.reservations": "list",
     "kea.dhcp4.ha": "dict",  # #1392

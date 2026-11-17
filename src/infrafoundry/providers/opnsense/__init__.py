@@ -154,6 +154,7 @@ class OPNsenseProvider(
         from .components.firewall_categories import FirewallCategoryManager  # #1286
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
+        from .components.hasync_settings import HasyncSettingsManager  # #1389
         from .components.hostdiscovery import HostDiscoveryManager
         from .components.interface_assignment import InterfaceAssignmentManager
         from .components.interfaces_settings import InterfacesSettingsManager
@@ -186,6 +187,7 @@ class OPNsenseProvider(
             ("interfaces.assignments", InterfaceAssignmentManager),
             ("interfaces.settings", InterfacesSettingsManager),
             ("syslog.settings", SyslogSettingsManager),  # #804
+            ("hasync.settings", HasyncSettingsManager),  # #1389
             ("firewall.aliases", AliasManager),
             ("firewall.source_nat", SourceNatManager),  # #1333
             ("firewall.nat", NATRuleManager),
@@ -309,6 +311,7 @@ class OPNsenseProvider(
         from .components.firewall_categories import FirewallCategoryManager  # #1286
         from .components.firewall_rule import FirewallRuleManager
         from .components.gateway import GatewayManager
+        from .components.hasync_settings import HasyncSettingsManager  # #1389
         from .components.hostdiscovery import HostDiscoveryManager
         from .components.interface_assignment import InterfaceAssignmentManager
         from .components.interfaces_settings import InterfacesSettingsManager
@@ -397,6 +400,8 @@ class OPNsenseProvider(
             # Placed after rules, NAT and aliases, it deletes after them without a split.
             "firewall.categories": FirewallCategoryManager,
             "interfaces.virtual_ips": VirtualIPManager,
+            # #1389: after the assignments and the CARP VIPs it pairs with
+            "hasync.settings": HasyncSettingsManager,
             "unbound.host_overrides": UnboundHostOverrideManager,
             "unbound.host_aliases": UnboundHostAliasManager,
             "unbound.forwards": UnboundForwardManager,
@@ -477,6 +482,7 @@ class OPNsenseProvider(
           :class:`InterfacesSettingsManager` when the interface settings changed.
 
         - ``syslog_reconfigure`` (#804) — fired by :class:`SyslogSettingsManager`.
+        - ``hasync_reconfigure`` (#1389) — fired by :class:`HasyncSettingsManager`.
         - ``source_nat_apply`` (#1333) — fired by :class:`SourceNatManager`.
         - ``hostdiscovery_reconfigure`` (#792) — fired by :class:`HostDiscoveryManager`
           when the host-discovery settings changed.
@@ -510,6 +516,7 @@ class OPNsenseProvider(
             "tunables_reconfigure": self._reconfigure_tunables,
             "interfaces_settings_reconfigure": self._reconfigure_interfaces_settings,
             "syslog_reconfigure": self._reconfigure_syslog,  # #804
+            "hasync_reconfigure": self._reconfigure_hasync,  # #1389
             "source_nat_apply": self._apply_source_nat,  # #1333
             "hostdiscovery_reconfigure": self._reconfigure_hostdiscovery,
             "acmeclient_reconfigure": self._reconfigure_acmeclient,  # #790
@@ -682,6 +689,21 @@ class OPNsenseProvider(
         from .services.syslog_settings import SyslogSettingsService
 
         service = SyslogSettingsService.from_environment(env_name, "opnsense", self.config_dir)
+        service.reconfigure()
+
+    def _reconfigure_hasync(self, env_name: str) -> None:
+        """Reload the HA sync settings after a change (#1389).
+
+        Used by :meth:`get_finalization_hooks` so one ``core/hasync/reconfigure``
+        call fires per apply, only when the settings changed. Hook errors propagate,
+        failing the apply.
+
+        Args:
+            env_name: Active environment name.
+        """
+        from .services.hasync_settings import HasyncSettingsService
+
+        service = HasyncSettingsService.from_environment(env_name, "opnsense", self.config_dir)
         service.reconfigure()
 
     def _apply_source_nat(self, env_name: str) -> None:
@@ -870,6 +892,7 @@ class OPNsenseProvider(
             "system.groups": ["system.users"],
             "interfaces.settings": [],
             "syslog.settings": [],  # #804
+            "hasync.settings": ["interfaces.assignments"],  # #1389
             "hostdiscovery": ["interfaces.assignments"],
             # #790
             "acmeclient.settings": [],
