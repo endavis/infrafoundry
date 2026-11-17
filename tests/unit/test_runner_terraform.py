@@ -11,7 +11,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrafoundry.core.exceptions import FilteredDestroyRefusedError, TerraformError
+from infrafoundry.core.exceptions import (
+    FilteredDestroyRefusedError,
+    OrphanedResourceConflictError,
+    TerraformError,
+)
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY
 from infrafoundry.core.runners.terraform_runner import TerraformRunner
@@ -1412,3 +1416,195 @@ class TestNonInteractive:
         for call in mock_run.call_args_list:
             assert "-input=false" not in call[0][0]
             assert call[1]["stdin"] == subprocess.DEVNULL
+
+
+ORPHAN_TF = """resource "terraform_data" "ova_vm_fw_test_a" {
+  triggers_replace = {
+    vmid = "105"
+  }
+}
+"""
+
+
+def _show_json(orphan_vmid: str) -> str:
+    return json.dumps(
+        {
+            "values": {
+                "root_module": {
+                    "resources": [
+                        {
+                            "address": "terraform_data.ova_vm_fw_test",
+                            "mode": "managed",
+                            "values": {"triggers_replace": {"vmid": orphan_vmid}},
+                        }
+                    ]
+                }
+            }
+        }
+    )
+
+
+class TestOrphanCheck:
+    """Orphaned state warning and VM id collision refusal (#1459)."""
+
+    def _run(
+        self,
+        runner: TerraformRunner,
+        provider: MagicMock,
+        *,
+        state: list[str],
+        show: Any = None,
+        tf: str = ORPHAN_TF,
+        **kwargs: Any,
+    ) -> tuple[MagicMock, MagicMock, MagicMock]:
+        """Plan with terraform mocked; return (run, state_list, console) mocks."""
+        provider.name = "proxmox"
+        (provider.terraform_dir / "main.tf").write_text(tf)
+        (provider.terraform_dir / ".terraform").mkdir(exist_ok=True)
+
+        def fake_run(cmd: list[str], **_: Any) -> Any:
+            if "show" in cmd:
+                if isinstance(show, Exception):
+                    raise show
+                return SimpleNamespace(returncode=0, stdout=show or "{}", stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        console = MagicMock()
+        runner.console = console
+        with (
+            patch("shutil.which", return_value="/usr/bin/terraform"),
+            patch.object(runner, "state_list", return_value=state) as state_list,
+            patch("subprocess.run", side_effect=fake_run) as mock_run,
+        ):
+            runner.plan(provider, **kwargs)
+        return mock_run, state_list, console
+
+    @staticmethod
+    def _shown(mock_run: MagicMock) -> bool:
+        return any("show" in c.args[0] for c in mock_run.call_args_list)
+
+    @staticmethod
+    def _planned(mock_run: MagicMock) -> bool:
+        return any("plan" in c.args[0] for c in mock_run.call_args_list)
+
+    @pytest.mark.parametrize("filtered", [True, False])
+    def test_collision_refused(
+        self, runner: TerraformRunner, provider: MagicMock, filtered: bool
+    ) -> None:
+        extra: dict[str, Any] = {"target_resources": ["fw-test-a"]} if filtered else {}
+        with pytest.raises(OrphanedResourceConflictError) as exc:
+            self._run(
+                runner,
+                provider,
+                state=["terraform_data.ova_vm_fw_test"],
+                show=_show_json("105"),
+                report_orphans=True,
+                env_name="dev",
+                **extra,
+            )
+        msg = str(exc.value)
+        assert "terraform_data.ova_vm_fw_test_a" in msg
+        assert "terraform_data.ova_vm_fw_test" in msg
+        assert "105" in msg
+        assert "foundry infra destroy --env dev -p" in msg
+
+    @pytest.mark.parametrize("filtered", [True, False])
+    def test_different_vmid_warns_only(
+        self, runner: TerraformRunner, provider: MagicMock, filtered: bool
+    ) -> None:
+        extra: dict[str, Any] = {"target_resources": ["fw-test-a"]} if filtered else {}
+        mock_run, _, console = self._run(
+            runner,
+            provider,
+            state=["terraform_data.ova_vm_fw_test"],
+            show=_show_json("106"),
+            report_orphans=True,
+            env_name="dev",
+            **extra,
+        )
+        text = str(console.print.call_args_list)
+        assert "terraform_data.ova_vm_fw_test" in text
+        assert ("leaves them in place" if filtered else "destroys them") in text
+        assert self._planned(mock_run)
+
+    def test_new_resource_outside_targets_warns_only(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        tf = ORPHAN_TF + 'resource "terraform_data" "ova_vm_web_01" {\n}\n'
+        mock_run, _, console = self._run(
+            runner,
+            provider,
+            state=["terraform_data.ova_vm_fw_test", "terraform_data.ova_vm_web_01"],
+            show=_show_json("105"),
+            tf=tf,
+            target_resources=["web-01"],
+            report_orphans=True,
+            env_name="dev",
+        )
+        assert "terraform_data.ova_vm_fw_test" in str(console.print.call_args_list)
+        assert not self._shown(mock_run)
+        assert self._planned(mock_run)
+
+    def test_default_is_silent(self, runner: TerraformRunner, provider: MagicMock) -> None:
+        mock_run, _, console = self._run(
+            runner, provider, state=["terraform_data.ova_vm_fw_test"], show=_show_json("105")
+        )
+        assert not self._shown(mock_run)
+        assert "no package declares" not in str(console.print.call_args_list)
+        assert self._planned(mock_run)
+
+    def test_no_orphans_no_show(self, runner: TerraformRunner, provider: MagicMock) -> None:
+        mock_run, _, console = self._run(
+            runner, provider, state=["terraform_data.ova_vm_fw_test_a"], report_orphans=True
+        )
+        assert not self._shown(mock_run)
+        assert "no package declares" not in str(console.print.call_args_list)
+
+    def test_orphans_without_new_vmid_resources_no_show(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        mock_run, _, _ = self._run(
+            runner,
+            provider,
+            state=["terraform_data.ova_vm_fw_test", "terraform_data.ova_vm_fw_test_a"],
+            report_orphans=True,
+        )
+        assert not self._shown(mock_run)
+
+    @pytest.mark.parametrize(
+        "show",
+        [subprocess.CalledProcessError(1, "terraform"), "not json"],
+        ids=["exit", "invalid-json"],
+    )
+    def test_show_failure_keeps_warning(
+        self, runner: TerraformRunner, provider: MagicMock, show: Any
+    ) -> None:
+        mock_run, _, console = self._run(
+            runner,
+            provider,
+            state=["terraform_data.ova_vm_fw_test"],
+            show=show,
+            report_orphans=True,
+        )
+        assert "terraform_data.ova_vm_fw_test" in str(console.print.call_args_list)
+        assert self._planned(mock_run)
+
+    def test_sdn_orphans_already_targeted_not_listed(
+        self, runner: TerraformRunner, provider: MagicMock
+    ) -> None:
+        tf = ORPHAN_TF + 'resource "proxmox_sdn_applier" "apply" {\n}\n'
+        _, _, console = self._run(
+            runner,
+            provider,
+            state=["proxmox_sdn_zone_vxlan.old", "proxmox_sdn_applier.apply"],
+            tf=tf,
+            target_resources=["fw-test-a"],
+            report_orphans=True,
+        )
+        assert "no package declares" not in str(console.print.call_args_list)
+
+    def test_state_listed_once(self, runner: TerraformRunner, provider: MagicMock) -> None:
+        _, state_list, _ = self._run(
+            runner, provider, state=["terraform_data.ova_vm_fw_test"], report_orphans=True
+        )
+        assert state_list.call_count == 1
