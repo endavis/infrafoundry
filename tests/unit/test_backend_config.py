@@ -456,3 +456,29 @@ class TestBackendConfig:
         """Test supports_locking returns False for local."""
         config = BackendConfig(type=BackendType.LOCAL)
         assert config.supports_locking() is False
+
+
+@pytest.mark.unit
+class TestBareKeyProvider:
+    """Tests for the bare_key_provider pin (#1464)."""
+
+    def test_default_is_none(self) -> None:
+        assert BackendConfig().bare_key_provider is None
+
+    def test_accepts_provider_id(self) -> None:
+        assert BackendConfig(bare_key_provider="opnsense@fw-a").bare_key_provider == (
+            "opnsense@fw-a"
+        )
+
+    @pytest.mark.parametrize("value", ["", "   "])
+    def test_rejects_empty(self, value: str) -> None:
+        with pytest.raises(ValidationError):
+            BackendConfig(bare_key_provider=value)
+
+    def test_not_part_of_rendered_backend_settings(self) -> None:
+        backend = BackendConfig(
+            type="s3",  # type: ignore[arg-type]
+            s3={"bucket": "b", "region": "r"},  # type: ignore[arg-type]
+            bare_key_provider="opnsense",
+        )
+        assert "bare_key_provider" not in backend.get_backend_config()

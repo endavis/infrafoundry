@@ -52,6 +52,8 @@ class HostProvider(
 ):
     """Provider for existing hosts; generates an Ansible inventory, never creates the machine."""
 
+    renders_terraform_backend = False
+
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
         """Initialize the host provider."""
         super().__init__("host", config_dir, output_dir)
