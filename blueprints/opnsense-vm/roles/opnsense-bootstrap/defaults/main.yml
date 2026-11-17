@@ -8,6 +8,13 @@ opnsense_api_allow_cidr: "172.20.10.0/24"
 # Also allow api_allow_cidr to reach TCP 443 on the LAN address, through the WAN interface
 opnsense_api_allow_lan: false
 
+# Optional sync NIC (em2, assigned as opt1). Empty sync_bridge keeps the two-NIC VM.
+opnsense_sync_bridge: ""
+opnsense_sync_ip: ""
+opnsense_sync_prefix: 24
+opnsense_sync_if: em2
+opnsense_sync_descr: SYNC
+
 # Seconds to wait for the first login prompt on the serial console
 opnsense_boot_timeout: 600
 

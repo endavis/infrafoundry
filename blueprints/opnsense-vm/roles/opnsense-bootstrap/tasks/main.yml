@@ -22,6 +22,14 @@
     quiet: true
   no_log: true
 
+- name: Check the sync NIC inputs
+  ansible.builtin.assert:
+    that:
+      - opnsense_sync_ip | length > 0
+    fail_msg: sync_ip is required when sync_bridge is set.
+    quiet: true
+  when: opnsense_sync_bridge | length > 0
+
 - name: Fail if the VM is already running
   ansible.builtin.command:
     cmd: "qm status {{ opnsense_vmid }}"
@@ -69,6 +77,11 @@
       lan_prefix: "{{ opnsense_lan_prefix | string }}"
       api_allow_cidr: "{{ opnsense_api_allow_cidr }}"
       api_allow_lan: "{{ opnsense_api_allow_lan | bool | ternary('1', '0') }}"
+    opnsense_bootstrap_sync:
+      interface: "{{ opnsense_sync_if }}"
+      descr: "{{ opnsense_sync_descr }}"
+      ip: "{{ opnsense_sync_ip if opnsense_sync_bridge | length > 0 else '' }}"
+      prefix: "{{ opnsense_sync_prefix | string }}"
   register: wrapper_bg
   changed_when: true
   no_log: true

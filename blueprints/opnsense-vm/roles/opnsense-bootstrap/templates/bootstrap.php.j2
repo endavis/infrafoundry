@@ -77,6 +77,38 @@ $lan_destination = $lan_rule->addChild('destination');
 $lan_destination->addChild('network', 'lanip');
 $lan_destination->addChild('port', '443');
 {% endif %}
+{% if opnsense_bootstrap_sync is defined and opnsense_bootstrap_sync.ip %}
+
+// Optional dedicated sync link: assign the third NIC as opt1 with a static
+// address, so pfsync_interface: opt1 works without a manual assignment.
+$s = json_decode(base64_decode('{{ opnsense_bootstrap_sync | to_json | b64encode }}'), true);
+$sync = $cfg->interfaces->addChild('opt1');
+$sync->addChild('if', $s['interface']);
+$sync->addChild('descr', $s['descr']);
+$sync->addChild('enable', '1');
+$sync->addChild('ipaddr', $s['ip']);
+$sync->addChild('subnet', $s['prefix']);
+
+$pfsync_rule = $cfg->filter->addChild('rule');
+$pfsync_rule->addChild('type', 'pass');
+$pfsync_rule->addChild('interface', 'opt1');
+$pfsync_rule->addChild('ipprotocol', 'inet');
+$pfsync_rule->addChild('protocol', 'pfsync');
+$pfsync_rule->addChild('descr', 'infrafoundry bootstrap: pfsync on the sync interface');
+$pfsync_rule->addChild('source')->addChild('network', 'opt1');
+$pfsync_rule->addChild('destination')->addChild('any');
+
+$xmlrpc_rule = $cfg->filter->addChild('rule');
+$xmlrpc_rule->addChild('type', 'pass');
+$xmlrpc_rule->addChild('interface', 'opt1');
+$xmlrpc_rule->addChild('ipprotocol', 'inet');
+$xmlrpc_rule->addChild('protocol', 'tcp');
+$xmlrpc_rule->addChild('descr', 'infrafoundry bootstrap: config sync (HTTPS) on the sync address');
+$xmlrpc_rule->addChild('source')->addChild('network', 'opt1');
+$xmlrpc_destination = $xmlrpc_rule->addChild('destination');
+$xmlrpc_destination->addChild('address', $s['ip']);
+$xmlrpc_destination->addChild('port', '443');
+{% endif %}
 
 Config::getInstance()->save();
 echo "BOOTSTRAP OK\n";

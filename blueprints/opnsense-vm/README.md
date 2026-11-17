@@ -17,6 +17,10 @@ reach the API. The OPNsense provider can then manage it with no manual steps.
    - `em1` is the WAN, on `wan_bridge` tagged with `wan_vlan` (default
      `vmbr0`, VLAN 10).
 
+   With `sync_bridge` set, the VM gets a third e1000 NIC, `em2`, on that
+   bridge (tagged with `sync_vlan` when it is not 0). It is the dedicated
+   pfsync and config-sync link of an HA pair. Without it the VM keeps two NICs.
+
    If `disk_size` is set above the image's own size, the provider resizes the
    imported disk after the import and before first boot. A value that is not
    larger than the image is skipped at apply time (the image size is kept); the
@@ -35,7 +39,11 @@ reach the API. The OPNsense provider can then manage it with no manual steps.
    - dnsmasq off, with its DHCP ranges removed, so the image's default LAN
      DHCP does not run and Kea can serve the LAN instead;
    - a WAN pass rule for TCP 443 from `api_allow_cidr` to the WAN address and,
-     with `api_allow_lan: true`, a second one to the LAN address.
+     with `api_allow_lan: true`, a second one to the LAN address;
+   - with `sync_bridge` set, `em2` assigned as `opt1` (description `SYNC`)
+     with `sync_ip`/`sync_prefix`, plus two pass rules on it: pfsync, and TCP
+     443 to `sync_ip` for config sync, both from the sync subnet. The OPNsense
+     provider can then use `pfsync_interface: opt1` with no manual step.
 
    When `disk_size` is above 0, the script first runs a best-effort grow step
    in the shell (`gpart recover`, `gpart resize`, `growfs -y /`). It logs to
@@ -119,6 +127,9 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 | `wan_ip` / `wan_prefix` | `172.20.10.250` / `24` | Static WAN address |
 | `lan_bridge` | `vmbr1` | LAN bridge |
 | `lan_ip` / `lan_prefix` | `172.20.99.1` / `24` | LAN address |
+| `sync_bridge` | `""` | Bridge for the optional sync NIC (`em2`); empty keeps the two-NIC VM |
+| `sync_vlan` | `0` | VLAN tag for the sync NIC; `0` is untagged |
+| `sync_ip` / `sync_prefix` | `""` / `24` | Static address of the sync interface; `sync_ip` is required when `sync_bridge` is set |
 | `domain` | `lab.local` | Domain |
 | `api_allow_cidr` | `172.20.10.0/24` | Source allowed to reach the web GUI/API on the WAN |
 | `api_allow_lan` | `false` | Also let `api_allow_cidr` reach the web GUI/API on the LAN address through the WAN; set it when the provider's `api_url` is the LAN address |
@@ -142,6 +153,11 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 - Whether the nano image grows its root filesystem by itself on first boot is
   UNVERIFIED until a live rebuild. The bootstrap's grow step is a no-op when
   there is nothing to grow.
+- The sync NIC is not verified on a live box. The expect script is unchanged:
+  it answers the optional-interface prompt with an empty line, so `em2` is
+  assigned by the bootstrap PHP, not the console menu. The bootstrap adds
+  rules only on the sync interface, so the peer needs no provider run to
+  reach the sync address. Example sync addresses use `192.0.2.0/24`.
 - The bootstrap runs once, on create. On a box that is already bootstrapped,
   the default credentials are rejected and the bootstrap fails; destroy and
   re-apply to start over.

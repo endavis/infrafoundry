@@ -358,3 +358,112 @@ def test_playbook_and_role_pass_api_allow_lan_to_the_php() -> None:
     [launch] = [t for t in tasks if "opnsense_bootstrap_values" in t.get("vars", {})]
     assert "ternary('1', '0')" in launch["vars"]["opnsense_bootstrap_values"]["api_allow_lan"]
     assert defaults["opnsense_api_allow_lan"] is False
+
+
+SYNC = {"interface": "em2", "descr": "SYNC", "ip": "192.0.2.10", "prefix": "29"}
+
+
+def _sync_package(tmp_path: Path, extra: str) -> list[Any]:
+    package = tmp_path / "dev" / "proxmox" / "fw-test"
+    package.mkdir(parents=True)
+    source = (PACKAGE_DIR / "infrafoundry.yml").read_text()
+    (package / "infrafoundry.yml").write_text(source.rstrip("\n") + "\n" + extra)
+    loader = PackageLoader(EXAMPLE_ENVS, blueprint_resolver=BlueprintResolver(EXAMPLE_ENVS))
+    resources, _events, _variables = loader.load_package(
+        package, provider="proxmox", env_name="dev"
+    )
+    return resources
+
+
+def _sync_php(**overrides: str) -> str:
+    return (
+        _ansible_like_env()
+        .get_template("bootstrap.php.j2")
+        .render(opnsense_bootstrap_values=VALUES, opnsense_bootstrap_sync=SYNC | overrides)
+    )
+
+
+def test_default_package_has_no_sync_nic(loaded: Any) -> None:
+    resources, _events, variables = loaded
+
+    assert variables["sync_bridge"] == ""
+    assert len(resources[0].config["network"]) == 2
+
+
+def test_sync_bridge_adds_a_third_untagged_nic(tmp_path: Path) -> None:
+    [vm] = _sync_package(tmp_path, '  sync_bridge: vmbr2\n  sync_ip: "192.0.2.10"\n')
+
+    assert vm.config["network"][2:] == [{"bridge": "vmbr2", "model": "e1000"}]
+    assert len(vm.config["network"]) == 3
+
+
+def test_sync_vlan_tags_the_third_nic(tmp_path: Path) -> None:
+    [vm] = _sync_package(
+        tmp_path, '  sync_bridge: vmbr2\n  sync_vlan: 30\n  sync_ip: "192.0.2.10"\n'
+    )
+
+    assert vm.config["network"][2] == {"bridge": "vmbr2", "model": "e1000", "tag": 30}
+
+
+def test_bootstrap_php_without_sync_does_not_touch_opt1() -> None:
+    php = _bootstrap_php()
+
+    assert "opt1" not in php
+    assert php.count("base64_decode(") == 1
+
+
+def test_bootstrap_php_with_sync_assigns_opt1_and_adds_rules_before_save() -> None:
+    php = _sync_php()
+
+    assert "$cfg->interfaces->addChild('opt1');" in php
+    assert "$sync->addChild('if', $s['interface']);" in php
+    assert "$sync->addChild('ipaddr', $s['ip']);" in php
+    assert "$pfsync_rule->addChild('protocol', 'pfsync');" in php
+    assert "$xmlrpc_destination->addChild('port', '443');" in php
+    assert php.count("addChild('rule')") == 3
+    [_, encoded] = re.findall(r"base64_decode\('([A-Za-z0-9+/=]+)'\)", php)
+    assert json.loads(base64.b64decode(encoded)) == SYNC
+    assert php.index("$xmlrpc_rule") < php.index("Config::getInstance()->save();")
+
+
+def test_bootstrap_php_with_sync_and_api_allow_lan_has_four_rules() -> None:
+    php = (
+        _ansible_like_env()
+        .get_template("bootstrap.php.j2")
+        .render(
+            opnsense_bootstrap_values=VALUES | {"api_allow_lan": "1"},
+            opnsense_bootstrap_sync=SYNC,
+        )
+    )
+
+    assert php.count("addChild('rule')") == 4
+
+
+def test_bootstrap_php_with_an_empty_sync_ip_skips_the_sync_block() -> None:
+    assert "opt1" not in _sync_php(ip="")
+
+
+@pytest.mark.skipif(shutil.which("php") is None, reason="php is not installed")
+def test_bootstrap_php_with_sync_is_valid_php(tmp_path: Path) -> None:
+    script = tmp_path / "bootstrap.php"
+    script.write_text(_sync_php())
+
+    subprocess.run(["php", "-l", str(script)], check=True, capture_output=True)
+
+
+def test_playbook_and_role_pass_the_sync_inputs_to_the_php() -> None:
+    import yaml
+
+    role = BLUEPRINT_DIR / "roles" / "opnsense-bootstrap"
+    playbook = yaml.safe_load((BLUEPRINT_DIR / "opnsense-bootstrap.yml").read_text())
+    tasks = yaml.safe_load((role / "tasks" / "main.yml").read_text())
+    defaults = yaml.safe_load((role / "defaults" / "main.yml").read_text())
+
+    role_vars = playbook[0]["roles"][0]["vars"]
+    for name in ("sync_bridge", "sync_ip", "sync_prefix"):
+        assert f"INFRAFOUNDRY_VAR_{name}" in role_vars[f"opnsense_{name}"]
+    [launch] = [t for t in tasks if "opnsense_bootstrap_sync" in t.get("vars", {})]
+    assert launch["vars"]["opnsense_bootstrap_sync"]["interface"] == "{{ opnsense_sync_if }}"
+    assert defaults["opnsense_sync_if"] == "em2"
+    assert defaults["opnsense_sync_descr"] == "SYNC"
+    assert defaults["opnsense_sync_bridge"] == ""
