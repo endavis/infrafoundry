@@ -78,7 +78,7 @@ class VirtualIPValidator(SpecializedValidator[OPNsenseValidationContext]):
             context: Validation context carrying the resources and lookups this validator checks.
         """
         virtual_ips = context.virtual_ips
-        managed_interface_names = context.managed_interface_names
+        managed_interface_names = context.interface_assignment_names
         existing_interfaces = context.existing_interfaces
         index = context.index
         seen_keys: dict[tuple[str, str, str, str], str] = {}

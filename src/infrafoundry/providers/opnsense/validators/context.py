@@ -56,7 +56,6 @@ class OPNsenseValidationContext(ValidationContext):
         interface_assignment_names: Interface assignment names managed in the configuration.
         gateway_names: Gateway names managed in the configuration.
         vlan_names: VLAN names managed in the configuration.
-        managed_interface_names: Interface names managed in the configuration.
         managed_host_override_names: Host override names managed in the configuration.
         dhcp4_subnet_names: Kea DHCPv4 subnet names managed in the configuration.
         dhcp6_subnet_names: Kea DHCPv6 subnet names managed in the configuration.
@@ -90,7 +89,6 @@ class OPNsenseValidationContext(ValidationContext):
     interface_assignment_names: set[str] = field(default_factory=set)
     gateway_names: set[str] = field(default_factory=set)
     vlan_names: set[str] = field(default_factory=set)
-    managed_interface_names: set[str] = field(default_factory=set)
     managed_host_override_names: set[str] = field(default_factory=set)
     dhcp4_subnet_names: set[str] = field(default_factory=set)
     dhcp6_subnet_names: set[str] = field(default_factory=set)
