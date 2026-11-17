@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794912878595,
+  "lastUpdate": 1794914395852,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2588,6 +2588,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000030263620450133287",
             "extra": "mean: 60.3464208527253 usec\nrounds: 17638"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f6448a41fc2be49c08c576ea96c26c851b2b3464",
+          "message": "feat: trigger opnsense ha config sync after apply (merges PR #1440, addresses #1390)\n\nAfter a successful OPNsense direct-API apply that changed something,\nthe provider's new post_apply_hook reads synchronizetoip from\ncore/hasync/get and, when a backup is set, calls\ncore/hasync_status/version as a preflight and then\ncore/hasync_status/restartAll, the action behind the GUI's\n\"Synchronize and reconfigure all\". It runs once, after the finalization\nhooks, on the success path only. A failure fails the apply with an\nAPIError naming the backup and the endpoint's message.\n\nProvider settings: ha_sync_after_apply (true by default; false turns it\noff; \"always\" also syncs when nothing changed, to re-sync after a failed\nsync) and ha_sync_timeout (300 s; an unreachable backup takes about\n60 s to report). Both are checked by the offline validator.\n\nOPNsense's exec_sync step always reports done, so a failed config push\ninside restartAll is not reported; the docs record this and the source\nand probe evidence. ADR-0014 is amended with the runner's post-apply\nhook.\n\nAddresses #1390\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T11:18:43Z",
+          "tree_id": "93ff404503a18477b912a009f49de201f86cd783",
+          "url": "https://github.com/endavis/infrafoundry/commit/f6448a41fc2be49c08c576ea96c26c851b2b3464"
+        },
+        "date": 1794914395049,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 74.6132711279995,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004593352204457344",
+            "extra": "mean: 13.402441481013401 msec\nrounds: 79"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14316.822876544593,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007643108774453147",
+            "extra": "mean: 69.84789912001432 usec\nrounds: 15910"
           }
         ]
       }
