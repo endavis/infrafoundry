@@ -158,3 +158,27 @@ def test_sync_failure_carries_its_error_code(orchestrator: MagicMock, tmp_path: 
     assert result.exit_code == 1
     assert "IF-PACKAGE-003" in result.output
     assert "uv not found on PATH" in " ".join(result.output.split())
+
+
+def test_check_passes_the_resource_scope(orchestrator: MagicMock, tmp_path: Path) -> None:
+    orchestrator.requirements_manager.check.return_value = _report(MET)
+
+    result = _invoke(tmp_path, "check", "--env", "prod", "-r", "fw-alias", "-r", "fw-rule")
+
+    assert result.exit_code == 0, result.output
+    orchestrator.requirements_manager.check.assert_called_once_with(
+        "prod", None, None, resource_filter=["fw-alias", "fw-rule"]
+    )
+
+
+def test_sync_passes_the_resource_scope(orchestrator: MagicMock, tmp_path: Path) -> None:
+    orchestrator.requirements_manager.sync.return_value = SyncResult(
+        steps=(STEP,), report=_report(UNMET), dry_run=True
+    )
+
+    result = _invoke(tmp_path, "sync", "--env", "prod", "-r", "fw-alias", "--dry-run")
+
+    assert result.exit_code == 0, result.output
+    orchestrator.requirements_manager.sync.assert_called_once_with(
+        "prod", None, None, dry_run=True, resource_filter=["fw-alias"]
+    )

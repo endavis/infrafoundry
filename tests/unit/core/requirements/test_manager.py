@@ -286,3 +286,67 @@ def test_sync_scope_follows_the_filters(config_manager: ConfigManager) -> None:
     )
 
     assert [step.command[0] for step in result.steps] == ["uv"]
+
+
+def _declare_resources(config_manager: ConfigManager) -> None:
+    """Give ``vm-a`` the resource ``res-a`` and ``vm-b`` / ``k8s-pkg`` the resource ``res-b``."""
+    envs = config_manager.base_dir
+    for package_dir, name in (
+        (envs / "dev" / "proxmox" / "vm-a", "res-a"),
+        (envs / "dev" / "proxmox" / "vm-b", "res-b"),
+        (envs / "dev" / "k8s-pkg", "res-k"),
+    ):
+        manifest = package_dir / "infrafoundry.yml"
+        data = yaml.safe_load(manifest.read_text(encoding="utf-8"))
+        data["resources"] = ["resources.yaml"]
+        _write(manifest, data)
+        _write(
+            package_dir / "resources.yaml",
+            {"resources": [{"name": name, "type": "vm", "provider": "proxmox", "config": {}}]},
+        )
+
+
+@pytest.mark.parametrize(
+    ("resource_filter", "expected"),
+    [
+        (["res-a"], ["bp-a"]),
+        (["res-b"], ["bp-b"]),
+        (["res-a", "res-k"], ["bp-a", "bp-b"]),
+        (["fw-alias"], []),
+    ],
+)
+def test_blueprints_in_scope_follow_the_resource_filter(
+    config_manager: ConfigManager, resource_filter: list[str], expected: list[str]
+) -> None:
+    _declare_resources(config_manager)
+    manager, _ = _manager(config_manager, {})
+
+    assert manager.blueprints_in_scope("dev", resource_filter=resource_filter) == expected
+
+
+def test_resource_filter_combines_with_the_package_filter(config_manager: ConfigManager) -> None:
+    _declare_resources(config_manager)
+    manager, _ = _manager(config_manager, {})
+
+    assert manager.blueprints_in_scope("dev", "vm-b", resource_filter=["res-a"]) == []
+
+
+def test_unmet_requirement_of_an_untargeted_blueprint_does_not_block_a_resource_run(
+    config_manager: ConfigManager,
+) -> None:
+    _declare_resources(config_manager)
+    manager, _ = _manager(config_manager, {})
+
+    assert manager.ensure("dev", resource_filter=["fw-alias"]).statuses == ()
+    with pytest.raises(MissingRequirementsError):
+        manager.ensure("dev", resource_filter=["res-b"])
+
+
+def test_sync_scope_follows_the_resource_filter(config_manager: ConfigManager) -> None:
+    _declare_resources(config_manager)
+    manager, _ = _manager(config_manager, {"alpha": "1.0"})
+
+    result = manager.sync("dev", resource_filter=["res-b"], dry_run=True)
+
+    assert {s.name for s in result.report.statuses} == {"alpha", "beta"}
+    assert [s.name for s in result.report.unmet] == ["beta"]

@@ -13,7 +13,14 @@ from ...utils import console
 
 
 def scope_options(func: Callable[..., Any]) -> Callable[..., Any]:
-    """Add ``--env``, ``--package`` and ``--provider``, as ``infra plan`` takes them."""
+    """Add ``--env`` and the package, provider and resource scope ``infra plan`` takes."""
+    func = click.option(
+        "--resource",
+        "-r",
+        "resource",
+        multiple=True,
+        help="Only blueprints owning these resource(s) (can be used multiple times)",
+    )(func)
     func = click.option(
         "--provider",
         "-P",
@@ -67,3 +74,8 @@ def render_report(report: RequirementsReport) -> None:
             escape(", ".join(status.blueprints)),
         )
     console.print(table)
+
+
+def resource_scope(resource: tuple[str, ...]) -> dict[str, Any]:
+    """Keyword arguments for ``RequirementsManager`` carrying ``--resource``, if given."""
+    return {"resource_filter": list(resource)} if resource else {}

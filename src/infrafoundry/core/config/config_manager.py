@@ -546,19 +546,47 @@ class ConfigManager(PathBasedManager):
             ``provider:`` when set, else the provider directory; it is ``None``
             for an env-root package that names no provider.
         """
-        manifests: list[tuple[str | None, PackageManifest]] = []
+        return [(provider, manifest) for _dir, provider, manifest in self._iter_packages(env_name)]
+
+    def _iter_packages(self, env_name: str) -> list[tuple[Path, str | None, PackageManifest]]:
+        """Discover every package as ``(directory, provider, manifest)``."""
+        found: list[tuple[Path, str | None, PackageManifest]] = []
         for provider_name in sorted(self.provider_centric.discover_providers(env_name)):
             for package_dir in self._package_loader.discover_packages(env_name, provider_name):
                 manifest = self._package_loader._parse_manifest(
                     package_dir / PackageLoader.MANIFEST_FILENAME
                 )
-                manifests.append((manifest.provider or provider_name, manifest))
+                found.append((package_dir, manifest.provider or provider_name, manifest))
         for package_dir in self._package_loader.discover_env_root_packages(env_name):
             manifest = self._package_loader._parse_manifest(
                 package_dir / PackageLoader.MANIFEST_FILENAME
             )
-            manifests.append((manifest.provider, manifest))
-        return manifests
+            found.append((package_dir, manifest.provider, manifest))
+        return found
+
+    def list_blueprint_package_resources(
+        self, env_name: str
+    ) -> list[tuple[str | None, PackageManifest, set[str] | None]]:
+        """List the packages that use a blueprint with the resource names each declares.
+
+        Args:
+            env_name: Environment name
+
+        Returns:
+            ``(provider, manifest, resource_names)`` per blueprint package. The
+            names are ``None`` when the package has no provider, so its resources
+            cannot be loaded and the caller must treat it as possibly matching.
+        """
+        result: list[tuple[str | None, PackageManifest, set[str] | None]] = []
+        for package_dir, provider, manifest in self._iter_packages(env_name):
+            if not manifest.blueprint:
+                continue
+            if provider is None:
+                result.append((provider, manifest, None))
+                continue
+            resources, _, _vars = self._package_loader.load_package(package_dir, provider, env_name)
+            result.append((provider, manifest, {r.name for r in resources}))
+        return result
 
     @staticmethod
     def _non_empty_package_names(package_name: str, resources: list[ResourceConfig]) -> list[str]:
