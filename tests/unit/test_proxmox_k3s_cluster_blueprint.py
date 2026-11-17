@@ -57,7 +57,7 @@ def test_proxmox_k3s_cluster_example_loads_blueprint(loader: PackageLoader) -> N
     assert variables["server_name"] == "k3s-dev-server"
     assert variables["server_vmid"] == 240
     assert variables["server_target"] == "node1"
-    assert variables["server_ip"] == "172.20.10.80"
+    assert variables["server_ip"] == "192.0.2.80"
     assert len(variables["agents"]) == 2
     assert variables["agents"][0]["name"] == "k3s-dev-agent-1"
     assert variables["agents"][1]["name"] == "k3s-dev-agent-2"
@@ -181,17 +181,17 @@ def test_proxmox_k3s_cluster_example_dhcp_configs(loader: PackageLoader) -> None
     server = dhcps_by_name["k3s-dev-server-dhcp"].config
     assert server["subnet_ref"] == "my-subnet"
     assert server["hw_address"] == "02:00:00:00:08:00"
-    assert server["ip_address"] == "172.20.10.80"
+    assert server["ip_address"] == "192.0.2.80"
     assert server["hostname"] == "k3s-dev-server"
 
     agent1 = dhcps_by_name["k3s-dev-agent-1-dhcp"].config
     assert agent1["hw_address"] == "02:00:00:00:08:01"
-    assert agent1["ip_address"] == "172.20.10.81"
+    assert agent1["ip_address"] == "192.0.2.81"
     assert agent1["hostname"] == "k3s-dev-agent-1"
 
     agent2 = dhcps_by_name["k3s-dev-agent-2-dhcp"].config
     assert agent2["hw_address"] == "02:00:00:00:08:02"
-    assert agent2["ip_address"] == "172.20.10.82"
+    assert agent2["ip_address"] == "192.0.2.82"
     assert agent2["hostname"] == "k3s-dev-agent-2"
 
 

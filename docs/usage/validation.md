@@ -62,10 +62,10 @@ Jumphost preflight (ansible@ansible.example.net):
   [SKIP] key match: package declares no public key to compare
   [OK] tools: rsync, bash, python3, ssh, scp
   [OK] writable /tmp
-  [OK] target k3s-server (172.20.10.70): not deployed; routable and unused
-  [OK] target k3s-agent-1 (172.20.10.71): not deployed; routable and unused
-  [OK] target k3s-agent-2 (172.20.10.72): not deployed; routable and unused
-  [OK] target k3s-agent-3 (172.20.10.73): not deployed; routable and unused
+  [OK] target k3s-server (192.0.2.70): not deployed; routable and unused
+  [OK] target k3s-agent-1 (192.0.2.71): not deployed; routable and unused
+  [OK] target k3s-agent-2 (192.0.2.72): not deployed; routable and unused
+  [OK] target k3s-agent-3 (192.0.2.73): not deployed; routable and unused
   [OK] output ~/.kube/k3s-demolab.yaml: exists, writable
 Jumphost preflight: 9 OK, 1 SKIP
 ```

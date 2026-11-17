@@ -32,7 +32,7 @@ variables:
   vmid: 210
   target_node: node1
   mac_address: "02:00:00:F8:F4:7D"
-  ip_address: "172.20.10.60"
+  ip_address: "192.0.2.60"
   dhcp_subnet: opt1-servers
   cloud_init_snippets:
     - system/hostname
@@ -58,7 +58,7 @@ foundry infra apply --env <env> --package my-service
 | `vmid`          | Proxmox VM ID                                                       | `210`                  |
 | `target_node`   | Proxmox host to place the VM on                                     | `node1`                 |
 | `mac_address`   | VM NIC MAC address (also used for DHCP reservation, lowercased)     | `02:00:00:F8:F4:7D`    |
-| `ip_address`    | VM IP address (assigned via DHCP reservation)                       | `172.20.10.60`        |
+| `ip_address`    | VM IP address (assigned via DHCP reservation)                       | `192.0.2.60`        |
 | `dhcp_subnet`   | OPNsense Kea subnet reference                                       | `opt1-servers`  |
 
 ### Optional (blueprint defaults)

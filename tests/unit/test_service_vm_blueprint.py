@@ -46,7 +46,7 @@ def test_service_vm_example_package_loads_blueprint(loader: PackageLoader) -> No
     assert variables["vmid"] == 210
     assert variables["target_node"] == "node1"
     assert variables["mac_address"] == "02:00:00:F8:F4:7D"
-    assert variables["ip_address"] == "172.20.10.60"
+    assert variables["ip_address"] == "192.0.2.60"
     assert variables["dhcp_subnet"] == "opt1-servers"
     assert variables["tags"] == ["infra", "web"]
     assert variables["dhcp_description"] == "Infrastructure web server (example)"
@@ -141,7 +141,7 @@ def test_service_vm_dhcp_config_uses_merged_values(loader: PackageLoader) -> Non
     assert config["subnet_ref"] == "opt1-servers"
     # hw_address must be lowercased by the blueprint template
     assert config["hw_address"] == "02:00:00:f8:f4:7d"
-    assert config["ip_address"] == "172.20.10.60"
+    assert config["ip_address"] == "192.0.2.60"
     assert config["hostname"] == "demo-web"
     assert config["description"] == "Infrastructure web server (example)"
 

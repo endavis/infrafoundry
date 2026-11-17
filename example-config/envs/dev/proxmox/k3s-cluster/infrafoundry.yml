@@ -28,7 +28,7 @@ variables:
   server_vmid: 240
   server_target: node1
   server_mac: "02:00:00:00:08:00"
-  server_ip: "172.20.10.80"
+  server_ip: "192.0.2.80"
 
   # --- Agent nodes ---
   agents:
@@ -36,9 +36,9 @@ variables:
       vmid: 241
       target_node: node1
       mac: "02:00:00:00:08:01"
-      ip: "172.20.10.81"
+      ip: "192.0.2.81"
     - name: k3s-dev-agent-2
       vmid: 242
       target_node: node1
       mac: "02:00:00:00:08:02"
-      ip: "172.20.10.82"
+      ip: "192.0.2.82"

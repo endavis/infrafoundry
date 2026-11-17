@@ -117,7 +117,7 @@ ontap_export_policies: []
 #   - name: nfs_data
 #     vserver: svm_data
 #     rules:
-#       - client_match: "172.20.10.0/24"
+#       - client_match: "192.0.2.0/24"
 #         protocols: [nfs]
 #         ro_rule: [sys]
 #         rw_rule: [sys]
