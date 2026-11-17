@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794919991655,
+  "lastUpdate": 1794921955192,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -2854,6 +2854,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007316989624668761",
             "extra": "mean: 93.4842730579098 usec\nrounds: 12100"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6f6d5b3b4df98f45cec73ce483d4c3c2b9f77c09",
+          "message": "docs: use rfc 5737 addresses for every private-range example value (merges PR #1455, addresses #1453)\n\n* docs: use rfc 5737 addresses for example values in blueprints and docs\n\nReplace example addresses from the 172.16.0.0/12 example range with RFC 5737\ndocumentation addresses in 13 blueprint, docs and example-config files, keeping\nsubnets, gateways, DHCP ranges and VIPs consistent within each file.\n\nThe opnsense-vm blueprint's pve_host input no longer has a default: it is a\nper-site value, so a missing value now fails loudly instead of pointing at an\naddress that looks real. The README moves it to the required inputs table.\n\nTest assertions changed to follow the example-config values (no other test\nchanges):\n- tests/unit/test_service_vm_blueprint.py: the two ip_address assertions that\n  load the service-vm example package\n- tests/unit/test_proxmox_k3s_cluster_blueprint.py: the four assertions on the\n  k3s-cluster example package's server_ip and node ip_address values\n\nAddresses #1453\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* docs: use rfc 5737 addresses for every private-range example value\n\nExtends the first commit to all three RFC 1918 ranges across\nblueprints, docs, example-config, source docstrings and test data.\nTest data and the assertions on those values change together; no\ntest was removed, skipped or changed in what it checks. Networks\nlarger than a /24 map to a documentation /24 with their subnets\nsplit inside it.\n\nKept: Unbound private-address list definitions and their tests, the\nk3s default cluster and service CIDRs, and the RFC 1918 block\nadvertised as a Tailscale route.\n\nAddresses #1453\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-17T13:24:44Z",
+          "tree_id": "acaccb576abe41910281abf549fa11395992a8a3",
+          "url": "https://github.com/endavis/infrafoundry/commit/6f6d5b3b4df98f45cec73ce483d4c3c2b9f77c09"
+        },
+        "date": 1794921954279,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 61.291112520462825,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005879920548564226",
+            "extra": "mean: 16.315579190476225 msec\nrounds: 63"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 11015.84523509577,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000955849836185924",
+            "extra": "mean: 90.77832691531148 usec\nrounds: 12465"
           }
         ]
       }
