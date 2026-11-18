@@ -12,6 +12,7 @@ import pytest
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.providers.mikrotik.client import RouterOSAPIError, RouterOSConnectionError
 from infrafoundry.providers.mikrotik.components.manager import MikroTikManager
 from infrafoundry.providers.mikrotik.settings import MikroTikSettings
 
@@ -25,7 +26,11 @@ class FakeRouterOS:
 
     def __init__(self, tables: dict[str, list[dict[str, str]]]) -> None:
         self.tables = copy.deepcopy(tables)
-        self.calls: list[tuple[str, str]] = []
+        self.calls: list[tuple[Any, ...]] = []
+        self.errors: dict[tuple[str, str], RouterOSAPIError | RouterOSConnectionError] = {}
+        """Raise this error on ``(verb, path)`` (the path of a PATCH or DELETE has the id)."""
+        self.put_returns_id = True
+        self._next_id = 100
 
     @classmethod
     def from_fixture(cls, name: str) -> FakeRouterOS:
@@ -34,6 +39,38 @@ class FakeRouterOS:
     def get(self, path: str) -> list[dict[str, str]]:
         self.calls.append(("GET", path))
         return copy.deepcopy(self.tables.get(path, []))
+
+    def _fail(self, verb: str, path: str) -> None:
+        error = self.errors.get((verb, path))
+        if error is not None:
+            raise error
+
+    def put(self, path: str, body: dict[str, str]) -> dict[str, str]:
+        self.calls.append(("PUT", path, dict(body)))
+        self._fail("PUT", path)
+        row = {**body, ".id": f"*{self._next_id}", "disabled": "false", "dynamic": "false"}
+        self._next_id += 1
+        self.tables.setdefault(path, []).append(row)
+        return dict(row) if self.put_returns_id else {}
+
+    def _row(self, path: str, row_id: str) -> dict[str, str]:
+        return next(r for r in self.tables.get(path, []) if r.get(".id") == row_id)
+
+    def patch(self, path: str, row_id: str, body: dict[str, str]) -> dict[str, str]:
+        self.calls.append(("PATCH", f"{path}/{row_id}", dict(body)))
+        self._fail("PATCH", f"{path}/{row_id}")
+        row = self._row(path, row_id)
+        row.update(body)
+        return dict(row)
+
+    def delete(self, path: str, row_id: str) -> None:
+        self.calls.append(("DELETE", f"{path}/{row_id}"))
+        self._fail("DELETE", f"{path}/{row_id}")
+        self.tables[path].remove(self._row(path, row_id))
+
+    def writes(self) -> list[tuple[Any, ...]]:
+        """The PUT, PATCH and DELETE calls, in order."""
+        return [c for c in self.calls if c[0] in ("PUT", "PATCH", "DELETE")]
 
     def execute(self, script: str) -> str:
         self.calls.append(("EXECUTE", script))

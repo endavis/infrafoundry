@@ -89,3 +89,59 @@ def test_connection_error_is_wrapped_without_credentials() -> None:
     ):
         client.get("system/resource")
     assert PASSWORD not in str(exc.value)
+
+
+def test_put_creates_a_row_and_returns_its_id() -> None:
+    client = RouterOSClient(SETTINGS)
+    body = {"name": "bridge"}
+    with patch.object(
+        requests.Session, "request", return_value=_response(201, {".id": "*9", "name": "bridge"})
+    ) as request:
+        row = client.put("interface/bridge", body)
+
+    assert row == {".id": "*9", "name": "bridge"}
+    assert request.call_args.args == ("PUT", "https://192.0.2.2/rest/interface/bridge")
+    assert request.call_args.kwargs["json"] == body
+
+
+def test_patch_addresses_the_row_by_id() -> None:
+    client = RouterOSClient(SETTINGS)
+    with patch.object(
+        requests.Session, "request", return_value=_response(200, {".id": "*41"})
+    ) as request:
+        client.patch("ip/service", "*41", {"disabled": "true"})
+
+    assert request.call_args.args == ("PATCH", "https://192.0.2.2/rest/ip/service/*41")
+    assert request.call_args.kwargs["json"] == {"disabled": "true"}
+
+
+@pytest.mark.parametrize("status", [204, 200])
+def test_delete_accepts_an_empty_body(status: int) -> None:
+    client = RouterOSClient(SETTINGS)
+    response = _response(status, None)
+    response.content = b""
+    response.json.side_effect = ValueError("no body")
+    with patch.object(requests.Session, "request", return_value=response) as request:
+        client.delete("interface/vlan", "*7")
+
+    assert request.call_args.args == ("DELETE", "https://192.0.2.2/rest/interface/vlan/*7")
+    response.json.assert_not_called()
+
+
+def test_write_error_carries_message_and_detail_without_credentials() -> None:
+    client = RouterOSClient(SETTINGS)
+    body = {"error": 400, "message": "Bad Request", "detail": "failure: already have such entry"}
+    with (
+        patch.object(requests.Session, "request", return_value=_response(400, body)),
+        pytest.raises(RouterOSAPIError) as exc,
+    ):
+        client.put("interface/vlan", {"name": "vlan10", "comment": PASSWORD})
+
+    assert "already have such entry" in str(exc.value)
+    assert PASSWORD not in str(exc.value)
+
+
+def test_put_with_a_non_object_response_returns_empty() -> None:
+    client = RouterOSClient(SETTINGS)
+    with patch.object(requests.Session, "request", return_value=_response(200, [])):
+        assert client.put("interface/bridge", {}) == {}

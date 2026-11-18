@@ -2,8 +2,8 @@
 
 ``MikroTikRestRunner`` acts only for ``provider.name == "mikrotik"``. ``plan`` reads
 the device, diffs it against the YAML and refuses a plan whose end state would cut the
-management connection. ``apply`` and ``destroy`` are not implemented yet (#1483) and
-fail loudly rather than doing nothing.
+management connection. ``apply`` runs the planned writes in order and stops at the
+first error; ``destroy`` deletes the declared objects that exist on the device.
 
 Core never imports the provider package: the runner talks to it through the
 structural ``_MikroTikProvider`` protocol.
@@ -20,14 +20,12 @@ from typing import Any, Protocol, cast, override
 from rich.console import Console
 from rich.markup import escape
 
+from infrafoundry.core.managed_set import ManagedResources, ReleasedResource
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.result_types import ApplyResult, DestroyResult, DriftInfo, PlanResult
 from infrafoundry.core.runners.base_runner import BaseRunner
 
 logger = logging.getLogger(__name__)
-
-NOT_IMPLEMENTED_MESSAGE = "mikrotik apply is not implemented yet (see #1483)"
-"""Failure message of ``apply`` and ``destroy`` until the follow-up lands."""
 
 
 class _Plan(Protocol):
@@ -56,6 +54,23 @@ class _Plan(Protocol):
         ...
 
 
+class _ApplyOutcome(Protocol):
+    """What the runner reads from a provider apply or destroy result."""
+
+    refusals: list[str]
+    warnings: list[str]
+    error: str | None
+    outcomes: list[Any]
+    counts: dict[str, int]
+    released: list[ReleasedResource]
+    completed: list[Any]
+
+    @property
+    def success(self) -> bool:
+        """True when nothing was refused and every step ran."""
+        ...
+
+
 class _MikroTikProvider(Protocol):
     """What the runner needs from the MikroTik provider."""
 
@@ -69,6 +84,36 @@ class _MikroTikProvider(Protocol):
         target_resources: list[str] | None = None,
     ) -> _Plan:
         """Plan the device's changes."""
+        ...
+
+    def rest_apply(
+        self,
+        env_name: str,
+        resources: list[ResourceConfig],
+        *,
+        add_only: bool = False,
+        managed_resources: Mapping[str, list[ResourceConfig]] | None = None,
+        target_resources: list[str] | None = None,
+    ) -> _ApplyOutcome:
+        """Plan and apply the device's changes."""
+        ...
+
+    def rest_destroy(
+        self,
+        env_name: str,
+        resources: list[ResourceConfig],
+        *,
+        target_resources: list[str] | None = None,
+    ) -> _ApplyOutcome:
+        """Delete the declared objects that exist on the device."""
+        ...
+
+    def rest_resource_ids(self, env_name: str, resources: list[ResourceConfig]) -> dict[str, str]:
+        """Map resource names to the device's row ids."""
+        ...
+
+    def deletable_types(self) -> set[str]:
+        """Resource types the provider can delete."""
         ...
 
 
@@ -232,15 +277,132 @@ class MikroTikRestRunner(BaseRunner):
     def apply(
         self, provider: ProviderBase, auto_approve: bool = True, **kwargs: Any
     ) -> ApplyResult:
-        """Not implemented yet (#1483): fail loudly instead of doing nothing."""
+        """Plan against the device, then write the planned changes in order.
+
+        Stops at the first error. A plan that could cut the management connection is
+        refused before any write.
+
+        Args:
+            provider: The MikroTik provider.
+            auto_approve: Ignored; the run is always approved.
+            **kwargs: ``add_only`` suppresses deletes; ``target_resources`` restricts the
+                run and implies add-only; ``managed_resources`` holds the managed rows by
+                type (ADR-0018); ``env_name`` overrides the provider's current environment.
+        """
         if not self._supports(provider):
             return ApplyResult(success=True, resources_created=0, resources_updated=0)
-        return ApplyResult(success=False, error=NOT_IMPLEMENTED_MESSAGE)
+        target_resources = kwargs.get("target_resources")
+        try:
+            env_name = self._env_name(provider, kwargs)
+            resources = self._load_resources(provider, env_name)
+            outcome = cast(_MikroTikProvider, provider).rest_apply(
+                env_name,
+                resources,
+                add_only=bool(kwargs.get("add_only", False)) or bool(target_resources),
+                managed_resources=kwargs.get("managed_resources"),
+                target_resources=target_resources,
+            )
+        except Exception as exc:
+            logger.exception("mikrotik_rest apply failed")
+            return ApplyResult(success=False, error=str(exc))
+
+        for warning in outcome.warnings:
+            self.console.print(f"  [yellow]mikrotik_rest: {escape(warning)}[/yellow]")
+        if outcome.refusals:
+            return ApplyResult(
+                success=False,
+                error="mikrotik apply refused, it could cut the management connection:\n"
+                + "\n".join(f"- {r}" for r in outcome.refusals),
+            )
+        result = ApplyResult(
+            success=outcome.success,
+            resources_created=outcome.counts.get("create", 0),
+            resources_updated=outcome.counts.get("update", 0),
+            resources_deleted=outcome.counts.get("delete", 0),
+        )
+        result["resource_outcomes"] = outcome.outcomes
+        result["resource_outcomes_summary"] = [o.to_dict() for o in outcome.outcomes]
+        if not outcome.success:
+            result["error"] = outcome.error or "mikrotik apply failed"
+            return result
+        self.console.print(f"  [dim]mikrotik_rest: applied {len(outcome.completed)} step(s)[/dim]")
+        if outcome.released:
+            result["released_resources"] = outcome.released
+        return result
 
     def destroy(
         self, provider: ProviderBase, auto_approve: bool = True, **kwargs: Any
     ) -> DestroyResult:
-        """Not implemented yet (#1483): fail loudly instead of doing nothing."""
+        """Delete the declared objects that exist on the device.
+
+        Never touches ``ip.service``, ``absent: true`` entries or undeclared rows. A
+        destroy that would remove the management path is refused before any write.
+
+        Args:
+            provider: The MikroTik provider.
+            auto_approve: Ignored; the run is always approved.
+            **kwargs: ``target_resources`` restricts the run; ``env_name`` overrides the
+                provider's current environment.
+        """
         if not self._supports(provider):
             return DestroyResult(success=True, resources_destroyed=0)
-        return DestroyResult(success=False, error=NOT_IMPLEMENTED_MESSAGE)
+        try:
+            env_name = self._env_name(provider, kwargs)
+            resources = self._load_resources(provider, env_name)
+            outcome = cast(_MikroTikProvider, provider).rest_destroy(
+                env_name, resources, target_resources=kwargs.get("target_resources")
+            )
+        except Exception as exc:
+            logger.exception("mikrotik_rest destroy failed")
+            return DestroyResult(success=False, error=str(exc))
+
+        if outcome.refusals:
+            return DestroyResult(
+                success=False,
+                error="mikrotik destroy refused, it would remove the management connection:\n"
+                + "\n".join(f"- {r}" for r in outcome.refusals),
+            )
+        result = DestroyResult(
+            success=outcome.success, resources_destroyed=outcome.counts.get("delete", 0)
+        )
+        result["resource_outcomes"] = outcome.outcomes
+        result["resource_outcomes_summary"] = [o.to_dict() for o in outcome.outcomes]
+        if not outcome.success:
+            result["error"] = outcome.error or "mikrotik destroy failed"
+        return result
+
+    def needs_managed_dispatch(
+        self, provider: ProviderBase, managed_resources: ManagedResources
+    ) -> bool:
+        """Return True if managed objects need deleting though no YAML remains (#1260).
+
+        Args:
+            provider: Provider with no resources in the environment's YAML.
+            managed_resources: Managed resources by type.
+
+        Returns:
+            True for the mikrotik provider when a deletable type has managed rows.
+        """
+        if not self._supports(provider):
+            return False
+        deletable = cast(_MikroTikProvider, provider).deletable_types()
+        return any(rows for type_name, rows in managed_resources.items() if type_name in deletable)
+
+    def get_resource_ids(self, provider: ProviderBase) -> dict[str, str]:
+        """Return ``{resource_name: .id}`` for the declared objects that exist live.
+
+        Args:
+            provider: The MikroTik provider (its environment must be set).
+
+        Returns:
+            The mapping, or an empty one on any failure so the apply pipeline goes on.
+        """
+        if not self._supports(provider):
+            return {}
+        try:
+            env_name = self._env_name(provider, {})
+            resources = self._load_resources(provider, env_name)
+            return cast(_MikroTikProvider, provider).rest_resource_ids(env_name, resources)
+        except Exception:
+            logger.exception("mikrotik_rest resource id lookup failed")
+            return {}

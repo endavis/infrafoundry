@@ -116,6 +116,12 @@ def test_opnsense_direct_runner_dispatches_managed_set() -> None:
     assert isinstance(_as_dispatches_managed_set(OPNsenseDirectRunner()), DispatchesManagedSet)
 
 
+def test_mikrotik_rest_runner_dispatches_managed_set_and_is_state_aware() -> None:
+    runner = MikroTikRestRunner()
+    assert isinstance(runner, DispatchesManagedSet)
+    assert isinstance(runner, StateAware)
+
+
 @pytest.mark.parametrize("cls", [TerraformRunner, AnsibleRunner, PyInfraRunner])
 def test_other_runners_do_not_dispatch_managed_set(cls: type[Any]) -> None:
     assert not isinstance(cls(), DispatchesManagedSet)

@@ -1,8 +1,8 @@
 """MikroTik RouterOS provider: manages a device natively over its REST API.
 
 InfraFoundry reads the device through ``/rest``, diffs the declared objects against
-it and, in a later change (#1483), applies them in a lock-out-safe order. Terraform has
-nothing to do here; ``MikroTikRestRunner`` plans and applies (ADR-0026).
+it and applies them in a lock-out-safe order, stopping at the first error. Terraform has
+nothing to do here; ``MikroTikRestRunner`` plans, applies and destroys (ADR-0026).
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from infrafoundry.core.provider_mixins import (
 )
 from infrafoundry.core.validation import ValidationReport
 
-from .components.manager import MikroTikManager, MikroTikPlan
+from .components.manager import MikroTikApplyResult, MikroTikManager, MikroTikPlan
 from .schema import SPECS
 from .validator import MikroTikValidator
 
@@ -134,3 +134,63 @@ class MikroTikProvider(
             managed_resources=managed_resources,
             target_resources=target_resources,
         )
+
+    def rest_apply(
+        self,
+        env_name: str,
+        resources: list[ResourceConfig],
+        *,
+        add_only: bool = False,
+        managed_resources: Mapping[str, list[ResourceConfig]] | None = None,
+        target_resources: list[str] | None = None,
+    ) -> MikroTikApplyResult:
+        """Plan against the device, then apply the plan; called by ``MikroTikRestRunner``.
+
+        Args:
+            env_name: Environment name.
+            resources: This provider's resources.
+            add_only: Suppress deletes.
+            managed_resources: Managed rows by type (ADR-0018).
+            target_resources: Restrict to these resource names.
+        """
+        manager = MikroTikManager(self.config_dir)
+        plan = manager.plan(
+            env_name,
+            resources,
+            add_only=add_only,
+            managed_resources=managed_resources,
+            target_resources=target_resources,
+        )
+        return manager.apply(env_name, plan)
+
+    def rest_destroy(
+        self,
+        env_name: str,
+        resources: list[ResourceConfig],
+        *,
+        target_resources: list[str] | None = None,
+    ) -> MikroTikApplyResult:
+        """Delete the declared objects that exist on the device.
+
+        Args:
+            env_name: Environment name.
+            resources: This provider's resources.
+            target_resources: Restrict to these resource names.
+        """
+        return MikroTikManager(self.config_dir).destroy(
+            env_name, resources, target_resources=target_resources
+        )
+
+    def rest_resource_ids(self, env_name: str, resources: list[ResourceConfig]) -> dict[str, str]:
+        """Return ``{resource_name: .id}`` for the declared objects that exist live.
+
+        Args:
+            env_name: Environment name.
+            resources: This provider's resources.
+        """
+        return MikroTikManager(self.config_dir).resource_ids(env_name, resources)
+
+    @staticmethod
+    def deletable_types() -> set[str]:
+        """Return the resource types the provider can delete."""
+        return {name for name, spec in SPECS.items() if spec.deletable}

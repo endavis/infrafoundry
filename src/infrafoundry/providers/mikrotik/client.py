@@ -1,8 +1,8 @@
 """Minimal RouterOS REST client (RouterOS 7 and later).
 
-Only reads and ``/rest/execute`` are implemented here. The write verbs (PUT to
-create, PATCH to update, DELETE to remove) are added with apply (#1483) after they
-are verified on a RouterOS CHR virtual machine.
+Reads, ``/rest/execute`` and the write verbs are implemented here: PUT creates, PATCH
+updates and DELETE removes a row. Error messages and logs never carry request bodies
+or credentials.
 """
 
 from __future__ import annotations
@@ -46,6 +46,22 @@ class RouterOSReader(Protocol):
         ...
 
 
+class RouterOSWriter(RouterOSReader, Protocol):
+    """What apply needs from a RouterOS client: the reads plus the write verbs."""
+
+    def put(self, path: str, body: dict[str, str]) -> dict[str, str]:
+        """Create a row under a REST path and return it (with its ``.id``)."""
+        ...
+
+    def patch(self, path: str, row_id: str, body: dict[str, str]) -> dict[str, str]:
+        """Update the row ``row_id`` under a REST path and return it."""
+        ...
+
+    def delete(self, path: str, row_id: str) -> None:
+        """Delete the row ``row_id`` under a REST path."""
+        ...
+
+
 class RouterOSClient:
     """REST client over a ``requests.Session`` with HTTP basic auth."""
 
@@ -62,7 +78,7 @@ class RouterOSClient:
         self._session.verify = settings.verify_ssl
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
-        """Send one request and return the decoded JSON body.
+        """Send one request and return the decoded JSON body (``None`` for an empty body).
 
         Raises:
             RouterOSConnectionError: On a transport failure.
@@ -77,6 +93,8 @@ class RouterOSClient:
             ) from exc
         if response.status_code >= 400:
             raise RouterOSAPIError(self._error_text(response, path), response.status_code)
+        if response.status_code == 204 or not response.content:
+            return None
         return response.json()
 
     @staticmethod
@@ -100,6 +118,8 @@ class RouterOSClient:
             path: REST path without the ``/rest/`` prefix, e.g. ``interface/bridge``.
         """
         data = self._request("GET", path)
+        if data is None:
+            return []
         if isinstance(data, dict):
             return [data]
         return list(data)
@@ -112,3 +132,33 @@ class RouterOSClient:
         """
         data = self._request("POST", "execute", json={"script": script, "as-string": True})
         return str(data.get("ret", "")) if isinstance(data, dict) else ""
+
+    def put(self, path: str, body: dict[str, str]) -> dict[str, str]:
+        """Create a row with ``PUT`` and return it (the row carries its ``.id``).
+
+        Args:
+            path: REST path without the ``/rest/`` prefix, e.g. ``interface/bridge``.
+            body: The row's fields as RouterOS strings.
+        """
+        data = self._request("PUT", path, json=body)
+        return data if isinstance(data, dict) else {}
+
+    def patch(self, path: str, row_id: str, body: dict[str, str]) -> dict[str, str]:
+        """Update one row with ``PATCH``.
+
+        Args:
+            path: REST path without the ``/rest/`` prefix.
+            row_id: The row's ``.id``.
+            body: The fields to change as RouterOS strings.
+        """
+        data = self._request("PATCH", f"{path.strip('/')}/{row_id}", json=body)
+        return data if isinstance(data, dict) else {}
+
+    def delete(self, path: str, row_id: str) -> None:
+        """Delete one row with ``DELETE``; the response body, if any, is ignored.
+
+        Args:
+            path: REST path without the ``/rest/`` prefix.
+            row_id: The row's ``.id``.
+        """
+        self._request("DELETE", f"{path.strip('/')}/{row_id}")
