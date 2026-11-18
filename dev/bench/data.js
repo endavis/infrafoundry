@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795014725428,
+  "lastUpdate": 1795015819142,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3538,6 +3538,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009727292919533966",
             "extra": "mean: 128.7217418725093 usec\nrounds: 8275"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "71457a314113800ae4fa5ab618cbb04eb1a982f9",
+          "message": "fix: plan drift in the environment's terraform dir and isolate provider failures (merges PR #1491, addresses #1488)\n\nDriftDetector called set_environment only on the direct-runner path, so\nevery Terraform provider was planned in the env-less generated/terraform/\n<provider> directory and failed. One try block also wrapped the whole\nprovider loop, so the first failure stopped drift detection for every\nprovider after it.\n\nThe Terraform path now sets the environment before planning, and each\nprovider is checked in its own handler: a failure is recorded as that\nprovider's result (parsed False, has_changes False) with a warning, and\nthe loop continues. KeyboardInterrupt and SystemExit still propagate.\n\nTwo existing tests in test_drift_detector.py get set_environment on their\nSimpleNamespace provider stubs (approved); their assertions are unchanged.\n\nAddresses #1488.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T15:29:07Z",
+          "tree_id": "6fc4754e81e3952c7dadd2678349f0e3d4821bb0",
+          "url": "https://github.com/endavis/infrafoundry/commit/71457a314113800ae4fa5ab618cbb04eb1a982f9"
+        },
+        "date": 1795015818682,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 48.74339512738474,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004206657862148111",
+            "extra": "mean: 20.515600060000452 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7926.5271377394265,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008443040605072993",
+            "extra": "mean: 126.15865468230655 usec\nrounds: 8372"
           }
         ]
       }
