@@ -226,6 +226,10 @@ class FilteredDestroyRefusedError(InfraFoundryError):
     """Raised when a filtered destroy would cascade beyond the selected resources (#1153)."""
 
 
+class OrphanedResourceConflictError(InfraFoundryError):
+    """Raised when a new resource's VM id is held by an undeclared resource in state (#1459)."""
+
+
 # Package Errors
 
 

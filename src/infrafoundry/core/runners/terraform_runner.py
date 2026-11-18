@@ -12,7 +12,11 @@ from typing import IO, Any, cast, override
 from rich.console import Console
 from rich.markup import escape
 
-from infrafoundry.core.exceptions import FilteredDestroyRefusedError, TerraformError
+from infrafoundry.core.exceptions import (
+    FilteredDestroyRefusedError,
+    OrphanedResourceConflictError,
+    TerraformError,
+)
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.result_types import (
     ApplyResult,
@@ -21,6 +25,7 @@ from infrafoundry.core.result_types import (
     DriftInfo,
     PlanResult,
 )
+from infrafoundry.core.runners import terraform_orphans
 from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY, BaseRunner
 from infrafoundry.core.types import ResourceOutcome
 
@@ -172,6 +177,9 @@ class TerraformRunner(BaseRunner):
             provider: Provider instance
             **kwargs: Additional terraform plan options:
                 - target_resources: List of resource names to target with -target
+                - report_orphans: When true, warn about state no package declares and
+                  refuse a new resource whose VM id an orphan still holds (#1459)
+                - env_name: Environment name used in remediation messages
 
         Returns:
             Plan result
@@ -179,7 +187,14 @@ class TerraformRunner(BaseRunner):
         target_resources = kwargs.get("target_resources")
         # Every field PlanResult adds to BaseResult is NotRequired.
         return cast(
-            PlanResult, self._run_terraform(provider, "plan", target_resources=target_resources)
+            PlanResult,
+            self._run_terraform(
+                provider,
+                "plan",
+                target_resources=target_resources,
+                report_orphans=bool(kwargs.get("report_orphans", False)),
+                env_name=kwargs.get("env_name"),
+            ),
         )
 
     def apply(
@@ -293,6 +308,9 @@ class TerraformRunner(BaseRunner):
         target_resources: list[str] | None = None,
         parallelism: int | None = None,
         resource_names: list[str] | None = None,
+        *,
+        report_orphans: bool = False,
+        env_name: str | None = None,
     ) -> BaseResult:
         """Run Terraform command for a provider.
 
@@ -326,6 +344,11 @@ class TerraformRunner(BaseRunner):
                 such as ``terraform_data.ova_vm_web_01`` resolves to ``web-01``
                 whether or not a target filter is set (#1099). Falls back to
                 ``target_resources`` when not given.
+            report_orphans: Plan and apply only. Warn about state addresses no
+                current package declares, and raise
+                :class:`OrphanedResourceConflictError` when a resource this run
+                creates reuses the VM id of one (#1459).
+            env_name: Environment name for the remediation messages.
 
         Returns:
             Dict with command results.  For apply/destroy, includes a
@@ -359,12 +382,16 @@ class TerraformRunner(BaseRunner):
         # applier, which terraform does not do on its own (#1153).
         extra_targets: list[str] = []
         replacements: list[str] = []
+        in_state: list[str] = []
         if command in {"plan", "apply"}:
-            extra_targets, replacements = self._sdn_change_args(tf_dir)
+            in_state = self.state_list(tf_dir)
+            extra_targets, replacements = self._sdn_change_args(tf_dir, in_state)
 
         # Add -target flags for resource filtering
+        resolved_targets: list[str] | None = None
         if target_resources:
             targets = self._resolve_terraform_targets(tf_dir, target_resources, command=command)
+            resolved_targets = list(targets)
             if command == "destroy":
                 # Backstop: -target on an SDN object cascades through the applier to
                 # every VM and container that depends on it (#1153).
@@ -372,6 +399,16 @@ class TerraformRunner(BaseRunner):
                 if sdn_targets:
                     raise FilteredDestroyRefusedError(self._refusal_message(sdn_targets))
             targets = list(dict.fromkeys([*targets, *extra_targets]))
+            if report_orphans and command in {"plan", "apply"}:
+                self._check_orphans(
+                    provider.name,
+                    tf_dir,
+                    in_state,
+                    resolved_targets,
+                    handled=set(extra_targets),
+                    env_name=env_name,
+                    env_vars=env,
+                )
             if not targets:
                 self.console.print(
                     f"[yellow]Warning: No terraform resources matched filter: "
@@ -387,6 +424,17 @@ class TerraformRunner(BaseRunner):
                 }
             for target in targets:
                 cmd.extend(["-target", target])
+
+        if report_orphans and command in {"plan", "apply"} and not target_resources:
+            self._check_orphans(
+                provider.name,
+                tf_dir,
+                in_state,
+                None,
+                handled=set(),
+                env_name=env_name,
+                env_vars=env,
+            )
 
         for replacement in replacements:
             cmd.extend(["-replace", replacement])
@@ -732,7 +780,9 @@ class TerraformRunner(BaseRunner):
                             addresses.append(address)
         return addresses
 
-    def _sdn_change_args(self, tf_dir: Path) -> tuple[list[str], list[str]]:
+    def _sdn_change_args(
+        self, tf_dir: Path, in_state: list[str] | None = None
+    ) -> tuple[list[str], list[str]]:
         """Work out what a plan or apply needs to apply SDN zone and vnet changes.
 
         Terraform re-runs ``proxmox_sdn_applier.apply`` (through
@@ -752,12 +802,15 @@ class TerraformRunner(BaseRunner):
 
         Args:
             tf_dir: Terraform working directory
+            in_state: State addresses already listed by the caller; listed here when
+                ``None``
 
         Returns:
             ``(extra_targets, replacements)``. Both are empty when there are
             neither orphans nor additions that need a replacement.
         """
-        in_state = self.state_list(tf_dir)
+        if in_state is None:
+            in_state = self.state_list(tf_dir)
         declared_list = self._declared_addresses(tf_dir)
         declared = set(declared_list)
         orphans = [
@@ -783,6 +836,91 @@ class TerraformRunner(BaseRunner):
             extra_targets.extend(a for a in _SDN_APPLIER_ADDRESSES if a in declared)
         replacements = [_SDN_APPLY_ADDRESS] if apply_declared else []
         return list(dict.fromkeys(extra_targets)), replacements
+
+    def _check_orphans(
+        self,
+        provider_name: str,
+        tf_dir: Path,
+        in_state: list[str],
+        targets: list[str] | None,
+        *,
+        handled: set[str],
+        env_name: str | None,
+        env_vars: dict[str, str] | None,
+    ) -> None:
+        """Warn about orphaned state and refuse a VM id collision with it (#1459).
+
+        An orphan is a state address no current package declares. It is reported
+        unless a filtered run already targets it (SDN orphans). A new resource, one
+        declared but not in state and in ``targets`` when the run is filtered, whose
+        VM id an orphan holds raises :class:`OrphanedResourceConflictError`. Read only.
+
+        Args:
+            provider_name: Provider name for messages
+            tf_dir: Terraform working directory
+            in_state: Addresses from ``terraform state list``
+            targets: Resolved targets of a filtered run, or ``None`` when unfiltered
+            handled: Orphans this run already removes
+            env_name: Environment name for messages
+            env_vars: Environment for the ``terraform show`` call
+
+        Raises:
+            OrphanedResourceConflictError: A new resource reuses an orphan's VM id.
+        """
+        declared = set(self._declared_addresses(tf_dir))
+        orphans = [
+            a
+            for a in terraform_orphans.orphaned_addresses(
+                in_state, declared, terraform_orphans.declared_modules(tf_dir)
+            )
+            if a not in handled
+        ]
+        if not orphans:
+            return
+        self.console.print(
+            "[yellow]"
+            + escape(
+                terraform_orphans.orphan_warning(
+                    provider_name, env_name, orphans, filtered=targets is not None
+                )
+            )
+            + "[/yellow]"
+        )
+        in_state_set = set(in_state)
+        new_ids = {
+            addr: vm_id
+            for addr, vm_id in terraform_orphans.declared_vm_ids(tf_dir).items()
+            if addr not in in_state_set and (targets is None or addr in targets)
+        }
+        if not new_ids:
+            return
+        held = self._state_vm_ids(tf_dir, env_vars)
+        orphan_ids = {a: v for a, v in held.items() if a in set(orphans)}
+        collisions = terraform_orphans.find_vmid_collisions(new_ids, orphan_ids)
+        if collisions:
+            raise OrphanedResourceConflictError(
+                terraform_orphans.collision_message(provider_name, env_name, collisions)
+            )
+
+    def _state_vm_ids(self, tf_dir: Path, env_vars: dict[str, str] | None) -> dict[str, str]:
+        """Return the VM id of each managed resource in state, ``{}`` if unreadable.
+
+        The ``terraform show -json`` output can hold secrets, so it is never logged.
+        """
+        try:
+            result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
+                [self.tool_path, "show", "-json"],
+                cwd=tf_dir,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=True,
+                env=env_vars,
+            )
+            return terraform_orphans.state_vm_ids(json.loads(result.stdout))
+        except (subprocess.CalledProcessError, json.JSONDecodeError, AttributeError):
+            logger.warning("Could not read VM ids from terraform state in %s", tf_dir)
+            return {}
 
     @staticmethod
     def _refusal_message(sdn_names: list[str]) -> str:

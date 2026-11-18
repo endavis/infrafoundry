@@ -385,6 +385,20 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
             "including live API checks",
         ],
     ),
+    "IF-VALIDATION-008": ErrorInfo(
+        code="IF-VALIDATION-008",
+        title="Orphaned Resource Conflict",
+        description=(
+            "A new resource would reuse the VM id of a resource that is still in terraform "
+            "state but no longer declared by any package, typically after a package rename. "
+            "Creating it would collide."
+        ),
+        suggestions=[
+            "Restore the old package, then run "
+            "'foundry infra destroy --env <env> -p <old-package>'",
+            "Apply the renamed package once the old resources are gone",
+        ],
+    ),
     # Package errors (IF-PACKAGE-XXX)
     "IF-PACKAGE-001": ErrorInfo(
         code="IF-PACKAGE-001",
@@ -625,6 +639,7 @@ _EXCEPTION_TO_CODE: dict[str, str] = {
     "ResourceFilterError": "IF-VALIDATION-005",
     "FilteredDestroyRefusedError": "IF-VALIDATION-006",
     "ConfigValidationError": "IF-VALIDATION-007",
+    "OrphanedResourceConflictError": "IF-VALIDATION-008",
     # Package errors
     "PackageNotFoundError": "IF-PACKAGE-001",
     "MissingRequirementsError": "IF-PACKAGE-002",

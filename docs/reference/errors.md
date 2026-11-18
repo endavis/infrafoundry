@@ -403,6 +403,14 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 1. Fix the errors listed above in the resource YAML
 2. Run `foundry infra doctor --env <env> --verbose` for the full report, including live API checks
 
+### IF-VALIDATION-008: Orphaned Resource Conflict
+
+**Cause:** A new resource would reuse the VM id of a resource that is still in terraform state but no longer declared by any package, typically after a package rename. Creating it would collide.
+
+**Solutions:**
+1. Restore the old package, then run `foundry infra destroy --env <env> -p <old-package>`
+2. Apply the renamed package once the old resources are gone
+
 ---
 
 ## Package Errors (IF-PACKAGE)

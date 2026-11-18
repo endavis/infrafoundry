@@ -483,6 +483,10 @@ resource-level events. They continue to work but emit `DeprecationWarning`
 messages. Migrate to resource-level `on_create`, `on_update`, and `on_destroy`
 events for new configurations.
 
+## Renaming a Package
+
+Resource names and VM ids that derive from package variables change when a package is renamed, so terraform sees new resources and keeps the old ones in state. Run `foundry infra destroy --env <env> -p <old>` before renaming. Otherwise `infra plan` warns about the leftover resources, and refuses with [IF-VALIDATION-008](../reference/errors.md#if-validation-008-orphaned-resource-conflict) when a new resource reuses a VM id they still hold.
+
 ## Duplicate Detection
 
 Resource names must be unique within a provider. If a package resource has the

@@ -513,6 +513,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_runner_protocol_conformance.py",
     "tests/unit/test_runner_results.py",
     "tests/unit/test_runner_terraform.py",
+    "tests/unit/test_terraform_orphans.py",
     "tests/unit/test_secrets.py",
     "tests/unit/test_secrets_rotation.py",
     "tests/unit/test_security_file_utils.py",

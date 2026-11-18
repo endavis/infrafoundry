@@ -22,6 +22,7 @@ from infrafoundry.core.exceptions import (
     InfraFoundryError,
     InvalidConfigurationError,
     MissingConfigurationError,
+    OrphanedResourceConflictError,
     PolicyViolationError,
     ProviderError,
     ProviderNotFoundError,
@@ -266,6 +267,11 @@ class TestGetErrorCode:
         """Test ValidationError maps correctly."""
         exc = ValidationError("Validation failed")
         assert get_error_code(exc) == "IF-VALIDATION-001"
+
+    def test_orphaned_resource_conflict_error(self) -> None:
+        """OrphanedResourceConflictError maps to IF-VALIDATION-008 (#1459)."""
+        assert "IF-VALIDATION-008" in ERROR_CATALOG
+        assert get_error_code(OrphanedResourceConflictError("x")) == "IF-VALIDATION-008"
 
     def test_circular_dependency_error(self) -> None:
         """Test CircularDependencyError maps correctly."""

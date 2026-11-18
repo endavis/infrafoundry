@@ -87,6 +87,13 @@ The code comes from the exception's class name, or from the nearest parent class
 - **Fix:** Remove the zone or vnet from the configuration and run `foundry infra apply`. If the package has no Proxmox resources left, run `foundry infra apply --env <env> -P proxmox`.
 - **Reference:** [IF-VALIDATION-006](../reference/errors.md#if-validation-006-filtered-destroy-refused).
 
+### Orphaned resource holds the VM id
+
+- **Symptom:** `[IF-VALIDATION-008] Orphaned Resource Conflict` during `infra plan` or `infra apply`.
+- **Cause:** A package was renamed, so its resources got new terraform addresses. The old ones are still in state and keep their VM id, which the renamed resources want.
+- **Fix:** Restore the old package, run `foundry infra destroy --env <env> -p <old-package>`, then apply the renamed package.
+- **Reference:** [IF-VALIDATION-008](../reference/errors.md#if-validation-008-orphaned-resource-conflict).
+
 ## Locks
 
 ### Environment is locked

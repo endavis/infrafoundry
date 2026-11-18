@@ -187,7 +187,9 @@ def test_plan_orchestrator_runs_runners_in_priority_order(console: Console) -> N
     assert tf_runner.plan.call_args_list[0][0][0] == provider
 
 
-def _plan_with_runner(console: Console, *, dry_run: bool) -> tuple[MagicMock, MagicMock]:
+def _plan_with_runner(
+    console: Console, *, dry_run: bool, plan_error: Exception | None = None
+) -> tuple[MagicMock, MagicMock]:
     """Run a one-provider plan and return ``(runner, state_manager)``."""
     from types import SimpleNamespace
 
@@ -198,7 +200,7 @@ def _plan_with_runner(console: Console, *, dry_run: bool) -> tuple[MagicMock, Ma
     ]
     runner = MagicMock()
     runner.priority = 0
-    runner.plan = MagicMock(return_value={"success": True})
+    runner.plan = MagicMock(return_value={"success": True}, side_effect=plan_error)
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
     runner_registry.create_runner.return_value = runner
@@ -239,6 +241,31 @@ def test_plan_orchestrator_passes_managed_resources_to_runner(console: Console) 
     state_manager.get_managed_resources.assert_called_once_with("dev", "proxmox")
     managed = runner.plan.call_args.kwargs["managed_resources"]
     assert [r.name for r in managed["unbound.forwards"]] == ["f1"]
+
+
+def test_plan_orchestrator_requests_orphan_report(console: Console) -> None:
+    """``runner.plan`` is asked to report orphaned state, with the env name (#1459)."""
+    runner, _ = _plan_with_runner(console, dry_run=False)
+
+    kwargs = runner.plan.call_args.kwargs
+    assert kwargs["report_orphans"] is True
+    assert kwargs["env_name"] == "dev"
+
+
+def test_plan_orchestrator_orphan_conflict_prints_no_traceback() -> None:
+    """An orphan conflict is re-raised without a traceback dump (#1459)."""
+    import io
+
+    from infrafoundry.core.exceptions import OrphanedResourceConflictError
+
+    buffer = io.StringIO()
+    with pytest.raises(OrphanedResourceConflictError):
+        _plan_with_runner(
+            Console(file=buffer),
+            dry_run=False,
+            plan_error=OrphanedResourceConflictError("vm id 105 held by an orphan"),
+        )
+    assert "Traceback" not in buffer.getvalue()
 
 
 def test_plan_orchestrator_dry_run_queries_managed_set_once(console: Console) -> None:

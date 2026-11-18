@@ -25,6 +25,7 @@ from infrafoundry.core.drift_detector import DriftDetector
 from infrafoundry.core.events import EventAbortedError, EventManager, EventType
 from infrafoundry.core.exceptions import (
     ConfigValidationError,
+    OrphanedResourceConflictError,
     ProviderFilterError,
     TerraformError,
 )
@@ -829,6 +830,8 @@ class PlanOrchestrator(HookExecutionMixin):
                                     target_resources=resource_filter if resource_filter else None,
                                     add_only=add_only,
                                     managed_resources=managed,
+                                    report_orphans=True,
+                                    env_name=env_name,
                                 )
                                 provider_results[f"{tool_name}_plan"] = runner_result
 
@@ -930,7 +933,8 @@ class PlanOrchestrator(HookExecutionMixin):
                 provider_filter=provider_filter,
             )
             if not isinstance(
-                exc, (ProviderFilterError, ConfigValidationError)
+                exc,
+                (ProviderFilterError, ConfigValidationError, OrphanedResourceConflictError),
             ):  # the CLI renders these cleanly
                 self.console.print(traceback.format_exc(), style="dim red")
             raise
