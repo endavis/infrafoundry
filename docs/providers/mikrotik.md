@@ -11,8 +11,17 @@ tags:
 
 The MikroTik provider manages a RouterOS 7 (or later) device over its REST API. It reads the device, diffs it against your YAML, and plans the changes in an order that keeps the management connection alive. It does not generate Terraform: the decision and the rejected alternatives are in [ADR-0026](../decisions/0026-mikrotik-routeros-is-managed-natively-over-the-rest-api-by-a-direct-runner.md).
 
-!!! note "Live verification follows"
-    `infra plan`, `infra apply`, `infra destroy`, `infra doctor` and `infra drift detect` are implemented. The write calls (PUT, PATCH, DELETE) are covered by unit tests against an in-memory fake device. Verification against a RouterOS CHR virtual machine follows: the [`routeros-chr` blueprint](#test-target-a-chr-vm) builds the target ([#1485](https://github.com/endavis/infrafoundry/issues/1485)). Until it is live-tested, run the first apply with console access.
+!!! note "Verified on a RouterOS CHR"
+    `infra plan`, `infra apply`, `infra destroy`, `infra doctor` and `infra drift detect` are implemented. The write calls (PUT, PATCH, DELETE) are covered by unit tests against an in-memory fake device and were verified live against a RouterOS 7.25.1 CHR built with the [`routeros-chr` blueprint](#test-target-a-chr-vm) ([#1483](https://github.com/endavis/infrafoundry/issues/1483)). The live run checked:
+
+    - apply converging, with a clean second plan;
+    - enabling `vlan-filtering`;
+    - a management move of `ether1` into a filtering bridge without losing the API;
+    - drift reported after an out-of-band PVID change;
+    - `absent` and managed-set deletes, with unmanaged objects kept;
+    - destroy refusing to remove the management path.
+
+    A real switch differs from a CHR in its switch chip and port names, so keep console access for the first apply on new hardware.
 
 ## Settings
 
@@ -201,5 +210,4 @@ testing. See `blueprints/routeros-chr/README.md` for the variables.
 ## Limitations
 
 - One device per environment.
-- Live verification of the write calls against a RouterOS CHR virtual machine is pending; the [`routeros-chr` blueprint](#test-target-a-chr-vm) provides the target ([#1485](https://github.com/endavis/infrafoundry/issues/1485)).
 - `config migrate` extractors and the `/export terse` backup are separate work.

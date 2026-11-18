@@ -34,13 +34,14 @@ Alternatives rejected:
 - **Generated Terraform for a community RouterOS provider.** It cannot express "filtering last" in one apply, needs an import per existing object, and cannot refuse a lock-out at plan time.
 - **Ansible `community.routeros`.** It configures but offers no plan or diff, so it has no parity with `infra plan` and drift detection.
 
-Cost: drift detection needed a small additive dispatch in `DriftDetector`, since direct runners were not drift-detectable before. The write verbs (PUT, PATCH, DELETE) follow RouterOS REST conventions and are unit-tested against an in-memory fake device; verification on a RouterOS CHR virtual machine follows in #1485.
+Cost: drift detection needed a small additive dispatch in `DriftDetector`, since direct runners were not drift-detectable before. The write verbs (PUT, PATCH, DELETE) follow RouterOS REST conventions and are unit-tested against an in-memory fake device and were verified live on a RouterOS CHR virtual machine (#1483, #1485).
 
 ## Related Issues
 
 - Issue #1480: add a MikroTik RouterOS provider
 - Issue #1483: apply and destroy for the MikroTik provider
-- Issue #1485: live verification of the write calls on a RouterOS CHR virtual machine
+- Issue #1485: RouterOS CHR test blueprint, the live verification target
+- Issue #1489: record the live verification in the docs
 
 ## Related Documentation
 
