@@ -69,7 +69,7 @@ class HasyncSettingsManager(BaseComponentManager):
         changed = service.changed_fields(live, desired, update_password)
         warnings = service.unknown_references(live, desired)
         if (
-            "password" in desired
+            desired.get("password")  # empty only in reset mode, which never warns
             and not update_password
             and not changed
             and password_unreadable(live)

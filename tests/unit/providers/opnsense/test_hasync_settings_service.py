@@ -246,3 +246,56 @@ def test_export_without_password_has_no_placeholder() -> None:
     leaf = yaml.safe_load(text)["opnsense"]["hasync"]["settings"]
     assert "password" not in leaf
     assert leaf["pfsync_interface"] == ""
+
+
+def test_reset_builds_fixed_map_and_copies_constant() -> None:
+    from infrafoundry.providers.opnsense.services.hasync_settings import RESET_DESIRED
+
+    desired = _service().build_desired(_resource(reset=True))
+    assert desired == RESET_DESIRED
+    assert desired is not RESET_DESIRED
+    assert desired["pfsync_version"] == "1400"
+    assert "disable_preempt" not in desired
+    assert not wants_password_update(_resource(reset=True))
+
+
+@pytest.mark.parametrize("other", ["password", "update_password", "username", "pfsync_defer"])
+def test_reset_with_other_key_rejected_naming_keys_only(other: str) -> None:
+    value: Any = True if other in {"update_password", "pfsync_defer"} else FAKE
+    with pytest.raises(InvalidConfigurationError) as exc:
+        _service().build_desired(_resource(reset=True, **{other: value}))
+    assert other in str(exc.value)
+    assert FAKE not in str(exc.value)
+
+
+@pytest.mark.parametrize("value", ["yes", 1, None])
+def test_reset_non_bool_rejected(value: Any) -> None:
+    with pytest.raises(InvalidConfigurationError, match="reset must be a boolean"):
+        _service().build_desired(_resource(reset=value))
+
+
+def test_reset_false_is_absent() -> None:
+    assert _service().build_desired(_resource(reset=False, username="u")) == {"username": "u"}
+    assert _service().build_desired(_resource(reset=False)) == {}
+
+
+def test_reset_changed_fields_password_rules() -> None:
+    service = _service()
+    desired = service.build_desired(_resource(reset=True))
+    assert service.changed_fields(_live(""), desired, False) == []
+    assert service.changed_fields(_live(FAKE), desired, False) == ["password"]
+    assert service.changed_fields(_live("***"), desired, False) == ["password"]
+    assert service.changed_fields(_live("", username="u"), desired, False) == ["username"]
+
+
+def test_reset_payload_writes_empty_password_and_keeps_booleans() -> None:
+    service = _service()
+    desired = service.build_desired(_resource(reset=True))
+    live = _live(FAKE, disablepreempt="1", username="u")
+    changed = service.changed_fields(live, desired, False)
+    assert service.should_send_password(desired, changed, False)
+    body = service.build_set_payload(live, desired, True)["hasync"]
+    assert body["password"] == ""
+    assert body["username"] == ""
+    assert body["disablepreempt"] == "1"
+    assert FAKE not in repr(body)

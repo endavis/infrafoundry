@@ -282,7 +282,7 @@ opnsense:
       synchronize_to_ip: 192.0.2.1
 ```
 
-Settings that exist once per node (`hasync.settings`, `interfaces.assignments`, interface addresses) go in a file or package with `firewall: fw-b` and, for the primary, in a default one. Resources that OPNsense carries to the backup through HA sync default to the primary.
+Settings that exist once per node (`hasync.settings`, `interfaces.assignments`, interface addresses) go in a file or package with `firewall: fw-b` and, for the primary, in a default one. Resources that OPNsense carries to the backup through HA sync default to the primary. To switch HA sync off on a node, declare `reset: true` in its `hasync.settings`; removing the block does not reset it. See [HA sync settings](../development/opnsense-resource-coverage.md#ha-sync-settings-1389).
 
 **Each firewall is its own provider.** The primary keeps the provider id `opnsense`; every other firewall is `opnsense@<name>`. So a resource name can repeat on two firewalls (`lan` on both), but twice on one firewall is still a duplicate. The managed set and deletes are per firewall, the HA sync runs once per firewall, and checks such as CARP `vhid` reuse see only that firewall's resources. Firewalls apply one after another: the primary first, then the others (the reverse on destroy). Turning a flat configuration into a `firewalls:` map keeps its state: the primary's rows stay under `opnsense`. The rows of another firewall are under `opnsense@<name>`, so `state list --provider opnsense` lists the primary only. Each firewall also gets its own generated directory (`generated/<env>/terraform/opnsense@<name>/`; the primary keeps `opnsense/`) and its own local Terraform state, and all firewalls render from the same OPNsense templates.
 

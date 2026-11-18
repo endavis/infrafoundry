@@ -194,3 +194,27 @@ def test_references_fetch_only_when_hasync_present() -> None:
     errors = [r.message for r in validator.report.results if r.level == ValidationLevel.ERROR]
     assert any("opt99" in m for m in errors)
     assert any("bogus" in m for m in errors)
+
+
+def test_reset_alone_is_valid() -> None:
+    report = _offline(reset=True)
+    assert _levels(report, ValidationLevel.ERROR) == []
+    assert _levels(report, ValidationLevel.WARNING) == []
+
+
+def test_reset_false_is_valid_and_validates_other_keys() -> None:
+    assert _levels(_offline(reset=False, username="u"), ValidationLevel.ERROR) == []
+    errors = _levels(_offline(reset=False, pfsync_version="9"), ValidationLevel.ERROR)
+    assert any("pfsync_version" in m for m in errors)
+
+
+def test_reset_with_other_keys_is_error_naming_keys_only() -> None:
+    report = _offline(reset=True, password=FAKE, update_password=True)
+    errors = _levels(report, ValidationLevel.ERROR)
+    assert any("password" in m and "update_password" in m for m in errors)
+    assert all(FAKE not in m for m in errors)
+
+
+def test_reset_non_bool_is_error() -> None:
+    errors = _levels(_offline(reset="yes"), ValidationLevel.ERROR)
+    assert any("reset must be a boolean" in m for m in errors)

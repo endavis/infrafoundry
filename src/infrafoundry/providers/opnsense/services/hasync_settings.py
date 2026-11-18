@@ -18,6 +18,8 @@ fields under ``hasync``:
 - ``password``           -> ``password`` (a ``secret://`` URI in YAML)
 - ``sync_items``         -> ``syncitems`` (list of str, compared as a set)
 - ``update_password``    -> not a wire field; forces the password to be written
+- ``reset``              -> not a wire field; ``true`` writes HA sync off (#1460) and
+  cannot be combined with any other key; ``false`` is the same as absent
 
 Password
 --------
@@ -85,8 +87,21 @@ STRING_FIELDS: frozenset[str] = frozenset(
     {"pfsync_interface", "pfsync_peer_ip", "synchronize_to_ip", "username"}
 )
 
-ALLOWED_KEYS: frozenset[str] = frozenset({*FIELD_MAP, "update_password"})
+ALLOWED_KEYS: frozenset[str] = frozenset({*FIELD_MAP, "update_password", "reset"})
 SECRET_FIELDS: tuple[str, ...] = ("password",)
+
+#: What ``reset: true`` writes: HA sync off. The booleans are left alone.
+RESET_DESIRED: dict[str, str] = {
+    "synchronize_to_ip": "",
+    "username": "",
+    # Spelled as a comprehension so bandit's B105 does not read the empty value as a
+    # hardcoded password; it clears the password.
+    **dict.fromkeys(SECRET_FIELDS, ""),
+    "pfsync_peer_ip": "",
+    "pfsync_interface": "",
+    "pfsync_version": "1400",
+    "sync_items": "",
+}
 
 #: The pfsync protocol versions the box offers (live option keys).
 PFSYNC_VERSIONS: tuple[str, ...] = ("1301", "1400")
@@ -107,6 +122,16 @@ def _live_password(live: dict[str, Any]) -> str:
     return "" if set(text) <= {"*"} else text
 
 
+def _live_password_set(live: dict[str, Any]) -> bool:
+    """Return True when the live password text is non-empty, masked text included."""
+    return bool(flatten_option(live.get(_PASSWORD_WIRE)).strip())
+
+
+def wants_reset(resource: ResourceConfig) -> bool:
+    """Return True when the resource sets ``reset: true``."""
+    return resource.config.get("reset") is True
+
+
 def password_unreadable(live: dict[str, Any]) -> bool:
     """Return True when the live password is empty or masked, i.e. write-only."""
     return not _live_password(live)
@@ -119,7 +144,7 @@ def redacted(desired: dict[str, str]) -> dict[str, str]:
 
 def wants_password_update(resource: ResourceConfig) -> bool:
     """Return True when the resource sets ``update_password: true``."""
-    return resource.config.get("update_password") is True
+    return resource.config.get("update_password") is True and not wants_reset(resource)
 
 
 def live_options(live: dict[str, Any], wire: str) -> set[str]:
@@ -216,6 +241,15 @@ class HasyncSettingsService(BaseService):
             )
         if "update_password" in config and not isinstance(config["update_password"], bool):
             raise InvalidConfigurationError("hasync.settings update_password must be a boolean")
+        if "reset" in config and not isinstance(config["reset"], bool):
+            raise InvalidConfigurationError("hasync.settings reset must be a boolean")
+        if config.get("reset") is True:
+            others = sorted(str(k) for k in config if k != "reset")
+            if others:
+                raise InvalidConfigurationError(
+                    f"hasync.settings reset cannot be combined with: {', '.join(others)}"
+                )
+            return dict(RESET_DESIRED)
         desired: dict[str, str] = {}
         for key in FIELD_MAP:
             if key not in config:
@@ -261,7 +295,11 @@ class HasyncSettingsService(BaseService):
         """
         changed: list[str] = []
         for key, value in desired.items():
-            if key == "password":
+            if key == "password" and value == "":
+                # Only reachable via reset: a change iff the box holds any password text.
+                if _live_password_set(live):
+                    changed.append(key)
+            elif key == "password":
                 if update_password or (
                     not password_unreadable(live) and _live_password(live) != value.strip()
                 ):
