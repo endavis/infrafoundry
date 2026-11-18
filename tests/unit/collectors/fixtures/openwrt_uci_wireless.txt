@@ -1,0 +1,7 @@
+package wireless
+
+config wifi-iface 'wifinet0'
+	option ssid 'travel-router-lab'
+	option encryption 'psk2'
+	option key 'CANARY-PSK-0002'
+	option sae_password 'CANARY-SAE-0001'

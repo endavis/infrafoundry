@@ -161,3 +161,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0024](0024-opnsense-firewalls-are-provider-instances-several-per-environment.md) | OPNsense firewalls are provider instances, several per environment | Accepted |
 | [0025](0025-remote-state-locations-are-derived-per-provider-when-several-share-an-environment.md) | Remote state locations are derived per provider when several share an environment | Accepted |
 | [0026](0026-mikrotik-routeros-is-managed-natively-over-the-rest-api-by-a-direct-runner.md) | MikroTik RouterOS is managed natively over the REST API by a direct runner | Accepted |
+| [0027](0027-unmanaged-network-devices-are-backed-up-by-read-only-collectors.md) | Unmanaged network devices are backed up by read-only collectors | Accepted |

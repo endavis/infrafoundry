@@ -4,6 +4,7 @@ import click
 
 from ..analyze import analyze
 from .apply import apply
+from .collect import collect
 from .deployed import deployed
 from .destroy import destroy
 from .doctor import doctor
@@ -28,6 +29,7 @@ def infra() -> None:
 
 # Register all subcommands
 infra.add_command(analyze)
+infra.add_command(collect)
 infra.add_command(doctor)
 infra.add_command(plan)
 infra.add_command(apply)

@@ -1,0 +1,5 @@
+package firewall
+
+config zone
+	option name 'lan'
+	option input 'ACCEPT'

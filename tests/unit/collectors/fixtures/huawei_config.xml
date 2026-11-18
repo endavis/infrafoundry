@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<InternetGatewayDevice>
+  <WANPPPConnection Username="user@example.com" Password="CANARY-PPP-0001"/>
+  <WLANConfiguration SSID="ont-isp-lab" PreSharedKey="CANARY-PSK-0001"/>
+  <VoiceProfile AuthPassword="CANARY-SIP-0001"/>
+</InternetGatewayDevice>
