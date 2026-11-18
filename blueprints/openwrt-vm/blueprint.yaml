@@ -1,0 +1,95 @@
+name: openwrt-vm
+description: "Disposable stock OpenWrt VM on Proxmox, bootstrapped for key-only SSH"
+version: "1.0.0"
+
+# No package secrets: the SSH public key is a normal input and the root
+# password stays unset (SSH password login is turned off by the bootstrap).
+
+inputs:
+  # --- Required per-instance inputs (no default) ---
+  - name: vm_name
+    description: "Proxmox VM name, also the router's hostname"
+  - name: vmid
+    description: "Proxmox VM ID"
+    type: integer
+  - name: target_node
+    description: "Proxmox node to create the VM on"
+  - name: pve_host
+    description: "Address Ansible uses to reach target_node over SSH (root)"
+  - name: ssh_public_key
+    description: "SSH public key installed for root; only the type and base64 fields are kept"
+  - name: mgmt_ip
+    description: "Static address of the LAN (management) NIC; required, because the image's vendor default would otherwise stay"
+
+  # --- Proxmox ---
+  - name: disk_storage
+    default: local-lvm
+  - name: memory
+    type: integer
+    default: 256
+  - name: cores
+    type: integer
+    default: 1
+
+  # --- Image (stock x86-64 generic-ext4-combined .img.gz; gunzipped on the PVE host) ---
+  - name: image_source
+    default: "https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz"
+  - name: image_sha256
+    description: "sha256 of the downloaded .img.gz (empty skips the check)"
+    default: "f8538784d0288b4133a99ac2a68443e4922ffde6343e80df56a5882364b9d499"
+  - name: image_cache_dir
+    default: "/var/lib/vz/template/cache/infrafoundry"
+
+  # --- LAN / management NIC (net0, eth0) ---
+  - name: mgmt_bridge
+    default: vmbr0
+  - name: mgmt_vlan
+    description: "VLAN tag for the management NIC; 0 means untagged"
+    type: integer
+    default: 0
+  - name: mgmt_netmask
+    description: "Netmask of mgmt_ip, passed to uci unchanged"
+    default: "255.255.255.0"
+  - name: mgmt_gateway
+    description: "Default gateway; empty sets none"
+    default: ""
+  - name: mgmt_dns
+    description: "DNS server; empty sets none"
+    default: ""
+  - name: lan_dhcp
+    description: "Keep the LAN DHCP server on; off by default"
+    type: boolean
+    default: false
+
+  # --- WAN NIC (net1, eth1) ---
+  - name: wan_bridge
+    description: "Bridge of the WAN NIC; empty means no WAN NIC"
+    default: vmbr1
+
+  - name: boot_timeout
+    description: "Seconds to wait for the console and for SSH after the bootstrap"
+    type: integer
+    default: 300
+
+  # Base Proxmox tags; extra_tags are appended to them. Changing base_tags on an
+  # existing VM changes its tags, which replaces an imported VM
+  - name: base_tags
+    description: "Base Proxmox tags for the VM; extra_tags are appended"
+    default: [openwrt, openwrt-test]
+  # Extra Proxmox tags appended to base_tags
+  - name: extra_tags
+    default: []
+
+resources:
+  - vm.yaml
+
+events:
+  on_create:
+    - type: script
+      name: openwrt-bootstrap
+      script: scripts/openwrt-post-terraform.sh
+      description: "Boot the VM, then set the SSH key, address and hostname over the serial console"
+      timeout: 900
+      continue_on_error: false
+      requires:
+        - "{{ vm_name }}"

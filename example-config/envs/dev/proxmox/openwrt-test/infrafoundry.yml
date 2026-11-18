@@ -1,0 +1,23 @@
+# Disposable OpenWrt test VM — example consumer of the openwrt-vm blueprint.
+#
+# All deployment logic (VM definition, image import, serial-console bootstrap)
+# lives in blueprints/openwrt-vm/. This file only supplies the per-instance
+# values. See blueprints/openwrt-vm/README.md for the full variable reference.
+#
+# Run: foundry infra apply --env dev --package openwrt-test
+
+name: openwrt-test
+description: "Disposable OpenWrt test VM (example)"
+blueprint: openwrt-vm
+
+variables:
+  vm_name: openwrt-test
+  vmid: 952
+  target_node: pve-node1
+  pve_host: "192.0.2.13"
+
+  # Fake key for the example; use your own public key
+  ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyNotARealKeyDoNotUse0000000 example-key"
+
+  mgmt_ip: "192.0.2.242"
+  mgmt_gateway: "192.0.2.1"

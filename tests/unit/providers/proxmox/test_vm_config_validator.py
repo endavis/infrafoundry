@@ -328,6 +328,8 @@ class TestDiskImageValidation:
             "http://mirror/x.img",
             "https://download.mikrotik.com/routeros/7.25.1/chr-7.25.1.img.zip",
             "/mnt/pve/nfs1/chr.img.zip",
+            "https://downloads.openwrt.org/releases/25.12.6/targets/x86/64/openwrt-25.12.6-x86-64-generic-ext4-combined.img.gz",
+            "/mnt/pve/nfs1/openwrt.img.gz",
         ],
     )
     def test_valid_sources_pass(
@@ -344,6 +346,7 @@ class TestDiskImageValidation:
             ({"disk_image_source": "fw.img"}, "disk_image_source", "absolute path"),
             ({"disk_image_source": "/x/fw.iso"}, "disk_image_source", ".img.zip"),
             ({"disk_image_source": "/x/chr.zip"}, "disk_image_source", ".img.zip"),
+            ({"disk_image_source": "/x/fw.gz"}, "disk_image_source", ".img.gz"),
             (
                 {"disk_image_source": "https://example.com/chr.img.tar"},
                 "disk_image_source",

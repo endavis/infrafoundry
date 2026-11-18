@@ -97,13 +97,14 @@ that ship as a disk, not as a cloud image. Such VMs skip cloud-init.
 
 - **`ova_source`** is a path on the Proxmox host to an `.ova`. Its VMDKs are
   extracted and imported in order.
-- **`disk_image_source`** is a raw disk image (`.img`, `.img.bz2` or `.img.zip`). It is
+- **`disk_image_source`** is a raw disk image (`.img`, `.img.bz2`, `.img.gz` or `.img.zip`). It is
   either an absolute path on the Proxmox host or an `http(s)` URL.
   - A URL is downloaded into `disk_image_cache_dir` (default
     `/var/lib/vz/template/cache/infrafoundry`).
-  - A `.bz2` is decompressed there. A `.zip` is extracted there (exactly one
+  - A `.bz2` is decompressed there. A `.gz` is decompressed there with
+    `gunzip`. A `.zip` is extracted there (exactly one
     `.img` member, with python3 on the host).
-  - Both results are cached, so later runs reuse them.
+  - The results are cached, so later runs reuse them.
   - If `disk_image_sha256` is set, the downloaded or given file is checked
     against it before use. For an archive it is the archive's digest.
   - The image is imported as the only disk.
@@ -134,7 +135,8 @@ vms:
 The `opnsense-vm` blueprint (`blueprints/opnsense-vm/`) uses this to build a
 disposable OPNsense test firewall, and the `routeros-chr` blueprint
 (`blueprints/routeros-chr/`) builds a MikroTik RouterOS CHR VM from an
-`.img.zip` image.
+`.img.zip` image. The `openwrt-vm` blueprint (`blueprints/openwrt-vm/`)
+builds a stock OpenWrt VM from an `.img.gz` image.
 
 ### Templates from a downloaded image
 
