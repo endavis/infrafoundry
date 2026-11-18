@@ -182,3 +182,23 @@ def test_sync_passes_the_resource_scope(orchestrator: MagicMock, tmp_path: Path)
     orchestrator.requirements_manager.sync.assert_called_once_with(
         "prod", None, None, dry_run=True, resource_filter=["fw-alias"]
     )
+
+
+def test_check_names_the_provider_that_needs_a_collection(
+    orchestrator: MagicMock, tmp_path: Path
+) -> None:
+    provider_only = RequirementStatus(
+        kind=RequirementKind.ANSIBLE_COLLECTION,
+        name="community.openwrt",
+        wanted=">=1.11.0",
+        installed="1.11.0",
+        satisfied=True,
+        blueprints=(),
+        providers=("openwrt",),
+    )
+    orchestrator.requirements_manager.check.return_value = _report(provider_only)
+
+    result = _invoke(tmp_path, "check", "--env", "prod")
+
+    assert result.exit_code == 0
+    assert "provider openwrt" in result.output

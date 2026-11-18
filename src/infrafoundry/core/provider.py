@@ -3,13 +3,16 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.hooks.models import HooksConfig
 from infrafoundry.core.validation import ValidationReport
+
+if TYPE_CHECKING:
+    from infrafoundry.core.requirements.models import CollectionRequirement
 
 
 class ResourceConfig(BaseModel):
@@ -129,6 +132,14 @@ class ProviderBase(ABC):
             resources: List of resources to generate pyinfra for
         """
         return
+
+    def ansible_collection_requirements(self) -> "tuple[CollectionRequirement, ...]":
+        """Return the Ansible collections this provider's runner needs.
+
+        ``foundry deps check`` and the pre-run requirement check include them for
+        every provider that has resources in scope. The default needs none.
+        """
+        return ()
 
     def ensure_directories(self) -> None:
         """Create necessary output directories."""

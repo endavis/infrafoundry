@@ -134,6 +134,7 @@ def check_collection(
     blueprints: tuple[str, ...],
     installed: Mapping[str, str] | None,
     collections_files: tuple[str, ...],
+    providers: tuple[str, ...] = (),
 ) -> RequirementStatus:
     """Check one Ansible collection against the installed collections.
 
@@ -142,6 +143,7 @@ def check_collection(
         blueprints: Blueprints that declare it
         installed: Result of :func:`installed_collections`
         collections_files: Requirements files that declare it, for the fix command
+        providers: Providers that declare it
 
     Returns:
         The status
@@ -165,6 +167,7 @@ def check_collection(
             problem=problem,
             fix="" if satisfied else fix,
             install_args=install_args,
+            providers=providers,
         )
 
     if installed is None:

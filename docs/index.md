@@ -41,6 +41,7 @@ This index provides a structured overview of the available documentation.
 - **[Kubernetes](providers/kubernetes.md)**: Namespaces, workloads, RBAC, Helm releases and manifests.
 - **[MikroTik](providers/mikrotik.md)**: RouterOS 7 switches and routers over the REST API (plan, apply, destroy and drift).
 - **[OCI](providers/oci.md)**: Oracle Cloud Infrastructure.
+- **[OpenWrt](providers/openwrt.md)**: One OpenWrt device over SSH, with a check-mode plan and rollback-protected apply.
 - **[OPNsense](providers/opnsense.md)**: Firewall configuration through the direct API.
 - **[Proxmox](providers/proxmox.md)**: Proxmox VE virtual machines, containers and SDN.
 - **[Tailscale](providers/tailscale.md)**: Tailnet ACL, keys, routes and DNS.

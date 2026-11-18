@@ -26,7 +26,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | **State** | `foundry state` | State database management: init, backup, resources, backend migration, audit trail |
 | **Secrets** | `foundry secrets` | SOPS/age secret lifecycle: init, encrypt, decrypt, rotate |
 | **Policy** | `foundry policy` | Policy listing and enforcement |
-| **Dependencies** | `foundry deps` | Blueprint requirements: check and install the Python packages and Ansible collections blueprints declare |
+| **Dependencies** | `foundry deps` | Blueprint requirements: check and install the Python packages and Ansible collections blueprints (and providers, for collections) declare |
 
 **The three-tier doctor pattern** illustrates the hierarchy:
 

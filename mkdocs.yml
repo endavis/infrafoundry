@@ -176,6 +176,7 @@ nav:
     - ADR-0025 Remote state locations are derived per provider when several share an environment: decisions/0025-remote-state-locations-are-derived-per-provider-when-several-share-an-environment.md
     - ADR-0026 MikroTik RouterOS is managed natively over the REST API by a direct runner: decisions/0026-mikrotik-routeros-is-managed-natively-over-the-rest-api-by-a-direct-runner.md
     - ADR-0027 Unmanaged network devices are backed up by read-only collectors: decisions/0027-unmanaged-network-devices-are-backed-up-by-read-only-collectors.md
+    - ADR-0028 OpenWrt devices are managed through generated community.openwrt playbooks with ubus apply-rollback: decisions/0028-openwrt-devices-are-managed-through-generated-communityopenwrt-playbooks-with-ubus-apply-rollback.md
     - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
     - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
     - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md
@@ -215,6 +216,7 @@ nav:
     - OCI: providers/oci.md
     - Kubernetes: providers/kubernetes.md
     - MikroTik: providers/mikrotik.md
+    - OpenWrt: providers/openwrt.md
     - OPNsense: providers/opnsense.md
     - Proxmox: providers/proxmox.md
     - Tailscale: providers/tailscale.md

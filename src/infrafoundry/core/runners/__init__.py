@@ -5,6 +5,7 @@ from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.runners.host_runner import HostRunner
 from infrafoundry.core.runners.mikrotik_rest_runner import MikroTikRestRunner
 from infrafoundry.core.runners.opentofu_runner import OpenTofuRunner
+from infrafoundry.core.runners.openwrt_ansible_runner import OpenWrtAnsibleRunner
 from infrafoundry.core.runners.opnsense_direct_runner import OPNsenseDirectRunner
 from infrafoundry.core.runners.pulumi_runner import PulumiRunner
 from infrafoundry.core.runners.pyinfra_runner import PyInfraRunner
@@ -24,6 +25,7 @@ __all__ = [
     "MikroTikRestRunner",
     "OPNsenseDirectRunner",
     "OpenTofuRunner",
+    "OpenWrtAnsibleRunner",
     "PulumiRunner",
     "PyInfraRunner",
     "RunnerRegistry",

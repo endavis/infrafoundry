@@ -35,6 +35,7 @@ from infrafoundry.core.requirements.models import (
 
 if TYPE_CHECKING:
     from infrafoundry.core.config import ConfigManager
+    from infrafoundry.core.provider import ProviderBase
 
 CollectionsLookup = Callable[[], Mapping[str, str] | None]
 
@@ -69,11 +70,18 @@ class RequirementsReport:
             label = f"{status.name}{status.wanted}" if status.wanted else status.name
             lines.append(
                 f"  - {status.kind.value} {label}: {status.problem} "
-                f"(needed by blueprint {', '.join(status.blueprints)})"
+                f"(needed by {_needed_by(status)})"
             )
             lines.append(f"    run: {status.fix}")
         lines.append(f"Or install them all with: foundry deps sync --env {self.env_name}")
         return "\n".join(lines)
+
+
+def _needed_by(status: RequirementStatus) -> str:
+    """Describe who declares a requirement: blueprints, providers or both."""
+    blueprints = f"blueprint {', '.join(status.blueprints)}" if status.blueprints else ""
+    providers = f"provider {', '.join(status.providers)}" if status.providers else ""
+    return "; ".join(part for part in (blueprints, providers) if part)
 
 
 @dataclass(frozen=True)
@@ -106,6 +114,7 @@ class RequirementsManager(BaseManager):
         get_version: VersionLookup = importlib.metadata.version,
         find_spec: SpecFinder = importlib.util.find_spec,
         collections_lookup: CollectionsLookup = installed_collections,
+        providers: Mapping[str, ProviderBase] | None = None,
     ) -> None:
         """Initialize the requirements manager.
 
@@ -114,12 +123,60 @@ class RequirementsManager(BaseManager):
             get_version: Returns a distribution's installed version
             find_spec: Locates an importable module
             collections_lookup: Returns installed Ansible collections
+            providers: Registered providers, by name; those with resources in scope
+                add the Ansible collections they declare
         """
         super().__init__()
         self.config_manager = config_manager
         self._get_version = get_version
         self._find_spec = find_spec
         self._collections_lookup = collections_lookup
+        self._providers = providers if providers is not None else {}
+
+    def providers_in_scope(
+        self,
+        env_name: str,
+        package_filter: str | None = None,
+        provider_filter: list[str] | None = None,
+        resource_filter: list[str] | None = None,
+    ) -> list[str]:
+        """Return the registered providers that have resources in scope.
+
+        Args:
+            env_name: Environment name
+            package_filter: Only providers of the package with this name
+            provider_filter: Only these providers
+            resource_filter: Only providers of resources with these names
+
+        Returns:
+            Distinct provider names, sorted; only providers that declare collections
+        """
+        if not any(self._provider_collections(name) for name in self._providers):
+            return []
+        if package_filter is not None:
+            found = {
+                provider
+                for provider, manifest in self.config_manager.list_package_manifests(env_name)
+                if provider and manifest.name == package_filter
+            }
+        else:
+            wanted = set(resource_filter or ())
+            found = {
+                resource.provider
+                for resource in self.config_manager.get_all_resources_all_providers(env_name)
+                if not wanted or resource.name in wanted
+            }
+        if provider_filter is not None:
+            found &= set(provider_filter)
+        return sorted(name for name in found if self._provider_collections(name))
+
+    def _provider_collections(self, name: str) -> tuple[CollectionRequirement, ...]:
+        """Return the collections a registered provider declares (none for an unknown name)."""
+        provider = self._providers.get(name)
+        if provider is None:
+            return ()
+        declared = provider.ansible_collection_requirements()
+        return tuple(declared) if isinstance(declared, tuple | list) else ()
 
     def blueprints_in_scope(
         self,
@@ -187,7 +244,7 @@ class RequirementsManager(BaseManager):
             InvalidConfigurationError: If a blueprint's ``requirements:`` is invalid
         """
         python: dict[PythonRequirement, list[str]] = {}
-        collections: dict[CollectionRequirement, tuple[list[str], list[str]]] = {}
+        collections: dict[CollectionRequirement, tuple[list[str], list[str], list[str]]] = {}
         resolver = self.config_manager.blueprint_resolver
         for name in self.blueprints_in_scope(
             env_name, package_filter, provider_filter, resource_filter
@@ -196,10 +253,15 @@ class RequirementsManager(BaseManager):
             for py_req in declared.python:
                 python.setdefault(py_req, []).append(name)
             for col_req in declared.collections:
-                blueprints, files = collections.setdefault(col_req, ([], []))
+                blueprints, files, _providers = collections.setdefault(col_req, ([], [], []))
                 blueprints.append(name)
                 if declared.collections_file is not None:
                     files.append(str(declared.collections_file))
+        for provider_name in self.providers_in_scope(
+            env_name, package_filter, provider_filter, resource_filter
+        ):
+            for col_req in self._provider_collections(provider_name):
+                collections.setdefault(col_req, ([], [], []))[2].append(provider_name)
 
         statuses: list[RequirementStatus] = []
         for py_req, blueprints in python.items():
@@ -213,10 +275,14 @@ class RequirementsManager(BaseManager):
                 statuses.append(status)
         if collections:
             installed = self._collections_lookup()
-            for col_req, (blueprints, files) in collections.items():
+            for col_req, (blueprints, files, provider_names) in collections.items():
                 statuses.append(
                     check_collection(
-                        col_req, tuple(blueprints), installed, tuple(dict.fromkeys(files))
+                        col_req,
+                        tuple(blueprints),
+                        installed,
+                        tuple(dict.fromkeys(files)),
+                        tuple(provider_names),
                     )
                 )
 

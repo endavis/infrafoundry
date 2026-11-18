@@ -139,7 +139,7 @@ The code comes from the exception's class name, or from the nearest parent class
 ### Blueprint requirements not met
 
 - **Symptom:** `[IF-PACKAGE-002] Blueprint Requirements Not Met`.
-- **Cause:** A blueprint in scope needs Python packages or Ansible collections that are missing or at the wrong version.
+- **Cause:** A blueprint in scope needs Python packages or Ansible collections that are missing or at the wrong version. A provider can also need a collection (the OpenWrt provider needs `community.openwrt`).
 - **Fix:** Run `foundry deps check --env <env>` to list them and `foundry deps sync --env <env>` to install them. `--dry-run` shows the commands first.
 - **Reference:** [IF-PACKAGE-002](../reference/errors.md#if-package-002-blueprint-requirements-not-met), [IF-PACKAGE-003](../reference/errors.md#if-package-003-requirement-install-failed).
 

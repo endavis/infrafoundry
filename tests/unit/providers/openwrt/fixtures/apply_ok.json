@@ -1,0 +1,94 @@
+{
+  "plays": [
+    {
+      "play": {
+        "name": "infrafoundry openwrt"
+      },
+      "tasks": [
+        {
+          "task": {
+            "name": "infrafoundry|preflight|network"
+          },
+          "hosts": {
+            "openwrt": {
+              "changed": false,
+              "changes": {}
+            }
+          }
+        },
+        {
+          "task": {
+            "name": "infrafoundry|preflight|fail"
+          },
+          "hosts": {
+            "openwrt": {
+              "skipped": true
+            }
+          }
+        },
+        {
+          "task": {
+            "name": "infrafoundry|network.interface|lan"
+          },
+          "hosts": {
+            "openwrt": {
+              "changed": false
+            }
+          }
+        },
+        {
+          "task": {
+            "name": "infrafoundry|dhcp.host|printer"
+          },
+          "hosts": {
+            "openwrt": {
+              "changed": true,
+              "diff": [
+                {
+                  "before": {},
+                  "after": {
+                    "mac": "02:00:00:00:00:0a"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "task": {
+            "name": "infrafoundry|firewall.redirect|web"
+          },
+          "hosts": {
+            "openwrt": {
+              "changed": true,
+              "diff": [
+                {
+                  "before": {
+                    "dest_port": "8080"
+                  },
+                  "after": {
+                    "dest_port": "80"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "task": {
+            "name": "infrafoundry|commit|confirm"
+          },
+          "hosts": {
+            "openwrt": {
+              "changed": true,
+              "rc": 0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "openwrt": {}
+  }
+}
