@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794994997806,
+  "lastUpdate": 1794996626646,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3310,6 +3310,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000923751183329936",
             "extra": "mean: 79.19358477204017 usec\nrounds: 13554"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c2c1e1e965348b1053ab1d972f940d8c413161a9",
+          "message": "feat: let hasync.settings reset a node to ha sync off (merges PR #1478, addresses #1460)\n\nAdd a `reset: true` key to hasync.settings. It writes the defaults for the\nsync target, credentials, pfsync peer and interface, pfsync version and sync\nitems, and clears the stored password. A node already at defaults plans clean.\nThe password is only ever shown as [REDACTED]. Removing the block does not\nreset; `reset: true` is the explicit form.\n\nAddresses #1460\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T10:09:22Z",
+          "tree_id": "39174045b9c7122ce44f5d03d06b41e6b8dd4939",
+          "url": "https://github.com/endavis/infrafoundry/commit/c2c1e1e965348b1053ab1d972f940d8c413161a9"
+        },
+        "date": 1794996625962,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.330800510767574,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0007657782948440093",
+            "extra": "mean: 20.271311019607865 msec\nrounds: 51"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7957.625781460773,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010382784306327701",
+            "extra": "mean: 125.66562282053317 usec\nrounds: 8431"
           }
         ]
       }
