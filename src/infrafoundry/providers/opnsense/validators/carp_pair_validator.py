@@ -19,6 +19,7 @@ from typing import Any, override
 
 from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.services.carp_status import vip_key
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 _VipKey = tuple[str, str]
@@ -34,11 +35,7 @@ def _vip_states(status: dict[str, Any]) -> dict[_VipKey, str]:
     rows = status.get("rows")
     if not isinstance(rows, list):
         return {}
-    return {
-        (_text(row.get("vhid")), _text(row.get("subnet"))): _text(row.get("status")).upper()
-        for row in rows
-        if isinstance(row, dict)
-    }
+    return {vip_key(row): _text(row.get("status")).upper() for row in rows if isinstance(row, dict)}
 
 
 def _counts(states: dict[_VipKey, str]) -> str:

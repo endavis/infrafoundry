@@ -239,7 +239,7 @@ class TestHaSyncPerFirewall:
         ("provider_name", "expected"),
         [
             ("opnsense@fw-b", "HA sync after apply disabled (ha_sync_after_apply: false)"),
-            ("opnsense", "HA sync skipped: nothing changed"),
+            ("opnsense", "HA sync skipped: nothing changed, backup fw-b has all 1 CARP VIP(s)"),
         ],
     )
     def test_each_firewall_uses_its_own_ha_sync_option(
@@ -247,7 +247,23 @@ class TestHaSyncPerFirewall:
     ) -> None:
         env = MagicMock()
         env.get_provider_settings.return_value = MULTI
-        with patch("infrafoundry.core.config.ConfigManager") as manager:
+        vips = {"rows": [{"vhid": "1", "subnet": "192.0.2.10", "status": "MASTER"}]}
+
+        def _reply(_method: str, path: str, **_kwargs: Any) -> dict[str, Any]:
+            if path == "core/hasync/get":
+                return {"hasync": {"synchronizetoip": "192.0.2.2"}}
+            return vips
+
+        client = MagicMock()
+        client.request.side_effect = _reply
+        with (
+            patch("infrafoundry.core.config.ConfigManager") as manager,
+            patch(
+                "infrafoundry.providers.opnsense.services.hasync_status."
+                "BaseService.client_from_environment",
+                return_value=client,
+            ),
+        ):
             manager.return_value.load_environment.return_value = env
             line = run_ha_sync_after_apply("prod", provider_name, Path("cfg"), False)
         assert line == expected
