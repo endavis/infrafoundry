@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794997157147,
+  "lastUpdate": 1795005642351,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3386,6 +3386,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000529637788661689",
             "extra": "mean: 77.24685117501122 usec\nrounds: 13788"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b84038cba928486402120706e650447d37ee3fec",
+          "message": "feat: add a read-only mikrotik routeros provider (merges PR #1484, addresses #1480)\n\n* feat: add a read-only mikrotik routeros provider\n\nAdd a `mikrotik` provider for RouterOS 7, managed natively over the REST\nAPI by a new direct runner (`mikrotik_rest`). ADR-0026 records why it is\nnative rather than generated Terraform: enabling bridge vlan-filtering\nsafely needs phased ordering that one parallel Terraform graph cannot\nexpress, and existing objects are adopted without imports.\n\nThis first part covers settings and secrets, the REST client, offline\nand doctor validation, and a read-only `infra plan` for seven resource\ntypes. The plan shows the diff, the apply phase order and the lock-out\nrefusals, including for a management address held by a DHCP lease. It\nalso wires `infra drift detect` to direct runners that support drift.\n`infra apply` and `infra destroy` fail with a pointer to #1483, which\nadds the write side.\n\nAddresses #1480\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* test: assert the exact unresolvable-host refusal message\n\nAddresses #1480\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T12:39:44Z",
+          "tree_id": "08df3ae5b511a59b1fd78833ff1a07fb7421a74a",
+          "url": "https://github.com/endavis/infrafoundry/commit/b84038cba928486402120706e650447d37ee3fec"
+        },
+        "date": 1795005641279,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 57.97785655203291,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0009150202438149155",
+            "extra": "mean: 17.247964300000262 msec\nrounds: 60"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10682.830635943368,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006710229265369921",
+            "extra": "mean: 93.60814882110064 usec\nrounds: 11282"
           }
         ]
       }
