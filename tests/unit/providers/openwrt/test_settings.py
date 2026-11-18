@@ -86,3 +86,17 @@ def test_key_file_and_user_are_kept() -> None:
         2222,
         "/keys/example",
     )
+
+
+@pytest.mark.parametrize(
+    "address", ["192.0.2.1 -o ProxyCommand=x", "-oProxyCommand=x", "host'name", "a b"]
+)
+def test_address_must_be_a_plain_host_name_or_ip(address: str) -> None:
+    # The address becomes an ssh option (HostKeyAlias); option syntax is refused.
+    with pytest.raises(OpenWrtSettingsError, match="must be a host name or IP address"):
+        settings_from_mapping({"address": address})
+
+
+@pytest.mark.parametrize("address", ["192.0.2.1", "router-test.example.com", "2001:db8::1"])
+def test_plain_addresses_are_accepted(address: str) -> None:
+    assert settings_from_mapping({"address": address}).address == address

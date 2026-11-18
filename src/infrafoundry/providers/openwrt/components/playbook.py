@@ -10,19 +10,22 @@ Shape of a run (one play against the inventory's single device):
 2. A block of staging tasks (``community.openwrt.uci``, ``replace: false``), one per
    resource, named ``infrafoundry|<type>|<name>`` and tagged with the resource name.
 3. In the same block, outside check mode and only when something was staged, the
-   commit tail: hand the staged changes to an rpcd session, ``ubus call uci apply``
+   commit tail: replay the staged changes into an rpcd session, ``ubus call uci apply``
    with rollback, reconnect, then ``ubus call uci confirm``. A device that cannot be
    reached afterwards reverts by itself after the timeout.
 4. A rescue that reverts the staging when the apply was not reached and otherwise
    reports ``INFRAFOUNDRY_ROLLBACK_PENDING``.
 
-The ubus sequence was measured on a device running OpenWrt 23.05: a CLI call has no
-session, so the tail creates one, grants it the uci scope, copies the staged config
-files into its save dir, reverts the CLI staging, and applies in that session.
+A CLI call has no ubus session, so the tail creates one, grants it the uci scope and
+replays the CLI-staged changes into it with a ucode helper (``files/handover.uc``)
+through the ubus ``uci`` API, then applies in that session. Copying the staged files into
+the session's save dir does not work on stock OpenWrt 25.12: rpcd no longer names that
+directory after the session id and does not expose it.
 """
 
 from __future__ import annotations
 
+from importlib import resources
 from typing import Any
 
 import yaml
@@ -39,6 +42,14 @@ SESSION_GRACE = 300
 
 UCI = "community.openwrt.uci"
 RAW = "ansible.builtin.raw"
+COPY = "community.openwrt.copy"
+HELPER_PATH = "/tmp/infrafoundry-handover-{{ infrafoundry_session | default('none') }}.uc"  # nosec B108  # device path named after the random session id
+"""Where the replay helper is placed on the device for the duration of the run.
+
+Named after the rpcd session id (32 random hex characters, validated when the
+session is created), so the path in the device's shared /tmp is not predictable.
+Before a session exists the name resolves to ``-none``, which nothing created.
+"""
 _ALWAYS = ["always"]
 _NOT_CHECK = "not ansible_check_mode"
 _APPLIED = "(infrafoundry_applied | default(false) | bool)"
@@ -163,6 +174,26 @@ def _session_payload(extra: str = "") -> str:
     return '{"ubus_rpc_session":"{{ infrafoundry_session }}"' + extra + "}"
 
 
+def _helper_content() -> str:
+    """Return the replay helper's source, wrapped so Jinja leaves it untouched."""
+    source = (
+        resources.files("infrafoundry.providers.openwrt")
+        .joinpath("files", "handover.uc")
+        .read_text(encoding="utf-8")
+    )
+    return "{% raw %}" + source + "{% endraw %}"
+
+
+def _remove_helper() -> dict[str, Any]:
+    return {
+        "name": f"{TASK_PREFIX}|commit|remove-helper",
+        RAW: f"rm -f {HELPER_PATH}",
+        "changed_when": False,
+        "failed_when": False,
+        "ignore_unreachable": True,
+    }
+
+
 def _raw(name: str, command: str, **extra: Any) -> dict[str, Any]:
     task: dict[str, Any] = {"name": f"{TASK_PREFIX}|commit|{name}", RAW: command}
     task.update(extra)
@@ -176,15 +207,6 @@ def commit_tail(settings: OpenWrtSettings) -> list[dict[str, Any]]:
         settings: Supplies the rollback timeout and the reconnect timeout.
     """
     timeout = settings.rollback_timeout
-    handoff = (
-        "set -e\n"
-        "S={{ infrafoundry_session }}\n"
-        "mkdir -p /var/run/rpcd/uci-$S\n"
-        f"for c in {' '.join(CONFIGS)}; do\n"
-        '  if [ -f /tmp/.uci/$c ]; then cp /tmp/.uci/$c "/var/run/rpcd/uci-$S/$c" '
-        "&& uci revert $c; fi\n"
-        "done\n"
-    )
     grant = (
         '{"ubus_rpc_session":"{{ infrafoundry_session }}","scope":"uci",'
         '"objects":[["*","read"],["*","write"]]}'
@@ -209,7 +231,17 @@ def commit_tail(settings: OpenWrtSettings) -> list[dict[str, Any]]:
             },
         },
         _raw("grant-session", _ubus("session grant", grant), changed_when=False),
-        _raw("hand-over-staged", handoff),
+        {
+            "name": f"{TASK_PREFIX}|commit|copy-helper",
+            COPY: {"content": _helper_content(), "dest": HELPER_PATH, "mode": "0600"},
+        },
+        _raw(
+            "replay-staged",
+            # The helper removes itself before the apply: once the apply runs the
+            # device may be unreachable, so a later cleanup step may never run.
+            f"ucode {HELPER_PATH} {{{{ infrafoundry_session }}}} {','.join(CONFIGS)}; "
+            f"rc=$?; rm -f {HELPER_PATH}; exit $rc",
+        ),
         _raw(
             "apply-with-rollback",
             _ubus("uci apply", apply_payload),
@@ -277,6 +309,7 @@ def commit_tail(settings: OpenWrtSettings) -> list[dict[str, Any]]:
         {
             "name": f"{TASK_PREFIX}|commit|tail",
             "block": inner,
+            "always": [_remove_helper()],
             "when": f"{_NOT_CHECK} and ((infrafoundry_staged | default([])) | length > 0)",
             "tags": list(_ALWAYS),
         },
@@ -297,6 +330,15 @@ def rescue_tasks(settings: OpenWrtSettings) -> list[dict[str, Any]]:
             "tags": list(_ALWAYS),
         },
         {
+            "name": f"{TASK_PREFIX}|rescue|revert-session",
+            RAW: _ubus("uci revert", _session_payload(',"config":"{{ item }}"')),
+            "loop": list(CONFIGS),
+            "when": f"{guard} and infrafoundry_session is defined",
+            "ignore_errors": True,
+            "ignore_unreachable": True,
+            "tags": list(_ALWAYS),
+        },
+        {
             "name": f"{TASK_PREFIX}|rescue|destroy-session",
             RAW: _ubus("session destroy", _session_payload()),
             "when": f"{guard} and infrafoundry_session is defined",
@@ -304,6 +346,7 @@ def rescue_tasks(settings: OpenWrtSettings) -> list[dict[str, Any]]:
             "ignore_unreachable": True,
             "tags": list(_ALWAYS),
         },
+        {**_remove_helper(), "name": f"{TASK_PREFIX}|rescue|remove-helper", "tags": list(_ALWAYS)},
         {
             "name": f"{TASK_PREFIX}|rescue|rollback-pending",
             "ansible.builtin.fail": {

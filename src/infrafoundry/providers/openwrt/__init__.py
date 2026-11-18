@@ -225,11 +225,17 @@ class OpenWrtProvider(
 
     @staticmethod
     def _render_inventory(settings: OpenWrtSettings) -> str:
-        """Render the inventory; it holds the address, port, user and key path only."""
+        """Render the inventory; it holds the address, port, user and key path only.
+
+        Every connection checks the device's host key under the settings address
+        (``HostKeyAlias``), so the reconnect after a management-address change is
+        checked against the same known key instead of failing on an unknown host.
+        """
         entry: dict[str, Any] = {
             "ansible_host": settings.address,
             "ansible_port": settings.ssh_port,
             "ansible_user": settings.ssh_user,
+            "ansible_ssh_common_args": f"-o HostKeyAlias={settings.address}",
         }
         if settings.ssh_private_key_file:
             entry["ansible_ssh_private_key_file"] = settings.ssh_private_key_file

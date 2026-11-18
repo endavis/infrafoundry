@@ -14,17 +14,16 @@ The OpenWrt provider manages one OpenWrt device (stock OpenWrt or a vendor build
 For a read-only backup of a device InfraFoundry does not manage, see [Device config collectors](../guides/device-config-collectors.md) (`openwrt-ssh`).
 
 !!! note "Live verification"
-    Verified on a GL.iNet device running OpenWrt 23.05:
+    Verified on stock OpenWrt 25.12.6 (a test VM), with `infra apply`:
 
-    - a check-mode plan wrote nothing to the device;
-    - an apply changed a DHCP pool, confirmed it, and the change outlasted the rollback timeout;
-    - a second apply restored the old value, and the re-plan was clean.
+    - a check-mode plan detected a pool change, a new lease and a new port forward, and left a converged interface clean;
+    - an apply made those changes, confirmed them, and they outlasted the rollback timeout; the re-plan was clean;
+    - an apply deleted the lease and the port forward (`absent: true`) and restored the pool; the re-plan was clean;
+    - a confirmed management-address change to an address the controller cannot reach failed with `INFRAFOUNDRY_ROLLBACK_PENDING`, and the device reverted to its old address by itself, with nothing left staged. The rpcd session's save directory stays until the session expires (the rollback timeout plus 300 seconds), then rpcd removes it.
 
-    Not yet verified:
+    Verified on a GL.iNet device running OpenWrt 23.05, before the session hand-over was changed to the replay: a check-mode plan, an apply that changed a DHCP pool and was confirmed, and a restore with a clean re-plan.
 
-    - stock OpenWrt;
-    - an apply that loses the connection and rolls back;
-    - a management-address change.
+    - a confirmed management-address change to another reachable address reconnected to the new address, confirmed, and held past the rollback timeout; a second change moved it back, and the re-plan was clean.
 
     Which services reload after an apply was not measured. Keep console or power access for the first apply on new hardware.
 
@@ -32,7 +31,7 @@ For a read-only backup of a device InfraFoundry does not manage, see [Device con
 
 - `ansible-playbook` on the controller (the `ansible` dependency of InfraFoundry provides it).
 - The `community.openwrt` collection, version 1.11.0 or later. The provider declares it, so `foundry deps check --env <env>` reports it and `foundry deps sync --env <env>` installs it.
-- Key-based SSH to the device as a user that can run `uci` and `ubus` (normally `root`). Host-key checking is always on, even when `ANSIBLE_HOST_KEY_CHECKING=False` is set in the environment: add the host key first with `ssh-keyscan` or a first manual login.
+- Key-based SSH to the device as a user that can run `uci` and `ubus` (normally `root`). Host-key checking is always on, even when `ANSIBLE_HOST_KEY_CHECKING=False` is set in the environment. Every connection checks the key under the settings `address` (ssh `HostKeyAlias`), whatever address it reaches the device at, so the reconnect after a management-address change is checked against the key you already trust. Add the key under the plain `address`, without a port, even when `ssh_port` is not 22; for example, `ssh -o HostKeyAlias=<address> -p <port> <user>@<address>` once. After you change `address` in the settings, add the key under the new address the same way.
 - No Python on the device. The collection's modules run in `ucode`, which `infra doctor` checks for at `/usr/bin/ucode`.
 - On the device, `ubus call uci apply` must accept `rollback` and `uci confirm` must exist. `infra doctor` checks both.
 
@@ -139,11 +138,11 @@ An unchanged resource that InfraFoundry does not manage yet is adopted into stat
 
 1. A preflight fails the run when UCI changes are already pending on the device, so InfraFoundry never commits someone else's staged edits.
 2. The `uci` tasks stage the changes without committing.
-3. The playbook creates an rpcd session, grants it the `uci` scope, moves the staged config files into the session's save directory and reverts the staging in the default cursor.
+3. The playbook creates an rpcd session, grants it the `uci` scope, copies a small ucode helper to the device and runs it. The helper replays the staged changes into the session through the ubus `uci` API (`add`, `set`, `delete`, and a full-list `set` for list changes), then reverts the staging in the default cursor, and the playbook removes the helper. It stops with an error on a staged change it cannot replay (`rename`, `order`). Copying the staged files into the session's save directory is not used: on stock OpenWrt 25.12 rpcd's save directory is not named after the session id and is not exposed.
 4. `ubus call uci apply` commits with `rollback` and the configured `rollback_timeout`.
 5. The playbook resets the SSH connection, waits for the device (the timeout minus 15 seconds), then sends `ubus call uci confirm` and destroys the session.
 
-If the device cannot be reached after the apply, nothing confirms, and the device reverts the change by itself when the timeout runs out. The result then says that the device did not confirm and reverts by itself (marker `INFRAFOUNDRY_ROLLBACK_PENDING` in the output). If the run fails before the apply was reached, a rescue reverts the staged changes and destroys the session.
+If the device cannot be reached after the apply, nothing confirms, and the device reverts the change by itself when the timeout runs out. The result then says that the device did not confirm and reverts by itself (marker `INFRAFOUNDRY_ROLLBACK_PENDING` in the output). If the run fails before the apply was reached, a rescue reverts the staged changes (in the default cursor and in the session) and destroys the session.
 
 ## Management-change refusal
 

@@ -100,6 +100,7 @@ def test_render_writes_inventory_config_and_playbook(tmp_path: Path) -> None:
                     "ansible_host": "192.0.2.2",
                     "ansible_port": 22,
                     "ansible_user": "admin-example",
+                    "ansible_ssh_common_args": "-o HostKeyAlias=192.0.2.2",
                     "ansible_ssh_private_key_file": "/keys/example",
                 }
             }

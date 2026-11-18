@@ -35,7 +35,7 @@ CollectionsLookup = Callable[[], Mapping[str, str] | None]
 
 
 def _run(argv: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # nosec B603  # list argv, no shell
+    return subprocess.run(  # list argv, no shell (B603 is skipped project-wide)
         argv, capture_output=True, text=True, check=False, timeout=60
     )
 

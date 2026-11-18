@@ -106,7 +106,7 @@ class _OpenWrtProvider(Protocol):
 
 def _run(argv: list[str], cwd: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
     """Run ``ansible-playbook`` with captured output (patched in tests)."""
-    return subprocess.run(  # nosec B603  # list argv, no shell
+    return subprocess.run(  # list argv, no shell (B603 is skipped project-wide)
         argv, cwd=cwd, env=env, capture_output=True, text=True, check=False
     )
 

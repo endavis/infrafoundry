@@ -6,6 +6,7 @@ controller already uses; the provider stores no password.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,10 @@ def _int_setting(raw: dict[str, Any], key: str, default: int) -> int:
     return value
 
 
+_ADDRESS = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
+"""A host name, IPv4 or IPv6 address: no spaces, quotes or option syntax."""
+
+
 def settings_from_mapping(raw: dict[str, Any]) -> OpenWrtSettings:
     """Build settings from an already secret-resolved mapping.
 
@@ -65,6 +70,12 @@ def settings_from_mapping(raw: dict[str, Any]) -> OpenWrtSettings:
     """
     if not raw.get("address"):
         raise OpenWrtSettingsError("provider_settings.openwrt is missing: address")
+    if not _ADDRESS.match(str(raw["address"])):
+        # The address also becomes an ssh option (HostKeyAlias), so it must be a
+        # plain host name or IP address.
+        raise OpenWrtSettingsError(
+            "provider_settings.openwrt.address must be a host name or IP address"
+        )
     port = _int_setting(raw, "ssh_port", DEFAULT_SSH_PORT)
     if not 1 <= port <= 65535:
         raise OpenWrtSettingsError("provider_settings.openwrt.ssh_port must be within 1-65535")

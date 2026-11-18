@@ -23,6 +23,8 @@ from .conftest import SETTINGS, lan, printer, res, web
 
 UCI = "community.openwrt.uci"
 
+HELPER = "/tmp/infrafoundry-handover-{{ infrafoundry_session | default('none') }}.uc"
+
 
 def _item(resource: Any) -> Desired:
     return desired_from_resources([resource])[0]
@@ -149,7 +151,8 @@ def test_commit_tail_follows_the_measured_ubus_sequence() -> None:
         "create-session",
         "remember-session",
         "grant-session",
-        "hand-over-staged",
+        "copy-helper",
+        "replay-staged",
         "apply-with-rollback",
         "record-apply",
         "apply-failed",
@@ -181,11 +184,27 @@ def test_session_is_granted_the_uci_scope() -> None:
     assert '"ubus_rpc_session":"{{ infrafoundry_session }}"' in command
 
 
-def test_staging_is_handed_to_the_session_then_reverted_from_the_cli_cursor() -> None:
-    command = _by_step("hand-over-staged")["ansible.builtin.raw"]
-    assert "mkdir -p /var/run/rpcd/uci-$S" in command
-    assert 'cp /tmp/.uci/$c "/var/run/rpcd/uci-$S/$c" && uci revert $c' in command
-    assert "for c in network dhcp firewall" in command
+def test_helper_is_copied_then_replayed_into_the_session_then_removed() -> None:
+    copy = next(t for t in _tail()["block"] if t["name"].endswith("|copy-helper"))
+    args = copy["community.openwrt.copy"]
+    assert args["dest"] == HELPER
+    assert args["mode"] == "0600"
+    assert "ubus_rpc_session" in args["content"]
+    assert args["content"].startswith("{% raw %}")
+    command = _by_step("replay-staged")["ansible.builtin.raw"]
+    # The helper is removed in the same step, before the apply can cut the link.
+    assert command == (
+        f"ucode {HELPER} {{{{ infrafoundry_session }}}} network,dhcp,firewall; "
+        f"rc=$?; rm -f {HELPER}; exit $rc"
+    )
+    always = _tail()["always"]
+    assert always[0]["ansible.builtin.raw"] == f"rm -f {HELPER}"
+
+
+def test_no_task_touches_the_rpcd_save_dir() -> None:
+    text = dump_playbook(build_playbook(SETTINGS, [_item(lan())]))
+    assert "/var/run/rpcd" not in text
+    assert "cp /tmp/.uci" not in text
 
 
 def test_apply_uses_rollback_with_the_configured_timeout_and_session() -> None:
@@ -229,7 +248,13 @@ def test_reconnect_resets_the_connection_before_waiting_and_confirms_last() -> N
 
 
 def test_rescue_reverts_only_when_apply_was_not_reached() -> None:
-    revert, destroy, pending, failed = rescue_tasks(SETTINGS)
+    revert, session_revert, destroy, cleanup, pending, failed = rescue_tasks(SETTINGS)
+    assert session_revert["ansible.builtin.raw"].startswith("ubus call uci revert '")
+    assert '"config":"{{ item }}"' in session_revert["ansible.builtin.raw"]
+    assert session_revert["loop"] == ["network", "dhcp", "firewall"]
+    assert "not (infrafoundry_applied" in session_revert["when"]
+    assert "infrafoundry_session is defined" in session_revert["when"]
+    assert cleanup["ansible.builtin.raw"] == f"rm -f {HELPER}"
     assert revert[UCI] == {"command": "revert", "config": "{{ item }}"}
     assert revert["loop"] == ["network", "dhcp", "firewall"]
     assert "not (infrafoundry_applied" in revert["when"]
