@@ -127,6 +127,7 @@ class TestBlueprintDefaultsIncludeExtraTags:
             "ontap-cluster",
             "opnsense-vm",
             "rocky9-template",
+            "routeros-chr",
             "ubuntu-template",
         ],
     )
@@ -158,6 +159,7 @@ class TestResourceTemplatesUseExtraTags:
             ("ontap-cluster", "vm.yaml"),
             ("opnsense-vm", "vm.yaml"),
             ("rocky9-template", "template.yaml"),
+            ("routeros-chr", "vm.yaml"),
             ("ubuntu-template", "template.yaml"),
         ],
     )

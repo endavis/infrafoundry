@@ -1,0 +1,12 @@
+---
+# RouterOS Bootstrap — Default Variables
+
+# Management interface (the first NIC) and its optional static address.
+# An empty routeros_mgmt_ip keeps the DHCP client.
+routeros_mgmt_if: ether1
+routeros_mgmt_ip: ""
+routeros_mgmt_prefix: 24
+routeros_mgmt_gateway: ""
+
+# Seconds to wait for the first login prompt on the serial console
+routeros_boot_timeout: 300

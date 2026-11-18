@@ -12,7 +12,7 @@ tags:
 The MikroTik provider manages a RouterOS 7 (or later) device over its REST API. It reads the device, diffs it against your YAML, and plans the changes in an order that keeps the management connection alive. It does not generate Terraform: the decision and the rejected alternatives are in [ADR-0026](../decisions/0026-mikrotik-routeros-is-managed-natively-over-the-rest-api-by-a-direct-runner.md).
 
 !!! note "Live verification follows"
-    `infra plan`, `infra apply`, `infra destroy`, `infra doctor` and `infra drift detect` are implemented. The write calls (PUT, PATCH, DELETE) are covered by unit tests against an in-memory fake device. Verification against a RouterOS CHR virtual machine follows in [#1485](https://github.com/endavis/infrafoundry/issues/1485); until then, run the first apply with console access.
+    `infra plan`, `infra apply`, `infra destroy`, `infra doctor` and `infra drift detect` are implemented. The write calls (PUT, PATCH, DELETE) are covered by unit tests against an in-memory fake device. Verification against a RouterOS CHR virtual machine follows: the [`routeros-chr` blueprint](#test-target-a-chr-vm) builds the target ([#1485](https://github.com/endavis/infrafoundry/issues/1485)). Until it is live-tested, run the first apply with console access.
 
 ## Settings
 
@@ -173,8 +173,33 @@ If the host cannot be resolved and the plan touches bridge, VLAN or address type
 
 `infra doctor` checks the schema, the settings and their secret references, that the device answers `/rest/system/resource` with RouterOS 7 or later, and that every interface a resource references exists on the device or is declared.
 
+## Test target: a CHR VM
+
+The `routeros-chr` blueprint (`blueprints/routeros-chr/`) builds a disposable
+RouterOS Cloud Hosted Router on Proxmox, so the provider can be tried without a
+real switch. It imports MikroTik's `.img.zip` image, attaches a management NIC
+(`ether1`) and trunk NICs (`ether2`..), and bootstraps the VM over its serial
+console: admin password, optional static address, and the `www` service.
+`infra destroy` removes the VM. The bootstrap is verified against a RouterOS
+7.25.1 CHR; the blueprint README lists what was checked.
+
+Point the environment at the VM (the example package sets a static address):
+
+```yaml
+provider_settings:
+  mikrotik:
+    api_url: http://192.0.2.241
+    username: admin
+    password: secret://env_secrets/mikrotik/password
+```
+
+The bootstrap enables `www` (plain HTTP) because `www-ssl` needs a certificate
+on the box. `infra doctor` warns about plaintext HTTP; that is expected for a
+disposable test VM. CHR's free licence caps throughput, which is enough for API
+testing. See `blueprints/routeros-chr/README.md` for the variables.
+
 ## Limitations
 
 - One device per environment.
-- Live verification of the write calls against a RouterOS CHR virtual machine: [#1485](https://github.com/endavis/infrafoundry/issues/1485).
+- Live verification of the write calls against a RouterOS CHR virtual machine is pending; the [`routeros-chr` blueprint](#test-target-a-chr-vm) provides the target ([#1485](https://github.com/endavis/infrafoundry/issues/1485)).
 - `config migrate` extractors and the `/export terse` backup are separate work.

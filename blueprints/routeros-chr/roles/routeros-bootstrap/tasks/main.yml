@@ -1,0 +1,97 @@
+---
+# RouterOS Bootstrap — Tasks
+#
+# Starts the VM with an expect script already listening on its serial
+# socket, so the script sees the first login prompt. The admin password
+# reaches the expect process only through its environment; it is never
+# written to the Proxmox host.
+
+- name: Check the bootstrap inputs
+  ansible.builtin.assert:
+    that:
+      - routeros_vmid | string | length > 0
+      - routeros_hostname | length > 0
+      - routeros_admin_password | length > 0
+    fail_msg: vmid, vm_name and the package secret routeros_admin_password are required.
+    quiet: true
+  no_log: true
+
+- name: Check the gateway input
+  ansible.builtin.assert:
+    that:
+      - routeros_mgmt_ip | length > 0
+    fail_msg: mgmt_gateway needs mgmt_ip.
+    quiet: true
+  when: routeros_mgmt_gateway | length > 0
+
+- name: Fail if the VM is already running
+  ansible.builtin.command:
+    cmd: "qm status {{ routeros_vmid }}"
+  register: vm_status
+  changed_when: false
+  failed_when: "vm_status.rc != 0 or 'status: stopped' not in vm_status.stdout"
+
+- name: Deploy expect script
+  ansible.builtin.template:
+    src: bootstrap.exp.j2
+    dest: "/tmp/routeros-bootstrap-{{ routeros_vmid }}.exp"
+    mode: "0700"
+
+- name: Deploy wrapper script that waits for the serial socket, then runs expect
+  ansible.builtin.copy:
+    dest: "/tmp/routeros-bootstrap-{{ routeros_vmid }}-wrapper.sh"
+    mode: "0700"
+    content: |
+      #!/bin/bash
+      SOCKET="/var/run/qemu-server/{{ routeros_vmid }}.serial0"
+      for _ in $(seq 1 60); do
+        [ -S "$SOCKET" ] && exec /tmp/routeros-bootstrap-{{ routeros_vmid }}.exp
+        sleep 0.5
+      done
+      echo "ERROR: Serial socket not found after 30s"
+      exit 1
+
+- name: Launch wrapper in background (listens before the VM boots)
+  ansible.builtin.shell: |
+    nohup /tmp/routeros-bootstrap-{{ routeros_vmid }}-wrapper.sh \
+      > /tmp/routeros-bootstrap-wrapper-{{ routeros_vmid }}.out 2>&1 &
+    echo $!
+  environment:
+    ROUTEROS_ADMIN_PASSWORD: "{{ routeros_admin_password }}"
+  register: wrapper_bg
+  changed_when: true
+  no_log: true
+
+- name: Start VM
+  ansible.builtin.command:
+    cmd: "qm start {{ routeros_vmid }}"
+  changed_when: true
+
+- name: Wait for the expect script to finish
+  ansible.builtin.shell: |
+    TIMEOUT={{ routeros_boot_timeout | int + 300 }}
+    ELAPSED=0
+    while kill -0 {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null; do
+      sleep 5
+      ELAPSED=$((ELAPSED + 5))
+      if [ $ELAPSED -ge $TIMEOUT ]; then
+        kill {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null || true
+        echo "ERROR: Expect script timed out after ${TIMEOUT}s"
+        break
+      fi
+    done
+    # Only the status lines of the expect script are shown; console output never
+    # reaches this file (the expect script runs with log_user 0).
+    grep -E "^(ERROR:|Bootstrap applied)" /tmp/routeros-bootstrap-wrapper-{{ routeros_vmid }}.out 2>/dev/null
+    ! grep -q "ERROR:" /tmp/routeros-bootstrap-wrapper-{{ routeros_vmid }}.out
+  register: bootstrap_run
+  changed_when: true
+
+- name: Remove the bootstrap scripts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/routeros-bootstrap-{{ routeros_vmid }}.exp"
+    - "/tmp/routeros-bootstrap-{{ routeros_vmid }}-wrapper.sh"
+    - "/tmp/routeros-bootstrap-wrapper-{{ routeros_vmid }}.out"

@@ -4,6 +4,11 @@ Tests the ova_vms.tf.j2 template and the routing logic that sends VMs with
 ova_source to the OVA template instead of the regular vms.tf template.
 """
 
+import re
+import shlex
+import subprocess
+import sys
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -522,6 +527,25 @@ def _make_image_vm(name: str = "test-image-vm", **config_overrides: Any) -> Reso
     return ResourceConfig(name=name, type="vm", provider="proxmox", config=config)
 
 
+def _zip_extraction_line(provider: ProxmoxProvider) -> str:
+    """Return the rendered python3 zip-extraction line for a CHR-style image VM."""
+    url = "https://download.mikrotik.com/routeros/7.25.1/chr-7.25.1.img.zip"
+    content = _render_ova_vms(provider, [_make_image_vm(disk_image_source=url)])
+    match = re.search(r"^\s*(python3 -I -c .*)$", content, re.MULTILINE)
+    assert match is not None
+    return match.group(1)
+
+
+def _run_extraction(
+    provider: ProxmoxProvider, archive: Path, out: Path
+) -> subprocess.CompletedProcess[str]:
+    """Run the rendered extraction one-liner against a local archive."""
+    argv = shlex.split(_zip_extraction_line(provider))
+    argv[0] = sys.executable
+    argv[-2:] = [str(archive), str(out)]
+    return subprocess.run(argv, capture_output=True, text=True, check=False)
+
+
 class TestDiskImageVM:
     """A VM built from a raw disk image (``disk_image_source``, #1094)."""
 
@@ -555,6 +579,76 @@ class TestDiskImageVM:
         assert f"qm disk import ${{self.triggers_replace.vmid}} {raw} stor01" in content
         assert "tar -xf" not in content
         assert "*.vmdk" not in content
+
+    def test_zip_is_downloaded_extracted_and_imported(self, provider: ProxmoxProvider) -> None:
+        url = "https://download.mikrotik.com/routeros/7.25.1/chr-7.25.1.img.zip"
+        content = _render_ova_vms(provider, [_make_image_vm(disk_image_source=url)])
+
+        local = f"{CACHE}/chr-7.25.1.img.zip"
+        raw = f"{CACHE}/chr-7.25.1.img"
+        assert f"curl -fsSL -o {local}.part '{url}'" in content
+        assert f"if [ ! -f {raw} ]; then" in content
+        assert "zipfile.ZipFile" in content
+        assert f"{local} {raw}.part" in content
+        assert f"mv {raw}.part {raw}" in content
+        assert f"qm disk import ${{self.triggers_replace.vmid}} {raw} " in content
+        assert "bunzip2" not in content
+        assert "unzip " not in content
+
+    def test_zip_sha256_is_checked_against_the_archive(self, provider: ProxmoxProvider) -> None:
+        digest = "cd" * 32
+        url = "https://download.mikrotik.com/routeros/7.25.1/chr-7.25.1.img.zip"
+        content = _render_ova_vms(
+            provider, [_make_image_vm(disk_image_source=url, disk_image_sha256=digest)]
+        )
+
+        assert f"echo '{digest}  {CACHE}/chr-7.25.1.img.zip' | sha256sum -c -" in content
+
+    def test_local_zip_is_extracted_into_the_cache(self, provider: ProxmoxProvider) -> None:
+        content = _render_ova_vms(
+            provider, [_make_image_vm(disk_image_source="/mnt/pve/nfs1/chr.img.zip")]
+        )
+
+        assert "curl" not in content
+        assert f"/mnt/pve/nfs1/chr.img.zip {CACHE}/chr.img.part" in content
+        assert f"qm disk import ${{self.triggers_replace.vmid}} {CACHE}/chr.img " in content
+
+    def test_zip_extraction_line_has_no_terraform_interpolation(
+        self, provider: ProxmoxProvider
+    ) -> None:
+        line = _zip_extraction_line(provider)
+
+        assert "${" not in line
+        assert "%{" not in line
+
+    def test_zip_extraction_writes_the_single_img_member(
+        self, provider: ProxmoxProvider, tmp_path: Path
+    ) -> None:
+        archive = tmp_path / "chr.img.zip"
+        with zipfile.ZipFile(archive, "w") as z:
+            z.writestr("chr-7.25.1.img", b"disk-bytes")
+        out = tmp_path / "chr.img.part"
+
+        result = _run_extraction(provider, archive, out)
+
+        assert result.returncode == 0
+        assert out.read_bytes() == b"disk-bytes"
+
+    @pytest.mark.parametrize("members", [[], ["a.img", "b.img"]])
+    def test_zip_extraction_rejects_zero_or_two_img_members(
+        self, provider: ProxmoxProvider, tmp_path: Path, members: list[str]
+    ) -> None:
+        archive = tmp_path / "chr.img.zip"
+        with zipfile.ZipFile(archive, "w") as z:
+            z.writestr("readme.txt", b"x")
+            for member in members:
+                z.writestr(member, b"x")
+        out = tmp_path / "chr.img.part"
+
+        result = _run_extraction(provider, archive, out)
+
+        assert result.returncode != 0
+        assert "ERROR: expected one .img" in result.stderr
 
     def test_sha256_is_checked_against_the_downloaded_file(self, provider: ProxmoxProvider) -> None:
         digest = "ab" * 32

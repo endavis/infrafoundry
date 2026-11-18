@@ -101,7 +101,11 @@ class TestOpnsenseVmBaseTags:
 @pytest.mark.unit
 @pytest.mark.parametrize(
     ("blueprint", "expected"),
-    [("ontap-cluster", ["ontap", "ontap-sim"]), ("opnsense-vm", ["opnsense", "fw-test"])],
+    [
+        ("ontap-cluster", ["ontap", "ontap-sim"]),
+        ("opnsense-vm", ["opnsense", "fw-test"]),
+        ("routeros-chr", ["routeros", "chr-test"]),
+    ],
 )
 def test_blueprint_declares_base_tags_default(blueprint: str, expected: list[str]) -> None:
     text = (BLUEPRINTS_DIR / blueprint / "blueprint.yaml").read_text()

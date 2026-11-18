@@ -97,14 +97,15 @@ that ship as a disk, not as a cloud image. Such VMs skip cloud-init.
 
 - **`ova_source`** is a path on the Proxmox host to an `.ova`. Its VMDKs are
   extracted and imported in order.
-- **`disk_image_source`** is a raw disk image (`.img`, or `.img.bz2`). It is
+- **`disk_image_source`** is a raw disk image (`.img`, `.img.bz2` or `.img.zip`). It is
   either an absolute path on the Proxmox host or an `http(s)` URL.
   - A URL is downloaded into `disk_image_cache_dir` (default
     `/var/lib/vz/template/cache/infrafoundry`).
-  - A `.bz2` is decompressed there.
+  - A `.bz2` is decompressed there. A `.zip` is extracted there (exactly one
+    `.img` member, with python3 on the host).
   - Both results are cached, so later runs reuse them.
   - If `disk_image_sha256` is set, the downloaded or given file is checked
-    against it before use.
+    against it before use. For an archive it is the archive's digest.
   - The image is imported as the only disk.
   - `disk_size` (GiB, positive integer) is for disk-image VMs only. The disk
     is resized after the import and before first boot, but only when the value
@@ -131,7 +132,9 @@ vms:
 ```
 
 The `opnsense-vm` blueprint (`blueprints/opnsense-vm/`) uses this to build a
-disposable OPNsense test firewall.
+disposable OPNsense test firewall, and the `routeros-chr` blueprint
+(`blueprints/routeros-chr/`) builds a MikroTik RouterOS CHR VM from an
+`.img.zip` image.
 
 ### Templates from a downloaded image
 

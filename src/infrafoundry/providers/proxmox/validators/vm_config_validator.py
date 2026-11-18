@@ -34,7 +34,7 @@ VALID_NIC_MODELS = frozenset({"virtio", "e1000", "e1000e", "rtl8139", "vmxnet3"}
 ISO_PATH_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+:iso/.+\.iso$")
 
 # A disk image is imported from a path on the PVE host or downloaded from a URL (#1094).
-DISK_IMAGE_SOURCE_PATTERN = re.compile(r"^(/|https?://).+\.img(\.bz2)?$")
+DISK_IMAGE_SOURCE_PATTERN = re.compile(r"^(/|https?://).+\.img(\.bz2|\.zip)?$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -222,7 +222,7 @@ class VMConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
                 name,
                 "disk_image_source",
                 f"disk_image_source '{source}' must be an absolute path on the PVE host "
-                "or an http(s) URL ending in .img or .img.bz2.",
+                "or an http(s) URL ending in .img, .img.bz2 or .img.zip.",
             )
         if sha256 is not None and not (isinstance(sha256, str) and SHA256_PATTERN.match(sha256)):
             self._error(

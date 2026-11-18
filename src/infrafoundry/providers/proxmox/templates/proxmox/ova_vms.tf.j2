@@ -4,11 +4,11 @@
 {% set image_source = vm.config.disk_image_source | default('') %}
 {% if image_source %}
 {#- Where the raw image ends up on the PVE host: a URL is downloaded into the
-    cache directory, and a .bz2 is decompressed there (#1094). -#}
+    cache directory, and a .bz2 or .zip is decompressed there (#1094, #1485). -#}
 {% set image_cache = vm.config.disk_image_cache_dir | default('/var/lib/vz/template/cache/infrafoundry') %}
 {% set image_name = image_source.split('/') | last %}
 {% set image_local = image_source if image_source.startswith('/') else image_cache ~ '/' ~ image_name %}
-{% set image_raw = (image_cache ~ '/' ~ image_name[:-4]) if image_name.endswith('.bz2') else image_local %}
+{% set image_raw = (image_cache ~ '/' ~ image_name[:-4]) if (image_name.endswith('.bz2') or image_name.endswith('.zip')) else image_local %}
 # Disk image VM: {{ vm.config.name }}
 {% else %}
 # OVA VM: {{ vm.config.name }}
@@ -63,7 +63,11 @@ resource "terraform_data" "ova_vm_{{ vm_tf_name }}" {
 {% endif %}
 {% if image_raw != image_local %}
       if [ ! -f {{ image_raw }} ]; then
+{% if image_name.endswith('.zip') %}
+        python3 -I -c 'import shutil, sys, zipfile; z = zipfile.ZipFile(sys.argv[1]); m = [n for n in z.namelist() if n.endswith(".img")]; len(m) == 1 or sys.exit("ERROR: expected one .img in " + sys.argv[1] + ", found " + str(len(m))); shutil.copyfileobj(z.open(m[0]), open(sys.argv[2], "wb"))' {{ image_local }} {{ image_raw }}.part
+{% else %}
         bunzip2 -kc {{ image_local }} > {{ image_raw }}.part
+{% endif %}
         mv {{ image_raw }}.part {{ image_raw }}
       fi
 {% endif %}
