@@ -39,6 +39,7 @@ This index provides a structured overview of the available documentation.
 - **[ESXi](providers/esxi.md)**: VMware ESXi hosts and virtual machines.
 - **[Host](providers/host.md)**: Existing machines that no provider creates, configured with Ansible.
 - **[Kubernetes](providers/kubernetes.md)**: Namespaces, workloads, RBAC, Helm releases and manifests.
+- **[MikroTik](providers/mikrotik.md)**: RouterOS 7 switches and routers over the REST API (plan and drift; apply follows in #1483).
 - **[OCI](providers/oci.md)**: Oracle Cloud Infrastructure.
 - **[OPNsense](providers/opnsense.md)**: Firewall configuration through the direct API.
 - **[Proxmox](providers/proxmox.md)**: Proxmox VE virtual machines, containers and SDN.

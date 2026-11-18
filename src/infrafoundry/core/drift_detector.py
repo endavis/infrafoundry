@@ -1,6 +1,6 @@
 """Drift detection for infrastructure resources."""
 
-from typing import Any, override
+from typing import Any, cast, override
 
 from infrafoundry.core.base_manager import BaseManager
 from infrafoundry.core.config import ConfigManager
@@ -13,7 +13,8 @@ from infrafoundry.core.exceptions import (
 )
 from infrafoundry.core.protocols import DriftDetectable, Plannable
 from infrafoundry.core.provider import ProviderBase
-from infrafoundry.core.runners import RunnerRegistry
+from infrafoundry.core.result_types import DriftInfo
+from infrafoundry.core.runners import BaseRunner, RunnerRegistry
 
 
 class DriftDetector(BaseManager):
@@ -46,6 +47,10 @@ class DriftDetector(BaseManager):
         Compares the actual infrastructure state (from Terraform state) with
         the declared configuration to identify resources that have been
         modified, added, or deleted outside of InfraFoundry.
+
+        A provider with a drift-detectable direct runner (not Terraform or OpenTofu,
+        for example MikroTik, ADR-0026) is planned add-only through that runner
+        instead of Terraform.
 
         Args:
             env_name: Environment name
@@ -107,6 +112,22 @@ class DriftDetector(BaseManager):
                 provider = self.providers[provider_name]
 
                 self._log_info(f"Checking {provider_name}...")
+
+                direct_runner = self._direct_drift_runner(provider)
+                if direct_runner is not None:
+                    drift_info = self._detect_direct(direct_runner, provider, env_name)
+                    if drift_info["has_changes"]:
+                        drift_detected = True
+                        self._log_warning(f"Drift detected: {drift_info['summary']}")
+                        self.event_manager.emit_event(
+                            EventType.DRIFT_DETECTED,
+                            env_name,
+                            {"provider": provider_name, "changes": drift_info},
+                        )
+                    else:
+                        self._log_info(f"No drift detected for {provider_name}")
+                    results[provider_name] = drift_info
+                    continue
 
                 # Check if runner supports plan and drift detection
                 if not isinstance(terraform_runner, Plannable):
@@ -174,6 +195,37 @@ class DriftDetector(BaseManager):
             raise
 
         return results
+
+    def _direct_drift_runner(self, provider: ProviderBase) -> BaseRunner | None:
+        """Return a direct-API runner that can detect drift for ``provider``.
+
+        A direct runner is an IaC runner other than Terraform and OpenTofu that is
+        ``Plannable`` and ``DriftDetectable`` and whose provider offers a
+        ``generate_<tool_name>`` method. OPNsense keeps the Terraform path because
+        its runner is not ``DriftDetectable``.
+        """
+        for tool_name in self.runner_registry.list_runners():
+            if tool_name in ("terraform", "opentofu"):
+                continue
+            runner = self.runner_registry.create_runner(tool_name)
+            if (
+                runner is not None
+                and runner.is_iac_runner
+                and isinstance(runner, Plannable)
+                and isinstance(runner, DriftDetectable)
+                and callable(getattr(type(provider), f"generate_{runner.tool_name}", None))
+            ):
+                return runner
+        return None
+
+    def _detect_direct(
+        self, runner: BaseRunner, provider: ProviderBase, env_name: str
+    ) -> DriftInfo:
+        """Plan add-only through a direct runner and parse the result as drift."""
+        provider.set_environment(env_name)
+        planner = cast(Plannable, runner)
+        plan_result = planner.plan(provider, add_only=True, env_name=env_name)
+        return cast(DriftDetectable, runner).parse_plan_for_drift(plan_result)
 
     @override
     def cleanup(self) -> None:

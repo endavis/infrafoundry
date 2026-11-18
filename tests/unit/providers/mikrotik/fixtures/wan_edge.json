@@ -1,0 +1,37 @@
+{
+  "interface": [
+    {".id": "*1", "name": "ether1", "type": "ether", "disabled": "false", "dynamic": "false"},
+    {".id": "*2", "name": "ether2", "type": "ether", "disabled": "false", "dynamic": "false"},
+    {".id": "*3", "name": "ether3", "type": "ether", "disabled": "false", "dynamic": "false"},
+    {".id": "*4", "name": "ether4", "type": "ether", "disabled": "false", "dynamic": "false"},
+    {".id": "*6", "name": "bridge", "type": "bridge", "disabled": "false", "dynamic": "false"},
+    {".id": "*7", "name": "vlan99", "type": "vlan", "disabled": "false", "dynamic": "false"}
+  ],
+  "interface/bridge": [
+    {".id": "*6", "name": "bridge", "vlan-filtering": "true", "pvid": "1", "protocol-mode": "rstp", "disabled": "false", "dynamic": "false"}
+  ],
+  "interface/bridge/port": [
+    {".id": "*10", "interface": "ether1", "bridge": "bridge", "pvid": "99", "disabled": "false", "dynamic": "false"},
+    {".id": "*11", "interface": "ether2", "bridge": "bridge", "pvid": "10", "disabled": "false", "dynamic": "false"},
+    {".id": "*12", "interface": "ether3", "bridge": "bridge", "pvid": "20", "disabled": "false", "dynamic": "false"},
+    {".id": "*13", "interface": "ether4", "bridge": "bridge", "pvid": "1", "disabled": "false", "dynamic": "false"}
+  ],
+  "interface/bridge/vlan": [
+    {".id": "*20", "bridge": "bridge", "vlan-ids": "10", "tagged": "bridge,ether4", "untagged": "ether2", "disabled": "false", "dynamic": "false"},
+    {".id": "*21", "bridge": "bridge", "vlan-ids": "20", "tagged": "bridge,ether4", "untagged": "ether3", "disabled": "false", "dynamic": "false"},
+    {".id": "*22", "bridge": "bridge", "vlan-ids": "99", "tagged": "bridge,ether4", "untagged": "ether1", "disabled": "false", "dynamic": "false"},
+    {".id": "*23", "bridge": "bridge", "vlan-ids": "1", "tagged": "", "untagged": "ether4", "disabled": "false", "dynamic": "true"}
+  ],
+  "interface/vlan": [
+    {".id": "*7", "name": "vlan99", "interface": "bridge", "vlan-id": "99", "disabled": "false", "dynamic": "false"}
+  ],
+  "ip/address": [
+    {".id": "*30", "address": "192.0.2.2/24", "network": "192.0.2.0", "interface": "vlan99", "disabled": "false", "dynamic": "false"}
+  ],
+  "ip/dhcp-client": [],
+  "ip/service": [
+    {".id": "*40", "name": "www", "port": "80", "address": "", "disabled": "true", "dynamic": "false"},
+    {".id": "*41", "name": "www-ssl", "port": "443", "address": "", "disabled": "false", "dynamic": "false"}
+  ],
+  "system/resource": [{"version": "7.14 (stable)", "board-name": "example-board"}]
+}
