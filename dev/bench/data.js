@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795013685093,
+  "lastUpdate": 1795014725428,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3500,6 +3500,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010644556007788994",
             "extra": "mean: 80.04892558312149 usec\nrounds: 13720"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2c4bdc0aa126869cf41a1058a6a436f8f21a53de",
+          "message": "docs: record live verification of the mikrotik provider (merges PR #1490, addresses #1489)\n\nThe provider page and ADR-0026 said live verification on a RouterOS CHR\nwas pending. It ran (#1483, on the routeros-chr blueprint from #1485), so\nthe note now lists what was verified and keeps console access only as a\nprecaution for new hardware. Addresses #1489.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T15:10:53Z",
+          "tree_id": "1eab55bcf49815a51d30eaa612313b2568eb6a05",
+          "url": "https://github.com/endavis/infrafoundry/commit/2c4bdc0aa126869cf41a1058a6a436f8f21a53de"
+        },
+        "date": 1795014724719,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.349360122338105,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00013106604144472108",
+            "extra": "mean: 20.26368725999646 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7768.695369197507,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009727292919533966",
+            "extra": "mean: 128.7217418725093 usec\nrounds: 8275"
           }
         ]
       }
