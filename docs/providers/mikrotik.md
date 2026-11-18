@@ -11,8 +11,8 @@ tags:
 
 The MikroTik provider manages a RouterOS 7 (or later) device over its REST API. It reads the device, diffs it against your YAML, and plans the changes in an order that keeps the management connection alive. It does not generate Terraform: the decision and the rejected alternatives are in [ADR-0026](../decisions/0026-mikrotik-routeros-is-managed-natively-over-the-rest-api-by-a-direct-runner.md).
 
-!!! warning "Plan only for now"
-    `infra plan`, `infra doctor` and `infra drift detect` work. `infra apply` and `infra destroy` fail with `mikrotik apply is not implemented yet (see #1483)` until the follow-up lands (#1483). An apply therefore never silently does nothing.
+!!! note "Live verification follows"
+    `infra plan`, `infra apply`, `infra destroy`, `infra doctor` and `infra drift detect` are implemented. The write calls (PUT, PATCH, DELETE) are covered by unit tests against an in-memory fake device. Verification against a RouterOS CHR virtual machine follows in [#1485](https://github.com/endavis/infrafoundry/issues/1485); until then, run the first apply with console access.
 
 ## Settings
 
@@ -146,6 +146,25 @@ If the host cannot be resolved and the plan touches bridge, VLAN or address type
 !!! tip "Keep console access"
     The first apply on a device should be done with console or MAC-level access available. The refusals cover the cases the plan can see; they cannot see a firewall rule or a path outside this provider's types.
 
+## Apply and Destroy
+
+`infra apply` plans against the live device in the same run, then writes the steps in phase order (A to F, see the ADR). Each step is one REST call: `PUT` to create, `PATCH` to update, `DELETE` to remove. The run stops at the first error, because later steps assume the earlier ones took effect.
+
+- **Refusals are re-checked.** An apply whose plan carries refusals sends nothing, and the error lists the reasons.
+- **A failure names the step.** The error gives the step number out of the total, its phase, kind, type and resource name, RouterOS's message, and the steps that already ran. If the device stops answering mid-run, the error says so and asks you to check console access before running again. Steps already completed stay in effect and are reported as outcomes.
+- **Created objects.** A step that acts on an object created earlier in the run (for example enabling VLAN filtering on a new bridge) uses the `.id` RouterOS returned for the create, or re-reads the path once to find it.
+- **Deletes follow the managed set.** A full apply deletes an undeclared object only when InfraFoundry applied it before (ADR-0018). Each such name is released from the managed set afterwards. A managed row that no longer parses is kept. A targeted or add-only run deletes and releases nothing.
+- **Outcomes.** Each object reports one outcome, `create`, `update` or `delete`, as `mikrotik_<type>.<name>` (a bridge created and then switched to VLAN filtering reports `create`).
+
+`infra destroy` removes the objects declared in your YAML that exist on the device, in reverse dependency order. It never touches:
+
+- `ip.service` entries, which cannot be deleted;
+- `absent: true` entries;
+- objects that are not in your YAML;
+- built-in or dynamic rows.
+
+`--target` narrows the set. The end state goes through the same management-path check as a plan, so a destroy that would remove the management address or path is refused whole, before any write. Destroying an environment whose YAML holds the management path therefore needs console access and is refused by design.
+
 ## Drift Detection
 
 `infra drift detect` plans the device add-only through the same runner. A live object that differs from your YAML (for example an out-of-band PVID change on a managed port) is reported and fires `DRIFT_DETECTED`. Undeclared objects are not reported as drift, because drift runs never delete.
@@ -157,5 +176,5 @@ If the host cannot be resolved and the plan touches bridge, VLAN or address type
 ## Limitations
 
 - One device per environment.
-- Apply and destroy: #1483.
+- Live verification of the write calls against a RouterOS CHR virtual machine: [#1485](https://github.com/endavis/infrafoundry/issues/1485).
 - `config migrate` extractors and the `/export terse` backup are separate work.

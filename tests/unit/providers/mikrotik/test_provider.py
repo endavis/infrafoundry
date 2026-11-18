@@ -1,6 +1,7 @@
 """Tests for the MikroTik provider."""
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from infrafoundry.core.protocols import ValidatesOffline
 from infrafoundry.core.validation import ValidationReport
@@ -62,3 +63,37 @@ def test_implements_validates_offline(tmp_path: Path) -> None:
         [resource("interface.bridge", "b", bogus=1)], [], make_env({}), report
     )
     assert any(not r.passed for r in report.results)
+
+
+def test_deletable_types_exclude_services(tmp_path: Path) -> None:
+    deletable = _provider(tmp_path).deletable_types()
+    assert "interface.bridge" in deletable and "ip.service" not in deletable
+
+
+def test_rest_apply_plans_then_applies_on_one_manager(tmp_path: Path) -> None:
+    provider = _provider(tmp_path)
+    resources = [resource("interface.bridge", "bridge")]
+    with patch("infrafoundry.providers.mikrotik.MikroTikManager") as cls:
+        manager: MagicMock = cls.return_value
+        result = provider.rest_apply("test", resources, add_only=True, target_resources=["bridge"])
+
+    cls.assert_called_once_with(tmp_path)
+    manager.plan.assert_called_once_with(
+        "test", resources, add_only=True, managed_resources=None, target_resources=["bridge"]
+    )
+    manager.apply.assert_called_once_with("test", manager.plan.return_value)
+    assert result is manager.apply.return_value
+
+
+def test_rest_destroy_and_resource_ids_delegate(tmp_path: Path) -> None:
+    provider = _provider(tmp_path)
+    resources = [resource("interface.bridge", "bridge")]
+    with patch("infrafoundry.providers.mikrotik.MikroTikManager") as cls:
+        manager: MagicMock = cls.return_value
+        assert provider.rest_destroy("test", resources, target_resources=["a"]) is (
+            manager.destroy.return_value
+        )
+        assert provider.rest_resource_ids("test", resources) is manager.resource_ids.return_value
+
+    manager.destroy.assert_called_once_with("test", resources, target_resources=["a"])
+    manager.resource_ids.assert_called_once_with("test", resources)
