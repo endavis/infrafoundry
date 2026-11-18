@@ -28,6 +28,7 @@ from infrafoundry.providers.host import HostProvider
 from infrafoundry.providers.host.validator import HostValidator
 from infrafoundry.providers.kubernetes import KubernetesProvider
 from infrafoundry.providers.kubernetes.validators import KubeconfigValidator
+from infrafoundry.providers.mikrotik import MikroTikProvider
 from infrafoundry.providers.oci import OCIProvider
 from infrafoundry.providers.oci.validator import OCIValidator
 from infrafoundry.providers.opnsense import OPNsenseProvider
@@ -285,6 +286,7 @@ def test_clean_provider_prints_nothing() -> None:
         EsxiProvider,
         TailscaleProvider,
         KubernetesProvider,
+        MikroTikProvider,
     ],
 )
 def test_provider_implements_validates_offline(provider_cls: Any, tmp_path: Path) -> None:

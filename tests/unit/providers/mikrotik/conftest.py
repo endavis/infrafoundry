@@ -1,0 +1,121 @@
+"""Shared builders for the MikroTik provider tests (documentation values only)."""
+
+from __future__ import annotations
+
+import copy
+import ipaddress
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from infrafoundry.core.config.models import EnvironmentConfig
+from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.providers.mikrotik.components.manager import MikroTikManager
+from infrafoundry.providers.mikrotik.settings import MikroTikSettings
+
+FIXTURES = Path(__file__).parent / "fixtures"
+MGMT_IP = "192.0.2.2"
+SETTINGS = MikroTikSettings(api_url=f"https://{MGMT_IP}", username="admin", password="pw-example")
+
+
+class FakeRouterOS:
+    """In-memory RouterOS: tables keyed by REST path, with a call log."""
+
+    def __init__(self, tables: dict[str, list[dict[str, str]]]) -> None:
+        self.tables = copy.deepcopy(tables)
+        self.calls: list[tuple[str, str]] = []
+
+    @classmethod
+    def from_fixture(cls, name: str) -> FakeRouterOS:
+        return cls(json.loads((FIXTURES / f"{name}.json").read_text()))
+
+    def get(self, path: str) -> list[dict[str, str]]:
+        self.calls.append(("GET", path))
+        return copy.deepcopy(self.tables.get(path, []))
+
+    def execute(self, script: str) -> str:
+        self.calls.append(("EXECUTE", script))
+        return ""
+
+
+def resource(type_name: str, name: str, **config: Any) -> ResourceConfig:
+    """Build a MikroTik resource."""
+    return ResourceConfig(name=name, type=type_name, provider="mikrotik", config=config)
+
+
+def make_env(
+    settings: dict[str, Any] | None = None, secrets: dict[str, Any] | None = None
+) -> EnvironmentConfig:
+    """Build an EnvironmentConfig with MikroTik provider settings."""
+    return EnvironmentConfig(
+        name="test",
+        provider_settings={"mikrotik": settings} if settings is not None else {},
+        secrets=secrets,
+    )
+
+
+def resolve_literal(host: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """Resolve only IP literals; a hostname does not resolve."""
+    try:
+        return ipaddress.ip_address(host)
+    except ValueError:
+        return None
+
+
+@pytest.fixture
+def wan_edge() -> FakeRouterOS:
+    """A filtering edge switch reachable at the management address."""
+    return FakeRouterOS.from_fixture("wan_edge")
+
+
+@pytest.fixture
+def factory() -> FakeRouterOS:
+    """A device in its vendor-default configuration."""
+    return FakeRouterOS.from_fixture("factory_default")
+
+
+def manager_for(
+    fake: FakeRouterOS, monkeypatch: pytest.MonkeyPatch, settings: MikroTikSettings = SETTINGS
+) -> MikroTikManager:
+    """A manager that reads ``fake`` and uses the documentation settings."""
+    monkeypatch.setattr(
+        "infrafoundry.providers.mikrotik.components.manager.load_settings",
+        lambda config_dir, env_name: settings,
+    )
+    return MikroTikManager(Path("."), client_factory=lambda s: fake, host_resolver=resolve_literal)
+
+
+def converged_wan_edge() -> list[ResourceConfig]:
+    """Resources that describe the ``wan_edge`` fixture exactly."""
+    port = "interface.bridge.port"
+    vlan = "interface.bridge.vlan"
+    return [
+        resource("interface.bridge", "bridge", **{"vlan-filtering": True, "pvid": 1}),
+        resource(port, "p1", interface="ether1", bridge="bridge", pvid=99),
+        resource(port, "p2", interface="ether2", bridge="bridge", pvid=10),
+        resource(port, "p3", interface="ether3", bridge="bridge", pvid=20),
+        resource(port, "p4", interface="ether4", bridge="bridge", pvid=1),
+        resource(
+            vlan,
+            "v10",
+            bridge="bridge",
+            **{"vlan-ids": 10, "tagged": ["bridge", "ether4"], "untagged": ["ether2"]},
+        ),
+        resource(
+            vlan,
+            "v20",
+            bridge="bridge",
+            **{"vlan-ids": 20, "tagged": ["bridge", "ether4"], "untagged": ["ether3"]},
+        ),
+        resource(
+            vlan,
+            "v99",
+            bridge="bridge",
+            **{"vlan-ids": 99, "tagged": ["bridge", "ether4"], "untagged": ["ether1"]},
+        ),
+        resource("interface.vlan", "vlan99", interface="bridge", **{"vlan-id": 99}),
+        resource("ip.address", "mgmt", address="192.0.2.2/24", interface="vlan99"),
+        resource("ip.service", "www-ssl", port=443, disabled=False),
+    ]

@@ -160,3 +160,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0023](0023-infra-plan-runs-providers-offline-validation-live-checks-stay-in-infra-doctor.md) | infra plan runs providers' offline validation; live checks stay in infra doctor | Accepted |
 | [0024](0024-opnsense-firewalls-are-provider-instances-several-per-environment.md) | OPNsense firewalls are provider instances, several per environment | Accepted |
 | [0025](0025-remote-state-locations-are-derived-per-provider-when-several-share-an-environment.md) | Remote state locations are derived per provider when several share an environment | Accepted |
+| [0026](0026-mikrotik-routeros-is-managed-natively-over-the-rest-api-by-a-direct-runner.md) | MikroTik RouterOS is managed natively over the REST API by a direct runner | Accepted |

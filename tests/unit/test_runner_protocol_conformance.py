@@ -28,6 +28,7 @@ from infrafoundry.core.protocols import (
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners.ansible_runner import AnsibleRunner
 from infrafoundry.core.runners.host_runner import HostRunner
+from infrafoundry.core.runners.mikrotik_rest_runner import MikroTikRestRunner
 from infrafoundry.core.runners.opentofu_runner import OpenTofuRunner
 from infrafoundry.core.runners.opnsense_direct_runner import OPNsenseDirectRunner
 from infrafoundry.core.runners.pulumi_runner import PulumiRunner
@@ -42,6 +43,7 @@ PlanCapable = (
     | PulumiRunner
     | OPNsenseDirectRunner
     | HostRunner
+    | MikroTikRestRunner
 )
 DestroyCapable = TerraformRunner | OpenTofuRunner | PulumiRunner | OPNsenseDirectRunner | HostRunner
 
@@ -71,7 +73,9 @@ def _as_state_aware(runner: TerraformRunner | OpenTofuRunner) -> StateAware:
     return runner
 
 
-def _as_drift_detectable(runner: TerraformRunner | OpenTofuRunner) -> DriftDetectable:
+def _as_drift_detectable(
+    runner: TerraformRunner | OpenTofuRunner | MikroTikRestRunner,
+) -> DriftDetectable:
     """Return the runner typed as ``DriftDetectable``; mypy rejects this if one drifts."""
     return runner
 
@@ -84,6 +88,7 @@ ALL_RUNNERS = [
     PulumiRunner,
     OPNsenseDirectRunner,
     HostRunner,
+    MikroTikRestRunner,
 ]
 DESTROY_RUNNERS = [
     TerraformRunner,
@@ -124,6 +129,10 @@ def test_terraform_runner_is_state_aware(cls: type[TerraformRunner]) -> None:
 @pytest.mark.parametrize("cls", [TerraformRunner, OpenTofuRunner])
 def test_terraform_runner_is_drift_detectable(cls: type[TerraformRunner]) -> None:
     assert isinstance(_as_drift_detectable(cls()), DriftDetectable)
+
+
+def test_mikrotik_rest_runner_is_drift_detectable() -> None:
+    assert isinstance(_as_drift_detectable(MikroTikRestRunner()), DriftDetectable)
 
 
 @pytest.mark.parametrize("method", ["apply", "destroy"])

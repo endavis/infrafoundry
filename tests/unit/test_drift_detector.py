@@ -1,7 +1,7 @@
 """Unit tests for DriftDetector."""
 
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, ClassVar
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -280,3 +280,105 @@ class TestDriftDetectorUnparsedPlan:
         assert "parsed" not in results["proxmox"]
         assert warnings == []
         assert "No drift detected for proxmox" in infos
+
+
+class _StubTerraformRunner(TerraformRunner):
+    """Terraform runner whose plan reports no drift and records its calls."""
+
+    calls: ClassVar[list[str]] = []
+
+    def plan(self, provider: Any, **kwargs: Any) -> Any:
+        type(self).calls.append(provider.name)
+        return {"success": True, "has_changes": False}
+
+    def parse_plan_for_drift(self, plan_result: Any) -> Any:
+        return {"has_changes": False, "summary": "none"}
+
+
+def _direct_detector(provider: Any, name: str) -> tuple[DriftDetector, MagicMock]:
+    from infrafoundry.core.runners import (
+        MikroTikRestRunner,
+        OPNsenseDirectRunner,
+        RunnerRegistry,
+    )
+
+    registry = RunnerRegistry()
+    registry.register(OPNsenseDirectRunner)
+    registry.register(MikroTikRestRunner)
+    registry.register(_StubTerraformRunner, "terraform")
+    config_manager = MagicMock()
+    config_manager.load_environment.side_effect = FileNotFoundError
+    config_manager.get_all_resources_all_providers.return_value = [SimpleNamespace(provider=name)]
+    events = MagicMock(spec=EventManager)
+    _StubTerraformRunner.calls = []
+    return DriftDetector(config_manager, registry, events, {name: provider}), events
+
+
+@pytest.mark.unit
+class TestDirectRunnerDrift:
+    """A provider with a drift-detectable direct runner skips Terraform."""
+
+    def _mikrotik(self, tmp_path: Any, changes: tuple[str, ...]) -> Any:
+        from infrafoundry.core.runners.mikrotik_rest_runner import MikroTikRestRunner
+        from infrafoundry.providers.mikrotik import MikroTikProvider
+        from infrafoundry.providers.mikrotik.components.diff import Change, TypeDiff
+        from infrafoundry.providers.mikrotik.components.manager import MikroTikPlan
+
+        diff = TypeDiff("interface.bridge.port")
+        diff.changes = [
+            Change(k, "interface.bridge.port", ("ether2",), "p2", "*1", {}, {"pvid": 11}, ("pvid",))
+            for k in changes
+        ]
+        provider = MikroTikProvider(tmp_path, tmp_path / "generated")
+        patches = (
+            patch.object(provider, "rest_plan", return_value=MikroTikPlan({diff.type_name: diff})),
+            patch.object(MikroTikRestRunner, "_load_resources", return_value=[]),
+        )
+        mocks = [p.start() for p in patches]
+        return provider, patches, mocks[0]
+
+    def test_out_of_band_pvid_change_is_drift(self, tmp_path: Any) -> None:
+        provider, patches, rest_plan = self._mikrotik(tmp_path, ("update",))
+        detector, events = _direct_detector(provider, "mikrotik")
+        try:
+            results = detector.detect("lab")
+        finally:
+            for p in patches:
+                p.stop()
+
+        assert results["mikrotik"]["has_changes"] is True
+        assert results["mikrotik"]["to_change"] == 1
+        assert provider._current_environment == "lab"
+        assert rest_plan.call_args.kwargs["add_only"] is True
+        assert _StubTerraformRunner.calls == []
+        emitted = [c.args[0] for c in events.emit_event.call_args_list]
+        assert EventType.DRIFT_DETECTED in emitted
+
+    def test_clean_device_reports_no_drift(self, tmp_path: Any) -> None:
+        provider, patches, _ = self._mikrotik(tmp_path, ())
+        detector, events = _direct_detector(provider, "mikrotik")
+        try:
+            results = detector.detect("lab")
+        finally:
+            for p in patches:
+                p.stop()
+
+        assert results["mikrotik"]["has_changes"] is False
+        emitted = [c.args[0] for c in events.emit_event.call_args_list]
+        assert EventType.DRIFT_DETECTED not in emitted
+
+    def test_provider_without_direct_hook_uses_terraform(self) -> None:
+        provider = SimpleNamespace(name="proxmox")
+        detector, _ = _direct_detector(provider, "proxmox")
+
+        detector.detect("lab")
+
+        assert _StubTerraformRunner.calls == ["proxmox"]
+
+    def test_opnsense_keeps_terraform_path(self) -> None:
+        provider = SimpleNamespace(name="opnsense", generate_opnsense_direct=lambda r: None)
+        detector, _ = _direct_detector(provider, "opnsense")
+
+        detector.detect("lab")
+
+        assert _StubTerraformRunner.calls == ["opnsense"]
