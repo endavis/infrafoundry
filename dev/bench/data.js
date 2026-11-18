@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795007018393,
+  "lastUpdate": 1795013685093,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3462,6 +3462,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005233149452120284",
             "extra": "mean: 76.69368906221287 usec\nrounds: 13842"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "41c6f9402123ef049b042c4ac52c1a6fbaf2177c",
+          "message": "feat: add a routeros chr test blueprint with .img.zip disk import (merges PR #1487, addresses #1485)\n\nProxmox disk-image import accepts .img.zip: the validator allows it, and\nthe image phase extracts the single .img member with python3 zipfile on\nthe host (no unzip there), with sha256 checked against the archive. The\n.bz2 render is unchanged.\n\nThe routeros-chr blueprint imports MikroTik's CHR image, attaches a\nmanagement NIC and trunk NICs, and bootstraps over the serial console:\nadmin password, identity, optional static address, www service. The\nexpect script answers each password prompt once, because RouterOS\nredraws the new-password line; it runs with log_user 0 and scrubs the\npassword from its log file, and the role shows only status lines.\n\nVerified live for #1485 against RouterOS 7.25.1 CHR: apply, REST with the\nbootstrapped credentials, destroy.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T14:53:43Z",
+          "tree_id": "388bc6e65158802a9714a6f95b80f6c0361733b0",
+          "url": "https://github.com/endavis/infrafoundry/commit/41c6f9402123ef049b042c4ac52c1a6fbaf2177c"
+        },
+        "date": 1795013684402,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 63.11773917422827,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0010654511643833939",
+            "extra": "mean: 15.84340651428643 msec\nrounds: 70"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12492.360049999876,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010644556007788994",
+            "extra": "mean: 80.04892558312149 usec\nrounds: 13720"
           }
         ]
       }
