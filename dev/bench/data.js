@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795005642351,
+  "lastUpdate": 1795007018393,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3424,6 +3424,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006710229265369921",
             "extra": "mean: 93.60814882110064 usec\nrounds: 11282"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "12dcd5fca6b7b6d271d17586f344b7615f5d066b",
+          "message": "feat: add apply and destroy to the mikrotik routeros provider (merges PR #1486, addresses #1483)\n\nApply runs the plan's phased steps (filtering off, creates and member\nunions, filtering on, narrowing and updates, deletes, services) over the\nRouterOS REST write verbs and stops at the first error, naming the failed\nstep and the steps already done. Refusals are re-checked before any write.\nabsent: true and managed-set deletes follow ADR-0018, and released rows\nare reported. Destroy deletes only declared, deletable objects and is\nrefused whole when it would remove the management path. The runner gains\nmanaged-set dispatch and resource ids.\n\nUnit-tested against a fake RouterOS client for #1483; live verification\nagainst a CHR VM follows separately.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T13:02:25Z",
+          "tree_id": "c96326a8b847a59af8a92c58f7ca40650d9f8754",
+          "url": "https://github.com/endavis/infrafoundry/commit/12dcd5fca6b7b6d271d17586f344b7615f5d066b"
+        },
+        "date": 1795007017366,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 67.94914294829431,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00154500229035672",
+            "extra": "mean: 14.716889082191175 msec\nrounds: 73"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13038.882497734772,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005233149452120284",
+            "extra": "mean: 76.69368906221287 usec\nrounds: 13842"
           }
         ]
       }
