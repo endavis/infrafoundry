@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794996626646,
+  "lastUpdate": 1794997157147,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3348,6 +3348,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010382784306327701",
             "extra": "mean: 125.66562282053317 usec\nrounds: 8431"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "412384760f52b6bd8d31347f5275bbae1c5ae0d2",
+          "message": "feat: sync a rebuilt opnsense ha backup when the primary is unchanged (merges PR #1479, addresses #1474)\n\nWith ha_sync_after_apply: true and a no-op apply, compare the primary's\nCARP VIPs (vhid and subnet) with the declared ha_backup firewall. Sync\nwhen the backup is missing one, and skip with a message naming the case\notherwise. An unreadable backup skips with a warning. false and \"always\"\nare unchanged.\n\nAddresses #1474\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T10:18:13Z",
+          "tree_id": "384fe177e4475bc9907999468fe9b42057b96627",
+          "url": "https://github.com/endavis/infrafoundry/commit/412384760f52b6bd8d31347f5275bbae1c5ae0d2"
+        },
+        "date": 1794997156390,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 67.79519866936505,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0008164170795493688",
+            "extra": "mean: 14.75030709588989 msec\nrounds: 73"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12945.511497088604,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000529637788661689",
+            "extra": "mean: 77.24685117501122 usec\nrounds: 13788"
           }
         ]
       }
