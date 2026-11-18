@@ -21,6 +21,34 @@ from infrafoundry.core.exceptions import APIError
 from .. import endpoints
 from .base import BaseService
 
+VipKey = tuple[str, str]
+
+
+def _text(value: Any) -> str:
+    """Return ``value`` as a stripped string, ``""`` for ``None``."""
+    return "" if value is None else str(value).strip()
+
+
+def vip_key(row: dict[str, Any]) -> VipKey:
+    """Return the ``(vhid, subnet)`` key that identifies a CARP VIP row."""
+    return (_text(row.get("vhid")), _text(row.get("subnet")))
+
+
+def carp_vip_keys(status: dict[str, Any]) -> set[VipKey]:
+    """Return the ``(vhid, subnet)`` keys of every VIP row in a status document.
+
+    Non-dict rows and a non-list ``rows`` value are ignored.
+    """
+    rows = status.get("rows")
+    if not isinstance(rows, list):
+        return set()
+    return {vip_key(row) for row in rows if isinstance(row, dict)}
+
+
+def missing_carp_vips(primary: dict[str, Any], backup: dict[str, Any]) -> list[VipKey]:
+    """Return the primary's CARP VIP keys that are absent on the backup, sorted."""
+    return sorted(carp_vip_keys(primary) - carp_vip_keys(backup))
+
 
 class CarpStatusService(BaseService):
     """Service for the read-only CARP VIP status."""

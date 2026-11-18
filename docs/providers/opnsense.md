@@ -217,21 +217,26 @@ When the firewall is the primary of an HA pair, an apply also has to push the co
 
 | Value | Meaning |
 |-------|---------|
-| `true` (default) | Sync only when the apply created, updated or deleted something. A no-op apply restarts nothing on the backup. |
+| `true` (default) | Sync only when the apply created, updated or deleted something. A no-op apply restarts nothing on the backup, unless the node sets `ha_backup` and the backup lacks one of its CARP VIPs (see below). |
 | `"always"` | Sync even when nothing changed. |
 | `false` | Never sync. |
 
-`ha_sync_timeout` (default `300` seconds) applies to all three calls. An unreachable backup makes the preflight answer only after about 60 seconds, so the 30 second client default would hide the endpoint's message. A bad value for either key fails `infra plan` and `infra apply` before anything is written.
+`ha_sync_timeout` (default `300` seconds) applies to all three calls. An unreachable backup makes the preflight answer only after about 60 seconds, so the 30 second client default would hide the endpoint's message. With `true`, a no-op apply on a node that sets `ha_backup` (see the firewalls table below) makes one more check. It reads the CARP VIPs of this node and of the `ha_backup` firewall, using `ha_sync_timeout` for both reads, and matches them on `(vhid, subnet)`. If the backup lacks any VIP the primary has, for example because the backup was rebuilt, the apply syncs as if something had changed. A VIP only the backup has does not trigger a sync. Without `ha_backup` the check does not run, and `"always"`, `false` and an apply that changed something behave as before. A bad value for either key fails `infra plan` and `infra apply` before anything is written.
 
 The apply prints one status line, or one of these skips:
 
 - `HA sync after apply disabled (ha_sync_after_apply: false)`
 - `HA sync skipped: nothing changed`
 - `HA sync skipped: no synchronize_to_ip on this node`
+- `HA sync skipped: nothing changed, backup <name> has all N CARP VIP(s)`
+- `HA sync skipped: nothing changed, no CARP VIPs on this node to compare with backup <name>`
+- `HA sync skipped: nothing changed, could not read CARP state of ha_backup firewall '<name>': <error>`
+
+When the check finds missing VIPs, the status line reads `HA sync to backup <ip>: backup <name> missing M of N CARP VIP(s), synchronized and reconfigured K service(s)`.
 
 When the preflight or the sync fails, the apply fails with an error that names the backup address and the endpoint and quotes the endpoint's message, for example `HA sync to backup 192.0.2.2 failed at core/hasync_status/version: <message>`. A timeout or connection error names the backup, the endpoint and `ha_sync_timeout`.
 
-**State after a failure.** The primary has already been written, so the next apply sees no difference on the primary and, with the default `true`, syncs nothing. To retry the sync from InfraFoundry, apply once with `ha_sync_after_apply: "always"`, then set it back.
+**State after a failure.** The primary has already been written, so the next apply sees no difference on the primary. With the default `true`, it syncs only when the node sets `ha_backup` and the backup still lacks a CARP VIP of the primary, so a failed sync to a rebuilt backup retries on the next apply. Without `ha_backup`, or when the backup already has every VIP, apply once with `ha_sync_after_apply: "always"` to retry, then set it back.
 
 !!! warning "Errors while pushing the config are not reported"
     OPNsense's `exec_sync` always answers `{"status": "done"}`, so a failure while pushing the config to the backup is not visible to InfraFoundry. A successful apply means the endpoints answered `ok`, not that the backup holds the config. Check the backup after the first sync.
@@ -250,7 +255,7 @@ provider_settings:
         api_url: https://fw-a.example.com
         api_key: secret://env_secrets/opnsense/fw_a_key
         api_secret: secret://env_secrets/opnsense/fw_a_secret
-        ha_backup: fw-b         # compare CARP state with fw-b in `infra doctor`
+        ha_backup: fw-b         # compare CARP state with fw-b in `infra doctor`; also re-sync it when it lacks a CARP VIP
       fw-b:
         api_url: https://fw-b.example.com
         api_key: secret://env_secrets/opnsense/fw_b_key
@@ -260,7 +265,7 @@ provider_settings:
 
 | Key | Meaning |
 |-----|---------|
-| `firewalls` | Map of firewall name to its settings: `api_url`, `api_key`, `api_secret`, `ssh_*`, `verify_ssl`, `proxy`, `ha_sync_after_apply`, `ha_sync_timeout` and `ha_backup` |
+| `firewalls` | Map of firewall name to its settings: `api_url`, `api_key`, `api_secret`, `ssh_*`, `verify_ssl`, `proxy`, `ha_sync_after_apply`, `ha_sync_timeout` and `ha_backup` (the firewall whose CARP state `infra doctor` compares, and whose missing CARP VIPs trigger an HA sync after a no-op apply) |
 | `primary` | Name of the primary firewall. Required with more than one entry |
 | `ha_backup` | On an entry: the firewall that is its HA backup. Enables the CARP pair check in `infra doctor` |
 

@@ -11,7 +11,9 @@ Settings (provider settings in ``settings.yaml``):
 
 - ``ha_sync_after_apply``: ``true`` (default) syncs only when the apply changed
   something; ``"always"`` syncs even when nothing changed (the recovery path after a
-  failed sync); ``false`` turns the sync off.
+  failed sync); ``false`` turns the sync off. With ``true`` and a no-op apply, a node
+  with ``ha_backup`` set still syncs when the backup lacks one of its CARP VIPs
+  (a rebuilt backup, #1474).
 - ``ha_sync_timeout``: seconds per request, a positive int, default ``300``.
 
 What the evidence says (probed on a single test node; wording generic):
@@ -37,10 +39,12 @@ from typing import Any, Literal
 import httpx
 
 from infrafoundry.core.exceptions import APIError, InvalidConfigurationError
+from infrafoundry.core.provider_instances import qualified_provider_id
 
 from .. import endpoints
-from ..firewalls import firewall_settings
+from ..firewalls import firewall_settings, ha_backup_name
 from .base import BaseService
+from .carp_status import CarpStatusService, carp_vip_keys, missing_carp_vips
 from .hasync_settings import HasyncSettingsService
 from .openvpn_instances import flatten_option
 
@@ -208,14 +212,16 @@ def run_ha_sync_after_apply(
     """
     from infrafoundry.core.config import ConfigManager
 
-    settings = firewall_settings(
-        ConfigManager(config_dir).load_environment(env_name), provider_name
-    )
+    env_config = ConfigManager(config_dir).load_environment(env_name)
+    settings = firewall_settings(env_config, provider_name)
     options = resolve_ha_sync_options(settings)
     if options.mode == "off":
         return "HA sync after apply disabled (ha_sync_after_apply: false)"
+    check_backup: str | None = None
     if options.mode == "changed" and not changed:
-        return "HA sync skipped: nothing changed"
+        check_backup = ha_backup_name(env_config, provider_name)
+        if check_backup is None:
+            return "HA sync skipped: nothing changed"
 
     client = BaseService.client_from_environment(
         env_name, provider_name, config_dir, timeout=options.timeout
@@ -226,8 +232,45 @@ def run_ha_sync_after_apply(
     if not backup:
         return "HA sync skipped: no synchronize_to_ip on this node"
 
+    missing_note = ""
+    if check_backup is not None:
+        primary_status = CarpStatusService(client).vip_status()
+        primary_keys = carp_vip_keys(primary_status)
+        if not primary_keys:
+            return (
+                "HA sync skipped: nothing changed, no CARP VIPs on this node to compare "
+                f"with backup {check_backup}"
+            )
+        try:
+            backup_client = BaseService.client_from_environment(
+                env_name,
+                qualified_provider_id("opnsense", check_backup),
+                config_dir,
+                timeout=options.timeout,
+            )
+            backup_status = CarpStatusService(backup_client).vip_status()
+        except (APIError, httpx.HTTPError, ValueError, KeyError) as exc:
+            logger.warning(
+                "HA sync check could not read CARP state of ha_backup firewall %r: %s",
+                check_backup,
+                exc,
+            )
+            return (
+                "HA sync skipped: nothing changed, could not read CARP state of "
+                f"ha_backup firewall '{check_backup}': {exc}"
+            )
+        missing = missing_carp_vips(primary_status, backup_status)
+        if not missing:
+            return (
+                f"HA sync skipped: nothing changed, backup {check_backup} has all "
+                f"{len(primary_keys)} CARP VIP(s)"
+            )
+        missing_note = (
+            f" backup {check_backup} missing {len(missing)} of {len(primary_keys)} CARP VIP(s),"
+        )
+
     service = HasyncStatusService(client, options.timeout)
     service.version(backup)
     count = service.restart_all(backup)
     suffix = "" if count is None else f" {count} service(s)"
-    return f"HA sync to backup {backup}: synchronized and reconfigured{suffix}"
+    return f"HA sync to backup {backup}:{missing_note} synchronized and reconfigured{suffix}"
