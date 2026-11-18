@@ -1,7 +1,7 @@
 """Unit tests for DriftDetector."""
 
 from types import SimpleNamespace
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -368,7 +368,7 @@ class TestDirectRunnerDrift:
         assert EventType.DRIFT_DETECTED not in emitted
 
     def test_provider_without_direct_hook_uses_terraform(self) -> None:
-        provider = SimpleNamespace(name="proxmox")
+        provider = SimpleNamespace(name="proxmox", set_environment=lambda env: None)
         detector, _ = _direct_detector(provider, "proxmox")
 
         detector.detect("lab")
@@ -376,9 +376,126 @@ class TestDirectRunnerDrift:
         assert _StubTerraformRunner.calls == ["proxmox"]
 
     def test_opnsense_keeps_terraform_path(self) -> None:
-        provider = SimpleNamespace(name="opnsense", generate_opnsense_direct=lambda r: None)
+        provider = SimpleNamespace(
+            name="opnsense",
+            generate_opnsense_direct=lambda r: None,
+            set_environment=lambda env: None,
+        )
         detector, _ = _direct_detector(provider, "opnsense")
 
         detector.detect("lab")
 
         assert _StubTerraformRunner.calls == ["opnsense"]
+
+
+class _EnvProvider:
+    """Provider stand-in that scopes ``terraform_dir`` like ``ProviderBase``."""
+
+    def __init__(self, name: str, base: Any, generate: bool = True) -> None:
+        self.name = name
+        self.base = base
+        self.generate = generate
+        self.terraform_dir = base / "terraform" / name
+        self.env_calls: list[str] = []
+
+    def set_environment(self, env_name: str) -> None:
+        self.env_calls.append(env_name)
+        self.terraform_dir = self.base / env_name / "terraform" / self.name
+        if self.generate:
+            self.terraform_dir.mkdir(parents=True, exist_ok=True)
+
+
+class _DirRecordingRunner(_StubTerraformRunner):
+    """Terraform stub that records the directory each plan sees and can fail."""
+
+    dirs: ClassVar[list[Any]] = []
+    fail_for: ClassVar[set[str]] = set()
+
+    def plan(self, provider: Any, **kwargs: Any) -> Any:
+        type(self).dirs.append(provider.terraform_dir)
+        if provider.name in type(self).fail_for:
+            raise RuntimeError(f"plan blew up for {provider.name}")
+        return super().plan(provider, **kwargs)
+
+
+def _multi_detector(providers: dict[str, Any]) -> tuple[DriftDetector, MagicMock]:
+    from infrafoundry.core.runners import RunnerRegistry
+
+    registry = RunnerRegistry()
+    registry.register(_DirRecordingRunner, "terraform")
+    config_manager = MagicMock()
+    config_manager.load_environment.side_effect = FileNotFoundError
+    config_manager.get_all_resources_all_providers.return_value = [
+        SimpleNamespace(provider=n) for n in providers
+    ]
+    events = MagicMock(spec=EventManager)
+    _StubTerraformRunner.calls = []
+    _DirRecordingRunner.dirs = []
+    _DirRecordingRunner.fail_for = set()
+    return DriftDetector(config_manager, registry, events, providers), events
+
+
+@pytest.mark.unit
+class TestDriftDetectorPerProvider:
+    """The Terraform path scopes the provider to the env; a failure stays per provider (#1488)."""
+
+    def test_set_environment_runs_before_plan(self, tmp_path: Any) -> None:
+        provider = _EnvProvider("proxmox", tmp_path)
+        detector, _ = _multi_detector({"proxmox": provider})
+
+        results = detector.detect("lab")
+
+        assert provider.env_calls == ["lab"]
+        assert _DirRecordingRunner.dirs == [tmp_path / "lab" / "terraform" / "proxmox"]
+        assert results["proxmox"]["has_changes"] is False
+
+    def test_failing_provider_does_not_stop_later_providers(self, tmp_path: Any) -> None:
+        bad = _EnvProvider("proxmox", tmp_path)
+        good = _EnvProvider("other", tmp_path)
+        detector, events = _multi_detector({"proxmox": bad, "other": good})
+        _DirRecordingRunner.fail_for = {"proxmox"}
+
+        results = detector.detect("lab")
+
+        assert results["proxmox"]["has_changes"] is False
+        assert results["proxmox"]["parsed"] is False
+        assert "plan blew up for proxmox" in results["proxmox"]["summary"]
+        assert "other" in results
+        assert _StubTerraformRunner.calls == ["other"]
+        emitted = [c.args[0] for c in events.emit_event.call_args_list]
+        assert emitted[-1] == EventType.DRIFT_CHECK_COMPLETED
+
+    def test_failure_then_direct_runner_provider_still_checked(self, tmp_path: Any) -> None:
+        from infrafoundry.core.runners import MikroTikRestRunner, RunnerRegistry
+        from infrafoundry.core.runners.mikrotik_rest_runner import MikroTikRestRunner as Rest
+        from infrafoundry.providers.mikrotik import MikroTikProvider
+        from infrafoundry.providers.mikrotik.components.diff import TypeDiff
+        from infrafoundry.providers.mikrotik.components.manager import MikroTikPlan
+
+        bad = _EnvProvider("proxmox", tmp_path)
+        mikrotik = MikroTikProvider(tmp_path, tmp_path / "generated")
+        registry = RunnerRegistry()
+        registry.register(MikroTikRestRunner)
+        registry.register(_DirRecordingRunner, "terraform")
+        config_manager = MagicMock()
+        config_manager.load_environment.side_effect = FileNotFoundError
+        config_manager.get_all_resources_all_providers.return_value = [
+            SimpleNamespace(provider="proxmox"),
+            SimpleNamespace(provider="mikrotik"),
+        ]
+        detector = DriftDetector(
+            config_manager,
+            registry,
+            MagicMock(spec=EventManager),
+            cast(Any, {"proxmox": bad, "mikrotik": mikrotik}),
+        )
+        _DirRecordingRunner.fail_for = {"proxmox"}
+        with (
+            patch.object(mikrotik, "rest_plan", return_value=MikroTikPlan({"x": TypeDiff("x")})),
+            patch.object(Rest, "_load_resources", return_value=[]),
+        ):
+            results = detector.detect("lab")
+
+        assert results["proxmox"]["parsed"] is False
+        assert results["mikrotik"]["has_changes"] is False
+        assert "parsed" not in results["mikrotik"]
