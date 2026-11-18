@@ -1,0 +1,32 @@
+---
+# RouterOS CHR VM — Bootstrap Playbook
+#
+# Runs on the Proxmox host that holds the VM: boots it, then configures it
+# over the serial console so the mikrotik provider can reach its REST API.
+#
+# All variables are read from INFRAFOUNDRY_VAR_* environment variables
+# set by the InfraFoundry framework.
+
+- name: Bootstrap RouterOS CHR over the serial console
+  hosts: proxmox_host
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Install serial console dependencies
+      ansible.builtin.apt:
+        name:
+          - expect
+          - socat
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+  roles:
+    - role: routeros-bootstrap
+      vars:
+        routeros_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_vmid') }}"
+        routeros_hostname: "{{ lookup('env', 'INFRAFOUNDRY_VAR_vm_name') }}"
+        routeros_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_ip') | default('', true) }}"
+        routeros_mgmt_prefix: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_prefix') | default('24', true) }}"
+        routeros_mgmt_gateway: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_gateway') | default('', true) }}"
+        routeros_boot_timeout: "{{ lookup('env', 'INFRAFOUNDRY_VAR_boot_timeout') | default('300', true) }}"
+        routeros_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_routeros_admin_password') }}"

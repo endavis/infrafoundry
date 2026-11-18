@@ -320,7 +320,16 @@ class TestDiskImageValidation:
 
     URL = "https://pkg.opnsense.org/releases/26.1/OPNsense-26.1.6-nano-amd64.img.bz2"
 
-    @pytest.mark.parametrize("source", [URL, "/mnt/pve/nfs1/fw.img", "http://mirror/x.img"])
+    @pytest.mark.parametrize(
+        "source",
+        [
+            URL,
+            "/mnt/pve/nfs1/fw.img",
+            "http://mirror/x.img",
+            "https://download.mikrotik.com/routeros/7.25.1/chr-7.25.1.img.zip",
+            "/mnt/pve/nfs1/chr.img.zip",
+        ],
+    )
     def test_valid_sources_pass(
         self, validator: VMConfigValidator, report: MagicMock, source: str
     ) -> None:
@@ -333,7 +342,13 @@ class TestDiskImageValidation:
         ("config", "check", "fragment"),
         [
             ({"disk_image_source": "fw.img"}, "disk_image_source", "absolute path"),
-            ({"disk_image_source": "/x/fw.iso"}, "disk_image_source", ".img or .img.bz2"),
+            ({"disk_image_source": "/x/fw.iso"}, "disk_image_source", ".img.zip"),
+            ({"disk_image_source": "/x/chr.zip"}, "disk_image_source", ".img.zip"),
+            (
+                {"disk_image_source": "https://example.com/chr.img.tar"},
+                "disk_image_source",
+                ".img.zip",
+            ),
             (
                 {"disk_image_source": URL, "ova_source": "/x/a.ova"},
                 "disk_image_source",

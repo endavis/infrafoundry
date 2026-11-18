@@ -1,0 +1,131 @@
+#!/usr/bin/expect -f
+# RouterOS CHR Bootstrap — Expect Script
+#
+# Logs in on the serial console as admin (empty password), sets the admin
+# password from $env(ROUTEROS_ADMIN_PASSWORD), the identity, an optional
+# static address and enables the www (REST) service.
+#
+# Secrets: console output never reaches stdout (log_user 0), so the Ansible
+# task output carries only this script's own puts lines. The diagnostic log
+# file is scrubbed of the password before every exit. Each password prompt is
+# answered at most once: RouterOS redraws the "new password>" line, and a
+# second match would type the password at the shell prompt, where it echoes.
+
+set timestamp [clock format [clock seconds] -format "%Y%m%d-%H%M%S"]
+set logpath /tmp/routeros-bootstrap-{{ routeros_vmid }}-${timestamp}.log
+log_user 0
+log_file -noappend $logpath
+set timeout {{ routeros_boot_timeout }}
+# The console prompt ends in "> " (with +ct it is drawn after a cursor move,
+# so the "[admin@identity]" part is not reliably in the stream).
+set prompt {> $}
+
+if {![info exists env(ROUTEROS_ADMIN_PASSWORD)]} {
+  puts "ERROR: ROUTEROS_ADMIN_PASSWORD is not set"
+  exit 1
+}
+
+# Remove the password from the log file, then exit with the given code.
+proc finish {code} {
+  global logpath env
+  log_file
+  if {[file exists $logpath]} {
+    set fh [open $logpath r]
+    set data [read $fh]
+    close $fh
+    set fh [open $logpath w]
+    puts -nonewline $fh [string map [list $env(ROUTEROS_ADMIN_PASSWORD) "<redacted>"] $data]
+    close $fh
+  }
+  exit $code
+}
+
+proc fail {msg} {
+  puts "ERROR: $msg"
+  finish 1
+}
+
+spawn socat STDIO,rawer UNIX-CONNECT:/var/run/qemu-server/{{ routeros_vmid }}.serial0
+
+# The "+ct" login suffix turns off colours and terminal auto-detection.
+expect {
+  "Login:" { send "admin+ct\r" }
+  timeout { fail "Timed out waiting for the login prompt" }
+}
+
+set timeout 60
+expect {
+  "assword:" { send "\r" }
+  timeout { fail "Timed out waiting for the password prompt" }
+}
+
+# Licence prompt, then the forced password change. Each password prompt is
+# answered once; redraws of the same prompt are consumed without sending.
+set sent_new 0
+set sent_repeat 0
+expect {
+  -re "(?i)software license" { send "n\r"; exp_continue }
+  -re "(?i)(login failed|incorrect)" {
+    fail "Default login rejected (box already bootstrapped?)"
+  }
+  "repeat new password>" {
+    if {!$sent_repeat} {
+      send -- "$env(ROUTEROS_ADMIN_PASSWORD)\r"
+      set sent_repeat 1
+    }
+    exp_continue
+  }
+  "new password>" {
+    if {!$sent_new} {
+      send -- "$env(ROUTEROS_ADMIN_PASSWORD)\r"
+      set sent_new 1
+    }
+    exp_continue
+  }
+  "Password changed" {}
+  -re "(?i)(do not match|mismatch)" { fail "RouterOS rejected the new password" }
+  timeout { fail "Timed out waiting for the password change" }
+}
+
+expect {
+  -re $prompt {}
+  timeout { fail "Timed out waiting for the console prompt" }
+}
+
+proc run {cmd} {
+  global prompt
+  send "$cmd\r"
+  expect {
+    -re "(failure:|syntax error|expected end of command|bad command name)" {
+      fail "command failed: $cmd"
+    }
+    -re $prompt {}
+    timeout { fail "Timed out running: $cmd" }
+  }
+}
+
+run "/system identity set name=\"{{ routeros_hostname }}\""
+{% if routeros_mgmt_ip %}
+run "/ip dhcp-client remove \[find interface={{ routeros_mgmt_if }}\]"
+run "/ip address add address={{ routeros_mgmt_ip }}/{{ routeros_mgmt_prefix }} interface={{ routeros_mgmt_if }}"
+{% if routeros_mgmt_gateway %}
+run "/ip route add dst-address=0.0.0.0/0 gateway={{ routeros_mgmt_gateway }}"
+{% endif %}
+{% endif %}
+run "/ip service set www disabled=no"
+
+# The marker is split so the echoed command does not match the pattern below.
+send ":put (\"BOOTSTRAP\" . \" OK\")\r"
+expect {
+  "BOOTSTRAP OK" {}
+  timeout { fail "Timed out waiting for the bootstrap marker" }
+}
+expect -re $prompt
+
+send "/quit\r"
+expect {
+  eof {}
+  timeout {}
+}
+puts "Bootstrap applied"
+finish 0

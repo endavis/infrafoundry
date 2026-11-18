@@ -1,0 +1,21 @@
+# Disposable RouterOS CHR test router — example consumer of the routeros-chr blueprint.
+#
+# All deployment logic (VM definition, image import, serial-console bootstrap)
+# lives in blueprints/routeros-chr/. This file only supplies the per-instance
+# values. See blueprints/routeros-chr/README.md for the full variable reference.
+#
+# Run: foundry infra apply --env dev --package chr-test
+
+name: chr-test
+description: "Disposable RouterOS CHR test router (example)"
+blueprint: routeros-chr
+
+variables:
+  vm_name: chr-test
+  vmid: 951
+  target_node: pve-node1
+  pve_host: "192.0.2.13"
+
+  # A static management address lets the post-create step probe the REST API
+  mgmt_ip: "192.0.2.241"
+  mgmt_gateway: "192.0.2.1"
