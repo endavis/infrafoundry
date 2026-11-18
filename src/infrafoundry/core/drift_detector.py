@@ -113,54 +113,32 @@ class DriftDetector(BaseManager):
 
                 self._log_info(f"Checking {provider_name}...")
 
-                direct_runner = self._direct_drift_runner(provider)
-                if direct_runner is not None:
-                    drift_info = self._detect_direct(direct_runner, provider, env_name)
-                    if drift_info["has_changes"]:
-                        drift_detected = True
-                        self._log_warning(f"Drift detected: {drift_info['summary']}")
-                        self.event_manager.emit_event(
-                            EventType.DRIFT_DETECTED,
-                            env_name,
-                            {"provider": provider_name, "changes": drift_info},
-                        )
-                    else:
-                        self._log_info(f"No drift detected for {provider_name}")
-                    results[provider_name] = drift_info
-                    continue
-
-                # Check if runner supports plan and drift detection
-                if not isinstance(terraform_runner, Plannable):
-                    self._log_warning(
-                        f"Runner {terraform_runner.tool_name} does not support plan operation"
+                try:
+                    drift_info = self._detect_provider(
+                        terraform_runner, provider, provider_name, env_name
+                    )
+                except Exception as e:  # one provider must not abort the others
+                    self._log_warning(f"Could not check drift for {provider_name}: {e}")
+                    results[provider_name] = DriftInfo(
+                        has_changes=False,
+                        to_add=0,
+                        to_change=0,
+                        to_destroy=0,
+                        summary=f"Drift check failed: {e}",
+                        raw_output="",
+                        parsed=False,
                     )
                     continue
-
-                if not isinstance(terraform_runner, DriftDetectable):
-                    self._log_warning(
-                        f"Runner {terraform_runner.tool_name} does not support drift detection"
-                    )
+                if drift_info is None:
                     continue
-
-                # Run terraform plan to detect drift
-                # This will compare current state with declared config
-                plan_result = terraform_runner.plan(provider)
-
-                # Parse the plan output to detect changes
-                drift_info = terraform_runner.parse_plan_for_drift(plan_result)
 
                 if drift_info["has_changes"]:
                     drift_detected = True
                     self._log_warning(f"Drift detected: {drift_info['summary']}")
-
-                    # Emit drift detected event
                     self.event_manager.emit_event(
                         EventType.DRIFT_DETECTED,
                         env_name,
-                        {
-                            "provider": provider_name,
-                            "changes": drift_info,
-                        },
+                        {"provider": provider_name, "changes": drift_info},
                     )
                 elif drift_info.get("parsed") is False:
                     self._log_warning(
@@ -195,6 +173,44 @@ class DriftDetector(BaseManager):
             raise
 
         return results
+
+    def _detect_provider(
+        self,
+        terraform_runner: BaseRunner,
+        provider: ProviderBase,
+        provider_name: str,
+        env_name: str,
+    ) -> DriftInfo | None:
+        """Detect drift for one provider.
+
+        Returns:
+            The drift info, or ``None`` when the runner cannot detect drift.
+
+        Raises:
+            Exception: Any failure of the plan or its parsing; ``detect`` records it
+                as this provider's result and carries on with the others.
+        """
+        direct_runner = self._direct_drift_runner(provider)
+        if direct_runner is not None:
+            return self._detect_direct(direct_runner, provider, env_name)
+
+        if not isinstance(terraform_runner, Plannable):
+            self._log_warning(
+                f"Runner {terraform_runner.tool_name} does not support plan operation"
+            )
+            return None
+        if not isinstance(terraform_runner, DriftDetectable):
+            self._log_warning(
+                f"Runner {terraform_runner.tool_name} does not support drift detection"
+            )
+            return None
+
+        # Point the provider at the environment's generated directory first, as
+        # every other caller does; otherwise terraform_dir is env-less (#1488).
+        provider.set_environment(env_name)
+        # Compare current state with declared config
+        plan_result = terraform_runner.plan(provider)
+        return terraform_runner.parse_plan_for_drift(plan_result)
 
     def _direct_drift_runner(self, provider: ProviderBase) -> BaseRunner | None:
         """Return a direct-API runner that can detect drift for ``provider``.
