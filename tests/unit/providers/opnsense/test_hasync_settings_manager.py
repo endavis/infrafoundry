@@ -176,3 +176,91 @@ def test_deletes_only_phase_does_nothing(tmp_path: Path) -> None:
         )
     assert result["resource_outcomes"] == []
     service.client.request.assert_not_called()  # type: ignore[attr-defined]
+
+
+RESET_FIELDS = {
+    "synchronizetoip": "",
+    "username": "",
+    "password": "",
+    "pfsyncpeerip": "",
+    "pfsyncinterface": "",
+    "pfsyncversion": "1400",
+    "syncitems": "",
+}
+
+
+def _configured_live(password: str = OTHER) -> dict[str, Any]:
+    return _live(
+        password,
+        username="fw-test-sync",
+        pfsyncpeerip="192.0.2.2",
+        synchronizetoip="192.0.2.2",
+        pfsyncinterface={"": {"selected": 0}, "lan": {"selected": 1}},
+        pfsyncversion={"1301": {"selected": 1}, "1400": {"selected": 0}},
+        syncitems={"aliases": {"selected": 1}, "rules": {"selected": 0}},
+    )
+
+
+def test_reset_plans_update_with_redacted_password(tmp_path: Path) -> None:
+    diff, _ = _run("plan", tmp_path, {"reset": True}, _configured_live())
+    assert diff.updates is not None
+    assert diff.updates[0]["password"] == REDACTED
+    assert OTHER not in repr(diff)
+    assert not diff.warnings
+
+
+def test_reset_apply_writes_one_set_with_empty_fields(tmp_path: Path) -> None:
+    result, service = _run("apply", tmp_path, {"reset": True}, _configured_live())
+    service.set_settings.assert_called_once()  # type: ignore[attr-defined]
+    written = _written(service)
+    for wire, value in RESET_FIELDS.items():
+        assert written[wire] == value
+    assert written["disablepreempt"] == "0"
+    assert result["resources_updated"] == 1
+    service.reconfigure.assert_not_called()  # type: ignore[attr-defined]
+    assert OTHER not in repr(service.set_settings.call_args)  # type: ignore[attr-defined]
+
+
+def test_reset_noop_when_live_at_defaults(tmp_path: Path) -> None:
+    diff, _ = _run("plan", tmp_path, {"reset": True}, _live(""))
+    assert diff.is_empty
+    assert not diff.warnings
+    result, service = _run("apply", tmp_path, {"reset": True}, _live(""))
+    service.set_settings.assert_not_called()  # type: ignore[attr-defined]
+    assert result["resource_outcomes"] == []
+
+
+@pytest.mark.parametrize("password", [OTHER, "*****"])
+def test_reset_updates_when_only_password_is_set(tmp_path: Path, password: str) -> None:
+    diff, _ = _run("plan", tmp_path, {"reset": True}, _live(password))
+    assert diff.updates == [
+        {
+            "synchronize_to_ip": "",
+            "username": "",
+            "password": REDACTED,
+            "pfsync_peer_ip": "",
+            "pfsync_interface": "",
+            "pfsync_version": "1400",
+            "sync_items": "",
+        }
+    ]
+    _, service = _run("apply", tmp_path, {"reset": True}, _live(password))
+    assert _written(service)["password"] == ""
+
+
+def test_reset_false_behaves_as_absent(tmp_path: Path) -> None:
+    diff, _ = _run("plan", tmp_path, {"reset": False, "username": ""}, _live())
+    assert diff.is_empty
+
+
+def test_reset_secret_not_in_logs_or_exceptions(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.DEBUG):
+        _run("apply", tmp_path, {"reset": True}, _configured_live())
+        _run("plan", tmp_path, {"reset": True}, _configured_live())
+    assert OTHER not in caplog.text
+    with pytest.raises(InvalidConfigurationError) as exc:
+        _run("apply", tmp_path, {"reset": True, "password": URI}, _configured_live())
+    assert FAKE not in str(exc.value)
+    assert OTHER not in str(exc.value)

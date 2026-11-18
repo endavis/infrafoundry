@@ -75,6 +75,8 @@ class HasyncValidator(SpecializedValidator[OPNsenseValidationContext]):
         for key in sorted(STRING_FIELDS):
             if key in config and not isinstance(config[key], str):
                 self._error(f"{check}_{key}", f"hasync.settings {key} must be a string")
+        if self._validate_reset(check, config):
+            return
         self._validate_ip(check, config, "pfsync_peer_ip", v4_only=True)
         self._validate_ip(check, config, "synchronize_to_ip", v4_only=False)
         self._validate_version(check, config)
@@ -88,6 +90,22 @@ class HasyncValidator(SpecializedValidator[OPNsenseValidationContext]):
                 message=f"pfsync_interface '{interface}' resolved to a managed assignment",
                 level=ValidationLevel.INFO,
             )
+
+    def _validate_reset(self, check: str, config: dict[str, object]) -> bool:
+        """Check ``reset``; return True when it is ``true`` (the other checks are moot)."""
+        if "reset" not in config:
+            return False
+        value = config["reset"]
+        name = f"{check}_reset"
+        if not isinstance(value, bool):
+            self._error(name, "hasync.settings reset must be a boolean")
+            return False
+        if not value:
+            return False
+        others = sorted(str(k) for k in config if k != "reset")
+        if others:
+            self._error(name, f"hasync.settings reset cannot be combined with: {', '.join(others)}")
+        return True
 
     def _validate_ip(
         self, check: str, config: dict[str, object], key: str, *, v4_only: bool

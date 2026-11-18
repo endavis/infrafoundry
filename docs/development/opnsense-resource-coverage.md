@@ -980,12 +980,15 @@ Configure the pair on the primary only. Leave `this_server_name` empty so each n
 | `password` | `password` | `secret://` URI |
 | `sync_items` | `syncitems` | list of strings, compared as a set |
 | `update_password` | not a wire field | bool |
+| `reset` | not a wire field | bool; `true` switches HA sync off |
 
-**Password.** Use a `secret://env_secrets/...` URI; a plaintext value is a validator WARNING. A readable live password is compared and written on a difference. When the box returns it empty or masked it cannot be compared, so it never counts as drift: the resolved password is still sent when another declared field is written in the same apply, or when `update_password: true` is set. A plan warns when the password is unreadable, no flag is set and nothing else changes. The password is never logged, shown in a plan (`[REDACTED]`) or echoed back, and an empty `password` is rejected, so a stored password can be replaced but not cleared.
+**Password.** Use a `secret://env_secrets/...` URI; a plaintext value is a validator WARNING. A readable live password is compared and written on a difference. When the box returns it empty or masked it cannot be compared, so it never counts as drift: the resolved password is still sent when another declared field is written in the same apply, or when `update_password: true` is set. A plan warns when the password is unreadable, no flag is set and nothing else changes. The password is never logged, shown in a plan (`[REDACTED]`) or echoed back, and an empty `password` is rejected. A stored password is cleared only through `reset: true`.
 
 **Validation.** On plan: unknown keys, types, IP formats, the `pfsync_version` enum, the `sync_items` shape and `update_password` without `password`. In `infra doctor`: `pfsync_interface` must be a managed interface assignment or an interface the box offers, and each `sync_items` entry must be one the box offers. The manager also refuses an unknown value before any write.
 
-**Order and disabling.** It depends on `interfaces.assignments` and is applied after the CARP virtual IPs. Destroy is a no-op. To turn sync off, declare `sync_items: []`, `synchronize_to_ip: ""` and `pfsync_interface: ""`.
+**Order and disabling.** It depends on `interfaces.assignments` and is applied after the CARP virtual IPs. Destroy is a no-op, and removing the `hasync.settings` block does not switch sync off. To turn sync off, declare `reset: true` (see below); `reset: false` is the same as leaving the key out.
+
+**Reset (#1460).** `reset: true` writes HA sync off in one `set`: `synchronize_to_ip`, `username`, `password`, `pfsync_peer_ip`, `pfsync_interface` and `sync_items` become `""` and `pfsync_version` becomes `"1400"` (the default). The booleans (`disable_preempt`, `disconnect_ppps`, `pfsync_defer`, `verify_peer`) are not touched. `reset` must be a boolean and cannot be combined with any other key, `password` and `update_password` included; both the validator and the manager reject it, naming keys only. A node already at these values plans clean. The live password counts as set when it has any text, masked text included, and the plan shows it only as `[REDACTED]`. The `hasync_reconfigure` hook still runs once after the apply.
 
 **CARP pair.** Configure the primary only. Nothing is pushed to the backup until the XMLRPC sync runs; the provider triggers it after an apply (see below).
 
@@ -1005,6 +1008,15 @@ opnsense:
       username: fw-test-sync
       password: secret://env_secrets/opnsense/hasync/password
       sync_items: [aliases, rules, virtualip]
+```
+
+To switch HA sync off on a node, declare only `reset: true`:
+
+```yaml
+opnsense:
+  hasync:
+    settings:
+      reset: true
 ```
 
 **Verified and not verified.**
