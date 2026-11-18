@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795015819142,
+  "lastUpdate": 1795017619569,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3576,6 +3576,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008443040605072993",
             "extra": "mean: 126.15865468230655 usec\nrounds: 8372"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f1f9a52930972418fdff489f85b330ff1fe6ecb5",
+          "message": "feat: back up unmanaged network device configs with read-only collectors (merges PR #1492, addresses #1481)\n\nAdd `foundry infra collect --env <env> [-d <device>]`. It reads the\nconfiguration of devices InfraFoundry does not manage and writes it to the\nconfig repo. It never writes to a device.\n\n- Collectors:\n  - huawei-ont-web: one login attempt per run, never retried, always logs out.\n  - routeros-rest: /export terse, reusing the MikroTik client.\n  - openwrt-ssh: uci export with keys redacted, ip addr/route, system facts;\n    key auth with strict host-key checking.\n- Config: a `collectors:` section in envs/<env>/settings.yaml, with\n  secret://env_secrets/... credential references resolved per device.\n- Output: device-configs/<env>/<device>/. Secret-bearing exports are\n  SOPS-encrypted whole-file (binary); plaintext exists only in a temp dir\n  that is always removed. A missing .sops.yaml creation rule gives a clear\n  error.\n- Change detection: compares plaintext hashes, decrypting the previous\n  file in memory, so unchanged files are not rewritten. Volatile content is\n  masked for the comparison: the RouterOS export timestamp, ip addr\n  lifetimes, and the ONT's re-salted $2...$ secrets and host-table runtime\n  attributes.\n- One device's failure does not stop the others.\n- ADR-0027, a guide, the CLI reference and AGENTS.md describe the feature.\n\nAddresses #1481.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T15:59:21Z",
+          "tree_id": "a94707f4c7235e3104c32af815b9036376e1a479",
+          "url": "https://github.com/endavis/infrafoundry/commit/f1f9a52930972418fdff489f85b330ff1fe6ecb5"
+        },
+        "date": 1795017619035,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 98.01780297355688,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00044686782441929053",
+            "extra": "mean: 10.20222826530583 msec\nrounds: 98"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16415.362321389497,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005681747341418997",
+            "extra": "mean: 60.91854571476519 usec\nrounds: 18167"
           }
         ]
       }
