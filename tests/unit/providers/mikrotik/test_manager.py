@@ -95,7 +95,10 @@ def test_unresolvable_host_refuses_structural_plan_only(
     structural = manager.plan("test", [resource("interface.bridge", "bridge", comment="x")])
     service_only = manager.plan("test", [resource("ip.service", "www", disabled=False)])
 
-    assert structural.refusals and "sw-wan.example.com" in structural.refusals[0]
+    assert structural.refusals == [
+        "cannot resolve the management host 'sw-wan.example.com', "
+        "so the plan cannot prove it keeps the management connection"
+    ]
     assert service_only.refusals == [] and service_only.has_changes
 
 
