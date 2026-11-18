@@ -384,6 +384,7 @@ do_not_mutate = ["src/infrafoundry/core/protocols.py"]
 # missing from this list.
 pytest_add_cli_args_test_selection = [
     "tests/unit/cli/",
+    "tests/unit/collectors/",
     "tests/unit/core/",
     "tests/unit/providers/",
     "tests/unit/secrets/",
@@ -391,6 +392,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_aiqum_initial_setup.py",
     "tests/unit/test_backend_config.py",
     "tests/unit/test_blueprint_base_tags.py",
+    "tests/unit/test_cli_infra_collect.py",
     "tests/unit/test_blueprint_extra_freeform_tags.py",
     "tests/unit/test_blueprint_extra_tags.py",
     "tests/unit/test_blueprint_jumphost_env.py",

@@ -3,7 +3,7 @@
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from infrafoundry.core.config.backend_config import BackendConfig
 from infrafoundry.core.hooks.models import HooksConfig
@@ -57,6 +57,36 @@ class SSHConfig(BaseModel):
     port: int = 22
 
 
+class CollectorDeviceConfig(BaseModel):
+    """One unmanaged device whose configuration is collected read-only."""
+
+    name: str = Field(pattern=r"^[a-z0-9][a-z0-9-]*$")
+    type: str
+    address: str
+    username: str | None = None
+    password: str | None = None
+    port: int | None = None
+    ssh_key_file: str | None = None
+    verify_ssl: bool = True
+    timeout: int = Field(default=30, ge=1)
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class CollectorsConfig(BaseModel):
+    """The ``collectors:`` section of ``settings.yaml``."""
+
+    output_dir: str | None = None
+    devices: list[CollectorDeviceConfig] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _unique_names(self) -> "CollectorsConfig":
+        names = [d.name for d in self.devices]
+        dupes = sorted({n for n in names if names.count(n) > 1})
+        if dupes:
+            raise ValueError(f"duplicate collector device name(s): {', '.join(dupes)}")
+        return self
+
+
 class NotificationChannelConfig(BaseModel):
     """Configuration for a single notification channel."""
 
@@ -103,6 +133,8 @@ class EnvironmentConfig(BaseModel):
     notifications: NotificationsConfig | None = None
     # Infrastructure as Code tool selection (terraform or opentofu)
     iac_tool: IaCTool = IaCTool.TERRAFORM
+    # Read-only collectors for unmanaged network devices (``infra collect``)
+    collectors: CollectorsConfig | None = None
     # Decrypted secrets for this environment.
     #
     # NOTE: This field is NOT loaded from settings.yaml. It is populated by

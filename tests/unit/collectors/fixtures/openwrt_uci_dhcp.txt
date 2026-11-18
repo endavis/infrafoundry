@@ -1,0 +1,6 @@
+package dhcp
+
+config dhcp 'lan'
+	option interface 'lan'
+	option start '100'
+	option limit '50'

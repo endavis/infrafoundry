@@ -1,0 +1,1 @@
+default via 198.51.100.1 dev wan

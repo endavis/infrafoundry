@@ -77,6 +77,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | Show infrastructure status | `foundry infra status --env <env>` |
 | Reset a provider component | `foundry infra reset --env <env> --provider opnsense --component <comp>` |
 | Manage deployment locks | `foundry infra unlock --list` |
+| Back up unmanaged device configs | `foundry infra collect --env prod` |
 | Initialize state database | `foundry state init` |
 | List resources in state | `foundry state list --env <env>` |
 | List tracked resources | `foundry state resources` |
@@ -642,6 +643,18 @@ foundry infra unlock --env prod --force --yes  # force-release active lock
 **Options:** `-e/--env TEXT` (required unless `--list`), `--force`, `--yes`, `--list`
 
 Set `INFRAFOUNDRY_SKIP_LOCK=1` to bypass locking entirely (emergency use only).
+
+### `infra collect`
+
+Back up the configuration of unmanaged network devices (read-only). Secret-bearing exports are
+SOPS-encrypted into the config repo. See [Device Config Collectors](../guides/device-config-collectors.md).
+
+```bash
+foundry infra collect --env home
+foundry infra collect --env home -d ont-isp -d switch-core
+```
+
+**Options:** `-e/--env TEXT` (required), `-d/--device TEXT` (repeatable)
 
 ---
 

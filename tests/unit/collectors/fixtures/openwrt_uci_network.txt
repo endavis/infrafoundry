@@ -1,0 +1,10 @@
+package network
+
+config interface 'lan'
+	option proto 'static'
+	option ipaddr '192.0.2.1'
+	option netmask '255.255.255.0'
+
+config interface 'wg0'
+	option proto 'wireguard'
+	option private_key 'CANARY-WG-0001'

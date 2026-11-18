@@ -181,6 +181,7 @@ Key commands (`foundry` via `uv run foundry ...`):
 - `infra status --env <name>` – show infrastructure status
 - `infra reset --env <name> --provider <p> --component <c>` – reset provider component
 - `infra unlock [--env <name> | --list]` – manage deployment locks
+- `infra collect --env <name>` – back up unmanaged device configs (read-only)
 
 **State group (`state`):**
 - `state init` – initialize state database
