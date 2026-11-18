@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794941768063,
+  "lastUpdate": 1794994997806,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3272,6 +3272,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000033604862941220772",
             "extra": "mean: 59.6368925023305 usec\nrounds: 17405"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b18a2cc2dbfaf8c51af537d9f588e99add9440f9",
+          "message": "fix: refuse a plan that reuses an orphaned resource's vm id (merges PR #1477, addresses #1459)\n\nRenaming a blueprint VM package left the old resource in Terraform state:\na scoped plan showed only an add, and the apply collided on the vmid while\nthe old VM kept running.\n\nPlan now compares the provider's state with the addresses the current\npackages generate. State entries no package declares are reported as\norphans, with a warning on both filtered and unfiltered runs. When a new\nresource would take the VM id of an orphan, plan (and so apply) stops with\nIF-VALIDATION-008, naming both addresses and the destroy command. The check\nonly reads state (state list, and show -json when needed); drift detection\ndoes not run it.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T09:42:06Z",
+          "tree_id": "d38348d9bc21bacfe32fd2fb5c333273e6fe9b5b",
+          "url": "https://github.com/endavis/infrafoundry/commit/b18a2cc2dbfaf8c51af537d9f588e99add9440f9"
+        },
+        "date": 1794994997448,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 69.13315302201295,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0008019845551157208",
+            "extra": "mean: 14.464840041095568 msec\nrounds: 73"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12627.285440841122,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000923751183329936",
+            "extra": "mean: 79.19358477204017 usec\nrounds: 13554"
           }
         ]
       }
