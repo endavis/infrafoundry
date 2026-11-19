@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795114853665,
+  "lastUpdate": 1795127075094,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3918,6 +3918,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000026474248810508035",
             "extra": "mean: 59.49042950567078 usec\nrounds: 18044"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6a3b741f1c94f434b4d28aa5d1657f09b7adb76a",
+          "message": "fix: let config migrate export radvd, system.firmware and operator-set tunables (merges PR #1511, addresses #1508)\n\n* fix: register radvd, system.firmware and system.tuning config migrate extractors\n\nEach service already implements export_to_yaml(), but the types were\nmissing from _register_extractors(), so `config migrate -p opnsense`\nrejected them as unsupported components. system.tuning already exports\nonly tunables that differ from the defaults.\n\nAddresses #1508\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: skip empty-value tunables in the system.tuning export\n\nOPNsense treats an empty tunable value as \"use the default\", so those\nrows are not operator settings and only add noise to the exported YAML.\n\nAddresses #1508\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: export only stored tunables from the system.tuning export\n\ncore/tunables/get returns a static child (key md5(tunable)) for every\nshipped tunable that is not stored in config; its value is the current\nkernel value, not an operator setting. Skip those rows, and stored rows\nwhose value is empty, the deprecated \"default\", or the shipped default.\n\nAddresses #1508\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T22:23:07Z",
+          "tree_id": "bc05e742c5a23f3d3a6f69dde498883995049d96",
+          "url": "https://github.com/endavis/infrafoundry/commit/6a3b741f1c94f434b4d28aa5d1657f09b7adb76a"
+        },
+        "date": 1795127073993,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 71.84396247072267,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00036014622707073644",
+            "extra": "mean: 13.919054094594415 msec\nrounds: 74"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12873.009674677482,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005313693792961475",
+            "extra": "mean: 77.68191163307378 usec\nrounds: 13625"
           }
         ]
       }
