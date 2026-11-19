@@ -50,15 +50,15 @@ def _create_package(
 
 
 def _create_blueprint(base_dir: Any, name: Any, manifest_data: Any, extra_files: Any = None) -> Any:
-    """Helper to create a blueprint directory under config_repo/blueprints/.
+    """Helper to create a blueprint directory under the test temp directory.
 
     Args:
-        base_dir: The envs/ directory (base_dir.parent / "blueprints" is used)
+        base_dir: The test temp directory (base_dir / "blueprints" is used)
         name: Blueprint name
         manifest_data: Dict for blueprint.yaml
         extra_files: Optional dict of relative_path -> content
     """
-    blueprint_dir = base_dir.parent / "blueprints" / name
+    blueprint_dir = base_dir / "blueprints" / name
     blueprint_dir.mkdir(parents=True, exist_ok=True)
 
     manifest_path = blueprint_dir / "blueprint.yaml"
@@ -85,7 +85,7 @@ class TestMultiProviderBlueprint:
     def test_selects_correct_resources_for_provider(self, temp_dir: Path) -> None:
         """Blueprint with providers section selects correct resource files."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "multi-bp",
@@ -128,7 +128,7 @@ class TestMultiProviderBlueprint:
     def test_selects_oci_provider_resources(self, temp_dir: Path) -> None:
         """Blueprint with providers section selects OCI resources when provider is oci."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "multi-bp-oci",
@@ -171,7 +171,7 @@ class TestMultiProviderBlueprint:
     def test_backward_compat_no_providers_section(self, temp_dir: Path) -> None:
         """Blueprint without providers section works as before."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "classic-bp",
@@ -203,7 +203,7 @@ class TestMultiProviderBlueprint:
     def test_shared_defaults_merge_order(self, temp_dir: Path) -> None:
         """Defaults merge: blueprint.defaults < providers[x].defaults < package.variables."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "merge-bp",
@@ -263,7 +263,7 @@ class TestMultiProviderBlueprint:
     def test_package_variables_override_provider_defaults(self, temp_dir: Path) -> None:
         """Package variables take priority over provider-specific defaults."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "override-bp",
@@ -304,7 +304,7 @@ class TestMultiProviderBlueprint:
     def test_missing_provider_in_providers_section_raises(self, temp_dir: Path) -> None:
         """Blueprint with providers section but package's provider not listed raises error."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "limited-bp",
@@ -342,7 +342,7 @@ class TestMultiProviderBlueprint:
         inferred provider argument are empty.
         """
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "needs-provider-bp",
@@ -377,7 +377,7 @@ class TestMultiProviderBlueprint:
     def test_package_own_resources_override_provider_resources(self, temp_dir: Path) -> None:
         """Package's own resources take priority even with providers section."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "override-res-bp",
@@ -417,7 +417,7 @@ class TestMultiProviderBlueprint:
     def test_provider_from_manifest_field(self, temp_dir: Path) -> None:
         """Provider from manifest's provider field is used for provider lookup."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "manifest-provider-bp",
@@ -458,7 +458,7 @@ class TestMultiProviderBlueprint:
     def test_selects_provider_specific_events(self, temp_dir: Path) -> None:
         """Blueprint with provider-specific events selects correct events for provider."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "events-bp",
@@ -534,7 +534,7 @@ class TestMultiProviderBlueprint:
     def test_selects_oci_provider_specific_events(self, temp_dir: Path) -> None:
         """Blueprint with provider-specific events selects OCI events when provider is oci."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "events-bp-oci",
@@ -612,7 +612,7 @@ class TestMultiProviderBlueprint:
     def test_package_events_override_provider_events(self, temp_dir: Path) -> None:
         """Package's own events take priority over provider-specific events."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "events-override-bp",
@@ -673,7 +673,7 @@ class TestMultiProviderBlueprint:
     def test_provider_events_not_inherited_when_no_providers_section(self, temp_dir: Path) -> None:
         """Blueprint without providers section uses top-level events as before."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "classic-events-bp",
@@ -719,7 +719,7 @@ class TestMultiProviderBlueprint:
     def test_providers_without_defaults_key(self, temp_dir: Path) -> None:
         """Provider block without defaults key works (no provider-specific defaults)."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "no-prov-defaults-bp",
@@ -766,7 +766,7 @@ class TestProviderTemplateVariable:
         which cannot vary per provider.
         """
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
 
         shared_resource = (
             "resources:\n"
