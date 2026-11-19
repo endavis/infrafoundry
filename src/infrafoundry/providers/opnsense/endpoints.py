@@ -480,10 +480,11 @@ ACMECLIENT_ACTION_TEMPLATE = Endpoint("GET", "acmeclient/actions/get", EndpointK
 
 # --- tailscale (#787, os-tailscale plugin) ----------------------------------------------
 # Probed on a test box: settings/get, authentication/get, settings/searchSubnet and
-# settings/getSubnet (the item template). The add, set and del subnet actions and
-# service/reconfigure are ASSUMED names, to be confirmed by a live write. Never
-# registered on purpose: status, up, login and any start/stop action; the provider does
-# not start the service or join a tailnet.
+# settings/getSubnet (the item template). addSubnet, setSubnet, delSubnet and
+# tailscale/service/reconfigure were verified live on a test firewall (PR #1347, #787);
+# docs/development/opnsense-resource-coverage.md ("Verified and not verified" under
+# Tailscale) is the source of truth. Never registered on purpose: status, up, login and
+# any start/stop action; the provider does not start the service or join a tailnet.
 TAILSCALE_SETTINGS_GET = Endpoint("GET", "tailscale/settings/get", EndpointKind.PLUGIN)
 TAILSCALE_SETTINGS_SET = Endpoint("POST", "tailscale/settings/set", EndpointKind.PLUGIN)
 TAILSCALE_AUTH_GET = Endpoint("GET", "tailscale/authentication/get", EndpointKind.PLUGIN)
