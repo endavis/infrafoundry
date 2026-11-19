@@ -394,7 +394,8 @@ KEA_RECONFIGURE = Endpoint("POST", "kea/service/reconfigure")
 # --- firewall rules, NAT, categories --------------------------------------------------
 FILTER = _rules("firewall/filter")
 FILTER_SAVEPOINT = Endpoint("POST", "firewall/filter/savepoint")
-# #1497: the configuration backup (config.xml), read by ``config migrate --include-legacy``.
+# #1497, #1509: the configuration backup (config.xml), read by ``config migrate
+# --include-legacy`` (firewall.rules and firewall.nat).
 # Read-only; the response body is XML, not JSON.
 # The bundled specs list it as POST (spec-generator heuristic); the web UI downloads it
 # with a plain GET, which is what the provider sends.

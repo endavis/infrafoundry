@@ -167,6 +167,26 @@ class LegacyExport:
     issues: list[LegacyRuleIssue] = field(default_factory=list)
 
 
+def parse_config_document(xml_text: str) -> Element:
+    """Parse a ``config.xml`` safely and return its root element.
+
+    Args:
+        xml_text: The configuration backup. It may hold secrets; it is not echoed into
+            any error.
+
+    Returns:
+        The root element.
+
+    Raises:
+        APIError: If the text is not well-formed XML or uses entities or a DTD.
+    """
+    try:
+        return SafeET.fromstring(xml_text)
+    except (DefusedXmlException, ParseError):
+        # Never chain or format the cause: a parse error can quote document text.
+        raise APIError("config backup is not valid XML", provider="opnsense") from None
+
+
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:_SLUG_MAX].strip("-")
 
@@ -232,11 +252,7 @@ def parse_legacy_rules(
     Raises:
         APIError: If the text is not well-formed XML or uses entities or a DTD.
     """
-    try:
-        root = SafeET.fromstring(xml_text)
-    except (DefusedXmlException, ParseError):
-        # Never chain or format the cause: a parse error can quote document text.
-        raise APIError("config backup is not valid XML", provider="opnsense") from None
+    root = parse_config_document(xml_text)
 
     known_interfaces = _interface_ids(root)
     cat_by_name, cat_uuids = _category_maps(root)

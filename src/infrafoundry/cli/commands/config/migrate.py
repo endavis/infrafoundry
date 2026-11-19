@@ -17,7 +17,9 @@ from ...decorators import with_orchestrator
 from ...utils import console
 
 #: Components that accept ``--include-legacy``.
-_LEGACY_RULE_COMPONENTS: frozenset[tuple[str, str]] = frozenset({("opnsense", "firewall.rules")})
+_LEGACY_RULE_COMPONENTS: frozenset[tuple[str, str]] = frozenset(
+    {("opnsense", "firewall.rules"), ("opnsense", "firewall.nat")}
+)
 
 
 @click.command()
@@ -49,8 +51,9 @@ _LEGACY_RULE_COMPONENTS: frozenset[tuple[str, str]] = frozenset({("opnsense", "f
     "--include-legacy",
     is_flag=True,
     help=(
-        "Also export legacy filter rules (read-only; downloads the configuration backup). "
-        "Only for --provider opnsense --component firewall.rules"
+        "Also export legacy filter rules or legacy outbound NAT rules (read-only; downloads "
+        "the configuration backup). Only for --provider opnsense --component firewall.rules "
+        "or firewall.nat"
     ),
 )
 @click.option(
@@ -99,6 +102,10 @@ def migrate(
             --include-legacy --dry-run
         foundry config migrate --env prod --provider opnsense --component firewall.rules \\
             --include-legacy --allow-partial
+
+        # Export legacy outbound NAT rules too (read-only)
+        foundry config migrate --env prod --provider opnsense --component firewall.nat \\
+            --include-legacy --dry-run
 
         # Dry-run mode
         foundry config migrate --env prod --provider opnsense --component isc_to_kea --dry-run
@@ -156,10 +163,11 @@ def migrate(
     if include_legacy:
         if (provider_lower, component_lower) not in _LEGACY_RULE_COMPONENTS:
             raise click.ClickException(
-                "--include-legacy only applies to --provider opnsense --component firewall.rules."
+                "--include-legacy only applies to --provider opnsense --component firewall.rules "
+                "or firewall.nat."
             )
         kwargs["include_legacy"] = True
-        console.info("Including legacy filter rules (read-only backup download)")
+        console.info("Including legacy rules (read-only backup download)")
 
     extractor = get_extractor(provider_lower, component_lower)
     try:

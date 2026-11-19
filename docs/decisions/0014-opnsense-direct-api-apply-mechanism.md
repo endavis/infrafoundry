@@ -10,6 +10,7 @@ tags:
 # ADR-0014: OPNsense Direct-API Apply Mechanism
 
 **Date:** 2026-04-30
+**Amended:** 2026-11-19 (#1509) — `config migrate --include-legacy` also exports legacy outbound NAT rules (`<nat><outbound><rule>`) for `firewall.nat`, reusing the read-only configuration backup download from #1497; no write path changes.
 **Amended:** 2026-11-17 (#1450) — the runner dispatches for `opnsense` and `opnsense@<name>` providers, passes `provider_name` to managers for instances only, and labels output `opnsense_direct[<name>]` when `firewalls:` is declared; the HA sync `post_apply_hook` runs once per firewall, see ADR-0024
 **Amended:** 2026-11-17 (#1389) — `hasync.settings` per-component decision recorded (direct-REST against `core/hasync/*`; password as a secret, write-only when the box does not read it back)
 **Amended:** 2026-05-03 (#717, PR #718) — added second internal write path for resources with no native REST CRUD; records `interface_assignments` per-component decision

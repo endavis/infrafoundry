@@ -772,3 +772,62 @@ def test_include_legacy_path_makes_no_write_calls(
     assert "allow-web" in out.read_text()
     assert [c.args[0] for c in client.request.call_args_list] == ["POST"]
     client.get_text.assert_called_once_with("core/backup/download/this")
+
+
+def test_include_legacy_is_forwarded_for_firewall_nat(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
+    legacy = MagicMock()
+    legacy.extract.return_value = "a: b\n"
+    result = _invoke_legacy(
+        cli_runner,
+        mock_orchestrator,
+        mock_opnsense_provider,
+        legacy,
+        ["--include-legacy", "-o", str(tmp_path / "nat.yaml")],
+        component="firewall.nat",
+    )
+    assert result.exit_code == 0, result.output
+    legacy.extract.assert_called_once_with("test", include_legacy=True)
+
+
+def test_include_legacy_nat_path_makes_no_write_calls(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
+    """End to end through the real extractor: only the searches and the backup GET run."""
+    from infrafoundry.providers.opnsense.services.config_backup import ConfigBackupService
+    from infrafoundry.providers.opnsense.services.nat_rule import NATRuleService
+
+    clean = (
+        Path(__file__).parent / "providers/opnsense/fixtures/legacy_outbound_nat_config.xml"
+    ).read_text()
+    client = MagicMock()
+    client.request.return_value = {"rows": []}
+    client.get_text.return_value = clean
+    service = NATRuleService(client)
+    service._category_uuid = "marker-uuid"
+    component = "infrafoundry.providers.opnsense.components.nat_rule"
+    out = tmp_path / "nat.yaml"
+
+    mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
+    with (
+        patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
+        patch(f"{component}.NATRuleService") as svc_cls,
+        patch(f"{component}.ConfigBackupService") as backup_cls,
+        patch(f"{component}.env_provider_resources", return_value=[]),
+    ):
+        svc_cls.from_environment.return_value = service
+        backup_cls.from_environment.return_value = ConfigBackupService(client)
+        result = cli_runner.invoke(
+            main,
+            [
+                "config", "migrate", "--env", "test", "--provider", "opnsense",
+                "--component", "firewall.nat", "--include-legacy", "-o", str(out),
+            ],
+        )  # fmt: skip
+    assert result.exit_code == 0, result.output
+    assert "servers-out-via-wan" in out.read_text()
+    paths = [str(c.args[1]) for c in client.request.call_args_list]
+    assert paths
+    assert all(path.endswith(("searchRule", "/get")) for path in paths), paths
+    client.get_text.assert_called_once_with("core/backup/download/this")

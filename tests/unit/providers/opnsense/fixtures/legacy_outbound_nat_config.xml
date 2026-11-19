@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<!-- Synthetic fixture: no real deployment data. Every rule maps without issues. -->
+<opnsense>
+  <system>
+    <hostname>fw-test</hostname>
+    <domain>example.com</domain>
+  </system>
+  <interfaces>
+    <wan><if>vtnet0</if><descr>WAN</descr></wan>
+    <lan><if>vtnet1</if><descr>LAN</descr></lan>
+    <opt1><if>vtnet2</if><descr>SERVERS</descr></opt1>
+  </interfaces>
+  <nat>
+    <outbound>
+      <mode>hybrid</mode>
+      <rule>
+        <source><network>opt1</network></source>
+        <destination><any>1</any></destination>
+        <descr>Servers out via wan</descr>
+        <interface>wan</interface>
+        <ipprotocol>inet</ipprotocol>
+        <target></target>
+        <targetip_subnet>0</targetip_subnet>
+        <staticnatport>1</staticnatport>
+        <sourceport></sourceport>
+        <protocol>udp</protocol>
+        <created><username>admin@192.0.2.10</username><time>1700000000.0</time></created>
+        <updated><username>admin@192.0.2.10</username><time>1700000001.0</time></updated>
+      </rule>
+      <rule>
+        <disabled>1</disabled>
+        <source><network>edge_hosts</network></source>
+        <destination><any>1</any></destination>
+        <descr>Edge hosts v6</descr>
+        <interface>wan</interface>
+        <ipprotocol>inet6</ipprotocol>
+        <target></target>
+        <targetip_subnet>0</targetip_subnet>
+      </rule>
+      <rule>
+        <source><network>198.51.100.0/24</network></source>
+        <destination><address>203.0.113.5</address></destination>
+        <descr>Documentation net to host</descr>
+        <interface>opt1</interface>
+        <ipprotocol>inet</ipprotocol>
+        <target>192.0.2.1</target>
+        <targetip_subnet>0</targetip_subnet>
+      </rule>
+    </outbound>
+  </nat>
+</opnsense>
