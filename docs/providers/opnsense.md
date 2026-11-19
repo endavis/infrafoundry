@@ -78,7 +78,7 @@ Keep the key and secret in the environment's SOPS-encrypted `secrets.yaml` and r
 
 ### SSH is needed for interface assignments only
 
-`interfaces.assignments` writes need a one-time controller install on the firewall over SSH. Only a run that has an assignment to write does this. A run with no assignment changes, and every other type, needs the API alone. The SSH login uses key authentication only (an ssh-agent or `~/.ssh/config`); there is no password support. If no SSH host resolves, the run stops with a message naming `ssh_host` and `api_url`.
+`interfaces.assignments` writes need a one-time controller install on the firewall over SSH. Only a run that has an assignment to write does this. A run with no assignment changes, and every other type, needs the API alone, plan included. Before the controller is installed, plan reads `interfacesInfo` only, so an assignment whose device is absent (for example a stopped tunnel) is not visible until the first assignment write installs it (#1499). The SSH login uses key authentication only (an ssh-agent or `~/.ssh/config`); there is no password support. If no SSH host resolves, the run stops with a message naming `ssh_host` and `api_url`.
 
 ### Environment variable overrides
 

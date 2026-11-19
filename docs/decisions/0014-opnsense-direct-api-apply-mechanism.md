@@ -153,7 +153,7 @@ Each new write mechanism that diverges from §1's default (REST via `opnsense_op
 
 **Mechanism:** Server-side-validated REST via the forked `AssignSettingsController.php` controller installed at `/usr/local/opnsense/mvc/app/controllers/OPNsense/Interfaces/Api/`.
 
-- **Read side:** `interfaces/overview/interfacesInfo` (already in production from PR #712, no controller required).
+- **Read side:** `interfaces/overview/interfacesInfo` (already in production from PR #712, no controller required), merged with `assign_settings/searchItem` when the controller is present so an assignment on an absent device is listed too (#1499).
 - **Write side:** `assign_settings/{addItem, setItem, getItem, searchItem, delItem}` against the installed controller.
 - **Fork location:** graduated in #720 to `src/infrafoundry/providers/opnsense/extensions/interface_assignments/AssignSettingsController.php`. The spike directory `tools/spikes/interface_assignment_gist_rest/` was deleted in the same PR. Provenance and security-review summary live alongside at `src/infrafoundry/providers/opnsense/extensions/interface_assignments/PROVENANCE.md`.
 - **Patches/extensions over the upstream gist:** `sessionClose()` removed (modern-OPNsense compatibility), IPv6 fields, `setItem` / `getItem` / `searchItem`, optional explicit `name: optN`, validation helpers. ~225 LoC net-new on top of ~345 LoC inherited from szymczag's BSD-2-Clause base.

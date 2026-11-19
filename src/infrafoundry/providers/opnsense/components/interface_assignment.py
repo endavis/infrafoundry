@@ -9,7 +9,8 @@ this manager once per plan/apply/destroy and delegates.
 Apply flow:
 
 1. ``apply()`` lists live state and computes the diff first (the list
-   endpoint needs no controller), then checks for lockout conflicts.
+   endpoint needs no controller; with it, assignments on an absent device
+   are listed too, #1499), then checks for lockout conflicts.
 2. Only when the (filtered) diff is non-empty does it run the
    SSH-target resolution (from ``provider_settings.opnsense``: ``ssh_host``,
    ``ssh_user``, ``ssh_port``, ``ssh_key``, falling back to the ``api_url``
@@ -146,7 +147,8 @@ class InterfaceAssignmentManager(BaseComponentManager):
         Pre-flight order:
 
         1. Compute the diff against live state (``service.list()`` needs
-           no controller). With ``deletes_only`` the adds and updates are
+           no controller; without it, assignments on an absent device are
+           not visible, #1499). With ``deletes_only`` the adds and updates are
            dropped.
         2. Lockout pre-flight refuses application if a planned ``add``
            would collide with an already-bound device.
@@ -215,7 +217,7 @@ class InterfaceAssignmentManager(BaseComponentManager):
             raise RuntimeError(f"interface_assignments lockout conflicts: {joined}")
 
         # Pre-flight 2: only a write needs SSH credentials and the PHP
-        # controller. Listing uses the core interfaces endpoint, so an empty
+        # controller. Listing falls back to the core interfaces endpoint, so an empty
         # (filtered) diff never installs and the runner's two passes do not
         # repeat the install.
         if not diff.is_empty:

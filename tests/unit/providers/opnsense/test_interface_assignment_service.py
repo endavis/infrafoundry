@@ -19,11 +19,12 @@ Coverage (full-CRUD path, #720):
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 import yaml
 
+from infrafoundry.core.exceptions import APIError, AuthenticationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.services.interface_assignment import (
     ApplyDiffResult,
@@ -34,6 +35,7 @@ from infrafoundry.providers.opnsense.services.interface_assignment import (
     _needs_update,
     _parse_live_to_config,
     _row_to_live_assignment,
+    _search_row_to_live_assignment,
     compute_diff,
     find_lockout_conflicts,
     interface_assignment_configs_from_resources,
@@ -525,7 +527,10 @@ class TestServiceList:
         client.request.return_value = {"rows": []}
         service = InterfaceAssignmentService(client)
         result = service.list()
-        client.request.assert_called_once_with("GET", "interfaces/overview/interfacesInfo")
+        assert client.request.call_args_list == [
+            call("GET", "interfaces/overview/interfacesInfo"),
+            call("POST", "interfaces/assign_settings/searchItem"),
+        ]
         assert result == []
 
     def test_search_alias(self) -> None:
@@ -535,7 +540,10 @@ class TestServiceList:
         client.request.return_value = {"rows": []}
         service = InterfaceAssignmentService(client)
         service.search()
-        client.request.assert_called_once_with("GET", "interfaces/overview/interfacesInfo")
+        assert client.request.call_args_list == [
+            call("GET", "interfaces/overview/interfacesInfo"),
+            call("POST", "interfaces/assign_settings/searchItem"),
+        ]
 
     def test_skips_rows_with_empty_identifier(self) -> None:
         client = MagicMock()
@@ -570,6 +578,155 @@ class TestServiceList:
         service = InterfaceAssignmentService(client)
         result = service.list()
         assert len(result) == 2
+
+
+def _search_row(
+    name: str = "opt2",
+    device: str = "wg0",
+    **extra: Any,
+) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "name": name,
+        "uuid": name,
+        "device": device,
+        "description": "tunnel",
+        "enable": True,
+        "spoofMac": None,
+        "ipv4Type": "none",
+        "ipv4Address": None,
+        "ipv4Subnet": None,
+        "ipv6Type": "none",
+        "ipv6Address": None,
+        "ipv6Subnet": None,
+        "ipv6Track": None,
+    }
+    row.update(extra)
+    return row
+
+
+def _routed_client(info: Any, search: Any) -> MagicMock:
+    """Client whose reply depends on the path; an exception instance is raised."""
+    client = MagicMock()
+
+    def _request(method: str, path: str, **_: Any) -> Any:
+        reply = search if path.endswith("searchItem") else info
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    client.request.side_effect = _request
+    return client
+
+
+class TestServiceListAbsentDevice:
+    def test_merges_assignment_missing_from_interfaces_info(self) -> None:
+        client = _routed_client(
+            {"rows": [_row("lan", "vtnet1")]},
+            {"rows": [_search_row("lan", "vtnet1"), _search_row("opt2", "wg0")]},
+        )
+        result = InterfaceAssignmentService(client).list()
+        assert [r.identifier for r in result] == ["lan", "opt2"]
+        opt2 = result[1]
+        assert opt2.device == "wg0"
+        assert opt2.description == "tunnel"
+        assert opt2.is_physical is False
+        assert opt2.ipv4 == {}
+        assert opt2.ipv6 == {}
+
+    def test_interfaces_info_row_wins_without_duplicate(self) -> None:
+        info_row = _row("opt1", "em1", description="live", mtu=1400)
+        client = _routed_client({"rows": [info_row]}, {"rows": [_search_row("opt1", "em9")]})
+        result = InterfaceAssignmentService(client).list()
+        assert result == [_row_to_live_assignment(info_row)]
+
+    def test_non_assignment_names_are_not_added(self) -> None:
+        client = _routed_client(
+            {"rows": []},
+            {"rows": [_search_row("openvpn", "ovpns1"), _search_row("lo0", "lo0")]},
+        )
+        assert InterfaceAssignmentService(client).list() == []
+
+    @pytest.mark.parametrize(
+        "error", [APIError("not found", status_code=404), AuthenticationError("denied", 403)]
+    )
+    def test_search_failure_falls_back_with_warning(
+        self, error: APIError, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        client = _routed_client({"rows": [_row("lan", "vtnet1")]}, error)
+        with caplog.at_level("WARNING"):
+            result = InterfaceAssignmentService(client).list()
+        assert [r.identifier for r in result] == ["lan"]
+        assert "stays invisible" in caplog.text
+
+    @pytest.mark.parametrize("reply", ["oops", {"rows": "x"}, {}])
+    def test_malformed_search_reply_falls_back(self, reply: Any) -> None:
+        client = _routed_client({"rows": [_row("lan", "vtnet1")]}, reply)
+        result = InterfaceAssignmentService(client).list()
+        assert [r.identifier for r in result] == ["lan"]
+
+    def test_interfaces_info_error_propagates(self) -> None:
+        client = _routed_client(APIError("boom", status_code=500), {"rows": []})
+        with pytest.raises(APIError):
+            InterfaceAssignmentService(client).list()
+
+    def test_compute_diff_sees_absent_device_assignment(self) -> None:
+        client = _routed_client({"rows": []}, {"rows": [_search_row("opt2", "wg0")]})
+        live = InterfaceAssignmentService(client).list()
+        desired = [_cfg("opt2", device="wg0", description="tunnel")]
+        diff = compute_diff(desired, live)
+        assert diff.is_empty
+
+    def test_lockout_conflict_on_absent_device(self) -> None:
+        client = _routed_client({"rows": []}, {"rows": [_search_row("opt2", "wg0")]})
+        live = InterfaceAssignmentService(client).list()
+        diff = compute_diff([_cfg("opt3", device="wg0", description="x")], live)
+        assert find_lockout_conflicts(diff, live)
+
+
+class TestSearchRowProjection:
+    def test_static_dual_stack_and_spoof(self) -> None:
+        row = _search_row(
+            ipv4Type="static",
+            ipv4Address="198.51.100.1",
+            ipv4Subnet=24,
+            ipv6Type="static",
+            ipv6Address="2001:db8::1",
+            ipv6Subnet=64,
+            spoofMac="02:00:00:00:00:01",
+        )
+        live = _search_row_to_live_assignment(row)
+        assert live.ipv4 == {
+            "ipaddr": "198.51.100.1",
+            "subnet": "24",
+            "spoofmac": "02:00:00:00:00:01",
+        }
+        assert live.ipv6 == {"ipaddrv6": "2001:db8::1", "subnetv6": "64"}
+        cfg = _parse_live_to_config(live)
+        assert cfg.ipv4_address == "198.51.100.1"
+        assert cfg.ipv4_subnet == 24
+        assert cfg.ipv6_subnet == 64
+
+    def test_dhcp_and_dhcp6(self) -> None:
+        live = _search_row_to_live_assignment(_search_row(ipv4Type="dhcp", ipv6Type="dhcp"))
+        assert live.ipv4 == {"ipaddr": "dhcp"}
+        assert live.ipv6 == {"ipaddrv6": "dhcp6"}
+        cfg = _parse_live_to_config(live)
+        assert cfg.ipv4_type == "dhcp"
+        assert cfg.ipv6_type == "dhcp"
+
+    def test_track_interface(self) -> None:
+        live = _search_row_to_live_assignment(
+            _search_row(ipv6Type="track-interface", ipv6Track="wan")
+        )
+        assert live.ipv6 == {"ipaddrv6": "track6", "track6-interface": "wan"}
+        assert _parse_live_to_config(live).ipv6_track == "wan"
+
+    def test_unsupported_mode_raises(self) -> None:
+        live = _search_row_to_live_assignment(
+            _search_row(ipv4Type="static", ipv4Address="pppoe", ipv4Subnet=None)
+        )
+        with pytest.raises(ValueError, match="unsupported IPv4 mode"):
+            _parse_live_to_config(live)
 
 
 class TestServiceWriteCRUD:
