@@ -118,6 +118,32 @@ class TestInterfaces:
         assert [i.field for i in export.issues] == ["interface"]
 
 
+class TestEmptyRuleElement:
+    """OPNsense leaves an empty ``<rule/>`` once every legacy rule is deleted (#1506)."""
+
+    @pytest.mark.parametrize("empty", ["<rule/>", "<rule></rule>", "<rule>\n</rule>"])
+    def test_only_empty_rule_gives_no_entries_and_no_issues(self, empty: str) -> None:
+        export = parse_legacy_rules(_doc(empty), reserved=set(), sequence_start=1)
+        assert export.entries == []
+        assert export.issues == []
+
+    def test_empty_rule_is_skipped_and_numbering_keeps_document_position(self) -> None:
+        rules = "<rule/><rule><type>pass</type><interface>nope</interface></rule>"
+        export = parse_legacy_rules(_doc(rules), reserved=set(), sequence_start=1)
+        assert export.entries == []
+        assert [(i.rule_label, i.field) for i in export.issues] == [("rule #2 (nope)", "interface")]
+
+    def test_empty_rule_does_not_consume_a_sequence(self) -> None:
+        rules = (
+            "<rule/><rule><interface>lan</interface><descr>one</descr></rule>"
+            "<rule/><rule><interface>opt1</interface><descr>two</descr></rule>"
+        )
+        export = parse_legacy_rules(_doc(rules), reserved=set(), sequence_start=200)
+        assert [e["name"] for e in export.entries] == ["one", "two"]
+        assert [e["config"]["sequence"] for e in export.entries] == [200, 210]
+        assert export.issues == []
+
+
 class TestFieldMapping:
     def test_basic_pass_rule(self) -> None:
         config = _by_name(_parse("legacy_filter_config_clean.xml"))["allow-web"]
