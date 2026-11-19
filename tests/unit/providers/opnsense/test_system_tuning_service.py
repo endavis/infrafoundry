@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from unittest.mock import MagicMock
 
@@ -143,6 +144,54 @@ def test_export_then_replan_is_clean(service: SystemTuningService) -> None:
     service.system_client.get_tunables.return_value = live_response  # type: ignore[attr-defined]
     exported = yaml.safe_load(service.export_to_yaml())
     items = exported["opnsense"]["system"]["tuning"]["items"]
+    desired = service.build_desired_tunables(_res(items))
+    live = service.extract_live_tunables(live_response)
+    assert service.compute_changes(desired, live) == ([], [])
+
+
+def _row(value: str, default: str = "7") -> dict[str, str]:
+    return {"tunable": "x.y", "value": value, "descr": "", "default_value": default}
+
+
+def _export_with(service: SystemTuningService, uuid: str, row: dict[str, str]) -> str:
+    service.system_client.get_tunables.return_value = {  # type: ignore[attr-defined]
+        "sysctl": {"item": {uuid: row}}
+    }
+    return service.export_to_yaml()
+
+
+def test_export_skips_static_child(service: SystemTuningService) -> None:
+    uuid = hashlib.md5(b"x.y", usedforsecurity=False).hexdigest()
+    assert "x.y" not in _export_with(service, uuid, _row("99"))
+
+
+def test_export_skips_stored_empty_value(service: SystemTuningService) -> None:
+    assert "x.y" not in _export_with(service, "stored-1", _row(""))
+
+
+def test_export_skips_stored_default_string(service: SystemTuningService) -> None:
+    assert "x.y" not in _export_with(service, "stored-1", _row("default"))
+
+
+def test_export_includes_stored_non_default(service: SystemTuningService) -> None:
+    out = _export_with(service, "stored-1", _row("99"))
+    items = yaml.safe_load(out)["opnsense"]["system"]["tuning"]["items"]
+    assert items == [{"tunable": "x.y", "value": "99"}]
+
+
+def test_export_then_replan_noop_with_static_children(service: SystemTuningService) -> None:
+    static = hashlib.md5(b"s.t", usedforsecurity=False).hexdigest()
+    live_response = {
+        "sysctl": {
+            "item": {
+                "stored-1": _row("99"),
+                static: {"tunable": "s.t", "value": "3", "descr": "", "default_value": "1"},
+            }
+        }
+    }
+    service.system_client.get_tunables.return_value = live_response  # type: ignore[attr-defined]
+    items = yaml.safe_load(service.export_to_yaml())["opnsense"]["system"]["tuning"]["items"]
+    assert [i["tunable"] for i in items] == ["x.y"]
     desired = service.build_desired_tunables(_res(items))
     live = service.extract_live_tunables(live_response)
     assert service.compute_changes(desired, live) == ([], [])
