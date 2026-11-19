@@ -245,6 +245,11 @@ def parse_legacy_rules(
     sequence = sequence_start
 
     for index, rule in enumerate(root.findall("./filter/rule"), start=1):
+        # OPNsense leaves an empty <rule/> under <filter> after every legacy rule is
+        # deleted. It is not a rule: skip it silently. ``index`` still counts it, so
+        # reports keep pointing at the document position of the real rules.
+        if len(rule) == 0:
+            continue
         outcome = _map_rule(
             rule,
             index=index,
