@@ -472,6 +472,96 @@ def device_matches(device: dict[str, Any], hostname: str, tags: Iterable[str]) -
     return any(isinstance(t, str) and t.casefold() in wanted for t in device_tags)
 
 
+def request_oauth_token(
+    http: requests.Session, api_base: str, client_id: str, client_secret: str, timeout: float
+) -> str:
+    """Exchange OAuth client credentials for an access token.
+
+    Returns:
+        The access token.
+
+    Raises:
+        RuntimeError: On a non-2xx response; the message carries the status only.
+        requests.RequestException: On a network error.
+        ValueError: On an unparsable body.
+        KeyError: On a missing field.
+        TypeError: On an unexpected shape.
+    """
+    resp = http.post(
+        f"{api_base}/oauth/token",
+        data={"client_id": client_id, "client_secret": client_secret},
+        timeout=timeout,
+    )
+    if not 200 <= resp.status_code < 300:
+        raise RuntimeError(f"token request failed with HTTP {resp.status_code}")
+    token = resp.json()["access_token"]
+    if not isinstance(token, str):
+        raise TypeError("access_token is not a string")
+    return token
+
+
+def create_auth_key(
+    http: requests.Session,
+    api_base: str,
+    token: str,
+    *,
+    tags: list[str],
+    ephemeral: bool,
+    preauthorized: bool,
+    expiry_seconds: int,
+    description: str,
+    timeout: float,
+) -> str:
+    """Create a single-use, tagged Tailscale auth key.
+
+    Args:
+        http: HTTP session.
+        api_base: Tailscale API base URL.
+        token: OAuth access token (scope ``auth_keys``).
+        tags: Tags the key assigns to the device.
+        ephemeral: Whether the device is ephemeral.
+        preauthorized: Whether the device skips manual approval.
+        expiry_seconds: Key lifetime in seconds.
+        description: Key description shown in the admin console.
+        timeout: Request timeout in seconds.
+
+    Returns:
+        The key. The caller must never log or store it.
+
+    Raises:
+        RuntimeError: On a non-2xx response; the message carries the status only.
+        requests.RequestException: On a network error.
+        ValueError: On an unparsable body.
+        KeyError: On a missing field.
+        TypeError: On an unexpected shape.
+    """
+    resp = http.post(
+        f"{api_base}/tailnet/-/keys",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "capabilities": {
+                "devices": {
+                    "create": {
+                        "reusable": False,
+                        "ephemeral": ephemeral,
+                        "preauthorized": preauthorized,
+                        "tags": list(tags),
+                    }
+                }
+            },
+            "expirySeconds": expiry_seconds,
+            "description": description,
+        },
+        timeout=timeout,
+    )
+    if not 200 <= resp.status_code < 300:
+        raise RuntimeError(f"auth key request failed with HTTP {resp.status_code}")
+    key = resp.json()["key"]
+    if not isinstance(key, str):
+        raise TypeError("key is not a string")
+    return key
+
+
 def _fetch_devices(
     http: requests.Session, api_base: str, token_creds: tuple[str, str], timeout: float
 ) -> tuple[str, list[dict[str, Any]]]:
@@ -487,17 +577,7 @@ def _fetch_devices(
         KeyError: On a missing field.
         TypeError: On an unexpected shape.
     """
-    client_id, client_secret = token_creds
-    resp = http.post(
-        f"{api_base}/oauth/token",
-        data={"client_id": client_id, "client_secret": client_secret},
-        timeout=timeout,
-    )
-    if not 200 <= resp.status_code < 300:
-        raise RuntimeError(f"token request failed with HTTP {resp.status_code}")
-    token = resp.json()["access_token"]
-    if not isinstance(token, str):
-        raise TypeError("access_token is not a string")
+    token = request_oauth_token(http, api_base, *token_creds, timeout)
     resp = http.get(
         f"{api_base}/tailnet/-/devices",
         headers={"Authorization": f"Bearer {token}"},

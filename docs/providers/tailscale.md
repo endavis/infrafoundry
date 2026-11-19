@@ -201,7 +201,19 @@ Each resource owns the device's full set of routes or tags, so at most one `devi
 
 ### Joining an OPNsense node with a minted key
 
-The live test fed a `tailnet_key` to a firewall: read the key from the output, store it in SOPS without printing it, and reference it from `opnsense.tailscale.auth.pre_auth_key`. The box does not echo a stored key back reliably, so set `update_pre_auth_key: true` for the apply that should write a new key:
+Prefer `opnsense.tailscale.auth.mint`: the firewall mints a single-use, tagged key from an OAuth client at apply time, so no key is kept in secrets and a rebuild needs no manual step. The OAuth client needs the `auth_keys` scope and must own the tags in `tagOwners`. Nothing is minted when the node is already `Running`. See [Minting the key](../development/opnsense-resource-coverage.md#minting-the-key-1510); this path has not been run against a live tailnet.
+
+```yaml
+opnsense:
+  tailscale:
+    auth:
+      mint:
+        oauth_client_id: secret://env_secrets/opnsense/tailscale/auth/oauth_client_id
+        oauth_client_secret: secret://env_secrets/opnsense/tailscale/auth/oauth_client_secret
+        tags: [tag:example]
+```
+
+The alternative below uses a `tailnet_key` of this provider and stores the key. The live test fed a `tailnet_key` to a firewall: read the key from the output, store it in SOPS without printing it, and reference it from `opnsense.tailscale.auth.pre_auth_key`. The box does not echo a stored key back reliably, so set `update_pre_auth_key: true` for the apply that should write a new key:
 
 ```bash
 terraform -chdir=generated/<env>/terraform/tailscale output -json tailnet_key_<name> \

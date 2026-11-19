@@ -51,3 +51,23 @@ def test_docs_example_loads_builds_and_validates(tmp_path: Path) -> None:
     report = ValidationReport()
     TailscaleValidator(report).validate(OPNsenseValidationContext(resources=found))
     assert [r.message for r in report.results if r.level == ValidationLevel.ERROR] == []
+
+
+def test_docs_mint_example_loads_and_validates(tmp_path: Path) -> None:
+    text = DOC.read_text(encoding="utf-8")
+    section = text.split("## Tailscale (#787)", 1)[1].split("\n## ", 1)[0]
+    blocks = re.findall(r"```yaml\n(.*?)```", section, re.DOTALL)
+    block = next(b for b in blocks if "mint:" in b)
+    data = yaml.safe_load(block)
+    resources = PackageLoader(tmp_path)._parse_resources_from_data(data, "doc.yaml", "opnsense")
+    assert [r.type for r in resources] == ["tailscale.auth"]
+    auth = TailscaleAuthService.__new__(TailscaleAuthService)
+    assert auth.build_desired(resources[0]) == {
+        "login_server": "https://controlplane.tailscale.com"
+    }
+    report = ValidationReport()
+    TailscaleValidator(report).validate(OPNsenseValidationContext(resources=resources))
+    problems = [
+        r.message for r in report.results if r.level != ValidationLevel.INFO and not r.passed
+    ]
+    assert problems == []

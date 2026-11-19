@@ -7,7 +7,10 @@ secret.
 - Settings: unknown or refused keys are ERRORs (refused keys carry a hint); types and
   ranges use the service's own rules.
 - Auth: unknown keys are ERRORs. ``pre_auth_key`` must be a ``secret://`` reference; a
-  literal is an ERROR. ``update_pre_auth_key`` must be a boolean and needs a
+  literal is an ERROR. ``mint`` (#1510) excludes ``pre_auth_key`` and ``update_pre_auth_key``,
+  needs ``secret://`` OAuth credentials and valid ``tags``, ``ephemeral``, ``preauthorized``
+  and ``expiry_seconds``; a ``login_server`` other than the Tailscale control plane is a
+  WARNING. ``update_pre_auth_key`` must be a boolean and needs a
   ``pre_auth_key``. ``login_server`` must be an ``http(s)://`` URL.
 - Subnets: unknown keys are ERRORs (``uuid`` carries a hint). ``subnet`` is required, a
   valid network CIDR with no host bits. ``description`` must be a string and ``lock`` a
@@ -30,6 +33,7 @@ from infrafoundry.providers.opnsense.services import tailscale_subnets as subnet
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
 _SECRET_URI = re.compile(r"^secret://[^/]+/.+$")
+_CONTROL_PLANE_HOST = "controlplane.tailscale.com"
 _URL = re.compile(r"^https?://[^\s/]+\S*$")
 
 
@@ -115,7 +119,11 @@ class TailscaleValidator(SpecializedValidator[OPNsenseValidationContext]):
                     f"{prefix}_update_pre_auth_key",
                     f"{label} update_pre_auth_key must be a boolean",
                 )
-            elif config["update_pre_auth_key"] and not config.get("pre_auth_key"):
+            elif (
+                config["update_pre_auth_key"]
+                and "mint" not in config
+                and not config.get("pre_auth_key")
+            ):
                 self._error(
                     f"{prefix}_update_pre_auth_key",
                     f"{label} sets update_pre_auth_key but no pre_auth_key",
@@ -125,6 +133,39 @@ class TailscaleValidator(SpecializedValidator[OPNsenseValidationContext]):
             if not isinstance(server, str) or not _URL.match(server):
                 self._error(
                     f"{prefix}_login_server", f"{label} login_server must be an http(s):// URL"
+                )
+        if "mint" in config:
+            self._validate_mint(config, label, prefix)
+
+    def _validate_mint(self, config: dict[str, Any], label: str, prefix: str) -> None:
+        try:
+            spec = auth_svc.parse_mint(config)
+        except InvalidConfigurationError as exc:
+            self._error(f"{prefix}_mint", str(exc))
+            return
+        if spec is None:
+            return
+        for field_name, value in (
+            ("oauth_client_id", spec.oauth_client_id),
+            ("oauth_client_secret", spec.oauth_client_secret),
+        ):
+            if not _SECRET_URI.match(value):
+                self._error(
+                    f"{prefix}_mint_{field_name}_literal_secret",
+                    f"{label} mint.{field_name} must be a secret:// reference, not a literal value",
+                )
+        server = config.get("login_server")
+        if isinstance(server, str) and _URL.match(server):
+            host = server.split("://", 1)[1].split("/", 1)[0].lower()
+            if host != _CONTROL_PLANE_HOST:
+                self.report.add_check(
+                    check_name=f"{prefix}_mint_login_server",
+                    passed=False,
+                    message=(
+                        f"{label} mint creates keys through the Tailscale API, which a "
+                        f"login_server other than {_CONTROL_PLANE_HOST} may not accept"
+                    ),
+                    level=ValidationLevel.WARNING,
                 )
 
     # -- subnets ------------------------------------------------------------------

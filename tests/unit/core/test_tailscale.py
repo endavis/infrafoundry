@@ -27,10 +27,12 @@ from infrafoundry.core.tailscale import (
     TAILSCALE_MODULE_SOURCE,
     TailnetDeviceCleanup,
     TailscaleSchemaError,
+    create_auth_key,
     device_matches,
     plan_tailnet_cleanup,
     process_tailscale_config,
     remove_tailnet_devices,
+    request_oauth_token,
 )
 
 
@@ -381,3 +383,78 @@ class TestRemoveTailnetDevices:
             text = " ".join(report.removed + report.skipped + report.warnings) + caplog.text
             assert CLIENT_SECRET not in text
             assert TOKEN not in text
+
+
+class TestMintHelpers:
+    def test_request_oauth_token_returns_token(self) -> None:
+        session = MagicMock()
+        session.post.return_value = _resp(200, {"access_token": "fake-token"})
+        assert request_oauth_token(session, "https://api.example.com", "cid", "csec", 5.0) == (
+            "fake-token"
+        )
+        assert session.post.call_args.args[0] == "https://api.example.com/oauth/token"
+        assert session.post.call_args.kwargs["data"] == {
+            "client_id": "cid",
+            "client_secret": "csec",
+        }
+
+    def test_request_oauth_token_status_only_error(self) -> None:
+        session = MagicMock()
+        session.post.return_value = _resp(401, {"error": "csec"})
+        with pytest.raises(RuntimeError, match="HTTP 401") as info:
+            request_oauth_token(session, "https://api.example.com", "cid", "csec", 5.0)
+        assert "csec" not in str(info.value)
+
+    def test_request_oauth_token_rejects_non_string(self) -> None:
+        session = MagicMock()
+        session.post.return_value = _resp(200, {"access_token": 5})
+        with pytest.raises(TypeError):
+            request_oauth_token(session, "https://api.example.com", "cid", "csec", 5.0)
+
+    def _create(self, session: MagicMock) -> str:
+        return create_auth_key(
+            session,
+            "https://api.example.com",
+            "fake-token",
+            tags=["tag:example"],
+            ephemeral=True,
+            preauthorized=False,
+            expiry_seconds=600,
+            description="d",
+            timeout=5.0,
+        )
+
+    def test_create_auth_key_request_and_result(self) -> None:
+        session = MagicMock()
+        session.post.return_value = _resp(200, {"key": "tskey-auth-fake"})
+        assert self._create(session) == "tskey-auth-fake"
+        call = session.post.call_args
+        assert call.args[0] == "https://api.example.com/tailnet/-/keys"
+        assert call.kwargs["headers"] == {"Authorization": "Bearer fake-token"}
+        assert call.kwargs["json"] == {
+            "capabilities": {
+                "devices": {
+                    "create": {
+                        "reusable": False,
+                        "ephemeral": True,
+                        "preauthorized": False,
+                        "tags": ["tag:example"],
+                    }
+                }
+            },
+            "expirySeconds": 600,
+            "description": "d",
+        }
+
+    def test_create_auth_key_status_only_error(self) -> None:
+        session = MagicMock()
+        session.post.return_value = _resp(403, {"message": "tskey-auth-leak"})
+        with pytest.raises(RuntimeError, match="HTTP 403") as info:
+            self._create(session)
+        assert "leak" not in str(info.value)
+
+    def test_create_auth_key_rejects_non_string_key(self) -> None:
+        session = MagicMock()
+        session.post.return_value = _resp(200, {"key": ["x"]})
+        with pytest.raises(TypeError):
+            self._create(session)
