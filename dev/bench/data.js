@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795105358247,
+  "lastUpdate": 1795107276800,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3766,6 +3766,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006230791767393323",
             "extra": "mean: 76.88837289632885 usec\nrounds: 13607"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "085ae3f608d4d33eafcc039d7ecbeaecb73b3e2c",
+          "message": "fix: label drift on adopted managed resources as update, not create (merges PR #1502, addresses #1495)\n\ninfra drift detect planned through a direct runner without the\nenvironment's managed rows, so a resource an earlier apply adopted was\nlabelled create. DriftDetector now takes the state manager and passes the\nmanaged set to plan, as infra plan does.\n\nAddresses #1495\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T16:53:33Z",
+          "tree_id": "2222af7af7db4baa814238701b259f1078f4c015",
+          "url": "https://github.com/endavis/infrafoundry/commit/085ae3f608d4d33eafcc039d7ecbeaecb73b3e2c"
+        },
+        "date": 1795107276289,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 66.68619506421119,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0014895166062429775",
+            "extra": "mean: 14.995607397259871 msec\nrounds: 73"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13064.679274120575,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004781653637252696",
+            "extra": "mean: 76.54225404376129 usec\nrounds: 13663"
           }
         ]
       }
