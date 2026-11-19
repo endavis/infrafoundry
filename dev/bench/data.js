@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795107276800,
+  "lastUpdate": 1795108178077,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3804,6 +3804,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004781653637252696",
             "extra": "mean: 76.54225404376129 usec\nrounds: 13663"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "423d3229d78d5e60e0edd4a31f08f5fd6b48c96c",
+          "message": "feat: export legacy opnsense filter rules to infrafoundry yaml (merges PR #1503, addresses #1497)\n\nAdd --include-legacy and --allow-partial to config migrate for the\nopnsense firewall.rules component. The legacy rules are read from the\nconfiguration backup (core/backup/download, read-only GET), parsed with\ndefusedxml, and mapped to the firewall.rules schema in document order.\nFields the schema cannot express are reported per rule, and the command\nexits non-zero unless --allow-partial is passed.\n\nAdd defusedxml as a runtime dependency (hardened parsing of the\ndownloaded config.xml) and types-defusedxml to the dev extra. Document\nthe migration guide, the relation to the GUI-only migration page and the\nmeasured cutover order; amend ADR-0015.\n\nAddresses #1497\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T17:08:27Z",
+          "tree_id": "00b53a3b08c77b96d7b51508c631801e4462eb3e",
+          "url": "https://github.com/endavis/infrafoundry/commit/423d3229d78d5e60e0edd4a31f08f5fd6b48c96c"
+        },
+        "date": 1795108177371,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 73.2810327839078,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006324500649585616",
+            "extra": "mean: 13.646095886077573 msec\nrounds: 79"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14373.547203365466,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004516842849923541",
+            "extra": "mean: 69.57224864895264 usec\nrounds: 15729"
           }
         ]
       }
