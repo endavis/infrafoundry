@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795017619569,
+  "lastUpdate": 1795084440146,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3614,6 +3614,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005681747341418997",
             "extra": "mean: 60.91854571476519 usec\nrounds: 18167"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4f52dc4d76e88201778624a01acedafe229b9bc2",
+          "message": "feat: add an openwrt test vm blueprint with .img.gz disk import (merges PR #1494, addresses #1493)\n\n* feat: add an openwrt test vm blueprint with .img.gz disk import\n\nBuild a stock OpenWrt test VM through InfraFoundry (#1493):\n\n- disk_image_source accepts .img.gz; the template derives the raw image\n  name from the suffix and decompresses with gunzip\n- new openwrt-vm blueprint: imports the stock x86-64 image, bootstraps\n  over the serial console with expect (LAN address, SSH key, key-only\n  dropbear, LAN DHCP/RA/DHCPv6/NDP off) and waits for the SSH banner\n- the bootstrap reconnects while the serial socket refuses connections,\n  waits for procd init complete before changing anything, and sends the\n  SSH key in 64-character chunks with a length check, because the\n  console drops characters from long lines\n- log_file -a, so the expect transcript is actually recorded\n- example consumer, README and Proxmox docs\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: press enter again when the openwrt console drops the first keypress\n\nOn a rebuild the bootstrap timed out after boot: the Enter sent once the\nconsole went quiet produced no output, so no prompt ever came (#1493).\nPress Enter again every 10 seconds until the prompt shows or the boot\ndeadline passes; covered by a fake console that drops the first Enter.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T10:33:04Z",
+          "tree_id": "7d84366796d0c541b51fce2c58a672c9cf4b6d6d",
+          "url": "https://github.com/endavis/infrafoundry/commit/4f52dc4d76e88201778624a01acedafe229b9bc2"
+        },
+        "date": 1795084439748,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 97.54250725374438,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0002129962087104053",
+            "extra": "mean: 10.251940699029067 msec\nrounds: 103"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15221.269928819567,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001532171128111255",
+            "extra": "mean: 65.69754065701346 usec\nrounds: 17168"
           }
         ]
       }
