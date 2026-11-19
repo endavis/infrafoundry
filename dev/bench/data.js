@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795097217071,
+  "lastUpdate": 1795105358247,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3728,6 +3728,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005361795205173726",
             "extra": "mean: 92.38260350922064 usec\nrounds: 11342"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5fbdea1a1b3bbe986359430cc446eee6010e04c5",
+          "message": "docs: correct the stale tailscale endpoint verification comment (merges PR #1501, addresses #1498)\n\nThe subnet add, set and del actions and service/reconfigure were confirmed\nlive, so drop the \"ASSUMED\" note and point at the resource coverage doc.\n\nAddresses #1498\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T16:21:19Z",
+          "tree_id": "6bda829a294430ce5dcf3cf87a4b323edc7542d8",
+          "url": "https://github.com/endavis/infrafoundry/commit/5fbdea1a1b3bbe986359430cc446eee6010e04c5"
+        },
+        "date": 1795105357143,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 67.3157901509223,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0009065808441367432",
+            "extra": "mean: 14.855355597223111 msec\nrounds: 72"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13005.867627714444,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006230791767393323",
+            "extra": "mean: 76.88837289632885 usec\nrounds: 13607"
           }
         ]
       }
