@@ -84,13 +84,23 @@ expect {
   eof { fail "Serial console closed during boot" }
   timeout {}
 }
-set timeout {{ openwrt_boot_timeout }}
+# An Enter sent while procd still sets up the console can be dropped without
+# any output (measured), so press it again every 10 seconds until the prompt
+# shows or the boot deadline passes.
+set timeout 10
 send "\r"
 expect {
   -re $prompt {}
   eof { fail "Serial console closed during boot" }
-  timeout { fail "Timed out waiting for the console prompt after boot" }
+  timeout {
+    if {[clock seconds] >= $deadline} {
+      fail "Timed out waiting for the console prompt after boot"
+    }
+    send "\r"
+    exp_continue
+  }
 }
+set timeout {{ openwrt_boot_timeout }}
 
 proc run {cmd} {
   global prompt

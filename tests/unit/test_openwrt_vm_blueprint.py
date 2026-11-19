@@ -205,8 +205,9 @@ attrs = termios.tcgetattr(fd)
 attrs[3] &= ~termios.ECHO
 termios.tcsetattr(fd, termios.TCSANOW, attrs)
 closed_once = sys.argv[3] if len(sys.argv) > 3 else ""
+drop_once = sys.argv[4] if len(sys.argv) > 4 else ""
+import os
 if closed_once:
-    import os
     if not os.path.exists(closed_once):
         open(closed_once, "w").close()
         sys.exit(0)
@@ -227,6 +228,9 @@ read()
 out("\r\n" + PROMPT)
 while True:
     line = read()
+    if line == "" and drop_once and not os.path.exists(drop_once):
+        open(drop_once, "w").close()
+        continue
     out(line + "\r\n")
     if line.startswith("echo \"BOOTSTRAP"):
         out("BOOTSTRAP OK\r\n" + PROMPT)
@@ -244,7 +248,7 @@ def _key_from_chunks(lines: list[str]) -> str:
 
 
 def _run_bootstrap(
-    tmp_path: Path, fail_on: str, *, close_first: bool = False
+    tmp_path: Path, fail_on: str, *, close_first: bool = False, drop_first_enter: bool = False
 ) -> tuple[subprocess.CompletedProcess[str], Path]:
     console = tmp_path / "console.py"
     console.write_text(FAKE_CONSOLE)
@@ -253,9 +257,11 @@ def _run_bootstrap(
     script = _expect_script(openwrt_boot_timeout=20)
     spawn = "spawn socat STDIO,rawer UNIX-CONNECT:/var/run/qemu-server/952.serial0"
     assert spawn in script
-    closed_once = tmp_path / "closed-once" if close_first else ""
+    closed_once = tmp_path / "closed-once" if close_first else "{}"
+    dropped_once = tmp_path / "dropped-once" if drop_first_enter else ""
     script = script.replace(
-        spawn, f"spawn {sys.executable} -I {console} {inputs} {{{fail_on}}} {closed_once}"
+        spawn,
+        f"spawn {sys.executable} -I {console} {inputs} {{{fail_on}}} {closed_once} {dropped_once}",
     )
     script = re.sub(r"(?m)^set logpath .*$", f"set logpath {log}", script)
     exp = tmp_path / "bootstrap.exp"
@@ -373,3 +379,16 @@ def test_a_long_key_is_sent_in_short_chunks_and_length_checked() -> None:
     chunks = [line.replace("\\[", "[").replace("\\]", "]") for line in sent]
     assert _key_from_chunks(chunks) == long_key
     assert any(f"-eq {len(long_key) + 1}" in line for line in sent)
+
+
+@pytest.mark.skipif(not shutil.which("expect"), reason="expect is not installed")
+def test_bootstrap_presses_enter_again_when_the_first_one_is_dropped(tmp_path: Path) -> None:
+    # An Enter sent while procd still sets up the console can vanish (measured).
+    result, inputs = _run_bootstrap(tmp_path, "", drop_first_enter=True)
+
+    assert (tmp_path / "dropped-once").exists()
+    assert result.returncode == 0, result.stdout + result.stderr
+    sent = inputs.read_text().splitlines()
+    assert sent[:3] == ["", "", ""]
+    assert "init complete" in sent[3]
+    assert "Bootstrap applied" in result.stdout

@@ -22,7 +22,8 @@ comes up with key-only root SSH at a static management address.
    - presses Enter once when the console asks for it. Stock OpenWrt offers this
      shell early in boot, while the kernel still writes to the console, so the
      script waits until the console has been quiet for 5 seconds, presses Enter
-     again for a fresh prompt, and waits (up to 120 seconds) until procd's
+     again for a fresh prompt (every 10 seconds until it shows, since an early
+     keypress can be dropped), and waits (up to 120 seconds) until procd's
      `- init complete -` shows in `logread` before it changes anything. procd
      logs that line to syslog only, not to the console;
    - writes `ssh_public_key` (type and base64 only, the comment is dropped) to
