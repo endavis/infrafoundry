@@ -51,6 +51,9 @@ EXPECTED_RESOURCE_TYPES = [
     "monit.alerts",
     "monit.tests",
     "monit.services",
+    "radvd",
+    "system.firmware",
+    "system.tuning",
 ]
 
 
@@ -217,6 +220,42 @@ def test_unbound_host_override_extractor_delegates_to_manager() -> None:
     init_mock.assert_called_once()
     migrate_mock.assert_called_once_with("env_test")
     assert result == "unbound_host_override: stub"
+
+
+@pytest.mark.usefixtures("provider")
+@pytest.mark.parametrize(
+    ("resource_type", "module", "class_name"),
+    [
+        ("radvd", "radvd", "RadvdManager"),
+        ("system.firmware", "system_firmware", "SystemFirmwareManager"),
+        ("system.tuning", "system_tuning", "SystemTuningManager"),
+    ],
+)
+def test_singleton_extractors_delegate_to_manager(
+    resource_type: str, module: str, class_name: str
+) -> None:
+    """``radvd``, ``system.firmware`` and ``system.tuning`` delegate to their manager (#1508)."""
+    import importlib
+
+    manager_class = getattr(
+        importlib.import_module(f"infrafoundry.providers.opnsense.components.{module}"),
+        class_name,
+    )
+
+    extractor = get_extractor("opnsense", resource_type)
+
+    assert isinstance(extractor, _ExtractorAdapter)
+    assert extractor.manager_class is manager_class
+
+    with (
+        patch.object(manager_class, "__init__", return_value=None) as init_mock,
+        patch.object(manager_class, "migrate", return_value="stub: yaml") as migrate_mock,
+    ):
+        result = extractor.extract("env_test")
+
+    init_mock.assert_called_once()
+    migrate_mock.assert_called_once_with("env_test")
+    assert result == "stub: yaml"
 
 
 @pytest.mark.usefixtures("provider")

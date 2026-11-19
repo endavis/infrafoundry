@@ -226,9 +226,12 @@ class OPNsenseProvider(
         )
         from .components.monit_settings import MonitSettingsManager
         from .components.nat_rule import NATRuleManager
+        from .components.radvd import RadvdManager
         from .components.source_nat import SourceNatManager  # #1333
         from .components.static_route import StaticRouteManager
         from .components.syslog_settings import SyslogSettingsManager  # #804
+        from .components.system_firmware import SystemFirmwareManager
+        from .components.system_tuning import SystemTuningManager
         from .components.tailscale_auth import TailscaleAuthManager  # #787
         from .components.tailscale_settings import TailscaleSettingsManager  # #787
         from .components.tailscale_subnets import TailscaleSubnetManager  # #787
@@ -279,6 +282,9 @@ class OPNsenseProvider(
             ("monit.alerts", MonitAlertsManager),
             ("monit.tests", MonitTestsManager),
             ("monit.services", MonitServicesManager),
+            ("radvd", RadvdManager),
+            ("system.firmware", SystemFirmwareManager),
+            ("system.tuning", SystemTuningManager),
         ]
         for resource_type, manager_class in components:
             register_extractor(
