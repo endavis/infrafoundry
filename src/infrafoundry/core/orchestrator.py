@@ -135,6 +135,7 @@ class Orchestrator:
             self.runner_registry,
             self.event_manager,
             self.providers,
+            state_manager=self.state_manager,
         )
         self.requirements_manager = RequirementsManager(
             self.config_manager, providers=self.providers

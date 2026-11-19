@@ -11,10 +11,12 @@ from infrafoundry.core.exceptions import (
     InfraFoundryError,
     TerraformError,
 )
+from infrafoundry.core.managed_set import build_managed_resources
 from infrafoundry.core.protocols import DriftDetectable, Plannable
 from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.result_types import DriftInfo
 from infrafoundry.core.runners import BaseRunner, RunnerRegistry
+from infrafoundry.core.state import StateManager
 
 
 class DriftDetector(BaseManager):
@@ -26,6 +28,7 @@ class DriftDetector(BaseManager):
         runner_registry: RunnerRegistry,
         event_manager: EventManager,
         providers: dict[str, ProviderBase],
+        state_manager: StateManager | None = None,
     ) -> None:
         """Initialize drift detector.
 
@@ -34,12 +37,16 @@ class DriftDetector(BaseManager):
             runner_registry: Registry for creating tool runners
             event_manager: Event manager for notifications
             providers: Dict of registered provider instances
+            state_manager: State manager that supplies the managed rows a direct runner
+                needs to tell an adopted resource (``update``) from a new one (``create``),
+                as ``infra plan`` does (ADR-0018, #1495). Without it no managed set is passed.
         """
         super().__init__()
         self.config_manager = config_manager
         self.runner_registry = runner_registry
         self.event_manager = event_manager
         self.providers = providers
+        self.state_manager = state_manager
 
     def detect(self, env_name: str) -> dict[str, Any]:
         """Detect infrastructure drift from declared configuration.
@@ -192,7 +199,7 @@ class DriftDetector(BaseManager):
         """
         direct_runner = self._direct_drift_runner(provider)
         if direct_runner is not None:
-            return self._detect_direct(direct_runner, provider, env_name)
+            return self._detect_direct(direct_runner, provider, provider_name, env_name)
 
         if not isinstance(terraform_runner, Plannable):
             self._log_warning(
@@ -235,12 +242,21 @@ class DriftDetector(BaseManager):
         return None
 
     def _detect_direct(
-        self, runner: BaseRunner, provider: ProviderBase, env_name: str
+        self, runner: BaseRunner, provider: ProviderBase, provider_name: str, env_name: str
     ) -> DriftInfo:
-        """Plan add-only through a direct runner and parse the result as drift."""
+        """Plan add-only through a direct runner and parse the result as drift.
+
+        The environment's managed rows go to ``plan`` as ``infra plan`` does, so a
+        resource an earlier apply adopted is labelled ``update``, not ``create``.
+        """
         provider.set_environment(env_name)
         planner = cast(Plannable, runner)
-        plan_result = planner.plan(provider, add_only=True, env_name=env_name)
+        kwargs: dict[str, Any] = {}
+        if self.state_manager is not None:
+            kwargs["managed_resources"] = build_managed_resources(
+                self.state_manager.get_managed_resources(env_name, provider_name), provider_name
+            )
+        plan_result = planner.plan(provider, add_only=True, env_name=env_name, **kwargs)
         return cast(DriftDetectable, runner).parse_plan_for_drift(plan_result)
 
     @override

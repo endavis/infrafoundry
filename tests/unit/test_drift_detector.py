@@ -367,6 +367,40 @@ class TestDirectRunnerDrift:
         emitted = [c.args[0] for c in events.emit_event.call_args_list]
         assert EventType.DRIFT_DETECTED not in emitted
 
+    def test_managed_rows_reach_plan(self, tmp_path: Any) -> None:
+        """Drift plans with the env's managed rows, as ``infra plan`` does (#1495)."""
+        provider, patches, rest_plan = self._mikrotik(tmp_path, ("update",))
+        detector, _ = _direct_detector(provider, "mikrotik")
+        row = SimpleNamespace(
+            resource_type="interface.bridge.port",
+            name="p2",
+            config={"name": "p2", "type": "interface.bridge.port", "provider": "mikrotik"},
+        )
+        state_manager = MagicMock()
+        state_manager.get_managed_resources.return_value = [row]
+        detector.state_manager = state_manager
+        try:
+            detector.detect("lab")
+        finally:
+            for p in patches:
+                p.stop()
+
+        state_manager.get_managed_resources.assert_called_once_with("lab", "mikrotik")
+        managed = rest_plan.call_args.kwargs["managed_resources"]
+        assert [r.name for r in managed["interface.bridge.port"]] == ["p2"]
+
+    def test_no_state_manager_passes_no_managed_set(self, tmp_path: Any) -> None:
+        """Without a state manager the plan call is unchanged."""
+        provider, patches, rest_plan = self._mikrotik(tmp_path, ("update",))
+        detector, _ = _direct_detector(provider, "mikrotik")
+        try:
+            detector.detect("lab")
+        finally:
+            for p in patches:
+                p.stop()
+
+        assert not rest_plan.call_args.kwargs.get("managed_resources")
+
     def test_provider_without_direct_hook_uses_terraform(self) -> None:
         provider = SimpleNamespace(name="proxmox", set_environment=lambda env: None)
         detector, _ = _direct_detector(provider, "proxmox")
