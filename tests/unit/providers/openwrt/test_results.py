@@ -14,7 +14,9 @@ from infrafoundry.providers.openwrt.components.results import (
 )
 from infrafoundry.providers.openwrt.schema import Desired, desired_from_resources
 
-from .conftest import MGMT_IP, doc, fixture_text, lan, printer, task, web
+from .conftest import MGMT_IP, doc, fixture_text, lan, printer, res, task, web
+
+_LAN = {"ipaddr": "192.0.2.1", "netmask": "255.255.255.0"}
 
 
 def _items(*resources: Any) -> list[Desired]:
@@ -202,3 +204,55 @@ def test_tasks_missing_from_the_output_are_ignored() -> None:
     result = interpret(parse_output(doc()), _spec(printer()), address=MGMT_IP, check=True)
     assert result.outcomes == []
     assert result.success
+
+
+def test_a_check_recorded_on_stock_openwrt_is_interpreted() -> None:
+    # Recorded with `ansible-playbook --check --diff` and the ansible.posix.json
+    # callback against stock OpenWrt 25.12.6; addresses and paths replaced with
+    # documentation values. The interface matches the device; the pool limit, the
+    # lease and the port forward differ.
+    items = (
+        res("network.interface", "lan-interface", interface="lan", **_LAN),
+        res("dhcp.pool", "lan-dhcp", interface="lan", start=100, limit=151, leasetime="12h"),
+        printer(hostname="printer-1"),
+        web(),
+    )
+    managed = {("network.interface", "lan-interface"), ("dhcp.pool", "lan-dhcp")}
+    result = _run("recorded_check_stock_25_12", _spec(*items, managed=managed))
+
+    assert result.success
+    assert result.has_changes
+    assert result.counts == {"create": 2, "update": 1, "delete": 0}
+    assert {(o.resource_name, o.action) for o in result.outcomes} == {
+        ("lan-dhcp", "update"),
+        ("printer", "create"),
+        ("web", "create"),
+    }
+    # Measured: for a section matched with `find` the collection reports an empty
+    # `before` in check mode, and the whole section, not only the change, as `after`.
+    diff = result.diffs["infrafoundry|dhcp.pool|lan-dhcp"]
+    assert diff["before"] == {}
+    assert diff["after"]["limit"] == "151"
+    assert diff["after"]["interface"] == "lan"
+
+
+def test_a_recorded_interface_change_is_refused_without_the_flag() -> None:
+    # Recorded on stock OpenWrt 25.12.6: moving the LAN address from .1 to .3 while
+    # the settings address is .1. A real device fills `before` for a named section.
+    spec = _spec(res("network.interface", "lan-interface", interface="lan", ipaddr="192.0.2.3"))
+    tasks = parse_output(fixture_text("recorded_check_management_stock_25_12"))
+    refused = interpret(tasks, spec, address="192.0.2.1", check=True, resolve=lambda h: h)
+    assert any("management network" in r for r in refused.refusals)
+
+    flagged = _spec(
+        res(
+            "network.interface",
+            "lan-interface",
+            interface="lan",
+            ipaddr="192.0.2.3",
+            confirm_management_change=True,
+        )
+    )
+    allowed = interpret(tasks, flagged, address="192.0.2.1", check=True, resolve=lambda h: h)
+    assert allowed.refusals == []
+    assert allowed.reconnect_host == "192.0.2.3"

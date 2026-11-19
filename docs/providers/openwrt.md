@@ -21,7 +21,7 @@ For a read-only backup of a device InfraFoundry does not manage, see [Device con
     - an apply deleted the lease and the port forward (`absent: true`) and restored the pool; the re-plan was clean;
     - a confirmed management-address change to an address the controller cannot reach failed with `INFRAFOUNDRY_ROLLBACK_PENDING`, and the device reverted to its old address by itself, with nothing left staged. The rpcd session's save directory stays until the session expires (the rollback timeout plus 300 seconds), then rpcd removes it.
 
-    Verified on a GL.iNet device running OpenWrt 23.05, before the session hand-over was changed to the replay: a check-mode plan, an apply that changed a DHCP pool and was confirmed, and a restore with a clean re-plan.
+    Verified on a GL.iNet device running OpenWrt 23.05, with the replay: an apply that changed a DHCP pool and was confirmed, a restore, and a clean re-plan after each, with nothing left staged. Over a slow SSH path each task costs one SSH round trip per module transfer; on that device an apply took about 6 minutes.
 
     - a confirmed management-address change to another reachable address reconnected to the new address, confirmed, and held past the rollback timeout; a second change moved it back, and the re-plan was clean.
 
