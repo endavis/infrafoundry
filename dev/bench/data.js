@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795084440146,
+  "lastUpdate": 1795084904982,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3652,6 +3652,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001532171128111255",
             "extra": "mean: 65.69754065701346 usec\nrounds: 17168"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "745f08a214a45ec8060db234e6957ff0cf40cf12",
+          "message": "feat: add an openwrt provider driven by community.openwrt playbooks (merges PR #1496, addresses #1482)\n\n* feat: add an openwrt provider driven by community.openwrt playbooks\n\nManage an OpenWrt device through generated community.openwrt playbooks\nrun by a dedicated OpenWrtAnsibleRunner (#1482):\n\n- network.interface, dhcp.pool, dhcp.host and firewall.redirect\n  resources, staged with the uci module and matched without renaming\n  sections made in the vendor UI\n- plan and drift run the playbook with --check --diff and parse the\n  ansible.posix.json callback output\n- apply commits through an rpcd session with ubus uci apply rollback,\n  reconnects, then confirms; an unreachable device reverts by itself\n- management-path changes are refused unless confirmed\n- providers can declare Ansible collections; deps check and deps sync\n  report and install them\n- host-key checking is forced on over the environment\n- ADR-0028 and the provider docs\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: replay staged openwrt changes into the rpcd session over ubus\n\nThe commit tail handed CLI-staged changes to the rpcd session by copying\nthem into /var/run/rpcd/uci-<session id>. On stock OpenWrt 25.12 rpcd no\nlonger names that directory after the session id and does not expose it,\nso apply committed nothing (#1482).\n\n- a packaged ucode helper replays cursor().changes() as ubus uci\n  add/set/delete calls on the session, maps anonymous sections, rebuilds\n  lists, refuses unsupported ops and reverts the CLI staging\n- the helper is named after the session id and removes itself before the\n  apply; the rescue reverts CLI and session staging\n- every connection checks the host key under the settings address\n  (HostKeyAlias), so the reconnect after a management-address change\n  stays strictly checked; the address must be a plain host name or IP\n- docs and ADR-0028 record the 25.12 finding and the live verification\n  on stock OpenWrt 25.12.6\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* test: add check-mode output recorded on stock openwrt as fixtures\n\nTwo ansible.posix.json documents recorded with --check --diff against\nstock OpenWrt 25.12.6, addresses and paths replaced with documentation\nvalues (#1482): a pool change, new lease and new port forward, and a LAN\naddress change that the management check must refuse without the flag.\nThe recording shows the collection reports an empty `before` for a\nsection matched with `find` in check mode, and full sections in the diff.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T10:40:29Z",
+          "tree_id": "cde5cfb8e8103fb8b5d0a5aa897f75810657cbe5",
+          "url": "https://github.com/endavis/infrafoundry/commit/745f08a214a45ec8060db234e6957ff0cf40cf12"
+        },
+        "date": 1795084904620,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 70.46075668494916,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004373480981440357",
+            "extra": "mean: 14.192297202701003 msec\nrounds: 74"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12962.85330260542,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000047252386415564845",
+            "extra": "mean: 77.14350973940351 usec\nrounds: 13707"
           }
         ]
       }
