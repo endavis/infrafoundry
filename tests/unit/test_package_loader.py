@@ -679,15 +679,15 @@ resources:
 
 
 def _create_blueprint(base_dir: Any, name: Any, manifest_data: Any, extra_files: Any = None) -> Any:
-    """Helper to create a blueprint directory under config_repo/blueprints/.
+    """Helper to create a blueprint directory under the test temp directory.
 
     Args:
-        base_dir: The envs/ directory (base_dir.parent / "blueprints" is used)
+        base_dir: The test temp directory (base_dir / "blueprints" is used)
         name: Blueprint name
         manifest_data: Dict for blueprint.yaml
         extra_files: Optional dict of relative_path -> content
     """
-    blueprint_dir = base_dir.parent / "blueprints" / name
+    blueprint_dir = base_dir / "blueprints" / name
     blueprint_dir.mkdir(parents=True, exist_ok=True)
 
     manifest_path = blueprint_dir / "blueprint.yaml"
@@ -714,7 +714,7 @@ class TestBlueprintIntegration:
     def test_blueprint_defaults_merged(self, temp_dir: Path) -> None:
         """Blueprint defaults are merged under package variables."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "test-bp",
@@ -750,7 +750,7 @@ class TestBlueprintIntegration:
     def test_blueprint_resources_inherited(self, temp_dir: Path) -> None:
         """Package without resources inherits from blueprint."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "infra-bp",
@@ -782,7 +782,7 @@ class TestBlueprintIntegration:
     def test_blueprint_events_inherited(self, temp_dir: Path) -> None:
         """Package without events inherits from blueprint."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         bp_dir = _create_blueprint(
             temp_dir,
             "event-bp",
@@ -814,7 +814,7 @@ class TestBlueprintIntegration:
     def test_package_overrides_blueprint_resources(self, temp_dir: Path) -> None:
         """Package's own resources take priority over blueprint."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "override-bp",
@@ -849,7 +849,7 @@ class TestBlueprintIntegration:
     def test_blueprint_file_fallback(self, temp_dir: Path) -> None:
         """Resource files fall back to blueprint dir when not in package."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "fallback-bp",
@@ -883,7 +883,7 @@ class TestBlueprintIntegration:
     def test_package_file_preferred_over_blueprint(self, temp_dir: Path) -> None:
         """Package's own resource file is used even if blueprint has same name."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "prefer-bp",
@@ -916,7 +916,7 @@ class TestBlueprintIntegration:
     def test_no_blueprint_works_unchanged(self, temp_dir: Path) -> None:
         """Packages without blueprint: key work exactly as before."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
 
         pkg_dir = _create_package(
@@ -958,7 +958,7 @@ class TestBlueprintIntegration:
     def test_blueprint_inventory_inherited(self, temp_dir: Path) -> None:
         """Inventory from blueprint is inherited and generated."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "inv-bp",
@@ -1004,7 +1004,7 @@ class TestBlueprintIntegration:
     def test_package_inventory_overrides_blueprint(self, temp_dir: Path) -> None:
         """Package's own inventory overrides blueprint inventory."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "inv-override-bp",
@@ -1042,7 +1042,7 @@ class TestBlueprintIntegration:
     def test_blueprint_handler_tagged_with_blueprint_dir(self, temp_dir: Path) -> None:
         """Event handlers from blueprint packages have _blueprint_dir tag."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         bp_dir = _create_blueprint(
             temp_dir,
             "tagged-bp",
@@ -1076,9 +1076,9 @@ class TestBlueprintIntegration:
     ) -> None:
         """Blueprint inventory `{% for %}` expands using consumer-supplied workers."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
 
-        blueprint_dir = temp_dir.parent / "blueprints" / "loop-bp"
+        blueprint_dir = temp_dir / "blueprints" / "loop-bp"
         blueprint_dir.mkdir(parents=True, exist_ok=True)
         (blueprint_dir / "blueprint.yaml").write_text(
             "name: loop-bp\n"
@@ -1154,9 +1154,9 @@ class TestBlueprintIntegration:
     def test_blueprint_inventory_raw_inheritance(self, temp_dir: Path) -> None:
         """Blueprint `inventory_raw` is inherited onto a consumer with no inventory."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
 
-        blueprint_dir = temp_dir.parent / "blueprints" / "raw-inherit-bp"
+        blueprint_dir = temp_dir / "blueprints" / "raw-inherit-bp"
         blueprint_dir.mkdir(parents=True, exist_ok=True)
         (blueprint_dir / "blueprint.yaml").write_text(
             "name: raw-inherit-bp\n"
@@ -1193,7 +1193,7 @@ class TestBlueprintIntegration:
     def test_secrets_override_blueprint_defaults(self, temp_dir: Path) -> None:
         """Secrets take priority over both blueprint defaults and package vars."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         _create_blueprint(
             temp_dir,
             "secret-bp",
@@ -1337,7 +1337,7 @@ class TestHandlerConfigTagging:
     ) -> None:
         """When a package consumes a blueprint, resource-level handlers also get _blueprint_dir."""
         resolver = BlueprintResolver(temp_dir)
-        resolver.blueprints_dir = temp_dir.parent / "blueprints"
+        resolver.blueprints_dir = temp_dir / "blueprints"
         bp_dir = _create_blueprint(
             temp_dir,
             "res-evt-bp",
