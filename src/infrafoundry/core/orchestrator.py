@@ -136,7 +136,9 @@ class Orchestrator:
             self.event_manager,
             self.providers,
         )
-        self.requirements_manager = RequirementsManager(self.config_manager)
+        self.requirements_manager = RequirementsManager(
+            self.config_manager, providers=self.providers
+        )
         self.deployment_executor = DeploymentExecutor(
             self.runner_registry,
             self.state_manager,

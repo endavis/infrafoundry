@@ -31,6 +31,7 @@ from infrafoundry.providers.kubernetes.validators import KubeconfigValidator
 from infrafoundry.providers.mikrotik import MikroTikProvider
 from infrafoundry.providers.oci import OCIProvider
 from infrafoundry.providers.oci.validator import OCIValidator
+from infrafoundry.providers.openwrt import OpenWrtProvider
 from infrafoundry.providers.opnsense import OPNsenseProvider
 from infrafoundry.providers.opnsense.validator import OPNsenseValidator
 from infrafoundry.providers.proxmox import ProxmoxProvider
@@ -287,6 +288,7 @@ def test_clean_provider_prints_nothing() -> None:
         TailscaleProvider,
         KubernetesProvider,
         MikroTikProvider,
+        OpenWrtProvider,
     ],
 )
 def test_provider_implements_validates_offline(provider_cls: Any, tmp_path: Path) -> None:

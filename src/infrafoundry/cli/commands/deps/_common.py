@@ -71,7 +71,7 @@ def render_report(report: RequirementsReport) -> None:
             status.kind.value,
             escape(status.installed or "-"),
             "[green]ok[/green]" if status.satisfied else f"[red]{escape(status.problem)}[/red]",
-            escape(", ".join(status.blueprints)),
+            escape(", ".join([*status.blueprints, *(f"provider {p}" for p in status.providers)])),
         )
     console.print(table)
 

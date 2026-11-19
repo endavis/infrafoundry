@@ -1,0 +1,714 @@
+{
+    "custom_stats": {},
+    "global_custom_stats": {},
+    "plays": [
+        {
+            "play": {
+                "duration": {
+                    "end": "2026-11-19T10:20:46.986270Z",
+                    "start": "2026-11-19T10:20:45.286971Z"
+                },
+                "id": "bc2411a5-25ad-44f8-e71f-000000000002",
+                "name": "infrafoundry openwrt",
+                "path": "/work/generated/test/ansible/openwrt/openwrt.yml:1"
+            },
+            "tasks": [
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "community.openwrt.uci",
+                            "changed": false,
+                            "changed_when_result": false,
+                            "changes": {},
+                            "command": "changes",
+                            "config": "network",
+                            "msg": "",
+                            "result": "",
+                            "warnings": [
+                                "sftp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information",
+                                "scp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information"
+                            ]
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:45.513296Z",
+                            "start": "2026-11-19T10:20:45.293093Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000004",
+                        "name": "infrafoundry|preflight|network",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:5"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "community.openwrt.uci",
+                            "changed": false,
+                            "changed_when_result": false,
+                            "changes": {},
+                            "command": "changes",
+                            "config": "dhcp",
+                            "msg": "",
+                            "result": "",
+                            "warnings": [
+                                "sftp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information",
+                                "scp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information"
+                            ]
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:45.662596Z",
+                            "start": "2026-11-19T10:20:45.514277Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000005",
+                        "name": "infrafoundry|preflight|dhcp",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:13"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "community.openwrt.uci",
+                            "changed": false,
+                            "changed_when_result": false,
+                            "changes": {},
+                            "command": "changes",
+                            "config": "firewall",
+                            "msg": "",
+                            "result": "",
+                            "warnings": [
+                                "sftp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information",
+                                "scp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information"
+                            ]
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:45.805678Z",
+                            "start": "2026-11-19T10:20:45.663554Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000006",
+                        "name": "infrafoundry|preflight|firewall",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:21"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.fail",
+                            "changed": false,
+                            "false_condition": "((infrafoundry_pending_network.changes | default({})) | length > 0) or ((infrafoundry_pending_dhcp.changes | default({})) | length > 0) or ((infrafoundry_pending_firewall.changes | default({})) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:45.822417Z",
+                            "start": "2026-11-19T10:20:45.806889Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000007",
+                        "name": "infrafoundry|preflight|fail",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:29"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "community.openwrt.uci",
+                            "changed": true,
+                            "command": "section",
+                            "config": "network",
+                            "diff": [
+                                {
+                                    "after": {
+                                        "device": "br-lan",
+                                        "gateway": "192.0.2.254",
+                                        "ip6assign": "60",
+                                        "ipaddr": "192.0.2.3",
+                                        "netmask": "255.255.255.0",
+                                        "proto": "static"
+                                    },
+                                    "after_header": "network.lan=interface",
+                                    "before": {
+                                        "device": "br-lan",
+                                        "gateway": "192.0.2.254",
+                                        "ip6assign": "60",
+                                        "ipaddr": "192.0.2.1",
+                                        "netmask": "255.255.255.0",
+                                        "proto": "static"
+                                    },
+                                    "before_header": "network.lan=interface"
+                                }
+                            ],
+                            "msg": "",
+                            "result": "lan",
+                            "section": "lan",
+                            "warnings": [
+                                "sftp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information",
+                                "scp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information"
+                            ]
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:45.972586Z",
+                            "start": "2026-11-19T10:20:45.823382Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000009",
+                        "name": "infrafoundry|network.interface|lan-interface",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:40"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "community.openwrt.uci",
+                            "changed": true,
+                            "command": "section",
+                            "config": "dhcp",
+                            "diff": [
+                                {
+                                    "after": {
+                                        "dhcpv4": "server",
+                                        "dhcpv6": "disabled",
+                                        "ignore": "1",
+                                        "interface": "lan",
+                                        "leasetime": "12h",
+                                        "limit": "151",
+                                        "ndp": "disabled",
+                                        "ra": "disabled",
+                                        "ra_flags": [
+                                            "managed-config",
+                                            "other-config"
+                                        ],
+                                        "ra_slaac": "1",
+                                        "start": "100"
+                                    },
+                                    "after_header": "dhcp.@dhcp[0]=dhcp",
+                                    "before": {},
+                                    "before_header": "dhcp.@dhcp[0]=dhcp"
+                                }
+                            ],
+                            "msg": "",
+                            "result": "@dhcp[0]",
+                            "section": "@dhcp[0]",
+                            "warnings": [
+                                "sftp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information",
+                                "scp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information"
+                            ]
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.123287Z",
+                            "start": "2026-11-19T10:20:45.973563Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000000a",
+                        "name": "infrafoundry|dhcp.pool|lan-dhcp",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:52"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "community.openwrt.uci",
+                            "changed": false,
+                            "changed_when_result": false,
+                            "command": "find_all",
+                            "config": "dhcp",
+                            "msg": "",
+                            "result": "",
+                            "result_list": [],
+                            "warnings": [
+                                "sftp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information",
+                                "scp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information"
+                            ]
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.273166Z",
+                            "start": "2026-11-19T10:20:46.124238Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000000b",
+                        "name": "infrafoundry|guard|printer|duplicate",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:67"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.fail",
+                            "changed": false,
+                            "false_condition": "(infrafoundry_guard_2_duplicate.result_list | default([])) | length > 1",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.289720Z",
+                            "start": "2026-11-19T10:20:46.274155Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000000c",
+                        "name": "infrafoundry|guard|printer|duplicate-fail",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:78"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "community.openwrt.uci",
+                            "changed": false,
+                            "changed_when_result": false,
+                            "command": "find_all",
+                            "config": "dhcp",
+                            "msg": "",
+                            "result": "",
+                            "result_list": [],
+                            "warnings": [
+                                "sftp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information",
+                                "scp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information"
+                            ]
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.437365Z",
+                            "start": "2026-11-19T10:20:46.290695Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000000d",
+                        "name": "infrafoundry|guard|printer|case-0",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:84"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.fail",
+                            "changed": false,
+                            "false_condition": "(infrafoundry_guard_2_case_0.result_list | default([])) | length > 0",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.453909Z",
+                            "start": "2026-11-19T10:20:46.438355Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000000e",
+                        "name": "infrafoundry|guard|printer|case-0-fail",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:95"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "community.openwrt.uci",
+                            "changed": true,
+                            "command": "section",
+                            "config": "dhcp",
+                            "diff": [
+                                {
+                                    "after": {
+                                        "ip": "192.0.2.50",
+                                        "mac": "02:00:00:00:00:0a",
+                                        "name": "printer-1"
+                                    },
+                                    "after_header": "dhcp.cfg05fe63=host",
+                                    "before": {},
+                                    "before_header": "dhcp.cfg05fe63=host"
+                                }
+                            ],
+                            "msg": "",
+                            "result": "cfg05fe63",
+                            "section": "cfg05fe63",
+                            "warnings": [
+                                "sftp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information",
+                                "scp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information"
+                            ]
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.593712Z",
+                            "start": "2026-11-19T10:20:46.454901Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000000f",
+                        "name": "infrafoundry|dhcp.host|printer",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:102"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "community.openwrt.uci",
+                            "changed": true,
+                            "command": "section",
+                            "config": "firewall",
+                            "diff": [
+                                {
+                                    "after": {
+                                        "dest": "lan",
+                                        "dest_ip": "192.0.2.50",
+                                        "dest_port": "80",
+                                        "name": "web",
+                                        "proto": "tcp udp",
+                                        "src": "wan",
+                                        "src_dport": "8080",
+                                        "target": "DNAT"
+                                    },
+                                    "after_header": "firewall.cfg0e3837=redirect",
+                                    "before": {},
+                                    "before_header": "firewall.cfg0e3837=redirect"
+                                }
+                            ],
+                            "msg": "",
+                            "result": "cfg0e3837",
+                            "section": "cfg0e3837",
+                            "warnings": [
+                                "sftp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information",
+                                "scp transfer mechanism failed on [192.0.2.1]. Use ANSIBLE_DEBUG=1 to see detailed information"
+                            ]
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.735580Z",
+                            "start": "2026-11-19T10:20:46.594663Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000010",
+                        "name": "infrafoundry|firewall.redirect|web",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:116"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.raw",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.744583Z",
+                            "start": "2026-11-19T10:20:46.736712Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000011",
+                        "name": "infrafoundry|commit|detect-staged",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:135"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.set_fact",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.753094Z",
+                            "start": "2026-11-19T10:20:46.745690Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000012",
+                        "name": "infrafoundry|commit|staged",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:143"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.raw",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.769326Z",
+                            "start": "2026-11-19T10:20:46.754005Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000014",
+                        "name": "infrafoundry|commit|create-session",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:151"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.set_fact",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.785004Z",
+                            "start": "2026-11-19T10:20:46.770371Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000015",
+                        "name": "infrafoundry|commit|remember-session",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:156"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.raw",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.800162Z",
+                            "start": "2026-11-19T10:20:46.785925Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000016",
+                        "name": "infrafoundry|commit|grant-session",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:159"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "community.openwrt.copy",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.816088Z",
+                            "start": "2026-11-19T10:20:46.801404Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000017",
+                        "name": "infrafoundry|commit|copy-helper",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:162"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.raw",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.831339Z",
+                            "start": "2026-11-19T10:20:46.817073Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000018",
+                        "name": "infrafoundry|commit|replay-staged",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:193"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.raw",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.847820Z",
+                            "start": "2026-11-19T10:20:46.832239Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000019",
+                        "name": "infrafoundry|commit|apply-with-rollback",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:197"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.set_fact",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.863453Z",
+                            "start": "2026-11-19T10:20:46.848799Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000001a",
+                        "name": "infrafoundry|commit|record-apply",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:202"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.fail",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.878782Z",
+                            "start": "2026-11-19T10:20:46.864413Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000001b",
+                        "name": "infrafoundry|commit|apply-failed",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:206"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.set_fact",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.895496Z",
+                            "start": "2026-11-19T10:20:46.879721Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000001c",
+                        "name": "infrafoundry|commit|use-new-address",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:211"
+                    }
+                },
+                {
+                    "hosts": {},
+                    "task": {
+                        "duration": {
+                            "start": "2026-11-19T10:20:46.896389Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000001d",
+                        "name": "infrafoundry|commit|reset-connection",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:215"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "community.openwrt.wait_for_connection",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.932157Z",
+                            "start": "2026-11-19T10:20:46.917560Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000001e",
+                        "name": "infrafoundry|commit|wait-for-device",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:217"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.raw",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.950848Z",
+                            "start": "2026-11-19T10:20:46.933303Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-00000000001f",
+                        "name": "infrafoundry|commit|confirm",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:221"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.raw",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.968764Z",
+                            "start": "2026-11-19T10:20:46.952008Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000020",
+                        "name": "infrafoundry|commit|destroy-session",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:223"
+                    }
+                },
+                {
+                    "hosts": {
+                        "openwrt": {
+                            "action": "ansible.builtin.raw",
+                            "changed": false,
+                            "false_condition": "not ansible_check_mode and ((infrafoundry_staged | default([])) | length > 0)",
+                            "skip_reason": "Conditional result was False",
+                            "skipped": true
+                        }
+                    },
+                    "task": {
+                        "duration": {
+                            "end": "2026-11-19T10:20:46.986270Z",
+                            "start": "2026-11-19T10:20:46.969852Z"
+                        },
+                        "id": "bc2411a5-25ad-44f8-e71f-000000000021",
+                        "name": "infrafoundry|commit|remove-helper",
+                        "path": "/work/generated/test/ansible/openwrt/openwrt.yml:228"
+                    }
+                }
+            ]
+        }
+    ],
+    "stats": {
+        "openwrt": {
+            "changed": 4,
+            "failures": 0,
+            "ignored": 0,
+            "ok": 9,
+            "rescued": 0,
+            "skipped": 18,
+            "unreachable": 0
+        }
+    }
+}

@@ -30,6 +30,7 @@ from infrafoundry.core.runners.ansible_runner import AnsibleRunner
 from infrafoundry.core.runners.host_runner import HostRunner
 from infrafoundry.core.runners.mikrotik_rest_runner import MikroTikRestRunner
 from infrafoundry.core.runners.opentofu_runner import OpenTofuRunner
+from infrafoundry.core.runners.openwrt_ansible_runner import OpenWrtAnsibleRunner
 from infrafoundry.core.runners.opnsense_direct_runner import OPNsenseDirectRunner
 from infrafoundry.core.runners.pulumi_runner import PulumiRunner
 from infrafoundry.core.runners.pyinfra_runner import PyInfraRunner
@@ -44,8 +45,16 @@ PlanCapable = (
     | OPNsenseDirectRunner
     | HostRunner
     | MikroTikRestRunner
+    | OpenWrtAnsibleRunner
 )
-DestroyCapable = TerraformRunner | OpenTofuRunner | PulumiRunner | OPNsenseDirectRunner | HostRunner
+DestroyCapable = (
+    TerraformRunner
+    | OpenTofuRunner
+    | PulumiRunner
+    | OPNsenseDirectRunner
+    | HostRunner
+    | OpenWrtAnsibleRunner
+)
 
 
 def _as_plannable(runner: PlanCapable) -> Plannable:
@@ -74,7 +83,7 @@ def _as_state_aware(runner: TerraformRunner | OpenTofuRunner) -> StateAware:
 
 
 def _as_drift_detectable(
-    runner: TerraformRunner | OpenTofuRunner | MikroTikRestRunner,
+    runner: TerraformRunner | OpenTofuRunner | MikroTikRestRunner | OpenWrtAnsibleRunner,
 ) -> DriftDetectable:
     """Return the runner typed as ``DriftDetectable``; mypy rejects this if one drifts."""
     return runner
@@ -89,6 +98,7 @@ ALL_RUNNERS = [
     OPNsenseDirectRunner,
     HostRunner,
     MikroTikRestRunner,
+    OpenWrtAnsibleRunner,
 ]
 DESTROY_RUNNERS = [
     TerraformRunner,
@@ -96,6 +106,7 @@ DESTROY_RUNNERS = [
     PulumiRunner,
     OPNsenseDirectRunner,
     HostRunner,
+    OpenWrtAnsibleRunner,
 ]
 
 
@@ -139,6 +150,12 @@ def test_terraform_runner_is_drift_detectable(cls: type[TerraformRunner]) -> Non
 
 def test_mikrotik_rest_runner_is_drift_detectable() -> None:
     assert isinstance(_as_drift_detectable(MikroTikRestRunner()), DriftDetectable)
+
+
+def test_openwrt_ansible_runner_dispatches_managed_set_and_is_drift_detectable() -> None:
+    runner = OpenWrtAnsibleRunner()
+    assert isinstance(runner, DispatchesManagedSet)
+    assert isinstance(_as_drift_detectable(runner), DriftDetectable)
 
 
 @pytest.mark.parametrize("method", ["apply", "destroy"])

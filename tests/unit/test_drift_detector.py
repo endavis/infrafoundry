@@ -499,3 +499,79 @@ class TestDriftDetectorPerProvider:
         assert results["proxmox"]["parsed"] is False
         assert results["mikrotik"]["has_changes"] is False
         assert "parsed" not in results["mikrotik"]
+
+
+@pytest.mark.unit
+class TestOpenWrtDrift:
+    """The openwrt provider's Ansible runner is the direct drift runner."""
+
+    @staticmethod
+    def _detector(provider: Any) -> tuple[DriftDetector, MagicMock]:
+        from infrafoundry.core.runners import OpenWrtAnsibleRunner, RunnerRegistry
+
+        registry = RunnerRegistry()
+        registry.register(OpenWrtAnsibleRunner)
+        registry.register(_StubTerraformRunner, "terraform")
+        config_manager = MagicMock()
+        config_manager.load_environment.side_effect = FileNotFoundError
+        config_manager.get_all_resources_all_providers.return_value = [
+            SimpleNamespace(provider="openwrt")
+        ]
+        events = MagicMock(spec=EventManager)
+        _StubTerraformRunner.calls = []
+        return DriftDetector(config_manager, registry, events, {"openwrt": provider}), events
+
+    @pytest.mark.parametrize(("changed", "expected"), [(True, 1), (False, 0)])
+    def test_out_of_band_change_is_drift_and_terraform_is_skipped(
+        self, tmp_path: Any, changed: bool, expected: int
+    ) -> None:
+        import json
+        import subprocess
+
+        from infrafoundry.core.runners.openwrt_ansible_runner import OpenWrtAnsibleRunner
+        from infrafoundry.providers.openwrt import OpenWrtProvider
+        from infrafoundry.providers.openwrt.settings import OpenWrtSettings
+
+        resource = SimpleNamespace(
+            name="printer",
+            type="dhcp.host",
+            provider="openwrt",
+            config={"name": "printer", "mac": "02:00:00:00:00:0a", "ip": "192.0.2.50"},
+        )
+        output = json.dumps(
+            {
+                "plays": [
+                    {
+                        "tasks": [
+                            {
+                                "task": {"name": "infrafoundry|dhcp.host|printer"},
+                                "hosts": {"openwrt": {"changed": changed, "diff": []}},
+                            }
+                        ]
+                    }
+                ]
+            }
+        )
+        provider = OpenWrtProvider(tmp_path, tmp_path / "generated")
+        detector, _events = self._detector(provider)
+        completed = subprocess.CompletedProcess([], 0, output, "")
+        with (
+            patch.object(OpenWrtAnsibleRunner, "_load_resources", return_value=[resource]),
+            patch(
+                "infrafoundry.core.runners.openwrt_ansible_runner._run", return_value=completed
+            ) as run,
+            patch(
+                "infrafoundry.providers.openwrt.load_settings",
+                return_value=OpenWrtSettings(address="192.0.2.2"),
+            ),
+            patch(
+                "infrafoundry.core.runners.openwrt_ansible_runner.shutil.which",
+                return_value="/usr/bin/ansible-playbook",
+            ),
+        ):
+            results = detector.detect("lab")
+
+        assert results["openwrt"]["has_changes"] is bool(expected)
+        assert results["openwrt"]["to_add"] == expected
+        assert "--check" in run.call_args.args[0]
+        assert _StubTerraformRunner.calls == []

@@ -429,7 +429,8 @@ InfraFoundry uses structured error codes to help you quickly identify and resolv
 ### IF-PACKAGE-002: Blueprint Requirements Not Met
 
 **Cause:** A blueprint used by a package in scope declares Python packages or Ansible collections
-that are missing or at the wrong version. `infra plan`, `infra apply` and `infra destroy` check
+that are missing or at the wrong version, or a provider with resources in scope needs an Ansible
+collection that is not installed. `infra plan`, `infra apply` and `infra destroy` check
 them before any provider work.
 
 **Solutions:**

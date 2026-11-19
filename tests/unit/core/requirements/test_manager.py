@@ -5,15 +5,18 @@ from __future__ import annotations
 import importlib.metadata
 import subprocess
 from pathlib import Path
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
+from unittest.mock import MagicMock
 
 import pytest
 import yaml
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.exceptions import InvalidConfigurationError, MissingRequirementsError
+from infrafoundry.core.requirements.installer import plan_install
 from infrafoundry.core.requirements.manager import RequirementsManager
-from infrafoundry.core.requirements.models import RequirementKind
+from infrafoundry.core.requirements.models import CollectionRequirement, RequirementKind
 
 
 def _write(path: Path, data: Any) -> None:
@@ -350,3 +353,176 @@ def test_sync_scope_follows_the_resource_filter(config_manager: ConfigManager) -
 
     assert {s.name for s in result.report.statuses} == {"alpha", "beta"}
     assert [s.name for s in result.report.unmet] == ["beta"]
+
+
+# --- collections declared by providers ---------------------------------------
+
+
+class _CollectionProvider:
+    """Stands in for a provider that needs an Ansible collection."""
+
+    def __init__(self, *collections: CollectionRequirement) -> None:
+        self._collections = collections
+
+    def ansible_collection_requirements(self) -> tuple[CollectionRequirement, ...]:
+        return self._collections
+
+
+OPENWRT = CollectionRequirement("community.openwrt", ">=1.11.0")
+
+
+def _provider_manager(
+    config_manager: ConfigManager,
+    resources: list[tuple[str, str]],
+    collections: dict[str, str] | None,
+    providers: dict[str, Any] | None = None,
+) -> RequirementsManager:
+    """A manager whose environment holds ``(provider, resource name)`` pairs."""
+    cast(Any, config_manager).get_all_resources_all_providers = lambda env: [
+        SimpleNamespace(provider=p, name=n) for p, n in resources
+    ]
+    return RequirementsManager(
+        config_manager,
+        get_version=_versions(alpha="1.0", beta="2.0"),
+        find_spec=lambda _: object(),
+        collections_lookup=lambda: collections,
+        providers=cast(
+            Any,
+            providers if providers is not None else {"openwrt": _CollectionProvider(OPENWRT)},
+        ),
+    )
+
+
+def test_provider_with_resources_in_scope_adds_its_collection(
+    config_manager: ConfigManager,
+) -> None:
+    manager = _provider_manager(config_manager, [("openwrt", "lan")], {})
+
+    report = manager.check("dev")
+
+    status = next(s for s in report.statuses if s.name == "community.openwrt")
+    assert (status.wanted, status.blueprints, status.providers) == (">=1.11.0", (), ("openwrt",))
+    assert not status.satisfied
+    assert status.install_args == ("community.openwrt>=1.11.0",)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "resources"),
+    [
+        ({"provider_filter": ["proxmox"]}, [("openwrt", "lan")]),
+        ({"resource_filter": ["other"]}, [("openwrt", "lan")]),
+        ({}, [("proxmox", "vm")]),
+    ],
+)
+def test_provider_collection_is_absent_outside_scope(
+    config_manager: ConfigManager, kwargs: dict[str, Any], resources: list[tuple[str, str]]
+) -> None:
+    manager = _provider_manager(config_manager, resources, {})
+
+    report = manager.check("dev", **kwargs)
+
+    assert "community.openwrt" not in {s.name for s in report.statuses}
+
+
+def test_resource_filter_keeps_the_provider_of_a_matching_resource(
+    config_manager: ConfigManager,
+) -> None:
+    manager = _provider_manager(config_manager, [("openwrt", "lan"), ("proxmox", "vm")], {})
+
+    assert manager.providers_in_scope("dev", resource_filter=["lan"]) == ["openwrt"]
+    assert manager.providers_in_scope("dev", provider_filter=["openwrt"]) == ["openwrt"]
+
+
+def test_package_filter_scopes_providers_to_the_package(config_manager: ConfigManager) -> None:
+    manager = _provider_manager(config_manager, [("openwrt", "lan")], {})
+
+    assert manager.providers_in_scope("dev", package_filter="vm-a") == []
+    manager = _provider_manager(
+        config_manager, [], {}, providers={"proxmox": _CollectionProvider(OPENWRT)}
+    )
+    assert manager.providers_in_scope("dev", package_filter="vm-a") == ["proxmox"]
+
+
+def test_no_registered_providers_means_no_provider_requirements(
+    config_manager: ConfigManager,
+) -> None:
+    manager = _provider_manager(config_manager, [("openwrt", "lan")], {}, providers={})
+
+    assert manager.providers_in_scope("dev") == []
+    assert {s.name for s in manager.check("dev").statuses} == {"alpha", "beta", "netapp.ontap"}
+
+
+def test_provider_and_blueprint_declaring_one_collection_give_one_status(
+    config_manager: ConfigManager,
+) -> None:
+    requirements = config_manager.blueprint_resolver.blueprints_dir / "bp-a" / "requirements.yml"
+    _write(
+        requirements,
+        {
+            "collections": [
+                {"name": "netapp.ontap", "version": ">=22.0.0"},
+                {"name": "community.openwrt", "version": ">=1.11.0"},
+            ]
+        },
+    )
+    manager = _provider_manager(config_manager, [("openwrt", "lan")], {})
+
+    report = manager.check("dev")
+
+    matching = [s for s in report.statuses if s.name == "community.openwrt"]
+    assert len(matching) == 1
+    assert matching[0].blueprints == ("bp-a",)
+    assert matching[0].providers == ("openwrt",)
+    assert "(needed by blueprint bp-a; provider openwrt)" in report.format_unmet()
+
+
+def test_format_unmet_names_the_provider_for_provider_only_entries(
+    config_manager: ConfigManager,
+) -> None:
+    manager = _provider_manager(config_manager, [("openwrt", "lan")], {"netapp.ontap": "22.1.0"})
+
+    message = manager.check("dev").format_unmet()
+
+    assert (
+        "ansible_collection community.openwrt>=1.11.0: not installed (needed by provider openwrt)"
+        in message
+    )
+    assert "needed by blueprint  " not in message
+
+
+def test_blueprint_only_wording_is_unchanged_with_providers_registered(
+    config_manager: ConfigManager,
+) -> None:
+    manager = _provider_manager(config_manager, [("proxmox", "vm")], {})
+
+    message = manager.check("dev").format_unmet()
+
+    assert "python beta: not installed" not in message
+    assert "ansible_collection netapp.ontap>=22.0.0: not installed (needed by blueprint bp-a)" in (
+        message
+    )
+
+
+def test_plan_install_installs_the_provider_collection(config_manager: ConfigManager) -> None:
+    manager = _provider_manager(config_manager, [("openwrt", "lan")], {})
+
+    steps = plan_install(manager.check("dev").unmet)
+
+    galaxy = [s for s in steps if s.kind is RequirementKind.ANSIBLE_COLLECTION]
+    assert [s.display() for s in galaxy][-1].endswith("community.openwrt>=1.11.0")
+    assert "ansible-galaxy collection install" in galaxy[-1].display()
+
+
+def test_providers_without_collections_do_not_load_the_environment(
+    config_manager: ConfigManager,
+) -> None:
+    def fail(env: str) -> list[Any]:
+        raise AssertionError("resources must not be loaded")
+
+    cast(Any, config_manager).get_all_resources_all_providers = fail
+    manager = RequirementsManager(
+        config_manager,
+        providers=cast(Any, {"proxmox": _CollectionProvider(), "mock": MagicMock()}),
+    )
+
+    assert manager.providers_in_scope("dev") == []

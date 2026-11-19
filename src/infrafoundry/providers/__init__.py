@@ -6,6 +6,7 @@ from infrafoundry.providers.host import HostProvider
 from infrafoundry.providers.kubernetes import KubernetesProvider
 from infrafoundry.providers.mikrotik import MikroTikProvider
 from infrafoundry.providers.oci import OCIProvider
+from infrafoundry.providers.openwrt import OpenWrtProvider
 from infrafoundry.providers.opnsense import OPNsenseProvider
 from infrafoundry.providers.proxmox import ProxmoxProvider
 from infrafoundry.providers.tailscale import TailscaleProvider
@@ -18,6 +19,7 @@ __all__ = [
     "MikroTikProvider",
     "OCIProvider",
     "OPNsenseProvider",
+    "OpenWrtProvider",
     "ProxmoxProvider",
     "TailscaleProvider",
 ]

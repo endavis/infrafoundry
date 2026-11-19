@@ -149,6 +149,7 @@ class RequirementStatus:
         install_args: What ``foundry deps sync`` installs for it: the PEP 508
             spec of a Python requirement, or the requirements file(s) (else
             ``name<spec>``) of a collection
+        providers: Providers that declare the requirement (collections only)
     """
 
     kind: RequirementKind
@@ -160,6 +161,7 @@ class RequirementStatus:
     problem: str = ""
     fix: str = ""
     install_args: tuple[str, ...] = ()
+    providers: tuple[str, ...] = ()
 
 
 def _as_list(value: Any, where: str) -> list[Any]:

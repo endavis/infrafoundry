@@ -119,6 +119,8 @@ has no wireless package), `ip addr`, `ip route` and the model and firmware versi
 files are redacted (`key`, `password`, `sae_password`, `psk`, `private_key`, `preshared_key`,
 `auth_secret`, `acct_secret`, `priv_key_pwd`) and also encrypted. The other files are plaintext.
 
+To manage an OpenWrt device rather than back it up, use the [OpenWrt provider](../providers/openwrt.md).
+
 ## Logging
 
 Collectors log only device names, artifact names and statuses. Credentials, tokens and
