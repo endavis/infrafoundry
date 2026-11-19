@@ -18,6 +18,7 @@ Wire payload for a write: ``{"sysctl": {"tunable", "value", "descr"}}``.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any
 
@@ -201,7 +202,15 @@ class SystemTuningService(BaseService):
         return adds, updates
 
     def export_to_yaml(self) -> str:
-        """Export tunables whose value differs from the default as YAML.
+        """Export tunables the operator set, as YAML.
+
+        Only stored items are exported. ``core/tunables/get`` also returns a
+        static child for every shipped tunable not stored in config; its key
+        is ``md5(tunable)`` and its value is the current kernel value, not an
+        operator setting, so those rows are skipped. Stored rows are skipped
+        too when the value is empty or the deprecated string ``default``
+        (OPNsense treats both as "use the default"), or equals the shipped
+        default.
 
         Returns:
             YAML string under the ``opnsense.system.tuning`` namespace.
@@ -210,9 +219,12 @@ class SystemTuningService(BaseService):
         items: list[dict[str, str]] = []
         for name in sorted(live):
             row = live[name]
-            if row["value"] == row["default_value"]:
+            if row["uuid"] == hashlib.md5(name.encode(), usedforsecurity=False).hexdigest():
                 continue
-            item = {"tunable": name, "value": row["value"]}
+            value = "" if row["value"] == "default" else row["value"]
+            if value == "" or value == row["default_value"]:
+                continue
+            item = {"tunable": name, "value": value}
             if row["descr"]:
                 item["descr"] = row["descr"]
             items.append(item)
