@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795108841033,
+  "lastUpdate": 1795114853665,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3880,6 +3880,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008291095392222983",
             "extra": "mean: 125.83595717692165 usec\nrounds: 8430"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c5c62c3bb649a81fd205682179275f45ea54004a",
+          "message": "fix: skip the empty legacy rule placeholder in the legacy rule export (merges PR #1507, addresses #1506)\n\nOPNsense leaves an empty <rule/> under <filter> once every legacy filter\nrule is deleted. parse_legacy_rules treated it as a rule without an\ninterface, so config migrate --include-legacy reported it as unexportable\nand exited 1 on a box whose legacy cutover was complete. Elements with no\nchildren are now skipped silently. They still count toward the rule\nnumber used in reports, so a reported rule keeps its document position.\n\nAddresses #1506\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T18:59:26Z",
+          "tree_id": "1290fb11845a8cb837e5e8e9014fde86f7370662",
+          "url": "https://github.com/endavis/infrafoundry/commit/c5c62c3bb649a81fd205682179275f45ea54004a"
+        },
+        "date": 1795114852913,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 101.7693300041072,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0009245576495155011",
+            "extra": "mean: 9.826143101852415 msec\nrounds: 108"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16809.426462531716,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000026474248810508035",
+            "extra": "mean: 59.49042950567078 usec\nrounds: 18044"
           }
         ]
       }
