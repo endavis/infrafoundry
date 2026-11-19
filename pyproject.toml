@@ -480,6 +480,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_ontap_svm_routes.py",
     "tests/unit/test_opnsense_vm_blueprint.py",
     "tests/unit/test_routeros_chr_blueprint.py",
+    "tests/unit/test_openwrt_vm_blueprint.py",
     "tests/unit/test_blueprint_templates_render.py",
     "tests/unit/test_orchestrator.py",
     "tests/unit/test_orchestrator_workflows_unit.py",

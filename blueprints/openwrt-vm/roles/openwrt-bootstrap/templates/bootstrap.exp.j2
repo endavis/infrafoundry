@@ -1,0 +1,161 @@
+#!/usr/bin/expect -f
+# OpenWrt Bootstrap — Expect Script
+#
+# Answers the "press Enter" console prompt, then installs the SSH key, turns
+# SSH password login off, sets the hostname and the static LAN address, and
+# optionally turns the LAN DHCP, router advertisement and DHCPv6 services off.
+#
+# There is no secret here. Console output never reaches stdout (log_user 0),
+# so the Ansible task output carries only this script's own puts lines. The
+# key reaches the Tcl strings bare: the role asserts it matches
+# [A-Za-z0-9+/= -] only, which needs no quoting.
+#
+# Every console command is sent as "<cmd>; echo @@RC=$?@@" and the script
+# waits for @@RC=<digits>@@. The echoed command line holds a literal $?, never
+# digits, so only real output matches, and kernel messages on the console
+# cannot confuse it.
+
+set timestamp [clock format [clock seconds] -format "%Y%m%d-%H%M%S"]
+set logpath /tmp/openwrt-bootstrap-{{ openwrt_vmid }}-${timestamp}.log
+log_user 0
+# -a: with log_user 0, log_file records nothing unless -a is given (measured).
+log_file -a -noappend $logpath
+set timeout {{ openwrt_boot_timeout }}
+set prompt {root@[^ ]*:[^#]*# $}
+
+proc finish {code} {
+  log_file
+  exit $code
+}
+
+proc fail {msg} {
+  puts "ERROR: $msg"
+  finish 1
+}
+
+# The serial socket can exist before QEMU accepts on it, so socat may hit EOF at
+# once. Reconnect until the boot timeout runs out. Press Enter once when asked
+# to activate the console; a redraw of the message is consumed without sending
+# again. After a reconnect the activated console prints nothing by itself, so
+# Enter is pressed once more to draw the prompt.
+set deadline [expr {[clock seconds] + {{ openwrt_boot_timeout }}}]
+set sent_enter 0
+while 1 {
+  spawn socat STDIO,rawer UNIX-CONNECT:/var/run/qemu-server/{{ openwrt_vmid }}.serial0
+  if {$sent_enter} {
+    send "\r"
+  }
+  set connected 0
+  expect {
+    "Please press Enter to activate this console" {
+      if {!$sent_enter} {
+        send "\r"
+        set sent_enter 1
+      }
+      exp_continue
+    }
+    -re $prompt { set connected 1 }
+    eof {
+      catch {wait}
+      if {[clock seconds] >= $deadline} {
+        fail "Serial console kept closing before the prompt"
+      }
+      after 2000
+    }
+    timeout { fail "Timed out waiting for the console prompt" }
+  }
+  if {$connected} {
+    break
+  }
+}
+
+# OpenWrt offers this shell early in boot (procd "- init -"), while the kernel
+# still writes to the console and first-boot uci-defaults still rewrite the
+# config. Let the console go quiet for 5 seconds, draw a fresh prompt, and wait
+# for procd's "- init complete -" in the system log before changing anything.
+# procd logs that line to syslog only, not to the console.
+set timeout 5
+expect {
+  -re ".+" {
+    if {[clock seconds] < $deadline} {
+      exp_continue
+    }
+  }
+  eof { fail "Serial console closed during boot" }
+  timeout {}
+}
+# An Enter sent while procd still sets up the console can be dropped without
+# any output (measured), so press it again every 10 seconds until the prompt
+# shows or the boot deadline passes.
+set timeout 10
+send "\r"
+expect {
+  -re $prompt {}
+  eof { fail "Serial console closed during boot" }
+  timeout {
+    if {[clock seconds] >= $deadline} {
+      fail "Timed out waiting for the console prompt after boot"
+    }
+    send "\r"
+    exp_continue
+  }
+}
+set timeout {{ openwrt_boot_timeout }}
+
+proc run {cmd} {
+  global prompt
+  send "$cmd; echo \"@@RC=\$?@@\"\r"
+  expect {
+    -re {@@RC=([0-9]+)@@} {
+      if {$expect_out(1,string) != 0} {
+        fail "command failed: $cmd"
+      }
+    }
+    eof { fail "Serial console closed while running: $cmd" }
+    timeout { fail "Timed out running: $cmd" }
+  }
+  expect -re $prompt
+}
+
+run "n=0; until logread 2>/dev/null | grep -q 'procd: - init complete -'; do n=\$((n+1)); \[ \$n -ge 120 \] && break; sleep 1; done; logread | grep -q 'procd: - init complete -'"
+run "mkdir -p /etc/dropbear && chmod 700 /etc/dropbear"
+# The serial console has no flow control: a long line (an RSA key is over 700
+# characters) loses characters and leaves the shell waiting for a closing quote
+# (measured). Write the key in 64-character chunks, then install it only if the
+# file has exactly the expected length.
+run ": > /etc/dropbear/authorized_keys.new"
+{% for start in range(0, openwrt_ssh_key | length, 64) %}
+run "printf '%s' '{{ openwrt_ssh_key[start:start + 64] }}' >> /etc/dropbear/authorized_keys.new"
+{% endfor %}
+run "echo >> /etc/dropbear/authorized_keys.new && \[ \"\$(wc -c < /etc/dropbear/authorized_keys.new)\" -eq {{ (openwrt_ssh_key | length) + 1 }} \]"
+run "mv /etc/dropbear/authorized_keys.new /etc/dropbear/authorized_keys && chmod 600 /etc/dropbear/authorized_keys"
+run "uci set dropbear.@dropbear\[0\].PasswordAuth=off"
+run "uci set dropbear.@dropbear\[0\].RootPasswordAuth=off"
+run "uci set system.@system\[0\].hostname='{{ openwrt_hostname }}'"
+run "uci set network.lan.ipaddr='{{ openwrt_mgmt_ip }}'"
+run "uci set network.lan.netmask='{{ openwrt_mgmt_netmask }}'"
+{% if openwrt_mgmt_gateway %}
+run "uci set network.lan.gateway='{{ openwrt_mgmt_gateway }}'"
+{% endif %}
+{% if openwrt_mgmt_dns %}
+run "uci set network.lan.dns='{{ openwrt_mgmt_dns }}'"
+{% endif %}
+{% if not openwrt_lan_dhcp %}
+run "uci set dhcp.lan.ignore=1"
+run "uci set dhcp.lan.ra=disabled"
+run "uci set dhcp.lan.dhcpv6=disabled"
+run "uci set dhcp.lan.ndp=disabled"
+{% endif %}
+run "uci commit"
+run "/etc/init.d/system reload; /etc/init.d/dropbear restart; /etc/init.d/dnsmasq restart; /etc/init.d/odhcpd restart"
+run "/etc/init.d/network reload"
+
+# The marker is split so the echoed command does not match the pattern below.
+send "echo \"BOOTSTRAP\"\" OK\"\r"
+expect {
+  "BOOTSTRAP OK" {}
+  eof { fail "Serial console closed before the bootstrap marker" }
+  timeout { fail "Timed out waiting for the bootstrap marker" }
+}
+puts "Bootstrap applied"
+finish 0

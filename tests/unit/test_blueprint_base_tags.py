@@ -104,6 +104,7 @@ class TestOpnsenseVmBaseTags:
     [
         ("ontap-cluster", ["ontap", "ontap-sim"]),
         ("opnsense-vm", ["opnsense", "fw-test"]),
+        ("openwrt-vm", ["openwrt", "openwrt-test"]),
         ("routeros-chr", ["routeros", "chr-test"]),
     ],
 )

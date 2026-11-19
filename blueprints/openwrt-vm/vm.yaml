@@ -1,0 +1,37 @@
+# OpenWrt VM — Jinja2 template rendered by infrafoundry.yml variables
+#
+# net0 is the LAN / management NIC (eth0); net1 is the optional WAN NIC (eth1).
+# NIC order maps to ethN order (unverified until live-tested).
+#
+# The Jinja control tags sit in YAML comments so they survive a YAML parse
+# of the unrendered file.
+vms:
+  - name: "{{ vm_name }}"
+    target_node: "{{ target_node }}"
+    vmid: {{ vmid }}
+    disk_image_source: "{{ image_source }}"
+# {% if image_sha256 %}
+    disk_image_sha256: "{{ image_sha256 }}"
+# {% endif %}
+    disk_image_cache_dir: "{{ image_cache_dir }}"
+    cores: {{ cores }}
+    memory: {{ memory }}
+    disk_bus: ide
+    disk_storage: "{{ disk_storage }}"
+    serial: true
+    boot_order: [ide0]
+    onboot: false
+    tags:
+# {% for tag in base_tags + extra_tags %}
+      - "{{ tag }}"
+# {% endfor %}
+    network:
+      - bridge: "{{ mgmt_bridge }}"
+        model: virtio       # eth0 — LAN / management
+# {% if mgmt_vlan %}
+        tag: {{ mgmt_vlan }}
+# {% endif %}
+# {% if wan_bridge %}
+      - bridge: "{{ wan_bridge }}"
+        model: virtio       # eth1 — WAN
+# {% endif %}

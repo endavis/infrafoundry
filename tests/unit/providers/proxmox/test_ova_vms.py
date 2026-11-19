@@ -4,8 +4,10 @@ Tests the ova_vms.tf.j2 template and the routing logic that sends VMs with
 ova_source to the OVA template instead of the regular vms.tf template.
 """
 
+import gzip
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -594,6 +596,55 @@ class TestDiskImageVM:
         assert f"qm disk import ${{self.triggers_replace.vmid}} {raw} " in content
         assert "bunzip2" not in content
         assert "unzip " not in content
+
+    def test_gz_is_downloaded_gunzipped_and_imported(self, provider: ProxmoxProvider) -> None:
+        url = "https://downloads.openwrt.org/releases/25.12.6/openwrt-x.img.gz"
+        content = _render_ova_vms(provider, [_make_image_vm(disk_image_source=url)])
+
+        local = f"{CACHE}/openwrt-x.img.gz"
+        raw = f"{CACHE}/openwrt-x.img"
+        assert f"curl -fsSL -o {local}.part '{url}'" in content
+        assert f"if [ ! -f {raw} ]; then" in content
+        assert f"gunzip -c {local} > {raw}.part" in content
+        assert f"mv {raw}.part {raw}" in content
+        assert f"qm disk import ${{self.triggers_replace.vmid}} {raw} " in content
+        assert "bunzip2" not in content
+        assert "zipfile" not in content
+
+    def test_gz_sha256_is_checked_against_the_archive(self, provider: ProxmoxProvider) -> None:
+        digest = "ef" * 32
+        url = "https://downloads.openwrt.org/releases/25.12.6/openwrt-x.img.gz"
+        content = _render_ova_vms(
+            provider, [_make_image_vm(disk_image_source=url, disk_image_sha256=digest)]
+        )
+
+        assert f"echo '{digest}  {CACHE}/openwrt-x.img.gz' | sha256sum -c -" in content
+
+    def test_local_gz_is_decompressed_into_the_cache(self, provider: ProxmoxProvider) -> None:
+        content = _render_ova_vms(
+            provider, [_make_image_vm(disk_image_source="/mnt/pve/nfs1/openwrt.img.gz")]
+        )
+
+        assert "curl" not in content
+        assert f"gunzip -c /mnt/pve/nfs1/openwrt.img.gz > {CACHE}/openwrt.img.part" in content
+        assert f"qm disk import ${{self.triggers_replace.vmid}} {CACHE}/openwrt.img " in content
+
+    @pytest.mark.skipif(not shutil.which("gunzip"), reason="gunzip is not installed")
+    def test_rendered_gunzip_line_restores_the_image_bytes(
+        self, provider: ProxmoxProvider, tmp_path: Path
+    ) -> None:
+        archive = tmp_path / "openwrt.img.gz"
+        archive.write_bytes(gzip.compress(b"disk-bytes"))
+        content = _render_ova_vms(provider, [_make_image_vm(disk_image_source=str(archive))])
+        match = re.search(r"^\s*(gunzip -c .*)$", content, re.MULTILINE)
+        assert match is not None
+        out = tmp_path / "out.img.part"
+        line = match.group(1).replace(f"{CACHE}/openwrt.img.part", str(out))
+
+        result = subprocess.run(["bash", "-c", line], capture_output=True, check=False)
+
+        assert result.returncode == 0
+        assert out.read_bytes() == b"disk-bytes"
 
     def test_zip_sha256_is_checked_against_the_archive(self, provider: ProxmoxProvider) -> None:
         digest = "cd" * 32

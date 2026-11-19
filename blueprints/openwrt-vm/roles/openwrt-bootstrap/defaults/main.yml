@@ -1,0 +1,12 @@
+---
+# OpenWrt Bootstrap — Default Variables
+
+openwrt_mgmt_netmask: 255.255.255.0
+openwrt_mgmt_gateway: ""
+openwrt_mgmt_dns: ""
+
+# Keep the LAN DHCP server running (off by default)
+openwrt_lan_dhcp: false
+
+# Seconds to wait for the console prompt
+openwrt_boot_timeout: 300

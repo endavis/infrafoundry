@@ -1,0 +1,34 @@
+---
+# OpenWrt VM — Bootstrap Playbook
+#
+# Runs on the Proxmox host that holds the VM: boots it, then configures it
+# over the serial console so it accepts key-only SSH at its management address.
+#
+# All variables are read from INFRAFOUNDRY_VAR_* environment variables
+# set by the InfraFoundry framework.
+
+- name: Bootstrap OpenWrt over the serial console
+  hosts: proxmox_host
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Install serial console dependencies
+      ansible.builtin.apt:
+        name:
+          - expect
+          - socat
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+  roles:
+    - role: openwrt-bootstrap
+      vars:
+        openwrt_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_vmid') }}"
+        openwrt_hostname: "{{ lookup('env', 'INFRAFOUNDRY_VAR_vm_name') }}"
+        openwrt_ssh_public_key: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ssh_public_key') }}"
+        openwrt_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_ip') }}"
+        openwrt_mgmt_netmask: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_netmask') | default('255.255.255.0', true) }}"
+        openwrt_mgmt_gateway: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_gateway') | default('', true) }}"
+        openwrt_mgmt_dns: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_dns') | default('', true) }}"
+        openwrt_lan_dhcp: "{{ (lookup('env', 'INFRAFOUNDRY_VAR_lan_dhcp') | default('false', true)) | lower in ['true', '1', 'yes'] }}"
+        openwrt_boot_timeout: "{{ lookup('env', 'INFRAFOUNDRY_VAR_boot_timeout') | default('300', true) }}"
