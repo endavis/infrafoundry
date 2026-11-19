@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795108178077,
+  "lastUpdate": 1795108841033,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3842,6 +3842,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004516842849923541",
             "extra": "mean: 69.57224864895264 usec\nrounds: 15729"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "269b5dac1377d0b854b3e2d7f0bac7a84c533ce7",
+          "message": "fix: give each package loader test its own blueprints directory (merges PR #1505, addresses #1504)\n\nThe package loader tests pointed BlueprintResolver.blueprints_dir and the\n_create_blueprint helper at temp_dir.parent / \"blueprints\", which is one\ndirectory in the system temp dir shared by every test and xdist worker.\nParallel runs could read a manifest another test was writing, and the\ndirectory was never cleaned up. Use temp_dir / \"blueprints\" instead.\n\nAddresses #1504\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T17:19:22Z",
+          "tree_id": "fc114d5388586e0fd70b41ec3fc9ceeabccf4791",
+          "url": "https://github.com/endavis/infrafoundry/commit/269b5dac1377d0b854b3e2d7f0bac7a84c533ce7"
+        },
+        "date": 1795108840269,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.94579950387842,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00016249355429077028",
+            "extra": "mean: 20.02170372550243 msec\nrounds: 51"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7946.854161835709,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008291095392222983",
+            "extra": "mean: 125.83595717692165 usec\nrounds: 8430"
           }
         ]
       }
