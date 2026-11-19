@@ -201,7 +201,10 @@ class SystemTuningService(BaseService):
         return adds, updates
 
     def export_to_yaml(self) -> str:
-        """Export tunables whose value differs from the default as YAML.
+        """Export tunables the operator set, as YAML.
+
+        Rows whose value equals the default, or is empty (OPNsense treats an
+        empty value as "use the default"), are skipped.
 
         Returns:
             YAML string under the ``opnsense.system.tuning`` namespace.
@@ -210,7 +213,7 @@ class SystemTuningService(BaseService):
         items: list[dict[str, str]] = []
         for name in sorted(live):
             row = live[name]
-            if row["value"] == row["default_value"]:
+            if row["value"] == row["default_value"] or row["value"] == "":
                 continue
             item = {"tunable": name, "value": row["value"]}
             if row["descr"]:

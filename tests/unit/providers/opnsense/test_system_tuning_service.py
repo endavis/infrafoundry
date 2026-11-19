@@ -6,6 +6,7 @@ import logging
 from unittest.mock import MagicMock
 
 import pytest
+import yaml
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.services.system_tuning import SystemTuningService
@@ -117,6 +118,34 @@ def test_export_only_non_default(service: SystemTuningService) -> None:
     assert "a.b" in out
     assert "c.d" not in out
     assert "descr" in out
+
+
+def test_export_skips_empty_value_with_default(service: SystemTuningService) -> None:
+    service.system_client.get_tunables.return_value = {  # type: ignore[attr-defined]
+        "sysctl": {
+            "item": {
+                "u1": {"tunable": "e.f", "value": "", "descr": "", "default_value": "7"},
+            }
+        }
+    }
+    assert "e.f" not in service.export_to_yaml()
+
+
+def test_export_then_replan_is_clean(service: SystemTuningService) -> None:
+    live_response = {
+        "sysctl": {
+            "item": {
+                **LIVE["sysctl"]["item"],
+                "u3": {"tunable": "e.f", "value": "", "descr": "", "default_value": "7"},
+            }
+        }
+    }
+    service.system_client.get_tunables.return_value = live_response  # type: ignore[attr-defined]
+    exported = yaml.safe_load(service.export_to_yaml())
+    items = exported["opnsense"]["system"]["tuning"]["items"]
+    desired = service.build_desired_tunables(_res(items))
+    live = service.extract_live_tunables(live_response)
+    assert service.compute_changes(desired, live) == ([], [])
 
 
 def test_export_empty(service: SystemTuningService) -> None:
