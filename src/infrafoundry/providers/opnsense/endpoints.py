@@ -51,6 +51,9 @@ class EndpointKind(StrEnum):
     STOCK = "stock"
     EXTENSION = "extension"
     PLUGIN = "plugin"  # served by an installed contrib plugin, absent from the core specs
+    #: Stock, but the bundled specs list it as POST while the box serves a plain GET (#1497).
+    #: Skipped by the conformance and version checks; a test pins the mismatch.
+    SPEC_LISTS_POST = "spec-lists-post"
 
 
 @dataclass(frozen=True)
@@ -61,7 +64,8 @@ class Endpoint:
         method: HTTP method the provider sends.
         template: Path relative to ``/api/`` with ``{name}`` placeholders.
         kind: :attr:`EndpointKind.EXTENSION` for endpoints stock OPNsense lacks,
-            :attr:`EndpointKind.PLUGIN` for those a contrib plugin serves.
+            :attr:`EndpointKind.PLUGIN` for those a contrib plugin serves,
+            :attr:`EndpointKind.SPEC_LISTS_POST` for a stock GET the specs list as POST.
     """
 
     method: Method
@@ -390,6 +394,11 @@ KEA_RECONFIGURE = Endpoint("POST", "kea/service/reconfigure")
 # --- firewall rules, NAT, categories --------------------------------------------------
 FILTER = _rules("firewall/filter")
 FILTER_SAVEPOINT = Endpoint("POST", "firewall/filter/savepoint")
+# #1497: the configuration backup (config.xml), read by ``config migrate --include-legacy``.
+# Read-only; the response body is XML, not JSON.
+# The bundled specs list it as POST (spec-generator heuristic); the web UI downloads it
+# with a plain GET, which is what the provider sends.
+CORE_BACKUP_DOWNLOAD = Endpoint("GET", "core/backup/download/{host}", EndpointKind.SPEC_LISTS_POST)
 SOURCE_NAT = _rules("firewall/source_nat")
 # #1333: the model document (outbound NAT mode) and its write.
 SOURCE_NAT_GET = Endpoint("GET", "firewall/source_nat/get")
@@ -745,6 +754,10 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
 
 #: Endpoints used outside a single resource type (ISC to Kea migration).
 SHARED_ENDPOINTS: tuple[Endpoint, ...] = (CORE_MENU_SEARCH,)
+
+#: Read-only endpoints ``foundry config migrate`` calls beyond a resource type's own. They
+#: never gate a resource type (#1497).
+MIGRATE_ENDPOINTS: tuple[Endpoint, ...] = (CORE_BACKUP_DOWNLOAD,)
 
 #: Endpoints ``OPNsenseValidator`` calls during ``infra doctor``.
 DOCTOR_ENDPOINTS: tuple[Endpoint, ...] = (

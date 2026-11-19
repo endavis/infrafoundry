@@ -305,9 +305,13 @@ foundry config migrate --env prod --provider opnsense --component kea_dhcp
 foundry config migrate --env prod --provider opnsense --component isc_to_kea
 foundry config migrate --env prod --provider opnsense --component isc_to_kea -i lan -i wan
 foundry config migrate --env prod --provider opnsense --component isc_to_kea --dry-run
+
+# Also export legacy filter rules (read-only); see the Legacy Firewall Rule Migration guide
+foundry config migrate --env prod --provider opnsense --component firewall.rules --include-legacy --dry-run
+foundry config migrate --env prod --provider opnsense --component firewall.rules --include-legacy --allow-partial
 ```
 
-**Options:** `-e/--env TEXT` (required), `-p/--provider TEXT` (required, validated at runtime against the registry), `-c/--component TEXT` (required, validated at runtime against the registry — for OPNsense: `gateways`, `interface_assignments`, `isc_to_kea`, `kea_dhcp`, `nat_rules`, `static_routes`, `unbound_forward`, `unbound_host_alias`, `virtual_ips`, `vlans`), `-i/--interfaces TEXT` (repeatable; currently consumed by `isc_to_kea` only), `-o/--output TEXT` (default: `envs/{env}/resources/migrated-{component}.yaml`), `--dry-run`
+**Options:** `-e/--env TEXT` (required), `-p/--provider TEXT` (required, validated at runtime against the registry), `-c/--component TEXT` (required, validated at runtime against the registry — for OPNsense: `gateways`, `interface_assignments`, `isc_to_kea`, `kea_dhcp`, `nat_rules`, `static_routes`, `unbound_forward`, `unbound_host_alias`, `virtual_ips`, `vlans`), `-i/--interfaces TEXT` (repeatable; currently consumed by `isc_to_kea` only), `-o/--output TEXT` (default: `envs/{env}/resources/migrated-{component}.yaml`), `--dry-run`, `--include-legacy` (`firewall.rules` only; also exports legacy filter rules, see [Legacy Firewall Rule Migration](../guides/legacy-firewall-rule-migration.md)), `--allow-partial` (write the YAML even when some elements could not be exported)
 
 > **Breaking change (#726):** Before #726, the component names were `kea/dhcp` and `isc-to-kea`. They are now `kea_dhcp` and `isc_to_kea` (Python-identifier form, matching the registry key). The hyphenated/slash forms are no longer accepted — there is no transparent alias. Update any scripts that pass these names.
 

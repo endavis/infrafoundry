@@ -197,13 +197,15 @@ foundry config migrate --env <env> --provider opnsense --component firewall.alia
 | `-i`, `--interfaces` | Specific interfaces to migrate, repeatable |
 | `-o`, `--output` | Output file; defaults to `envs/{env}/resources/migrated-{component}.yaml` |
 | `--dry-run` | Show what would be generated without writing files |
+| `--include-legacy` | `firewall.rules` only: also export the legacy `<filter><rule>` rules (read-only; downloads the configuration backup, needs the backup-download privilege) |
+| `--allow-partial` | Write the YAML even when some elements could not be exported; they are listed in a header comment. Without it the command exits 1 and writes nothing |
 
 The component is the extractor key the provider registers, not always the same as a resource type. The keys are `acmeclient.accounts`, `acmeclient.actions`, `acmeclient.certs`, `acmeclient.settings`, `acmeclient.validations`, `cron.jobs`, `firewall.aliases`, `firewall.categories`, `firewall.nat`, `firewall.rules`, `firewall.source_nat`, `hasync.settings`, `hostdiscovery`, `interfaces.assignments`, `interfaces.settings`, `interfaces.virtual_ips`, `interfaces.vlans`, `isc_to_kea`, `kea.dhcp4.ha`, `kea.dhcp4.ha_peers`, `kea_dhcp`, `monit.alerts`, `monit.services`, `monit.settings`, `monit.tests`, `routing.gateways`, `routing.static`, `syslog.settings`, `tailscale.auth`, `tailscale.settings`, `tailscale.subnets`, `unbound.forwards`, `unbound.host_aliases`, `unbound.host_overrides` and `unbound.settings`. An unknown component is refused with this list.
 
 !!! note "The command's own help example"
     The `--help` text of `config migrate` shows `--component vlans`. The registered key is `interfaces.vlans`, and `vlans` is refused as an unsupported component.
 
-After a migration, plan and apply with `--add-only` until the YAML describes the whole box. For the ISC DHCP to Kea conversion see [ISC to Kea Migration](../guides/isc-to-kea-migration.md). For moving a configuration to a new firewall see the [box-to-box runbook](../development/opnsense-resource-coverage.md#box-to-box-migration-runbook-template).
+After a migration, plan and apply with `--add-only` until the YAML describes the whole box. For the ISC DHCP to Kea conversion see [ISC to Kea Migration](../guides/isc-to-kea-migration.md). For legacy filter rules see [Legacy Firewall Rule Migration](../guides/legacy-firewall-rule-migration.md). For moving a configuration to a new firewall see the [box-to-box runbook](../development/opnsense-resource-coverage.md#box-to-box-migration-runbook-template).
 
 ## Finalization Hooks
 

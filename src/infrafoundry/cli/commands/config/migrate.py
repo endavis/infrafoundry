@@ -5,6 +5,7 @@ from typing import Any
 
 import click
 
+from infrafoundry.core.exceptions import PartialExtractionError
 from infrafoundry.core.extractors import (
     get_extractor,
     list_extractor_providers,
@@ -14,6 +15,9 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 from ...decorators import with_orchestrator
 from ...utils import console
+
+#: Components that accept ``--include-legacy``.
+_LEGACY_RULE_COMPONENTS: frozenset[tuple[str, str]] = frozenset({("opnsense", "firewall.rules")})
 
 
 @click.command()
@@ -41,6 +45,22 @@ from ...utils import console
     "-o",
     help="Output file path (default: envs/{env}/resources/migrated-{component}.yaml)",
 )
+@click.option(
+    "--include-legacy",
+    is_flag=True,
+    help=(
+        "Also export legacy filter rules (read-only; downloads the configuration backup). "
+        "Only for --provider opnsense --component firewall.rules"
+    ),
+)
+@click.option(
+    "--allow-partial",
+    is_flag=True,
+    help=(
+        "Write the YAML even when some elements could not be exported "
+        "(they are listed in a header comment)"
+    ),
+)
 @click.option("--dry-run", is_flag=True, help="Show what would be generated without writing files")
 @with_orchestrator("Migration failed")
 def migrate(
@@ -52,6 +72,8 @@ def migrate(
     output: str | None,
     dry_run: bool,
     interfaces: tuple[str, ...],
+    include_legacy: bool,
+    allow_partial: bool,
 ) -> None:
     """Migrate existing infrastructure to InfraFoundry configuration.
 
@@ -71,6 +93,12 @@ def migrate(
         # Migrate ISC DHCP to Kea DHCP format
         foundry config migrate --env prod --provider opnsense --component isc_to_kea
         foundry config migrate --env prod --provider opnsense --component isc_to_kea -i lan -i wan
+
+        # Export legacy filter rules too (read-only), listing what could not be mapped
+        foundry config migrate --env prod --provider opnsense --component firewall.rules \\
+            --include-legacy --dry-run
+        foundry config migrate --env prod --provider opnsense --component firewall.rules \\
+            --include-legacy --allow-partial
 
         # Dry-run mode
         foundry config migrate --env prod --provider opnsense --component isc_to_kea --dry-run
@@ -125,8 +153,27 @@ def migrate(
         kwargs["interfaces"] = interfaces_list
         console.info(f"Targeting interfaces: {', '.join(interfaces_list)}")
 
+    if include_legacy:
+        if (provider_lower, component_lower) not in _LEGACY_RULE_COMPONENTS:
+            raise click.ClickException(
+                "--include-legacy only applies to --provider opnsense --component firewall.rules."
+            )
+        kwargs["include_legacy"] = True
+        console.info("Including legacy filter rules (read-only backup download)")
+
     extractor = get_extractor(provider_lower, component_lower)
-    yaml_content = extractor.extract(env, **kwargs)
+    try:
+        yaml_content = extractor.extract(env, **kwargs)
+    except PartialExtractionError as exc:
+        for issue in exc.issues:
+            console.warning(issue)
+        if not allow_partial:
+            raise click.ClickException(
+                f"{len(exc.issues)} element(s) could not be exported; nothing was written. "
+                "Review the list above, or pass --allow-partial to write the YAML anyway."
+            ) from exc
+        console.warning("--allow-partial: writing the YAML without those elements")
+        yaml_content = exc.yaml_content
 
     if dry_run:
         console.warning("Dry-run mode - configuration would be written to:")
