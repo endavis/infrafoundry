@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795084904982,
+  "lastUpdate": 1795097217071,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3690,6 +3690,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000047252386415564845",
             "extra": "mean: 77.14350973940351 usec\nrounds: 13707"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "63c3263f31c83b64c090b4636826b77cadeeaa2f",
+          "message": "fix: see opnsense interface assignments whose device is absent (merges PR #1500, addresses #1499)\n\nInterfaceAssignmentService.list() read only interfaces/overview/interfacesInfo,\nwhich omits an assignment whose device does not currently exist (a stopped\nTailscale, OpenVPN or WireGuard tunnel). Plan then showed the existing\nassignment as an add and destroy skipped it, leaving it in config.xml.\n\nlist() now keeps the interfacesInfo rows unchanged and appends every\nlan/wan/optN assignment the controller's config-backed searchItem returns that\ninterfacesInfo lacks. Without the controller (a 404 or 403 from searchItem) it\nlogs a warning and falls back to interfacesInfo alone, so plan still needs only\nthe API. The two TestServiceList tests that asserted a single interfacesInfo\ncall now assert both calls, as approved.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-19T14:05:57Z",
+          "tree_id": "b08a96baad766676f602dbda4bb6c53759a52da7",
+          "url": "https://github.com/endavis/infrafoundry/commit/63c3263f31c83b64c090b4636826b77cadeeaa2f"
+        },
+        "date": 1795097216490,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 57.50155064626595,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00053145803016603",
+            "extra": "mean: 17.39083535593206 msec\nrounds: 59"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10824.548800469676,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005361795205173726",
+            "extra": "mean: 92.38260350922064 usec\nrounds: 11342"
           }
         ]
       }
