@@ -130,7 +130,7 @@ Before each lease, the playbook fails the run when more than one `host` section 
 
 An unchanged resource that InfraFoundry does not manage yet is adopted into state on the next apply. This produces no device change and no plan change.
 
-`infra drift detect` runs the same check pass, add-only. A value changed on the device out of band shows as drift.
+`infra drift detect` runs the same check pass, add-only, with the same managed set as `infra plan`. A value changed on the device out of band shows as drift, and a resource an earlier apply adopted is labelled `update`, not `create`.
 
 ## Apply and rollback
 
