@@ -101,6 +101,12 @@ For the immediate use case driving #742 — mirroring prod to a freshly-built `f
 
 This sequence is added to [`docs/development/opnsense-resource-coverage.md`](../development/opnsense-resource-coverage.md) box-to-box runbook.
 
+### Amendment (#1497)
+
+Legacy rules can now be exported without the GUI page: `foundry config migrate --component firewall.rules --include-legacy` ([#1497](https://github.com/endavis/infrafoundry/issues/1497)) reads `config.xml` through the read-only backup download and writes reviewable `firewall.rules` YAML in legacy order. The decisions above are unchanged: the GUI page still converts in place and InfraFoundry owns nothing it creates; the export produces rules InfraFoundry owns. See [Legacy Firewall Rule Migration](../guides/legacy-firewall-rule-migration.md).
+
+Measured evaluation order on a supported 26.1 firewall, all rules quick, first match wins: automation floating, legacy floating, automation interface, legacy interface. The safe cutover applies the exported automation set while the legacy rules still exist, verifies, then disables and deletes the legacy rules by hand. The reverse opens a policy gap, and a legacy floating quick rule can shadow an exported interface rule until it is disabled.
+
 ## Coexistence with the existing terraform path
 
 Existing `firewall_rules.tf.j2` rendering and the validator's terraform-managed firewall rule path **stay callable** during the deprecation window. The provider dispatch table (`OPNsenseProvider.get_direct_api_resource_types()`) routes `firewall_rules` resources to the new component manager **by default**; envs that have terraform-managed firewall rules in state can opt back into the old path via `kind: legacy` on the resource (parallel to `nat_rules`'s `kind: outbound | one_to_one | port_forward`) for one minor-release window. Removal of the terraform path is a follow-up issue with its own migration note for affected envs.

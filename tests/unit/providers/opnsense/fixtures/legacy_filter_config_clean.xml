@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<!-- Synthetic fixture: no real deployment data. Every rule maps without issues. -->
+<opnsense>
+  <system>
+    <hostname>fw-test</hostname>
+    <domain>example.com</domain>
+  </system>
+  <interfaces>
+    <wan><if>vtnet0</if><descr>WAN</descr></wan>
+    <lan><if>vtnet1</if><descr>LAN</descr></lan>
+    <opt1><if>vtnet2</if><descr>SERVERS</descr></opt1>
+    <opt2><if>vtnet3</if><descr>GUEST</descr></opt2>
+  </interfaces>
+  <ifgroups>
+    <ifgroupentry>
+      <ifname>trusted</ifname>
+      <members>lan opt1</members>
+    </ifgroupentry>
+  </ifgroups>
+  <OPNsense>
+    <Firewall>
+      <Category version="1.0.0">
+        <categories>
+          <category uuid="11111111-2222-3333-4444-555555555555">
+            <name>Servers</name>
+            <auto>0</auto>
+          </category>
+        </categories>
+      </Category>
+    </Firewall>
+  </OPNsense>
+  <filter>
+    <rule uuid="aaaaaaaa-0000-0000-0000-000000000001">
+      <type>pass</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>keep state</statetype>
+      <descr>Allow web</descr>
+      <protocol>tcp</protocol>
+      <log>1</log>
+      <category>Servers</category>
+      <sched></sched>
+      <tracker>1700000001</tracker>
+      <source><network>lan</network></source>
+      <destination><any/><port>443</port></destination>
+      <created><username>admin@192.0.2.1</username><time>1700000001</time><description>Added</description></created>
+      <updated><username>admin@192.0.2.1</username><time>1700000002</time><description>Changed</description></updated>
+    </rule>
+    <rule uuid="aaaaaaaa-0000-0000-0000-000000000002">
+      <type>block</type>
+      <interface>lan</interface>
+      <ipprotocol>inet</ipprotocol>
+      <descr>Block host</descr>
+      <protocol>any</protocol>
+      <source><address>192.0.2.10/32</address></source>
+      <destination><not/><network>opt1</network></destination>
+    </rule>
+    <rule uuid="aaaaaaaa-0000-0000-0000-000000000003">
+      <type>block</type>
+      <floating>yes</floating>
+      <quick>1</quick>
+      <direction>any</direction>
+      <interface></interface>
+      <ipprotocol>inet</ipprotocol>
+      <descr>Floating block</descr>
+      <protocol>udp</protocol>
+      <source><any/></source>
+      <destination><address>198.51.100.0/24</address><port>53</port></destination>
+    </rule>
+    <rule uuid="aaaaaaaa-0000-0000-0000-000000000004">
+      <type>reject</type>
+      <interface>opt1</interface>
+      <ipprotocol>inet</ipprotocol>
+      <statetype>sloppy state</statetype>
+      <descr>Reject ssh</descr>
+      <protocol>tcp/udp</protocol>
+      <disabled>1</disabled>
+      <gateway>WAN_GW</gateway>
+      <source><any/></source>
+      <destination><address>example_hosts</address><port>22</port></destination>
+    </rule>
+    <rule uuid="aaaaaaaa-0000-0000-0000-000000000005">
+      <type>pass</type>
+      <interface>opt2</interface>
+      <ipprotocol>inet6</ipprotocol>
+      <descr>Guest ping</descr>
+      <protocol>icmp</protocol>
+      <icmp6type>echoreq</icmp6type>
+      <source><network>opt2ip</network></source>
+      <destination><address>2001:db8::/32</address></destination>
+    </rule>
+    <rule uuid="aaaaaaaa-0000-0000-0000-000000000006">
+      <type>pass</type>
+      <interface>trusted</interface>
+      <ipprotocol>inet46</ipprotocol>
+      <protocol>any</protocol>
+      <source><any/></source>
+      <destination><any/></destination>
+    </rule>
+  </filter>
+</opnsense>

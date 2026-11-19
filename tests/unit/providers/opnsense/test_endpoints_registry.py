@@ -378,3 +378,27 @@ def test_firmware_update_endpoints_are_registered_and_major_ones_are_not() -> No
     assert "core/firmware/upgrade" not in paths
     assert "core/firmware/reboot" not in paths
     assert "core/firmware/poweroff" not in paths
+
+
+def test_backup_download_is_a_read_only_migrate_endpoint_that_gates_no_type() -> None:
+    """#1497: the config backup is registered for conformance but never gates a type."""
+    ep = endpoints.CORE_BACKUP_DOWNLOAD
+    assert (ep.method, ep.template) == ("GET", "core/backup/download/{host}")
+    assert ep.params == ("host",)
+    assert ep in endpoints.MIGRATE_ENDPOINTS
+    assert ep in endpoints.registered_endpoints()
+    assert all(ep not in eps for eps in endpoints.RESOURCE_TYPE_ENDPOINTS.values())
+    assert all(e.method == "GET" for e in endpoints.MIGRATE_ENDPOINTS)
+
+
+@pytest.mark.parametrize("version", ["26.1", "26.1.11"])
+def test_spec_lists_post_exemption_stands(version: str) -> None:
+    """#1497: the specs list these as POST only; drop the exemption if that changes."""
+    from opnsense_openapi import endpoint_exists
+
+    exempt = [e for e in endpoints.registered_endpoints() if e.kind is EndpointKind.SPEC_LISTS_POST]
+    assert endpoints.CORE_BACKUP_DOWNLOAD in exempt
+    for e in exempt:
+        assert e.method == "GET"
+        assert endpoint_exists(e.sample_path(), "POST", version=version)
+        assert not endpoint_exists(e.sample_path(), "GET", version=version)

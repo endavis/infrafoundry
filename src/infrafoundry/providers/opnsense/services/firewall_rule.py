@@ -1053,17 +1053,47 @@ class FirewallRuleService(BaseService):
             YAML string with the nested ``opnsense:`` namespace and a
             ``firewall.rules`` list leaf.
         """
-        rules: list[LiveFirewallRule] = self.search_tolerant()
-        managed = [r for r in rules if r.managed_name is not None]
+        return emit_nested_list_yaml("firewall.rules", self.export_entries())
+
+    def export_entries(self, rules: list[LiveFirewallRule] | None = None) -> list[dict[str, Any]]:
+        """Build the export entries for the managed live rules.
+
+        Args:
+            rules: Live rules already fetched by the caller. ``None`` fetches them with
+                :meth:`search_tolerant`.
+
+        Returns:
+            ``{"name": ..., "config": {...}}`` dicts for the managed rules only.
+        """
+        live = self.search_tolerant() if rules is None else rules
+        managed = [r for r in live if r.managed_name is not None]
         marker_uuid = self._category_uuid  # may be None if cache cold
-        entries = [
+        return [
             {
                 "name": r.managed_name,
                 "config": _live_to_export_config(r, marker_uuid),
             }
             for r in managed
         ]
-        return emit_nested_list_yaml("firewall.rules", entries)
+
+
+def max_live_sequence(rules: list[LiveFirewallRule]) -> int:
+    """Return the highest ``sequence`` among all live rows, managed or not.
+
+    Args:
+        rules: Live rules from :meth:`FirewallRuleService.search`.
+
+    Returns:
+        The highest sequence, or ``0`` when there are no rows or none has a number.
+    """
+    highest = 0
+    for rule in rules:
+        text = _normalize_field(rule.raw.get("sequence"))
+        try:
+            highest = max(highest, int(text))
+        except ValueError:
+            continue
+    return highest
 
 
 # ---------------------------------------------------------------------------

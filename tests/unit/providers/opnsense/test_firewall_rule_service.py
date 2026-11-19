@@ -42,6 +42,7 @@ from infrafoundry.providers.opnsense.services.firewall_rule import (
     compute_diff,
     encode_identity,
     firewall_rule_configs_from_resources,
+    max_live_sequence,
     parse_identity,
 )
 
@@ -1287,6 +1288,40 @@ class TestExportToYaml:
         # Hyphenated wire keys must NOT leak into the YAML output.
         assert "state-policy:" not in text
         assert "max-src-conn:" not in text
+
+
+class TestExportEntries:
+    """``export_entries`` / ``max_live_sequence`` back the legacy export (#1497)."""
+
+    @staticmethod
+    def _rows() -> list[dict[str, Any]]:
+        return [
+            {"uuid": "u1", "description": "LAN [infrafoundry:lan-allow]", "sequence": "20"},
+            {"uuid": "u2", "description": "manual rule", "sequence": "450"},
+            {"uuid": "u3", "description": "odd", "sequence": "not-a-number"},
+        ]
+
+    def test_export_entries_matches_export_to_yaml(self) -> None:
+        from infrafoundry.providers.opnsense.services._nested_emit import emit_nested_list_yaml
+
+        client = MagicMock()
+        client.request.return_value = {"rows": self._rows()}
+        svc = FirewallRuleService(client)
+        assert svc.export_to_yaml() == emit_nested_list_yaml("firewall.rules", svc.export_entries())
+
+    def test_export_entries_uses_the_rows_it_is_given_without_a_request(self) -> None:
+        client = MagicMock()
+        svc = FirewallRuleService(client)
+        live = [_row_to_live(row) for row in self._rows()]
+        entries = svc.export_entries(live)
+        assert [e["name"] for e in entries] == ["lan-allow"]
+        client.request.assert_not_called()
+
+    def test_max_live_sequence_counts_unmanaged_rows(self) -> None:
+        assert max_live_sequence([_row_to_live(row) for row in self._rows()]) == 450
+
+    def test_max_live_sequence_is_zero_without_rows(self) -> None:
+        assert max_live_sequence([]) == 0
 
 
 class TestStatetypeWireKey:

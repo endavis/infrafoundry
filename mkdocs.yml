@@ -224,6 +224,7 @@ nav:
 
   - Guides:
     - ISC to Kea Migration: guides/isc-to-kea-migration.md
+    - Legacy Firewall Rule Migration: guides/legacy-firewall-rule-migration.md
     - DHCP VM Integration: guides/dhcp-vm-integration.md
     - Age Key Management: guides/age-key-management.md
     - Device Config Collectors: guides/device-config-collectors.md

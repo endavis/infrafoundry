@@ -43,3 +43,19 @@ emitted by historical templates: `opnsense_kea_reservation`,
 `opnsense_kea_subnet`, `opnsense_unbound_host_override`. They remain in
 the JSON for reference; trim them when the next provider-pin bump
 forces a regeneration.
+
+## Legacy filter rule fixtures (#1497)
+
+`legacy_filter_config.xml` and `legacy_filter_config_clean.xml` are **synthetic**
+`config.xml` excerpts for the legacy filter rule export (`foundry config migrate
+--component firewall.rules --include-legacy`). They hold no real deployment data
+(RFC 5737 / RFC 3849 addresses, role-name hostnames, `example.com`) and no secrets.
+
+- `legacy_filter_config_clean.xml`: every rule maps without issues.
+- `legacy_filter_config.xml`: the clean rules plus rules that cannot be fully exported
+  (`sched`, `os`, `dnpipe`, `associated-rule-id`, an unknown element, a multi-interface
+  floating rule, an unknown interface).
+
+The element names and value vocabulary follow the legacy `<filter><rule>` layout; they
+are inferred, not proven. When touching the mapper, compare against a real 26.1
+`config.xml` kept local and never committed.

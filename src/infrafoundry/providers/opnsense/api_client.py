@@ -133,6 +133,53 @@ class OPNsenseClient:
                 provider="opnsense",
             ) from e
 
+    def get_text(self, endpoint: str, params: dict[str, Any] | None = None) -> str:
+        """Fetch a GET endpoint whose body is not JSON (for example the config backup).
+
+        ``opnsense-openapi`` decodes every response as JSON and raises
+        ``APIResponseError`` carrying the raw body when it is not. This method returns
+        that body. The body can hold secrets: it is never logged and never put in an
+        exception message or ``response=``.
+
+        Args:
+            endpoint: Path relative to ``/api/`` with at least three segments.
+            params: Optional query parameters.
+
+        Returns:
+            The raw response text.
+
+        Raises:
+            AuthenticationError: On HTTP 401 or 403.
+            APIError: On any other HTTP failure, or when the body was JSON.
+            ValueError: If the endpoint path is malformed.
+        """
+        parts = [p for p in endpoint.split("/") if p]
+        if len(parts) < 3:
+            raise ValueError(f"Invalid endpoint format: {endpoint}")
+
+        module, controller, command, *extra = parts
+        try:
+            self.client.get(module, controller, command, *extra, **(params or {}))
+        except APIResponseError as e:
+            return str(e.response_text)
+        except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code if e.response else None
+            if status_code in (401, 403):
+                raise AuthenticationError(
+                    "OPNsense authentication failed",
+                    status_code=status_code,
+                    provider="opnsense",
+                ) from e
+            raise APIError(
+                f"OPNsense API request failed with HTTP status {status_code}",
+                status_code=status_code,
+                provider="opnsense",
+            ) from e
+        raise APIError(
+            f"Expected a non-JSON response from {endpoint}",
+            provider="opnsense",
+        )
+
 
 class KeaClient:
     """Kea DHCP-specific API operations.

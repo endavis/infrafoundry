@@ -9,6 +9,7 @@ import pytest
 from click.testing import CliRunner
 
 from infrafoundry.cli.main import main
+from infrafoundry.core.exceptions import PartialExtractionError
 from infrafoundry.core.orchestrator import Orchestrator
 
 
@@ -564,3 +565,210 @@ def test_migrate_kea_dhcp_no_underscore_alias_for_legacy_name(
         # operator gets a list of valid options including ``kea_dhcp``.
         assert "kea_dhcp" in result.output
         assert not output_file.exists()
+
+
+# ---------------------------------------------------------------------------
+# --include-legacy / --allow-partial (#1497)
+# ---------------------------------------------------------------------------
+
+_PARTIAL_ISSUES = ('rule #7 "Scheduled access": sched: has no counterpart', "rule #11: interface")
+_PARTIAL_YAML = "# Legacy rule fields not exported \u2014 review before apply:\nopnsense: {}\n"
+
+
+def _invoke_legacy(
+    cli_runner: CliRunner,
+    mock_orchestrator: Mock,
+    mock_opnsense_provider: Mock,
+    extractor: MagicMock,
+    extra_args: list[str],
+    *,
+    component: str = "firewall.rules",
+) -> Any:
+    mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
+    with (
+        patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
+        patch(
+            "infrafoundry.cli.commands.config.migrate.get_extractor",
+            return_value=extractor,
+        ),
+    ):
+        return cli_runner.invoke(
+            main,
+            [
+                "config",
+                "migrate",
+                "--env",
+                "test",
+                "--provider",
+                "opnsense",
+                "--component",
+                component,
+                *extra_args,
+            ],
+        )
+
+
+def _partial_extractor() -> MagicMock:
+    extractor = MagicMock()
+    extractor.extract.side_effect = PartialExtractionError(
+        "partial", yaml_content=_PARTIAL_YAML, issues=_PARTIAL_ISSUES
+    )
+    return extractor
+
+
+def test_include_legacy_forwards_the_option_only_when_set(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
+    out = tmp_path / "rules.yaml"
+    plain = MagicMock()
+    plain.extract.return_value = "a: b\n"
+    result = _invoke_legacy(
+        cli_runner, mock_orchestrator, mock_opnsense_provider, plain, ["-o", str(out)]
+    )
+    assert result.exit_code == 0, result.output
+    plain.extract.assert_called_once_with("test")
+
+    legacy = MagicMock()
+    legacy.extract.return_value = "a: b\n"
+    result = _invoke_legacy(
+        cli_runner,
+        mock_orchestrator,
+        mock_opnsense_provider,
+        legacy,
+        ["--include-legacy", "-o", str(out)],
+    )
+    assert result.exit_code == 0, result.output
+    legacy.extract.assert_called_once_with("test", include_legacy=True)
+
+
+def test_include_legacy_clean_export_exits_zero_and_writes(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
+    out = tmp_path / "rules.yaml"
+    extractor = MagicMock()
+    extractor.extract.return_value = "opnsense: {}\n"
+    result = _invoke_legacy(
+        cli_runner,
+        mock_orchestrator,
+        mock_opnsense_provider,
+        extractor,
+        ["--include-legacy", "-o", str(out)],
+    )
+    assert result.exit_code == 0, result.output
+    assert out.read_text() == "opnsense: {}\n"
+
+
+def test_partial_export_without_allow_partial_fails_and_writes_nothing(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
+    out = tmp_path / "rules.yaml"
+    result = _invoke_legacy(
+        cli_runner,
+        mock_orchestrator,
+        mock_opnsense_provider,
+        _partial_extractor(),
+        ["--include-legacy", "-o", str(out)],
+    )
+    assert result.exit_code == 1
+    assert not out.exists()
+    for issue in _PARTIAL_ISSUES:
+        assert issue in result.output
+    assert "--allow-partial" in result.output
+
+
+def test_partial_export_with_allow_partial_writes_the_yaml_with_header(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
+    out = tmp_path / "rules.yaml"
+    result = _invoke_legacy(
+        cli_runner,
+        mock_orchestrator,
+        mock_opnsense_provider,
+        _partial_extractor(),
+        ["--include-legacy", "--allow-partial", "-o", str(out)],
+    )
+    assert result.exit_code == 0, result.output
+    assert out.read_text() == _PARTIAL_YAML
+    for issue in _PARTIAL_ISSUES:
+        assert issue in result.output
+
+
+def test_partial_export_dry_run_without_allow_partial_fails(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
+    out = tmp_path / "rules.yaml"
+    result = _invoke_legacy(
+        cli_runner,
+        mock_orchestrator,
+        mock_opnsense_provider,
+        _partial_extractor(),
+        ["--include-legacy", "--dry-run", "-o", str(out)],
+    )
+    assert result.exit_code == 1
+    assert not out.exists()
+
+
+def test_include_legacy_is_rejected_for_other_components(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
+    extractor = MagicMock()
+    result = _invoke_legacy(
+        cli_runner,
+        mock_orchestrator,
+        mock_opnsense_provider,
+        extractor,
+        ["--include-legacy", "-o", str(tmp_path / "x.yaml")],
+        component="interfaces.vlans",
+    )
+    assert result.exit_code != 0
+    assert "--include-legacy only applies" in result.output
+    extractor.extract.assert_not_called()
+
+
+def test_include_legacy_path_makes_no_write_calls(
+    cli_runner: CliRunner, mock_orchestrator: Mock, mock_opnsense_provider: Mock, tmp_path: Path
+) -> None:
+    """End to end through the real extractor: only the search and the backup GET run."""
+    from infrafoundry.providers.opnsense.services.config_backup import ConfigBackupService
+    from infrafoundry.providers.opnsense.services.firewall_rule import FirewallRuleService
+
+    clean = (
+        Path(__file__).parent / "providers/opnsense/fixtures/legacy_filter_config_clean.xml"
+    ).read_text()
+    client = MagicMock()
+    client.request.return_value = {"rows": []}
+    client.get_text.return_value = clean
+    service = FirewallRuleService(client)
+    service._category_uuid = "marker-uuid"
+    component = "infrafoundry.providers.opnsense.components.firewall_rule"
+    out = tmp_path / "rules.yaml"
+
+    mock_orchestrator.providers["opnsense"] = mock_opnsense_provider
+    with (
+        patch("infrafoundry.cli.main._get_orchestrator", return_value=mock_orchestrator),
+        patch(f"{component}.FirewallRuleService") as svc_cls,
+        patch(f"{component}.ConfigBackupService") as backup_cls,
+        patch(f"{component}.env_provider_resources", return_value=[]),
+    ):
+        svc_cls.from_environment.return_value = service
+        backup_cls.from_environment.return_value = ConfigBackupService(client)
+        result = cli_runner.invoke(
+            main,
+            [
+                "config",
+                "migrate",
+                "--env",
+                "test",
+                "--provider",
+                "opnsense",
+                "--component",
+                "firewall.rules",
+                "--include-legacy",
+                "-o",
+                str(out),
+            ],
+        )
+    assert result.exit_code == 0, result.output
+    assert "allow-web" in out.read_text()
+    assert [c.args[0] for c in client.request.call_args_list] == ["POST"]
+    client.get_text.assert_called_once_with("core/backup/download/this")

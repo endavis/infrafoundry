@@ -11,18 +11,32 @@ diff engine's job in ``services/firewall_rule.py``.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, ClassVar
 
+from infrafoundry.core.exceptions import APIError, PartialExtractionError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import ResourceOutcome
 
+from ..services._nested_emit import emit_nested_list_yaml
+from ..services.config_backup import ConfigBackupService
 from ..services.firewall_rule import (
     Diff,
     FirewallRuleService,
     LiveFirewallRule,
     firewall_rule_configs_from_resources,
+    max_live_sequence,
 )
+from ..services.firewall_rule_legacy import parse_legacy_rules
+from ._migrate_names import env_provider_resources, reserved_names
 from .base import BaseComponentManager
+
+logger = logging.getLogger(__name__)
+
+#: Legacy rules start this far above the highest live sequence.
+_LEGACY_SEQUENCE_GAP = 100
+
+_PARTIAL_HEADER = "# Legacy rule fields not exported — review before apply:\n"
 
 
 class FirewallRuleManager(BaseComponentManager):
@@ -237,16 +251,70 @@ class FirewallRuleManager(BaseComponentManager):
         service = FirewallRuleService.from_environment(env_name, provider_name, self.config_dir)
         return service.search()
 
-    def migrate(self, env_name: str, *, provider_name: str = "opnsense") -> str:
+    def migrate(
+        self,
+        env_name: str,
+        *,
+        provider_name: str = "opnsense",
+        include_legacy: bool = False,
+    ) -> str:
         """Export the current managed firewall rules to InfraFoundry YAML.
 
         Args:
             env_name: Active environment name.
             provider_name: Provider identifier (defaults to ``opnsense``).
+            include_legacy: Also export the legacy ``<filter><rule>`` rules read from the
+                configuration backup (#1497). Read-only: one GET of the backup. The legacy
+                rules are numbered after the highest live ``sequence`` so they keep their
+                order and sort behind the rules already on the box.
 
         Returns:
-            YAML string containing the live managed rules in
-            resource-centric form.
+            YAML string containing the live managed rules (and, with ``include_legacy``,
+            the mapped legacy rules) in resource-centric form.
+
+        Raises:
+            PartialExtractionError: With ``include_legacy``, when a legacy rule or field
+                could not be exported or the backup could not be read. The error carries
+                the YAML that was produced, with the issues in a header comment.
         """
         service = FirewallRuleService.from_environment(env_name, provider_name, self.config_dir)
-        return service.export_to_yaml()
+        if not include_legacy:
+            return service.export_to_yaml()
+
+        live = service.search_tolerant()
+        entries = service.export_entries(live)
+        resources = env_provider_resources(self.config_dir, env_name, provider_name)
+        reserved = reserved_names(resources, exclude_types=frozenset()) | {
+            str(entry["name"]) for entry in entries
+        }
+
+        issues: list[str] = []
+        try:
+            backup = ConfigBackupService.from_environment(
+                env_name, provider_name, self.config_dir
+            ).download_config()
+            exported = parse_legacy_rules(
+                backup,
+                reserved=reserved,
+                sequence_start=max_live_sequence(live) + _LEGACY_SEQUENCE_GAP,
+            )
+        except APIError as exc:
+            logger.warning("Legacy rules not read: %s", exc.message)
+            issues.append(
+                "legacy rules not read: the configuration backup could not be downloaded or "
+                "parsed; the API key needs the backup-download privilege"
+            )
+        else:
+            entries.extend(exported.entries)
+            issues.extend(str(issue) for issue in exported.issues)
+
+        yaml_text = emit_nested_list_yaml("firewall.rules", entries)
+        if not issues:
+            return yaml_text
+
+        header = _PARTIAL_HEADER + "".join(f"# - {issue}\n" for issue in issues)
+        raise PartialExtractionError(
+            f"{len(issues)} legacy rule field(s) could not be exported",
+            yaml_content=header + yaml_text,
+            issues=issues,
+        )

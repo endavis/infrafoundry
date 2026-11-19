@@ -6,6 +6,7 @@ and debugging throughout the application.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 
@@ -171,6 +172,31 @@ class ResourceNotFoundError(StateError):
 
 class StateInconsistencyError(StateError):
     """State database is inconsistent."""
+
+
+class PartialExtractionError(InfraFoundryError):
+    """Raised when a migrate extraction produced YAML but could not cover everything.
+
+    ``foundry config migrate`` writes nothing on this error unless the operator passes
+    ``--allow-partial``; then it writes :attr:`yaml_content`.
+
+    Attributes:
+        yaml_content: The YAML the extraction did produce, with the issues in a header
+            comment.
+        issues: One human-readable line per element that was not exported.
+    """
+
+    def __init__(self, message: str, *, yaml_content: str, issues: Sequence[str]) -> None:
+        """Initialize the partial-extraction error.
+
+        Args:
+            message: Human-readable summary.
+            yaml_content: The partial YAML.
+            issues: What was not exported, one line each.
+        """
+        super().__init__(message)
+        self.yaml_content = yaml_content
+        self.issues: tuple[str, ...] = tuple(issues)
 
 
 class LockAcquisitionError(InfraFoundryError):
