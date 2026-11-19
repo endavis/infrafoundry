@@ -14,7 +14,11 @@ returns ``{"rows": [...]}`` where each row carries ``identifier``
 (physical NIC or VLAN child), ``description``, ``ipv4``/``ipv6`` (raw
 dicts), ``is_physical``, and others. Rows with empty ``identifier``
 are physical NICs that are not assigned to any logical interface — the
-service skips them.
+service skips them. ``interfacesInfo`` omits an assignment whose device does
+not currently exist (a stopped Tailscale/OpenVPN/WireGuard tunnel), so the
+service also reads the controller's config-backed ``searchItem`` and appends
+every ``lan``/``wan``/``optN`` assignment missing from ``interfacesInfo``
+(#1499). Without the controller it falls back to ``interfacesInfo`` alone.
 
 Write path: the controller exposes ``addItem``, ``setItem`` (in-place
 update), ``delItem``, ``getItem``, and ``searchItem``. Each call
@@ -36,6 +40,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.provider import ResourceConfig
 
 from .. import endpoints
@@ -1020,6 +1025,36 @@ class InterfaceAssignmentService(BaseService):
     # binds to the builtin too)
     # ------------------------------------------------------------------
 
+    def _config_assignments(self) -> list[LiveInterfaceAssignment]:
+        """Read assignments from the controller's config-backed ``searchItem``.
+
+        Returns:
+            Assignments named ``lan``/``wan``/``optN``. Empty when the controller
+            is absent (an ``APIError``) or the reply has no ``rows`` list.
+        """
+        ep = endpoints.ASSIGN_SETTINGS.search
+        response: Any
+        try:
+            response = self.client.request(ep.method, ep.path())
+        except APIError as exc:
+            logger.warning(
+                "Could not read interface assignments from the controller (%s); an "
+                "assignment whose device is absent stays invisible until the first "
+                "assignment write installs it",
+                exc,
+            )
+            return []
+        if not isinstance(response, dict):
+            return []
+        raw_rows = response.get("rows")
+        if not isinstance(raw_rows, list):
+            return []
+        return [
+            _search_row_to_live_assignment(row)
+            for row in raw_rows
+            if isinstance(row, dict) and _ASSIGNABLE_NAME_RE.match(str(row.get("name", "")))
+        ]
+
     def search(self) -> list[LiveInterfaceAssignment]:
         """Alias for ``list()`` — VLAN-style call name for cross-service parity."""
         return self.list()
@@ -1030,9 +1065,13 @@ class InterfaceAssignmentService(BaseService):
         Skips rows with an empty ``identifier`` — those are physical
         NICs that are not assigned to any logical interface.
 
+        Assignments whose device does not exist are missing from
+        ``interfacesInfo``; they are appended from the controller's
+        ``searchItem`` (#1499).
+
         Returns:
             ``LiveInterfaceAssignment`` entries normalized from the
-            ``interfacesInfo`` API.
+            ``interfacesInfo`` API, plus config-only assignments.
         """
         response = self.client.request(
             endpoints.INTERFACES_INFO.method, endpoints.INTERFACES_INFO.path()
@@ -1044,7 +1083,10 @@ class InterfaceAssignmentService(BaseService):
             if isinstance(raw_rows, list):
                 rows = [r for r in raw_rows if isinstance(r, dict)]
 
-        return [_row_to_live_assignment(row) for row in rows if row.get("identifier")]
+        live = [_row_to_live_assignment(row) for row in rows if row.get("identifier")]
+        seen = {entry.identifier for entry in live}
+        live.extend(entry for entry in self._config_assignments() if entry.identifier not in seen)
+        return live
 
 
 # ---------------------------------------------------------------------------
@@ -1109,6 +1151,44 @@ def _row_to_live_assignment(row: dict[str, Any]) -> LiveInterfaceAssignment:
         ipv6=ipv6,
         macaddr=macaddr,
         mtu=mtu,
+    )
+
+
+#: Names the merge accepts from ``searchItem``; other ``<interfaces>`` children
+#: (groups, internal nodes) are not assignments.
+_ASSIGNABLE_NAME_RE = re.compile(r"^(lan|wan|opt\d+)$")
+
+
+def _search_row_to_live_assignment(row: dict[str, Any]) -> LiveInterfaceAssignment:
+    """Rebuild an ``interfacesInfo``-shaped assignment from a ``searchItem`` row."""
+    ipv4: dict[str, Any] = {}
+    v4_type = row.get("ipv4Type")
+    if v4_type == "dhcp":
+        ipv4 = {"ipaddr": "dhcp"}
+    elif v4_type == "static":
+        ipv4 = {"ipaddr": row.get("ipv4Address"), "subnet": str(row.get("ipv4Subnet"))}
+    spoof = row.get("spoofMac")
+    if isinstance(spoof, str) and spoof:
+        ipv4["spoofmac"] = spoof
+
+    ipv6: dict[str, Any] = {}
+    v6_type = row.get("ipv6Type")
+    if v6_type == "dhcp":
+        ipv6 = {"ipaddrv6": "dhcp6"}
+    elif v6_type == "track-interface":
+        ipv6 = {"ipaddrv6": "track6", "track6-interface": row.get("ipv6Track")}
+    elif v6_type == "static":
+        ipv6 = {"ipaddrv6": row.get("ipv6Address"), "subnetv6": str(row.get("ipv6Subnet"))}
+
+    return LiveInterfaceAssignment(
+        identifier=str(row.get("name", "")),
+        device=str(row.get("device", "") or ""),
+        description=str(row.get("description", "") or ""),
+        is_physical=False,
+        ipv4=ipv4,
+        ipv6=ipv6,
+        macaddr="",
+        mtu=0,
     )
 
 

@@ -30,6 +30,7 @@ from infrafoundry.providers.opnsense.services.interface_assignment import (
     ApplyDiffResult,
     Diff,
     InterfaceAssignmentConfig,
+    InterfaceAssignmentService,
     LiveInterfaceAssignment,
 )
 
@@ -162,6 +163,58 @@ class TestPlan:
             svc_cls.from_environment.return_value = service_mock
             manager.plan("test-env", [_resource("opt5")])
         inst.ensure_installed.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# absent-device assignment (#1499): real service over a mock client
+# ---------------------------------------------------------------------------
+
+
+def _absent_device_client() -> MagicMock:
+    """Client whose ``interfacesInfo`` omits ``opt2`` while ``searchItem`` lists it."""
+    client = MagicMock()
+
+    def _request(method: str, path: str, **_: Any) -> dict[str, Any]:
+        if path.endswith("searchItem"):
+            return {
+                "rows": [
+                    {
+                        "name": "opt2",
+                        "device": "wg0",
+                        "description": "tunnel",
+                        "ipv4Type": "none",
+                        "ipv6Type": "none",
+                    }
+                ]
+            }
+        if path.endswith("interfacesInfo"):
+            return {"rows": []}
+        return {"result": "deleted"}
+
+    client.request.side_effect = _request
+    return client
+
+
+class TestAbsentDeviceAssignment:
+    def test_plan_sees_assignment_on_absent_device(self, tmp_path: Path) -> None:
+        service = InterfaceAssignmentService(_absent_device_client())
+        with patch(SERVICE_PATH) as svc_cls:
+            svc_cls.from_environment.return_value = service
+            diff = InterfaceAssignmentManager(tmp_path).plan(
+                "test-env", [_resource("opt2", device="wg0", description="tunnel")]
+            )
+        assert diff.is_empty
+
+    def test_destroy_deletes_assignment_on_absent_device(self, tmp_path: Path) -> None:
+        client = _absent_device_client()
+        service = InterfaceAssignmentService(client)
+        with patch(SERVICE_PATH) as svc_cls, patch(INSTALLER_PATH):
+            svc_cls.from_environment.return_value = service
+            result = InterfaceAssignmentManager(tmp_path).destroy(
+                "test-env", [_resource("opt2", device="wg0", description="tunnel")]
+            )
+        assert result["resources_destroyed"] == 1
+        client.request.assert_any_call("POST", "interfaces/assign_settings/delItem/opt2")
 
 
 # ---------------------------------------------------------------------------
