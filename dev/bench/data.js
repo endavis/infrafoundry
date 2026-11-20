@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795165896891,
+  "lastUpdate": 1795180151136,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4032,6 +4032,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000873315338104265",
             "extra": "mean: 92.23333667815994 usec\nrounds: 12457"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d0893053f7f2a1b5d6d729933cffaba08c149cf5",
+          "message": "fix: make the tailscale mint key description valid and surface api errors (merges PR #1515, addresses #1514)\n\nThe mint key description contained a '.', which the Tailscale API rejects,\nso every mint failed with HTTP 400. Use letters, spaces and hyphens only,\npinned by a test.\n\nToken and key-create errors now append the API's error message, with any\ntskey-* token redacted, instead of the bare HTTP status.\n\nAddresses #1514\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T13:08:14Z",
+          "tree_id": "700537088984e5f2206a584d9c2b17d96eb0354b",
+          "url": "https://github.com/endavis/infrafoundry/commit/d0893053f7f2a1b5d6d729933cffaba08c149cf5"
+        },
+        "date": 1795180150352,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 76.4437755529116,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0007132140159549192",
+            "extra": "mean: 13.081509812500514 msec\nrounds: 80"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14357.962831821234,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000041028626216343014",
+            "extra": "mean: 69.6477635242043 usec\nrounds: 15879"
           }
         ]
       }
