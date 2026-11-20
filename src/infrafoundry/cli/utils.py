@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import click
 from rich.console import Console as RichConsole
+from rich.markup import escape
 
 from infrafoundry.core.exceptions import InfraFoundryError
 
@@ -25,19 +26,19 @@ class InfraFoundryConsole:
 
     def header(self, message: str) -> None:
         """Print a section header."""
-        self._console.print(f"[bold cyan]{message}")
+        self._console.print(f"[bold cyan]{escape(message)}")
 
     def success(self, message: str) -> None:
         """Print a success message."""
-        self._console.print(f"[green]✓ {message}")
+        self._console.print(f"[green]✓ {escape(message)}")
 
     def error(self, message: str) -> None:
         """Print an error message."""
-        self._console.print(f"[red]✗ {message}")
+        self._console.print(f"[red]✗ {escape(message)}")
 
     def warning(self, message: str) -> None:
         """Print a warning message."""
-        self._console.print(f"[yellow]⚠ {message}")
+        self._console.print(f"[yellow]⚠ {escape(message)}")
 
     def info(self, message: str) -> None:
         """Print an info message."""
@@ -50,11 +51,11 @@ class InfraFoundryConsole:
             message: Item text
             indent: Number of spaces before bullet (default: 2)
         """
-        self._console.print(f"{' ' * indent}{BULLET} {message}")
+        self._console.print(f"{' ' * indent}{BULLET} {escape(message)}")
 
     def status(self, message: str) -> None:
         """Print a status update."""
-        self._console.print(f"[dim]{message}[/dim]")
+        self._console.print(f"[dim]{escape(message)}[/dim]")
 
     def print(self, *args: Any, **kwargs: Any) -> None:
         """Forward generic print to rich console."""
@@ -93,18 +94,18 @@ def raise_cli_error(action: str, exc: Exception, *, use_error_codes: bool = True
         for line in error_msg.split("\n"):
             if line.startswith("[IF-"):
                 # Error code line
-                console.print(f"[bold red]{line}[/bold red]")
+                console.print(f"[bold red]{escape(line)}[/bold red]")
             elif line.strip().startswith("- "):
                 # Suggestion bullet
-                console.print(f"[yellow]{line}[/yellow]")
+                console.print(f"[yellow]{escape(line)}[/yellow]")
             elif "Suggestions:" in line:
-                console.print(f"[bold]{line}[/bold]")
+                console.print(f"[bold]{escape(line)}[/bold]")
             elif "See:" in line:
-                console.print(f"[cyan]{line}[/cyan]")
+                console.print(f"[cyan]{escape(line)}[/cyan]")
             elif "Run with --debug" in line:
-                console.print(f"[dim]{line}[/dim]")
+                console.print(f"[dim]{escape(line)}[/dim]")
             else:
-                console.print(line)
+                console.print(escape(line))
         # Raise with just the code and title for the CLI exit message
         code = get_error_code(exc)
         info = get_error_info(code)
