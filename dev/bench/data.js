@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795180151136,
+  "lastUpdate": 1795181268952,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4070,6 +4070,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000041028626216343014",
             "extra": "mean: 69.6477635242043 usec\nrounds: 15879"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "00158f5e13301122b363f5ed79c17350ba331918",
+          "message": "docs: record the live verification of tailscale.auth.mint (merges PR #1517, addresses #1516)\n\nThe provider guide and the coverage doc still said mint had not been run\nlive. Record the #1510 live test and that the auth_keys-only scope is still\nunverified. Also correct the error-content sentence after #1514, which\nadded the API's message (with tskey- tokens redacted) to failures.\n\nAddresses #1516\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T13:26:21Z",
+          "tree_id": "48c96d36fbe24d3d01b74431a6bf4025207d5cbc",
+          "url": "https://github.com/endavis/infrafoundry/commit/00158f5e13301122b363f5ed79c17350ba331918"
+        },
+        "date": 1795181268168,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 70.16821609450768,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005522647783225978",
+            "extra": "mean: 14.251466770269987 msec\nrounds: 74"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12820.660873403891,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004603727272994399",
+            "extra": "mean: 77.99909925661262 usec\nrounds: 13722"
           }
         ]
       }
