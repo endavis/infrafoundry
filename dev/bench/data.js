@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795202894806,
+  "lastUpdate": 1795204972626,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4488,6 +4488,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000690401958441141",
             "extra": "mean: 100.8054054486735 usec\nrounds: 10608"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "50d5eb2f04d849a7b319b6d9b977b0f481250d7d",
+          "message": "feat: support several kubernetes clusters per environment as provider instances (merges PR #1540, addresses #1539)\n\n* refactor: make the provider-instance machinery generic\n\nPrepares provider instances for more than one provider family (#1539).\nBehaviour is unchanged for OPNsense firewalls; all existing tests pass\nunmodified.\n\n- INSTANCE_SETTINGS becomes an InstanceSpec registry (map key, primary\n  key, selector key, noun); messages are built from it, so the OPNsense\n  wording is byte-identical\n- the settings merge, primary check, settings-shape validation and\n  entry/file/manifest selection move from providers/opnsense/firewalls.py\n  into core/provider_instances.py; firewalls.py wraps them and keeps the\n  HA backup checks\n- a package manifest's firewall: now stamps only opnsense resources\n- the CLI -P expansion helper is generic over the instance family\n- tests for the new generic helpers\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* feat: support several kubernetes clusters per environment as provider instances\n\nAn environment can now describe more than one Kubernetes cluster. The\nprimary keeps the provider id `kubernetes`; every other cluster is\n`kubernetes@<name>` with its own generated directory, Terraform state,\napply batch and validation, as OPNsense firewalls are (ADR-0024).\n\n- provider_settings.kubernetes.clusters maps a name to kubeconfig_path\n  and an optional context, with primary; the flat kubeconfig_path shape\n  is unchanged and keeps its state\n- a resource picks its cluster by its own cluster: key, then a file-level\n  cluster:, then the package manifest's cluster:, then the primary, so a\n  blueprint package can be pinned to a cluster\n- infra plan/apply/destroy/doctor take --cluster; -P kubernetes covers\n  every cluster\n- with clusters: declared, KUBECONFIG is ignored for every cluster (with a\n  warning) so the shell cannot retarget the primary\n- kubeconfig context now reaches Terraform (config_context), matching\n  what validation already used\n- outputs.* references resolve into a non-primary cluster's resources\n- ADR-0030 records the decision\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T20:02:01Z",
+          "tree_id": "ddce3f98ba4d0c1e54cdc3985a6026c9cc83f994",
+          "url": "https://github.com/endavis/infrafoundry/commit/50d5eb2f04d849a7b319b6d9b977b0f481250d7d"
+        },
+        "date": 1795204972034,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 105.42711064379543,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003795580342228004",
+            "extra": "mean: 9.485226275228968 msec\nrounds: 109"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 17147.908575951074,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000026884252105726893",
+            "extra": "mean: 58.31614949256499 usec\nrounds: 17827"
           }
         ]
       }
