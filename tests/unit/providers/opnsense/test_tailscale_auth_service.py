@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -15,6 +16,7 @@ from infrafoundry.core.exceptions import APIError, InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.opnsense.services.tailscale_auth import (
     KEY_PLACEHOLDER,
+    MINT_DESCRIPTION,
     REDACTED,
     MintSpec,
     TailscaleAuthService,
@@ -320,3 +322,9 @@ def test_mint_key_wraps_errors_without_secrets(error: Exception) -> None:
     assert FAKE_CLIENT_SECRET not in text
     assert FAKE_KEY not in text
     assert info.value.__cause__ is None
+
+
+def test_mint_description_is_accepted_by_tailscale() -> None:
+    """Tailscale rejects other characters or more than 50 characters (#1514)."""
+    assert re.fullmatch(r"[A-Za-z0-9 -]+", MINT_DESCRIPTION)
+    assert len(MINT_DESCRIPTION) <= 50
