@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795211467579,
+  "lastUpdate": 1795214064417,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4754,6 +4754,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009655061662237204",
             "extra": "mean: 129.5705856713706 usec\nrounds: 8235"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4e7cb6cbedafa1218561b3810e6adaebdde748c7",
+          "message": "fix: isolate k3s cluster dns from the node's tailscale dns in the k3s-cluster blueprint (merges PR #1555, addresses #1554)\n\nOn nodes that accept Tailscale DNS, kubelet hands CoreDNS the systemd-resolved\nupstreams (MagicDNS plus the platform resolver) and search domains. MagicDNS\nreturns SERVFAIL for the VCN domain, and musl stops on SERVFAIL, so Alpine-based\npods could not resolve external names.\n\nAdd a standalone, idempotent k3s-dns role and playbook:\n- it writes /etc/rancher/k3s/resolv.conf with only the platform resolver and\n  search domain, plus a config.yaml.d drop-in setting resolv-conf;\n- it restarts k3s or k3s-agent only when a file changed, then restarts CoreDNS\n  only if any node changed;\n- it never installs or uninstalls k3s and never touches /var/lib/rancher.\n\nIt runs at the end of k3s.yml on create, and from a new OCI after_apply handler\n(scripts/oci/k3s-dns.sh) on every later apply, so existing clusters are fixed\nwithout being recreated.\n\nNew OCI inputs:\n- k3s_dns_nameservers, default [\"169.254.169.254\"]; [] disables the step;\n- k3s_dns_search, default [], meaning <vcn_dns_label>.oraclevcn.com.\n\nValues are validated before they reach resolv.conf. The on_create inventory\nmoves to a shared k3s-lib.sh and stays byte-identical, pinned by a golden test.\nProxmox is not wired.\n\nThe events test now expects the two after_apply handlers k3s-dns and\nverify-cluster (approved change).\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T22:33:22Z",
+          "tree_id": "cc094df49b4e3b364a8041fafcc5d1513c4a5cad",
+          "url": "https://github.com/endavis/infrafoundry/commit/4e7cb6cbedafa1218561b3810e6adaebdde748c7"
+        },
+        "date": 1795214063367,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 69.6564095215007,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006220189744055452",
+            "extra": "mean: 14.356180671232156 msec\nrounds: 73"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12437.95057693218,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011059651549898383",
+            "extra": "mean: 80.3990974087509 usec\nrounds: 13777"
           }
         ]
       }
