@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795209220161,
+  "lastUpdate": 1795210773797,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4678,6 +4678,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000054446208038372375",
             "extra": "mean: 92.66658916819043 usec\nrounds: 11854"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "52ce68e45f18873d02b0a2c9d3f6dae327241e9d",
+          "message": "fix: render the kubernetes cronjob timezone as timezone, not time_zone (merges PR #1551, addresses #1550)\n\nThe cronjob template rendered config.timezone as `time_zone`, which the\nkubernetes_cron_job_v1 spec does not accept, so terraform plan failed for\nany cronjob with a timezone. Render it as `timezone`, correct the docs, and\nadd regression tests for both the set and unset cases.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T21:38:23Z",
+          "tree_id": "4301d19a5f90755cb83bf25e3abd4cf7547cb445",
+          "url": "https://github.com/endavis/infrafoundry/commit/52ce68e45f18873d02b0a2c9d3f6dae327241e9d"
+        },
+        "date": 1795210773067,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 55.612152479934906,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00021342456853546145",
+            "extra": "mean: 17.981681258620657 msec\nrounds: 58"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10705.52989589075,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000053167106801012146",
+            "extra": "mean: 93.40966862218035 usec\nrounds: 11250"
           }
         ]
       }
