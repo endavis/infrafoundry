@@ -172,6 +172,13 @@ wait_for_ssh() {
             sed 's/^/    /' "${WAIT_ERR}" >&2
             return 1
         fi
+        if grep -qi 'tailnet policy does not permit' "${WAIT_ERR}"; then
+            echo "ERROR: Tailscale SSH to ${host} was denied by the tailnet policy." >&2
+            echo "  The policy's ssh rules need a rule allowing this controller's tag to SSH" >&2
+            echo "  to the nodes' tags (for example tag:controller -> tag:k3s-node)." >&2
+            sed 's/^/    /' "${WAIT_ERR}" >&2
+            return 1
+        fi
         if [ ${elapsed} -ge ${MAX_WAIT} ]; then
             echo "ERROR: ${host} not reachable after ${MAX_WAIT}s"
             echo "  Last ssh attempt:" >&2
