@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795204972626,
+  "lastUpdate": 1795206466614,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4526,6 +4526,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000026884252105726893",
             "extra": "mean: 58.31614949256499 usec\nrounds: 17827"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2155416f109d3dc6b1d555536616226c62131da8",
+          "message": "fix: attach a vcn's security list to its subnets that set none (merges PR #1543, addresses #1542)\n\nA VCN's security_list was created but never attached: a subnet only got\nsecurity_list_ids when it set security_list_id itself, so it fell back to\nthe VCN's default security list and the declared rules never applied. In\nthe k3s-cluster blueprint this blocked flannel VXLAN and kubelet traffic\nbetween nodes.\n\nA subnet with no security_list_id now uses its VCN's security list when\nthe VCN declares one; an explicit security_list_id still wins.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T20:26:29Z",
+          "tree_id": "735ffdc07c81bad5f861eaa279e9c2e47bcd4ceb",
+          "url": "https://github.com/endavis/infrafoundry/commit/2155416f109d3dc6b1d555536616226c62131da8"
+        },
+        "date": 1795206466114,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 68.04909534911961,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0009054371047388964",
+            "extra": "mean: 14.695272506851007 msec\nrounds: 73"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13096.037627310403,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004516564763140558",
+            "extra": "mean: 76.35897425299127 usec\nrounds: 13788"
           }
         ]
       }
