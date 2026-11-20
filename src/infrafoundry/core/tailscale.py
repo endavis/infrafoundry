@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
@@ -472,6 +473,26 @@ def device_matches(device: dict[str, Any], hostname: str, tags: Iterable[str]) -
     return any(isinstance(t, str) and t.casefold() in wanted for t in device_tags)
 
 
+_KEY_LIKE = re.compile(r"tskey-[A-Za-z0-9_-]+")
+
+
+def _error_detail(resp: Any) -> str:
+    """Return ``": <message>"`` from a JSON error body, or ``""``.
+
+    Only a string ``message`` field is used, with any ``tskey-...`` token
+    replaced by ``[redacted]``. A non-JSON body, a missing or
+    non-string ``message`` yields an empty string. Never includes request data.
+    """
+    try:
+        body = resp.json()
+    except ValueError:
+        return ""
+    message = body.get("message") if isinstance(body, dict) else None
+    if isinstance(message, str) and message:
+        return f": {_KEY_LIKE.sub('[redacted]', message)}"
+    return ""
+
+
 def request_oauth_token(
     http: requests.Session, api_base: str, client_id: str, client_secret: str, timeout: float
 ) -> str:
@@ -481,7 +502,8 @@ def request_oauth_token(
         The access token.
 
     Raises:
-        RuntimeError: On a non-2xx response; the message carries the status only.
+        RuntimeError: On a non-2xx response; the message carries the status and the
+            API error ``message`` when the body has one.
         requests.RequestException: On a network error.
         ValueError: On an unparsable body.
         KeyError: On a missing field.
@@ -493,7 +515,9 @@ def request_oauth_token(
         timeout=timeout,
     )
     if not 200 <= resp.status_code < 300:
-        raise RuntimeError(f"token request failed with HTTP {resp.status_code}")
+        raise RuntimeError(
+            f"token request failed with HTTP {resp.status_code}{_error_detail(resp)}"
+        )
     token = resp.json()["access_token"]
     if not isinstance(token, str):
         raise TypeError("access_token is not a string")
@@ -529,7 +553,8 @@ def create_auth_key(
         The key. The caller must never log or store it.
 
     Raises:
-        RuntimeError: On a non-2xx response; the message carries the status only.
+        RuntimeError: On a non-2xx response; the message carries the status and the
+            API error ``message`` when the body has one.
         requests.RequestException: On a network error.
         ValueError: On an unparsable body.
         KeyError: On a missing field.
@@ -555,7 +580,9 @@ def create_auth_key(
         timeout=timeout,
     )
     if not 200 <= resp.status_code < 300:
-        raise RuntimeError(f"auth key request failed with HTTP {resp.status_code}")
+        raise RuntimeError(
+            f"auth key request failed with HTTP {resp.status_code}{_error_detail(resp)}"
+        )
     key = resp.json()["key"]
     if not isinstance(key, str):
         raise TypeError("key is not a string")
@@ -571,7 +598,8 @@ def _fetch_devices(
         The access token and the devices.
 
     Raises:
-        RuntimeError: On a non-2xx response; the message carries the status only.
+        RuntimeError: On a non-2xx response; the message carries the status only, or
+            the status and API error ``message`` when the token request fails.
         requests.RequestException: On a network error.
         ValueError: On an unparsable body.
         KeyError: On a missing field.

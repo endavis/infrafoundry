@@ -93,7 +93,7 @@ MAX_EXPIRY_SECONDS = 7776000  # 90 days, the Tailscale maximum
 DEFAULT_EXPIRY_SECONDS = 3600
 
 #: Description of minted keys in the Tailscale admin console.
-MINT_DESCRIPTION = "infrafoundry opnsense tailscale.auth"
+MINT_DESCRIPTION = "infrafoundry opnsense tailscale auth"
 MINT_TIMEOUT = 30.0
 
 #: Placeholder written by migrate when the box holds a key.
@@ -298,7 +298,7 @@ class TailscaleAuthService(BaseService):
                 description=MINT_DESCRIPTION,
                 timeout=MINT_TIMEOUT,
             )
-        except RuntimeError as exc:  # message carries the HTTP status only
+        except RuntimeError as exc:  # message carries the HTTP status and API message
             raise APIError(f"tailscale key mint failed: {exc}", provider="opnsense") from None
         except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
             raise APIError(

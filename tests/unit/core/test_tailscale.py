@@ -458,3 +458,81 @@ class TestMintHelpers:
         session.post.return_value = _resp(200, {"key": ["x"]})
         with pytest.raises(TypeError):
             self._create(session)
+
+
+class TestMintErrorDetail:
+    """The API ``message`` is appended to mint errors, redacted and defensive (#1514)."""
+
+    def _token(self, session: MagicMock) -> str:
+        return request_oauth_token(session, "https://api.example.com", "cid", "csec-secret", 5.0)
+
+    def _key(self, session: MagicMock) -> str:
+        return create_auth_key(
+            session,
+            "https://api.example.com",
+            "tok-secret",
+            tags=["tag:example"],
+            ephemeral=True,
+            preauthorized=False,
+            expiry_seconds=600,
+            description="d",
+            timeout=5.0,
+        )
+
+    def test_key_error_includes_message(self) -> None:
+        session = MagicMock()
+        session.post.return_value = _resp(400, {"message": "keys: description had invalid chars"})
+        with pytest.raises(RuntimeError) as info:
+            self._key(session)
+        assert str(info.value) == (
+            "auth key request failed with HTTP 400: keys: description had invalid chars"
+        )
+
+    def test_token_error_includes_message(self) -> None:
+        session = MagicMock()
+        session.post.return_value = _resp(401, {"message": "invalid client"})
+        with pytest.raises(RuntimeError) as info:
+            self._token(session)
+        assert str(info.value) == "token request failed with HTTP 401: invalid client"
+
+    @pytest.mark.parametrize(
+        "body",
+        [None, {}, {"message": 5}, {"message": ""}, ["message"], "text"],
+    )
+    def test_falls_back_to_status_only(self, body: Any) -> None:
+        for call, text in ((self._key, "auth key"), (self._token, "token")):
+            session = MagicMock()
+            session.post.return_value = _resp(500, body)
+            with pytest.raises(RuntimeError) as info:
+                call(session)
+            assert str(info.value) == f"{text} request failed with HTTP 500"
+
+    def test_falls_back_when_body_is_not_json(self) -> None:
+        def _raise() -> Any:
+            raise ValueError("not json")
+
+        for call, text in ((self._key, "auth key"), (self._token, "token")):
+            session = MagicMock()
+            session.post.return_value = MagicMock(status_code=502, json=_raise)
+            with pytest.raises(RuntimeError) as info:
+                call(session)
+            assert str(info.value) == f"{text} request failed with HTTP 502"
+
+    def test_key_like_tokens_in_message_are_redacted(self) -> None:
+        session = MagicMock()
+        session.post.return_value = _resp(400, {"message": "bad tskey-auth-AbC_1-x and tskey-k1"})
+        with pytest.raises(RuntimeError) as info:
+            self._key(session)
+        assert str(info.value) == (
+            "auth key request failed with HTTP 400: bad [redacted] and [redacted]"
+        )
+
+    def test_passed_in_secrets_never_appear(self) -> None:
+        for call in (self._key, self._token):
+            session = MagicMock()
+            session.post.return_value = _resp(403, {"message": "forbidden"})
+            with pytest.raises(RuntimeError) as info:
+                call(session)
+            text = f"{info.value} {info.value!r}"
+            assert "csec-secret" not in text
+            assert "tok-secret" not in text
