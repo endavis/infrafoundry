@@ -20,6 +20,7 @@ from infrafoundry.core.runner_results import raise_on_runner_failure
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.state import ResourceState, StateManager
+from infrafoundry.core.state.pending_on_create import PendingKind, PendingOnCreate
 from infrafoundry.core.types import ResourceEventData, ResourceOutcome, RunnerEventData
 
 logger = logging.getLogger(__name__)
@@ -217,6 +218,7 @@ class DeploymentExecutor:
                 resource_filter=resource_filter,
                 package_filter=package_filter,
                 add_only=add_only,
+                record_package_pending=True,
             )
             results[provider_name] = result
 
@@ -239,6 +241,19 @@ class DeploymentExecutor:
                             if action == "create" and name and name not in seen_created:
                                 seen_created.add(name)
                                 all_created.append(name)
+        # Package-level on_create obligations left by a failed earlier apply, plus this
+        # run's own (recorded before the runner outcome was checked, #1524).
+        by_provider_name = {(pn, r.name): r for pn, rs in resources_by_provider.items() for r in rs}
+        pending_by_name: dict[str, list[PendingOnCreate]] = {}
+        for entry in self._pending_on_create(env_name, "package"):
+            if (entry.provider, entry.name) not in by_provider_name:
+                continue
+            if filter_set and entry.name not in filter_set:
+                continue
+            pending_by_name.setdefault(entry.name, []).append(entry)
+            if entry.name not in seen_created:
+                seen_created.add(entry.name)
+                all_created.append(entry.name)
         if all_created:
             # One event per package-variables group so each package's group
             # handlers see only their own variables.
@@ -258,6 +273,11 @@ class DeploymentExecutor:
                 for hr in handler_results:
                     if not hr.success and hr.abort:
                         raise EventAbortedError(EventType.RESOURCE_CREATED, hr)
+                for n in names:
+                    for entry in pending_by_name.get(n, []):
+                        self._ledger_done(
+                            deployment_id, entry.provider, entry.name, "package", entry.address
+                        )
 
         return results
 
@@ -402,6 +422,7 @@ class DeploymentExecutor:
         package_filter: str | None = None,
         *,
         add_only: bool = False,
+        record_package_pending: bool = False,
     ) -> dict[str, Any]:
         """Apply a single provider's resources.
 
@@ -426,6 +447,9 @@ class DeploymentExecutor:
             add_only: If True, suppress deletes (forwarded as ``add_only``
                 kwarg to ``runner.apply``). Honored by direct-API runners
                 only; other runners absorb the kwarg via ``**kwargs``.
+            record_package_pending: If True, also record each primary create as a
+                pending package-level ``on_create`` obligation. ``apply_serial``
+                sets it because it emits the aggregate event afterwards.
 
         Returns:
             Dict with apply results including terraform outcomes
@@ -513,6 +537,17 @@ class DeploymentExecutor:
                 raw_outcomes = run_result.get("resource_outcomes", [])
                 outcomes = cast(list[ResourceOutcome], raw_outcomes)
                 all_outcomes.extend(outcomes)
+
+                # Record the on_create obligation before checking the runner's
+                # success: a failed apply can still have created resources (#1524).
+                self._record_pending_creates(
+                    deployment_id,
+                    provider_name,
+                    provider,
+                    resources,
+                    outcomes,
+                    record_package=record_package_pending,
+                )
 
                 # Honor the runner's success flag: if terraform exited
                 # non-zero, raise so the CLI reports failure rather than
@@ -623,6 +658,7 @@ class DeploymentExecutor:
             all_outcomes,
             resource_filter,
             package_filter,
+            deployment_id=deployment_id,
         )
 
         # Replace ResourceOutcome objects with JSON-safe dicts for audit logging
@@ -633,6 +669,158 @@ class DeploymentExecutor:
                 ]
 
         return runner_results
+
+    def _primary_outcomes(
+        self,
+        provider: ProviderBase,
+        resources: list[ResourceConfig],
+        outcomes: list[ResourceOutcome],
+        action: str | None = None,
+    ) -> list[ResourceOutcome]:
+        """Keep outcomes of the primary terraform resource of each configured resource.
+
+        Helper resources (cloud-init files and the like) map to no InfraFoundry type
+        of the resource they belong to and are dropped.
+
+        Args:
+            provider: Provider whose terraform type mapping decides what is primary.
+            resources: Configured resources of the provider.
+            outcomes: Terraform outcomes to filter.
+            action: Keep only this action when given.
+
+        Returns:
+            The primary outcomes, in order.
+        """
+        tf_to_infra: dict[str, set[str]] = {}
+        for infra_type, tf_types in provider.get_terraform_resource_types().items():
+            for tf_type in tf_types:
+                tf_to_infra.setdefault(tf_type, set()).add(infra_type)
+        type_by_name = {r.name: r.type for r in resources}
+        primary: list[ResourceOutcome] = []
+        for outcome in outcomes:
+            if action is not None and outcome.action != action:
+                continue
+            resource_type = type_by_name.get(outcome.resource_name)
+            if resource_type is None:
+                continue
+            tf_type = outcome.address.split(".")[0] if "." in outcome.address else ""
+            if resource_type in tf_to_infra.get(tf_type, set()):
+                primary.append(outcome)
+        return primary
+
+    def _record_pending_creates(
+        self,
+        deployment_id: int,
+        provider_name: str,
+        provider: ProviderBase,
+        resources: list[ResourceConfig],
+        outcomes: list[ResourceOutcome],
+        *,
+        record_package: bool,
+    ) -> None:
+        """Record an ``on_create`` obligation per primary create outcome (#1524).
+
+        A resource gets a ``resource`` entry when it declares ``on_create``
+        handlers, and a ``package`` entry when ``record_package`` is set. Errors
+        are logged and swallowed so they never mask the runner's own failure.
+
+        Args:
+            deployment_id: Deployment the ledger rows belong to.
+            provider_name: Provider name.
+            provider: Provider instance.
+            resources: Configured resources of the provider.
+            outcomes: Terraform outcomes of the apply.
+            record_package: Also record the package-level obligation.
+        """
+        try:
+            by_name = {r.name: r for r in resources}
+            for outcome in self._primary_outcomes(provider, resources, outcomes, "create"):
+                resource = by_name[outcome.resource_name]
+                if resource.events and resource.events.get("on_create"):
+                    self.state_manager.record_pending_on_create(
+                        deployment_id,
+                        provider_name,
+                        outcome.resource_name,
+                        "resource",
+                        outcome.address,
+                    )
+                if record_package:
+                    self.state_manager.record_pending_on_create(
+                        deployment_id,
+                        provider_name,
+                        outcome.resource_name,
+                        "package",
+                        outcome.address,
+                    )
+        except Exception:
+            logger.exception("Could not record pending on_create handlers for %s", provider_name)
+
+    def _ledger_done(
+        self,
+        deployment_id: int,
+        provider_name: str,
+        name: str,
+        kind: PendingKind,
+        address: str,
+    ) -> None:
+        """Record an ``on_create`` obligation as done, logging and swallowing errors."""
+        try:
+            self.state_manager.record_on_create_done(
+                deployment_id, provider_name, name, kind, address
+            )
+        except Exception:
+            logger.exception("Could not record completed on_create handlers for '%s'", name)
+
+    def _pending_on_create(
+        self, env_name: str, kind: PendingKind, provider_name: str | None = None
+    ) -> list[PendingOnCreate]:
+        """Read pending ``on_create`` obligations, returning none when the read fails."""
+        try:
+            pending = self.state_manager.get_pending_on_create(
+                env_name, kind=kind, provider=provider_name
+            )
+        except Exception:
+            logger.exception("Could not read pending on_create handlers for '%s'", env_name)
+            return []
+        return pending if isinstance(pending, list) else []
+
+    def _with_pending_creates(
+        self,
+        env_name: str,
+        provider_name: str,
+        resources: list[ResourceConfig],
+        outcomes: list[ResourceOutcome],
+        deployment_id: int | None,
+    ) -> list[ResourceOutcome]:
+        """Put synthetic ``create`` outcomes for pending resources before the real ones.
+
+        A resource whose ``on_create`` handlers did not finish in an earlier apply
+        gets a synthetic outcome unless this run reports a create for it too, or it
+        is no longer configured (filtered out) or no longer has handlers.
+
+        Args:
+            env_name: Environment name.
+            provider_name: Provider name.
+            resources: Configured, filtered resources of the provider.
+            outcomes: This run's outcomes.
+            deployment_id: ``None`` disables the ledger.
+
+        Returns:
+            Synthetic outcomes followed by ``outcomes``.
+        """
+        if deployment_id is None:
+            return outcomes
+        by_name = {r.name: r for r in resources}
+        created_now = {o.resource_name for o in outcomes if o.action == "create"}
+        synthetic: list[ResourceOutcome] = []
+        for entry in self._pending_on_create(env_name, "resource", provider_name):
+            resource = by_name.get(entry.name)
+            if resource is None or entry.name in created_now:
+                continue
+            if not (resource.events and resource.events.get("on_create")):
+                continue
+            synthetic.append(ResourceOutcome(entry.address, "create", entry.name))
+        return [*synthetic, *outcomes]
 
     def _record_released_resources(
         self,
@@ -679,6 +867,8 @@ class DeploymentExecutor:
         outcomes: list[ResourceOutcome],
         resource_filter: list[str] | None,
         package_filter: str | None = None,
+        *,
+        deployment_id: int | None = None,
     ) -> None:
         """Fire resource lifecycle events based on terraform outcomes.
 
@@ -696,7 +886,16 @@ class DeploymentExecutor:
             outcomes: List of terraform resource outcomes
             resource_filter: Optional resource name filter
             package_filter: Optional package name to restrict event handlers
+            deployment_id: Deployment the ``on_create`` ledger rows belong to. When
+                ``None`` the ledger is neither read nor written.
+
+        Raises:
+            EventAbortedError: If a handler fails with ``abort`` set. The resource's
+                ``on_create`` obligation then stays pending for the next apply.
         """
+        outcomes = self._with_pending_creates(
+            env_name, provider_name, resources, outcomes, deployment_id
+        )
         if not outcomes:
             return
 
@@ -800,6 +999,10 @@ class DeploymentExecutor:
             for hr in handler_results:
                 if not hr.success and hr.abort:
                     raise EventAbortedError(event_type, hr)
+            if outcome.action == "create" and deployment_id is not None:
+                self._ledger_done(
+                    deployment_id, provider_name, outcome.resource_name, "resource", outcome.address
+                )
 
         # NOTE: Aggregate events for group handlers (requires: [...]) are NOT
         # emitted here. They must be emitted after ALL providers complete to

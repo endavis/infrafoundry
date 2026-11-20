@@ -292,7 +292,7 @@ apply or destroy, rather than on runner completion. This replaces the
 
 | Event Key | Fires When | Maps to EventType |
 |:----------|:-----------|:------------------|
-| `on_create` | Terraform created the resource | `RESOURCE_CREATED` |
+| `on_create` | Terraform created the resource, or an earlier apply created it and failed before the handlers ran | `RESOURCE_CREATED` |
 | `on_update` | Terraform updated the resource in place | `RESOURCE_UPDATED` |
 | `on_destroy` | Terraform destroyed the resource | `RESOURCE_DELETED` |
 
