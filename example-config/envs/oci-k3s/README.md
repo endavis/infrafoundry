@@ -42,6 +42,7 @@ the VCN, subnets, and instances.
 
 ## Shared roles
 
-The k3s install logic is provided by `example-config/roles/k3s-server/` and
-`example-config/roles/k3s-agent/` — the same roles the proxmox k3s variant
-uses. They are not duplicated into the blueprint.
+The k3s install logic is provided by the roles shipped with the blueprint,
+`blueprints/k3s-cluster/roles/k3s-server/` and `blueprints/k3s-cluster/roles/k3s-agent/`.
+No `roles/` directory is needed here; to override them, add roles of the same names
+under `envs/oci-k3s/roles/`.

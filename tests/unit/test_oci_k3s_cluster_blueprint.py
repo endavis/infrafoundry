@@ -18,11 +18,16 @@ The test depends only on files checked into this repository:
 It does NOT depend on the private infra-config/ config repo.
 """
 
+import json
+import os
+import shutil
+import subprocess
 import textwrap
 from pathlib import Path
 
 import jinja2
 import pytest
+import yaml
 
 from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
 from infrafoundry.core.config.filters import create_jinja2_env
@@ -427,3 +432,149 @@ def test_k3s_install_declares_the_kubeconfig_as_an_output(loader: PackageLoader)
     rendered = {key: env.from_string(output[key]).render(**variables) for key in output}
 
     assert rendered == {"source": "~/.kube/oci-k3s.yaml", "dest": "~/.kube/oci-k3s.yaml"}
+
+
+# --- Shipped roles and the post-terraform script (#1522) ---
+
+BLUEPRINT = REPO_ROOT / "blueprints" / "k3s-cluster"
+OCI_SCRIPT = BLUEPRINT / "scripts" / "oci" / "k3s-post-terraform.sh"
+
+_FAKE_ANSIBLE = """#!/bin/sh
+echo "$ANSIBLE_ROLES_PATH" > "$RECORD_DIR/roles_path"
+echo "$@" > "$RECORD_DIR/args"
+"""
+
+
+def _run_script(
+    tmp_path: Path,
+    *,
+    blueprint_dir: Path | None = None,
+    config_dir: Path | None = None,
+    jumphost: bool = False,
+) -> tuple[str, str]:
+    """Run the OCI script with stubbed ssh/ansible; return (ANSIBLE_ROLES_PATH, args)."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    record = tmp_path / "record"
+    record.mkdir()
+    stubs = {
+        "ssh": "#!/bin/sh\nexit 0\n",
+        "ssh-add": "#!/bin/sh\necho key\n",
+        "sleep": "#!/bin/sh\nexit 0\n",
+        "ansible-playbook": _FAKE_ANSIBLE,
+    }
+    for name, body in stubs.items():
+        stub = bin_dir / name
+        stub.write_text(body)
+        stub.chmod(0o755)
+    env = {
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "HOME": str(tmp_path),
+        "RECORD_DIR": str(record),
+        "INFRAFOUNDRY_VAR_control_name": "ctl",
+        "INFRAFOUNDRY_VAR_cluster_name": "c",
+        "INFRAFOUNDRY_VAR_kubeconfig_local_path": str(tmp_path / "kube.yaml"),
+        "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"workers": [{"name": "w1"}]}),
+    }
+    if blueprint_dir is not None:
+        env["INFRAFOUNDRY_BLUEPRINT_DIR"] = str(blueprint_dir)
+    if config_dir is not None:
+        env["INFRAFOUNDRY_CONFIG_DIR"] = str(config_dir)
+    if jumphost:
+        env["INFRAFOUNDRY_ON_JUMPHOST"] = "1"
+    result = subprocess.run(
+        ["bash", str(OCI_SCRIPT)], env=env, capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    return (record / "roles_path").read_text().strip(), (record / "args").read_text().strip()
+
+
+def test_script_defaults_to_blueprint_roles(tmp_path: Path) -> None:
+    """Without an env roles/ directory the blueprint roles and playbook are used."""
+    env_dir = tmp_path / "env"
+    env_dir.mkdir()
+    roles_path, args = _run_script(tmp_path, blueprint_dir=BLUEPRINT, config_dir=env_dir)
+
+    assert roles_path == str(BLUEPRINT / "roles")
+    assert args.endswith(str(BLUEPRINT / "playbooks" / "k3s.yml"))
+
+
+def test_script_env_roles_override_comes_first(tmp_path: Path) -> None:
+    """An env roles/ directory is searched before the blueprint's."""
+    env_dir = tmp_path / "env"
+    (env_dir / "roles").mkdir(parents=True)
+    roles_path, _ = _run_script(tmp_path, blueprint_dir=BLUEPRINT, config_dir=env_dir)
+
+    assert roles_path == f"{env_dir / 'roles'}:{BLUEPRINT / 'roles'}"
+
+
+def test_script_runs_without_config_dir(tmp_path: Path) -> None:
+    """INFRAFOUNDRY_CONFIG_DIR is optional now."""
+    roles_path, _ = _run_script(tmp_path, blueprint_dir=BLUEPRINT)
+
+    assert roles_path == str(BLUEPRINT / "roles")
+
+
+def test_script_on_jumphost_ignores_override(tmp_path: Path) -> None:
+    """On a jumphost the env roles/ is not there, so only the blueprint roles are used."""
+    env_dir = tmp_path / "env"
+    (env_dir / "roles").mkdir(parents=True)
+    roles_path, _ = _run_script(
+        tmp_path, blueprint_dir=BLUEPRINT, config_dir=env_dir, jumphost=True
+    )
+
+    assert roles_path == str(BLUEPRINT / "roles")
+
+
+def test_script_resolves_blueprint_root_without_env_var(tmp_path: Path) -> None:
+    """The fallback BLUEPRINT_DIR is the blueprint root, not scripts/."""
+    roles_path, args = _run_script(tmp_path)
+
+    assert roles_path == str(BLUEPRINT / "roles")
+    assert args.endswith(str(BLUEPRINT / "playbooks" / "k3s.yml"))
+
+
+@pytest.mark.skipif(shutil.which("ansible-playbook") is None, reason="ansible not installed")
+def test_real_ansible_prefers_env_override_over_blueprint_roles(tmp_path: Path) -> None:
+    """With the playbook in playbooks/, an override listed first wins in real Ansible."""
+    override = tmp_path / "ovr"
+    (override / "k3s-server" / "tasks").mkdir(parents=True)
+    (override / "k3s-server" / "tasks" / "main.yml").write_text(
+        "---\n- name: override marker task\n  ansible.builtin.debug:\n    msg: hi\n"
+    )
+    inventory = tmp_path / "inv.yml"
+    inventory.write_text(
+        "all:\n  children:\n    k3s_control:\n      hosts:\n        ctl: {}\n"
+        "    k3s_workers:\n      hosts: {}\n"
+    )
+    playbook = BLUEPRINT / "playbooks" / "k3s.yml"
+
+    def list_tasks(roles_path: str) -> str:
+        result = subprocess.run(
+            ["ansible-playbook", "-i", str(inventory), str(playbook), "--list-tasks"],
+            env={**os.environ, "ANSIBLE_ROLES_PATH": roles_path},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return result.stdout
+
+    assert "override marker task" in list_tasks(f"{override}:{BLUEPRINT / 'roles'}")
+    assert "override marker task" not in list_tasks(str(BLUEPRINT / "roles"))
+
+
+def test_blueprint_ships_roles_and_playbook_layout() -> None:
+    """Roles live in the blueprint; the playbook sits in playbooks/, away from roles/."""
+    assert not list(BLUEPRINT.glob("playbook*.yml"))
+    assert not (BLUEPRINT / "playbooks" / "roles").exists()
+    for role in ("k3s-server", "k3s-agent"):
+        assert (BLUEPRINT / "roles" / role / "tasks" / "main.yml").is_file()
+        assert not (REPO_ROOT / "example-config" / "roles" / role).exists()
+
+
+def test_playbook_and_role_files_are_valid_yaml() -> None:
+    """The playbook and every role YAML file parse."""
+    files = [BLUEPRINT / "playbooks" / "k3s.yml", *(BLUEPRINT / "roles").rglob("*.yml")]
+    assert len(files) > 1
+    for path in files:
+        assert yaml.safe_load(path.read_text(encoding="utf-8")) is not None, path

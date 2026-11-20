@@ -6,8 +6,6 @@ This directory contains reusable Ansible roles for configuring infrastructure.
 
 ```
 roles/
-├── k3s-server/          # K3s control plane installation
-├── k3s-agent/           # K3s worker node installation
 ├── tailscale-exit-node/ # Tailscale VPN exit node (includes example)
 ├── common/              # Base configuration for all servers
 ├── webserver/           # Nginx/Apache web server
@@ -16,6 +14,9 @@ roles/
 ├── monitoring/          # Monitoring agents (Prometheus, etc.)
 └── custom/              # Your custom roles
 ```
+
+> The `k3s-server` and `k3s-agent` roles now ship with the `k3s-cluster` blueprint, in
+> `blueprints/k3s-cluster/roles/`.
 
 ## Example Roles
 

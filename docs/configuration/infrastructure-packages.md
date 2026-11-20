@@ -293,7 +293,7 @@ environment variables for the script to consume:
 | `INFRAFOUNDRY_ENV` | Environment name |
 | `INFRAFOUNDRY_PROVIDER` | Provider name |
 | `INFRAFOUNDRY_PACKAGE` | Package name |
-| `INFRAFOUNDRY_CONFIG_DIR` | Path to the environment config directory |
+| `INFRAFOUNDRY_CONFIG_DIR` | Path to the environment directory (`<config>/envs/<env>`), not the repo root |
 
 Scripts should read configuration from these environment variables rather than
 re-parsing `infrafoundry.yml` or `secrets.yaml` directly:
