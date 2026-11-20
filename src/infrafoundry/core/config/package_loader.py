@@ -29,9 +29,9 @@ from infrafoundry.core.config.yaml_loader import load_config_yaml
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_instances import (
-    INSTANCE_SETTINGS,
+    entry_instance_provider,
     qualified_provider_id,
-    stamp_instance,
+    stamp_selected,
     validate_instance_name,
 )
 from infrafoundry.core.secrets.provider import SecretProvider
@@ -397,11 +397,9 @@ class PackageLoader:
             resources.extend(parsed)
 
         if manifest.firewall is not None:
-            for resource in resources:
-                if resource.provider.partition("@")[0] in INSTANCE_SETTINGS:
-                    stamp_instance(
-                        resource, manifest.firewall, f"package '{manifest.name}' firewall"
-                    )
+            stamp_selected(
+                resources, {"firewall": manifest.firewall}, f"package '{manifest.name}' firewall"
+            )
 
         # ----- Events -----
         # Render event configs through Jinja2 to resolve variable references
@@ -802,10 +800,10 @@ class PackageLoader:
                     if "name" not in entry_config:
                         entry_config["name"] = item["name"]
                     entry_provider = item.get("provider", file_provider)
-                    if item.get("firewall") is not None:
-                        entry_provider = self._entry_firewall_provider(
-                            item, provider, resource_file, dotted
-                        )
+                    entry_provider = (
+                        self._entry_instance_provider(item, provider, resource_file, dotted)
+                        or entry_provider
+                    )
                     results.append(
                         ResourceConfig(
                             name=item["name"],
@@ -829,10 +827,10 @@ class PackageLoader:
         return results
 
     @staticmethod
-    def _entry_firewall_provider(
+    def _entry_instance_provider(
         item: dict[str, Any], default_provider: str, resource_file: str, where: str
-    ) -> str:
-        """Return the provider id for an entry carrying its own ``firewall:`` key.
+    ) -> str | None:
+        """Return the provider id for an entry carrying its own instance selector key.
 
         Args:
             item: Resource entry mapping.
@@ -841,18 +839,13 @@ class PackageLoader:
             where: Resource type or entry label for error messages.
 
         Returns:
-            ``provider@firewall`` for the entry.
+            ``provider@instance`` for the entry, or ``None`` when it has no selector key.
 
         Raises:
-            InvalidConfigurationError: If the provider has no firewall support or
-                the name is invalid.
+            InvalidConfigurationError: If the provider does not honour the selector key
+                or the name is invalid.
         """
-        base = str(item.get("provider", default_provider)).partition("@")[0]
-        firewall = item["firewall"]
-        validate_instance_name(
-            base, firewall, f"{resource_file}: entry '{item.get('name', '?')}' ({where})"
-        )
-        return qualified_provider_id(base, firewall)
+        return entry_instance_provider(item, default_provider, resource_file, where)
 
     def _parse_resource_centric(
         self, resources: list[Any], resource_file: str, default_provider: str
@@ -884,11 +877,10 @@ class PackageLoader:
                     name=item["name"],
                     type=str(item["type"]),
                     provider=(
-                        self._entry_firewall_provider(
+                        self._entry_instance_provider(
                             item, default_provider, resource_file, str(item["type"])
                         )
-                        if item.get("firewall") is not None
-                        else item.get("provider", default_provider)
+                        or item.get("provider", default_provider)
                     ),
                     config=config,
                     events=item.get("events"),

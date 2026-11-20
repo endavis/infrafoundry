@@ -1,21 +1,26 @@
-"""Provider instances: several firewalls of one provider in one environment (#1450).
+"""Provider instances: several targets of one provider in one environment (#1450).
 
-A provider that supports instances (currently ``opnsense``) is configured with a
-``firewalls:`` map in ``provider_settings``. Each extra firewall is a separate
-provider instance whose id is ``<provider>@<name>``. The primary firewall keeps the
-plain provider id, so a flat configuration and state rows written before instances
-existed keep working unchanged.
+A provider that supports instances (see :data:`INSTANCE_SPECS`, currently ``opnsense``)
+is configured with an instance map in ``provider_settings`` (``firewalls:`` for
+OPNsense). Each extra entry is a separate provider instance whose id is
+``<provider>@<name>``. The primary entry keeps the plain provider id, so a flat
+configuration and state rows written before instances existed keep working unchanged.
 
 Everything keyed by provider id (duplicate check, state rows, dependency graph
 nodes, executor batches, post-apply hooks, validation reports) therefore becomes
-per-firewall without a change to ``ResourceConfig`` or the state schema.
+per-instance without a change to ``ResourceConfig`` or the state schema.
+
+The map key, primary key, selector key and the noun used in messages come from one
+:class:`InstanceSpec` per provider, so the helpers here serve every instance-capable
+provider.
 """
 
 from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Iterable, MutableMapping
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 from infrafoundry.core.exceptions import InvalidConfigurationError
@@ -24,8 +29,28 @@ logger = logging.getLogger(__name__)
 
 INSTANCE_SEPARATOR = "@"
 
-#: provider id -> (settings key holding the instance map, settings key naming the primary)
-INSTANCE_SETTINGS: dict[str, tuple[str, str]] = {"opnsense": ("firewalls", "primary")}
+
+@dataclass(frozen=True)
+class InstanceSpec:
+    """How one provider names its instances in settings, configuration and messages."""
+
+    #: ``provider_settings.<base>`` key holding the instance map (``firewalls``).
+    map_key: str
+    #: ``provider_settings.<base>`` key naming the primary instance (``primary``).
+    primary_key: str
+    #: Key an entry, file or manifest uses to pick an instance (``firewall``).
+    selector_key: str
+    #: Singular word used in messages (``firewall``).
+    noun: str
+
+
+#: base provider id -> how it names its instances
+INSTANCE_SPECS: dict[str, InstanceSpec] = {
+    "opnsense": InstanceSpec("firewalls", "primary", "firewall", "firewall"),
+}
+
+#: Every selector key (``firewall`` ...) some instance-capable provider honours.
+SELECTOR_KEYS: frozenset[str] = frozenset(spec.selector_key for spec in INSTANCE_SPECS.values())
 
 #: Instance names stay short so ``<provider>@<name>`` fits the 50-character provider column.
 INSTANCE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
@@ -55,31 +80,42 @@ def qualified_provider_id(base: str, instance: str | None) -> str:
     return f"{base}{INSTANCE_SEPARATOR}{instance}" if instance else base
 
 
-def validate_instance_name(base: str, instance: str, source: str) -> None:
+def instance_spec(base: str) -> InstanceSpec | None:
+    """Return the :class:`InstanceSpec` for ``base``, or ``None`` without instance support."""
+    return INSTANCE_SPECS.get(base)
+
+
+def validate_instance_name(
+    base: str, instance: str, source: str, selector_key: str = "firewall"
+) -> None:
     """Check that ``base`` supports instances and ``instance`` is a valid name.
 
     Args:
         base: Base provider id.
         instance: Candidate instance name.
         source: Where the name came from, for the error message.
+        selector_key: The selector key the name came from; ``base`` must honour it.
 
     Raises:
         InvalidConfigurationError: If the provider has no instance support or the
             name does not match ``INSTANCE_NAME_RE``.
     """
-    if base not in INSTANCE_SETTINGS:
+    spec = INSTANCE_SPECS.get(base)
+    if spec is None or spec.selector_key != selector_key:
+        supported = sorted(b for b, sp in INSTANCE_SPECS.items() if sp.selector_key == selector_key)
         raise InvalidConfigurationError(
-            f"{source}: 'firewall' is only supported for provider "
-            f"{sorted(INSTANCE_SETTINGS)!r}, not '{base}'"
+            f"{source}: '{selector_key}' is only supported for provider {supported!r}, not '{base}'"
         )
     if not isinstance(instance, str) or not INSTANCE_NAME_RE.match(instance):
         raise InvalidConfigurationError(
-            f"{source}: invalid firewall name {instance!r}; use lowercase letters, "
+            f"{source}: invalid {spec.noun} name {instance!r}; use lowercase letters, "
             "digits and '-' (1-32 characters, starting with a letter or digit)"
         )
 
 
-def stamp_instance(resource: _Stampable, instance: str, source: str) -> None:
+def stamp_instance(
+    resource: _Stampable, instance: str, source: str, selector_key: str = "firewall"
+) -> None:
     """Point an unstamped resource at ``instance`` of its provider.
 
     A resource whose provider already carries an instance is left alone, so the
@@ -87,8 +123,9 @@ def stamp_instance(resource: _Stampable, instance: str, source: str) -> None:
 
     Args:
         resource: Resource to stamp; its ``provider`` is rewritten in place.
-        instance: Instance (firewall) name.
+        instance: Instance name.
         source: Where the selection came from, for error messages.
+        selector_key: The selector key the name came from.
 
     Raises:
         InvalidConfigurationError: If the provider does not support instances or the
@@ -97,8 +134,186 @@ def stamp_instance(resource: _Stampable, instance: str, source: str) -> None:
     base, existing = split_provider_id(resource.provider)
     if existing is not None:
         return
-    validate_instance_name(base, instance, source)
+    validate_instance_name(base, instance, source, selector_key)
     resource.provider = qualified_provider_id(base, instance)
+
+
+def stamp_selected(
+    resources: Iterable[_Stampable], selections: Mapping[str, str | None], source: str
+) -> None:
+    """Stamp each resource with the selection that belongs to its provider.
+
+    A resource is stamped only when its base provider's selector key has a value in
+    ``selections``; every other resource is left alone. Resources already stamped keep
+    their more specific selection (see :func:`stamp_instance`).
+
+    Args:
+        resources: Resources to stamp, rewritten in place.
+        selections: Selector key (``firewall`` ...) -> instance name, or ``None``.
+        source: Where the selections came from, for error messages.
+
+    Raises:
+        InvalidConfigurationError: If a selected name is invalid.
+    """
+    for resource in resources:
+        spec = INSTANCE_SPECS.get(split_provider_id(resource.provider)[0])
+        if spec is None:
+            continue
+        instance = selections.get(spec.selector_key)
+        if instance is not None:
+            stamp_instance(resource, instance, source, spec.selector_key)
+
+
+def entry_instance_provider(
+    item: Mapping[str, Any], default_provider: str, source: str, where: str
+) -> str | None:
+    """Return the provider id for an entry carrying its own selector key, if any.
+
+    Args:
+        item: Resource entry mapping.
+        default_provider: Provider used when the entry names none.
+        source: Source filename for error messages.
+        where: Resource type or entry label for error messages.
+
+    Returns:
+        ``<base>@<name>`` for the entry, or ``None`` when it has no selector key.
+
+    Raises:
+        InvalidConfigurationError: If the entry's provider does not honour the selector
+            key it carries, or the name is invalid.
+    """
+    base = str(item.get("provider", default_provider)).partition(INSTANCE_SEPARATOR)[0]
+    result: str | None = None
+    for key in sorted(SELECTOR_KEYS):
+        value = item.get(key)
+        if value is None:
+            continue
+        validate_instance_name(
+            base, value, f"{source}: entry '{item.get('name', '?')}' ({where})", key
+        )
+        result = qualified_provider_id(base, value)
+    return result
+
+
+def raw_provider_settings(settings_or_env_config: Any, provider_id: str) -> dict[str, Any] | None:
+    """Return the base provider's settings dict from a dict or an environment config."""
+    if isinstance(settings_or_env_config, dict):
+        return settings_or_env_config
+    getter = getattr(settings_or_env_config, "get_provider_settings", None)
+    if getter is None:
+        return None
+    result = getter(split_provider_id(provider_id)[0])
+    return result if isinstance(result, dict) else None
+
+
+def _instance_map(base: str, settings: dict[str, Any] | None) -> dict[str, Any] | None:
+    spec = INSTANCE_SPECS[base]
+    instances = (settings or {}).get(spec.map_key)
+    return instances if isinstance(instances, dict) else None
+
+
+def instance_name(base: str, settings: dict[str, Any], provider_id: str) -> str | None:
+    """Return the instance name ``provider_id`` addresses, or ``None`` if unknown."""
+    instance = split_provider_id(provider_id)[1]
+    if instance is not None:
+        return instance
+    return primary_instance(base, {base: settings})
+
+
+def instance_settings(
+    base: str,
+    settings_or_env_config: Any,
+    provider_id: str,
+    *,
+    drop_keys: Sequence[str] = (),
+) -> dict[str, Any] | None:
+    """Resolve the flat settings dict for one instance.
+
+    Args:
+        base: Base provider id; it must have an :class:`InstanceSpec`.
+        settings_or_env_config: The provider settings dict, or an environment config
+            exposing ``get_provider_settings``.
+        provider_id: ``<base>`` (the primary) or ``<base>@<name>``.
+        drop_keys: Extra keys to remove from the shared defaults and the entry.
+
+    Returns:
+        With no instance map, the settings unchanged (``None`` stays ``None``, and a
+        flat dict is returned as the same object). Otherwise the shared top-level
+        defaults merged with the instance's entry (the entry wins), minus the map key,
+        the primary key and ``drop_keys``. An undeclared or ambiguous instance yields
+        an empty dict.
+    """
+    spec = INSTANCE_SPECS[base]
+    settings = raw_provider_settings(settings_or_env_config, provider_id)
+    instances = _instance_map(base, settings)
+    if settings is None or instances is None:
+        return settings
+    name = instance_name(base, settings, provider_id)
+    entry = instances.get(name) if name is not None else None
+    if not isinstance(entry, dict):
+        return {}
+    skip = {spec.map_key, spec.primary_key, *drop_keys}
+    merged = {k: v for k, v in settings.items() if k not in skip}
+    merged.update({k: v for k, v in entry.items() if k not in drop_keys})
+    return merged
+
+
+def instance_label(base: str, settings_or_env_config: Any, provider_id: str) -> str | None:
+    """Return the instance name to show in output, or ``None`` for a flat config."""
+    settings = raw_provider_settings(settings_or_env_config, provider_id)
+    if settings is None or _instance_map(base, settings) is None:
+        return None
+    return instance_name(base, settings, provider_id)
+
+
+def is_primary_id(provider_id: str) -> bool:
+    """Return whether ``provider_id`` is a plain id (the primary), not ``base@name``."""
+    return split_provider_id(provider_id)[1] is None
+
+
+def validate_instance_map(
+    base: str, settings: dict[str, Any] | None, per_instance_keys: Sequence[str]
+) -> list[str]:
+    """Return the shape errors in ``provider_settings.<base>`` (empty when valid).
+
+    Checks the map is a non-empty mapping, no per-instance key is also a top-level
+    default, names and entries are well formed, and ``primary`` is declared.
+
+    Args:
+        base: Base provider id; it must have an :class:`InstanceSpec`.
+        settings: The provider settings; ``None`` or flat settings are valid.
+        per_instance_keys: Keys that identify one instance and so cannot be shared.
+    """
+    spec = INSTANCE_SPECS[base]
+    if not isinstance(settings, dict) or spec.map_key not in settings:
+        return []
+    errors: list[str] = []
+    instances = settings[spec.map_key]
+    if not isinstance(instances, dict) or not instances:
+        return [f"provider_settings.{base}.{spec.map_key} must be a non-empty mapping"]
+    clash = [k for k in per_instance_keys if k in settings]
+    if clash:
+        errors.append(
+            f"provider_settings.{base} cannot combine '{spec.map_key}' with top-level "
+            f"{', '.join(clash)}; move them into a {spec.noun} entry"
+        )
+    for name, entry in instances.items():
+        if not isinstance(name, str) or not INSTANCE_NAME_RE.match(name):
+            errors.append(
+                f"{spec.noun} name {name!r} is invalid; use lowercase letters, digits and '-' "
+                "(1-32 characters)"
+            )
+        if not isinstance(entry, dict):
+            errors.append(f"{spec.noun} '{name}' must be a mapping")
+    primary = settings.get(spec.primary_key)
+    if primary is None:
+        if len(instances) > 1:
+            errors.append(
+                f"'{spec.primary_key}' is required when more than one {spec.noun} is declared"
+            )
+    elif primary not in instances:
+        errors.append(f"{spec.primary_key} '{primary}' is not declared under {spec.map_key}")
+    return errors
 
 
 def declared_instances(base: str, provider_settings: dict[str, Any] | None) -> list[str]:
@@ -111,13 +326,13 @@ def declared_instances(base: str, provider_settings: dict[str, Any] | None) -> l
     Returns:
         Names in declaration order; empty when the provider has no instance map.
     """
-    keys = INSTANCE_SETTINGS.get(base)
-    if keys is None or not isinstance(provider_settings, dict):
+    spec = INSTANCE_SPECS.get(base)
+    if spec is None or not isinstance(provider_settings, dict):
         return []
     settings = provider_settings.get(base)
     if not isinstance(settings, dict):
         return []
-    instances = settings.get(keys[0])
+    instances = settings.get(spec.map_key)
     if not isinstance(instances, dict):
         return []
     return [str(name) for name in instances]
@@ -131,9 +346,9 @@ def primary_instance(base: str, provider_settings: dict[str, Any] | None) -> str
     names = declared_instances(base, provider_settings)
     if not names:
         return None
-    keys = INSTANCE_SETTINGS[base]
+    spec = INSTANCE_SPECS[base]
     settings = (provider_settings or {}).get(base) or {}
-    named = settings.get(keys[1])
+    named = settings.get(spec.primary_key)
     if isinstance(named, str) and named:
         return named
     return names[0] if len(names) == 1 else None
@@ -152,15 +367,15 @@ def normalize_instance_providers(
     """Rewrite instance-stamped resources onto their final provider ids, in place.
 
     ``opnsense@<primary>`` becomes ``opnsense`` so state rows survive converting a
-    flat configuration to ``firewalls:``.
+    flat configuration to an instance map.
 
     Args:
         resources: Resources loaded from configuration.
         provider_settings: Environment ``provider_settings``.
 
     Raises:
-        InvalidConfigurationError: If a resource names a firewall that is not
-            declared under ``firewalls:``.
+        InvalidConfigurationError: If a resource names an instance that is not
+            declared in the provider's instance map.
     """
     for resource in resources:
         base, instance = split_provider_id(resource.provider)
@@ -168,10 +383,11 @@ def normalize_instance_providers(
             continue
         declared = declared_instances(base, provider_settings)
         if instance not in declared:
+            spec = INSTANCE_SPECS[base]
             known = ", ".join(declared) if declared else "none declared"
             raise InvalidConfigurationError(
-                f"Resource targets firewall '{instance}' of provider '{base}', which is "
-                f"not declared under provider_settings.{base}.firewalls (declared: {known})"
+                f"Resource targets {spec.noun} '{instance}' of provider '{base}', which is "
+                f"not declared under provider_settings.{base}.{spec.map_key} (declared: {known})"
             )
         resource.provider = instance_provider_id(base, instance, provider_settings)
 
@@ -187,7 +403,7 @@ def register_instance_providers(
     """
     if not isinstance(provider_settings, dict):
         return
-    for base in INSTANCE_SETTINGS:
+    for base in INSTANCE_SPECS:
         base_provider = providers.get(base)
         spawn = getattr(base_provider, "spawn_instance", None)
         if base_provider is None or not callable(spawn):

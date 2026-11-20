@@ -24,9 +24,12 @@ from __future__ import annotations
 from typing import Any
 
 from infrafoundry.core.provider_instances import (
-    INSTANCE_NAME_RE,
-    primary_instance,
-    split_provider_id,
+    instance_label,
+    instance_name,
+    instance_settings,
+    is_primary_id,
+    raw_provider_settings,
+    validate_instance_map,
 )
 
 BASE_PROVIDER = "opnsense"
@@ -40,14 +43,7 @@ _PER_FIREWALL_KEYS = ("api_url", "api_key", "api_secret", "ssh_host")
 
 def _raw_settings(settings_or_env_config: Any, provider_name: str) -> dict[str, Any] | None:
     """Return the base ``opnsense`` settings dict from a dict or an environment config."""
-    if isinstance(settings_or_env_config, dict):
-        return settings_or_env_config
-    getter = getattr(settings_or_env_config, "get_provider_settings", None)
-    if getter is None:
-        return None
-    base = split_provider_id(provider_name)[0]
-    result = getter(base)
-    return result if isinstance(result, dict) else None
+    return raw_provider_settings(settings_or_env_config, provider_name)
 
 
 def _firewalls_map(settings: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -57,10 +53,7 @@ def _firewalls_map(settings: dict[str, Any] | None) -> dict[str, Any] | None:
 
 def _instance_for(settings: dict[str, Any], provider_name: str) -> str | None:
     """Return the firewall name ``provider_name`` addresses, or ``None`` if unknown."""
-    instance = split_provider_id(provider_name)[1]
-    if instance is not None:
-        return instance
-    return primary_instance(BASE_PROVIDER, {BASE_PROVIDER: settings})
+    return instance_name(BASE_PROVIDER, settings, provider_name)
 
 
 def firewall_settings(settings_or_env_config: Any, provider_name: str) -> dict[str, Any] | None:
@@ -77,19 +70,9 @@ def firewall_settings(settings_or_env_config: Any, provider_name: str) -> dict[s
         (the entry wins), minus ``firewalls``, ``primary`` and ``ha_backup``. An
         undeclared or ambiguous firewall yields an empty dict.
     """
-    settings = _raw_settings(settings_or_env_config, provider_name)
-    firewalls = _firewalls_map(settings)
-    if settings is None or firewalls is None:
-        return settings
-    name = _instance_for(settings, provider_name)
-    entry = firewalls.get(name) if name is not None else None
-    if not isinstance(entry, dict):
-        return {}
-    merged = {
-        k: v for k, v in settings.items() if k not in (FIREWALLS_KEY, PRIMARY_KEY, HA_BACKUP_KEY)
-    }
-    merged.update({k: v for k, v in entry.items() if k != HA_BACKUP_KEY})
-    return merged
+    return instance_settings(
+        BASE_PROVIDER, settings_or_env_config, provider_name, drop_keys=(HA_BACKUP_KEY,)
+    )
 
 
 def allows_env_override(provider_name: str) -> bool:
@@ -98,15 +81,12 @@ def allows_env_override(provider_name: str) -> bool:
     Only the primary (the plain ``opnsense`` id) accepts them; an instance would
     otherwise be redirected to the same endpoint as the primary.
     """
-    return split_provider_id(provider_name)[1] is None
+    return is_primary_id(provider_name)
 
 
 def firewall_label(settings_or_env_config: Any, provider_name: str) -> str | None:
     """Return the firewall name to show in output, or ``None`` for a flat config."""
-    settings = _raw_settings(settings_or_env_config, provider_name)
-    if _firewalls_map(settings) is None or settings is None:
-        return None
-    return _instance_for(settings, provider_name)
+    return instance_label(BASE_PROVIDER, settings_or_env_config, provider_name)
 
 
 def ha_backup_name(settings_or_env_config: Any, provider_name: str) -> str | None:
@@ -147,33 +127,10 @@ def validate_firewalls_settings(settings: dict[str, Any] | None) -> list[str]:
     Args:
         settings: The ``opnsense`` provider settings; ``None`` or flat settings are valid.
     """
-    if not isinstance(settings, dict) or FIREWALLS_KEY not in settings:
-        return []
-    errors: list[str] = []
-    firewalls = settings[FIREWALLS_KEY]
+    errors = validate_instance_map(BASE_PROVIDER, settings, _PER_FIREWALL_KEYS)
+    firewalls = (settings or {}).get(FIREWALLS_KEY)
     if not isinstance(firewalls, dict) or not firewalls:
-        return [f"provider_settings.opnsense.{FIREWALLS_KEY} must be a non-empty mapping"]
-    clash = [k for k in _PER_FIREWALL_KEYS if k in settings]
-    if clash:
-        errors.append(
-            f"provider_settings.opnsense cannot combine '{FIREWALLS_KEY}' with top-level "
-            f"{', '.join(clash)}; move them into a firewall entry"
-        )
-    for name, entry in firewalls.items():
-        if not isinstance(name, str) or not INSTANCE_NAME_RE.match(name):
-            errors.append(
-                f"firewall name {name!r} is invalid; use lowercase letters, digits and '-' "
-                "(1-32 characters)"
-            )
-        if not isinstance(entry, dict):
-            errors.append(f"firewall '{name}' must be a mapping")
-    names = [str(n) for n in firewalls]
-    primary = settings.get(PRIMARY_KEY)
-    if primary is None:
-        if len(names) > 1:
-            errors.append(f"'{PRIMARY_KEY}' is required when more than one firewall is declared")
-    elif primary not in firewalls:
-        errors.append(f"{PRIMARY_KEY} '{primary}' is not declared under {FIREWALLS_KEY}")
+        return errors
     for name, entry in firewalls.items():
         if not isinstance(entry, dict):
             continue

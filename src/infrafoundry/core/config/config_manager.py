@@ -280,17 +280,17 @@ class ConfigManager(PathBasedManager):
         return all_resources
 
     def _normalize_instances(self, env_name: str, resources: list[ResourceConfig]) -> None:
-        """Rewrite firewall-stamped resources onto their final provider ids (#1450).
+        """Rewrite instance-stamped resources onto their final provider ids (#1450).
 
-        The environment settings are read only when a resource names a firewall, so
-        an environment without ``firewalls:`` never pays for the lookup.
+        The environment settings are read only when a resource names a provider
+        instance, so an environment without an instance map never pays for the lookup.
 
         Args:
             env_name: Environment name.
             resources: Freshly loaded resources, rewritten in place.
 
         Raises:
-            InvalidConfigurationError: If a resource names an undeclared firewall.
+            InvalidConfigurationError: If a resource names an undeclared provider instance.
         """
         if not any(INSTANCE_SEPARATOR in r.provider for r in resources):
             return

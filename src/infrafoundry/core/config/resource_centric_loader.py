@@ -130,10 +130,12 @@ class ResourceCentricLoader:
             config["name"] = item["name"]
 
             provider = item["provider"]
-            if item.get("firewall") is not None:
-                provider = self._package_loader._entry_firewall_provider(
+            provider = (
+                self._package_loader._entry_instance_provider(
                     item, provider, str(config_file), str(item["type"])
                 )
+                or provider
+            )
 
             resources.append(
                 ResourceConfig(
