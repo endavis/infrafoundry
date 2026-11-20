@@ -201,7 +201,7 @@ Each resource owns the device's full set of routes or tags, so at most one `devi
 
 ### Joining an OPNsense node with a minted key
 
-Prefer `opnsense.tailscale.auth.mint`: the firewall mints a single-use, tagged key from an OAuth client at apply time, so no key is kept in secrets and a rebuild needs no manual step. The OAuth client needs the `auth_keys` scope and must own the tags in `tagOwners`. Nothing is minted when the node is already `Running`. See [Minting the key](../development/opnsense-resource-coverage.md#minting-the-key-1510); this path has not been run against a live tailnet.
+Prefer `opnsense.tailscale.auth.mint`: the firewall mints a single-use, tagged key from an OAuth client at apply time, so no key is kept in secrets and a rebuild needs no manual step. The OAuth client needs the `auth_keys` scope and must own the tags in `tagOwners`. Nothing is minted when the node is already `Running`. See [Minting the key](../development/opnsense-resource-coverage.md#minting-the-key-1510). The path was verified live against a test firewall (#1510), with an OAuth client that held every scope; the `auth_keys` scope alone has not been tested.
 
 ```yaml
 opnsense:

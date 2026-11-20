@@ -549,9 +549,9 @@ Unknown `mint` keys are an ERROR. A `login_server` other than `controlplane.tail
 
 **Rebuild flow.** Install the plugin (`system.firmware`), declare `tailscale.settings` with `enabled: true` and `tailscale.auth` with `mint`, and apply. The node joins with the declared tags and no key is kept in secrets. Re-applying a `Running` node changes nothing.
 
-The key, the OAuth credentials and the access token are never logged, shown in a plan, put in a warning or an exception, or stored; failures carry an HTTP status or an exception type only.
+The key, the OAuth credentials and the access token are never logged, shown in a plan, put in a warning or an exception, or stored. A failure carries the HTTP status and the API's error `message`, with any `tskey-` token in it redacted, or an exception type ([#1514](https://github.com/endavis/infrafoundry/issues/1514)).
 
-**Not verified live:** `mint` was written against the Tailscale API and the plugin's documented responses and is covered by unit tests only. It has not been run against a firewall or a tailnet.
+**Verified live** ([#1510](https://github.com/endavis/infrafoundry/issues/1510)): on a test firewall with the plugin installed, disabled, and with no key and no node state, as after a rebuild, the first apply minted a key and the node came up `Running` with the declared tag. A re-plan showed no changes, and a second apply minted nothing and did not rewrite the authentication settings. The OAuth client in that test held every scope, so whether the `auth_keys` scope alone is enough has not been verified.
 
 ### Subnets (`tailscale.subnets`)
 
