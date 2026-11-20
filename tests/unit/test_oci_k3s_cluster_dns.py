@@ -591,3 +591,80 @@ def test_real_ansible_second_run_changes_nothing(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "changed=0" in result.stdout
+
+
+# --- Worker node name (#1556) ---
+
+
+def test_worker_wait_uses_the_discovered_node_name_not_the_inventory_name() -> None:
+    """The worker wait targets the registered node name, never inventory_hostname."""
+    tasks = yaml.safe_load((ROLE / "tasks" / "main.yml").read_text())
+    by_name = {task["name"]: task for task in tasks}
+    wait = by_name["Wait for the node to be Ready (worker)"]
+    assert "inventory_hostname" not in wait["ansible.builtin.command"]
+    assert "k3s_dns_node_name.stdout" in wait["ansible.builtin.command"]
+    lookup = by_name["Find the k3s node name (worker)"]
+    assert lookup["register"] == "k3s_dns_node_name"
+    assert "delegate_to" not in lookup
+    assert lookup["when"] == wait["when"]
+
+
+def _run_worker(tmp_path: Path, node_config: str | None) -> str:
+    """Run the role as a worker against localhost; return the recorded k3s args."""
+    config_dir = tmp_path / "rancher"
+    (config_dir / "config.yaml.d").mkdir(parents=True)
+    if node_config is not None:
+        (config_dir / "config.yaml.d" / "10-node.yaml").write_text(node_config)
+    stub = tmp_path / "k3s"
+    stub.write_text('#!/bin/sh\necho "$@" >> "$RECORD_FILE"\n')
+    stub.chmod(0o755)
+    record = tmp_path / "record"
+    play, inv = _role_playbook(tmp_path)
+    result = subprocess.run(
+        [
+            "ansible-playbook",
+            "-i",
+            str(inv),
+            str(play),
+            "-e",
+            f"k3s_dns_install_marker={stub}",
+            "-e",
+            f"k3s_dns_config_dir={config_dir}",
+            "-e",
+            "k3s_control_host=localhost",
+            "-e",
+            f"k3s_dns_file_owner={pwd.getpwuid(os.getuid()).pw_name}",
+            "-e",
+            f"k3s_dns_file_group={grp.getgrgid(os.getgid()).gr_name}",
+            "--skip-tags",
+            "k3s_dns_restart",
+        ],
+        env={
+            **os.environ,
+            "RECORD_FILE": str(record),
+            "ANSIBLE_ROLES_PATH": str(BLUEPRINT / "roles"),
+            "ANSIBLE_LOCAL_TEMP": str(tmp_path / "ansible-tmp"),
+            "ANSIBLE_HOME": str(tmp_path / "ansible-home"),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    return record.read_text()
+
+
+@needs_ansible
+def test_real_ansible_worker_waits_on_the_hostname_not_the_inventory_name(tmp_path: Path) -> None:
+    """Without a node-name setting the wait uses the machine hostname."""
+    recorded = _run_worker(tmp_path, None)
+    hostname = subprocess.run(["hostname"], capture_output=True, text=True, check=True).stdout
+    assert f"node/{hostname.strip()} " in recorded
+
+
+@needs_ansible
+def test_real_ansible_worker_waits_on_a_configured_node_name(tmp_path: Path) -> None:
+    """A node-name in config.yaml.d wins over the hostname and the inventory name."""
+    recorded = _run_worker(tmp_path, 'node-name: "w0-vnic"\n')
+    assert "node/w0-vnic " in recorded
+    assert "node/localhost " not in recorded

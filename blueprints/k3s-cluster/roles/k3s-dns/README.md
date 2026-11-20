@@ -24,8 +24,13 @@ The `k3s` or `k3s-agent` service restarts only when one of the files changed.
 | `k3s_dns_search` | `[]` | Cluster-wide search domains |
 | `k3s_dns_config_dir` | `/etc/rancher/k3s` | k3s config directory |
 | `k3s_dns_install_marker` | `/usr/local/bin/k3s` | Must exist |
+| `k3s_dns_bin` | `k3s_dns_install_marker` | k3s binary for the readiness waits |
 | `k3s_dns_service` | `k3s` | Unit to restart (`k3s-agent` on workers) |
 | `k3s_control_host` | unset | Set on workers; the readiness wait runs there |
 
 It sets the fact `k3s_dns_changed`, which `blueprints/k3s-cluster/playbooks/k3s-dns.yml` uses to decide
 whether to restart CoreDNS.
+
+On a worker the wait uses the node's real k3s name, not the inventory name: a
+`node-name` in `config.yaml` or `config.yaml.d/*.yaml`, else `--node-name` in the
+service unit, else the machine hostname.
