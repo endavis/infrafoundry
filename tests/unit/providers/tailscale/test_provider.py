@@ -11,6 +11,7 @@ from infrafoundry.providers.tailscale import TailscaleProvider
 EXPECTED_TYPES = [
     "acl",
     "tailnet_key",
+    "oauth_client",
     "device_subnet_routes",
     "device_tags",
     "dns_nameservers",
@@ -41,6 +42,7 @@ class TestMetadata:
     def test_dependencies(self, provider: TailscaleProvider) -> None:
         deps = provider.get_dependencies()
         assert deps["tailnet_key"] == ["acl"]
+        assert deps["oauth_client"] == ["acl"]
         assert deps["device_tags"] == ["acl"]
         assert deps["device_subnet_routes"] == ["acl"]
         assert deps["acl"] == []

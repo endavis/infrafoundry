@@ -247,3 +247,44 @@ class TestValidationOnGenerate:
         assert oauth_env.terraform_dir == Path(oauth_env.base_output_dir) / "test" / (
             "terraform/tailscale"
         )
+
+
+class TestOAuthClient:
+    def test_fields_and_depends_on_acl(self, oauth_env: TailscaleProvider) -> None:
+        files = _generate(
+            oauth_env,
+            res("main", "acl", policy=POLICY),
+            res(
+                "k8s-operator",
+                "oauth_client",
+                scopes=["devices:core", "auth_keys"],
+                tags=["tag:k8s-operator"],
+                description="example",
+            ),
+        )
+        text = files["oauth_client.tf"]
+        assert 'resource "tailscale_oauth_client" "k8s_operator"' in text
+        assert 'scopes      = ["devices:core", "auth_keys"]' in text
+        assert 'tags        = ["tag:k8s-operator"]' in text
+        assert 'description = "example"' in text
+        assert "depends_on  = [tailscale_acl.main]" in text
+
+    def test_no_depends_on_without_acl(self, oauth_env: TailscaleProvider) -> None:
+        text = _generate(oauth_env, res("k", "oauth_client", scopes=["all"]))["oauth_client.tf"]
+        assert "depends_on" not in text
+        assert "tags" not in text
+
+    def test_outputs_sensitive(self, oauth_env: TailscaleProvider) -> None:
+        text = _generate(oauth_env, res("k8s-operator", "oauth_client", scopes=["all"]))[
+            "outputs.tf"
+        ]
+        id_block = text.split('output "oauth_client_k8s_operator_id"')[1].split("}")[0]
+        secret_block = text.split('output "oauth_client_k8s_operator_secret"')[1].split("}")[0]
+        assert "tailscale_oauth_client.k8s_operator.id" in id_block
+        assert "sensitive   = true" in id_block
+        assert "tailscale_oauth_client.k8s_operator.key" in secret_block
+        assert "sensitive   = true" in secret_block
+        assert 'output "oauth_clients"' in text
+
+    def test_no_outputs_without_clients(self, oauth_env: TailscaleProvider) -> None:
+        assert "oauth_client" not in _generate(oauth_env)["outputs.tf"]

@@ -23,6 +23,7 @@ The Tailscale provider manages the control plane of a tailnet: the ACL policy, a
 |------|--------------------|-------------|
 | `acl` | `tailscale_acl` | The tailnet policy file (one per environment) |
 | `tailnet_key` | `tailscale_tailnet_key` | An auth key |
+| `oauth_client` | `tailscale_oauth_client` | An OAuth client whose credentials other providers can consume |
 | `device_subnet_routes` | `tailscale_device_subnet_routes` | The approved subnet routes of one device |
 | `device_tags` | `tailscale_device_tags` | The tags of one device |
 | `dns_nameservers` | `tailscale_dns_nameservers` | Global nameservers (one per environment) |
@@ -81,6 +82,7 @@ Give the OAuth client the scopes for the resources you use. The names below come
 |----------|-------|
 | `acl` | `policy_file` |
 | `tailnet_key` | `auth_keys` |
+| `oauth_client` | `oauth_keys` on the managing client, plus every scope the new client is given |
 | `device_tags`, and the `device:` lookup | `devices:core` |
 | `device_subnet_routes` | `devices:routes` |
 | `dns_*` | `dns` |
@@ -170,6 +172,43 @@ terraform -chdir=generated/<env>/terraform/tailscale output -raw tailnet_key_<na
     The key value, and the ACL, are stored in plaintext in the Terraform state (`generated/<env>/terraform/tailscale/terraform.tfstate` for a local backend). Use an encrypted remote backend, a short `expiry`, and `ephemeral` or single-use keys. Do not paste the output into shared logs.
 
 When an `acl` is declared, keys, routes and tags depend on it, so the tags exist in `tagOwners` first.
+
+### oauth_client
+
+```yaml
+oauth_client:
+  - name: k8s-operator
+    description: example operator client
+    scopes: ["devices:core", "auth_keys"]
+    tags: ["tag:k8s-operator"]
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `scopes` | Yes | A non-empty list of scope names |
+| `description` | No | Client description |
+| `tags` | No | Tags, each `tag:<name>`; a tag missing from `tagOwners` is a warning |
+
+The client id and secret are exposed as the sensitive outputs `oauth_client_<name>_id` and `oauth_client_<name>_secret` (a hyphen in the name becomes `_`), and `oauth_clients` lists `created_at` for each client. The scope needed on the managing client to create OAuth clients (`oauth_keys`) comes from Tailscale's documentation and was not checked in a live test.
+
+!!! danger "State holds secrets"
+    The client secret is stored in plaintext in the Terraform state of this provider, and again in the state of any provider that consumes it. Use an encrypted remote backend.
+
+Another provider can take the id or secret straight from these outputs with an `outputs.tailscale.<output>` reference, for example in a Kubernetes secret:
+
+```yaml
+secrets:
+  - name: operator-oauth
+    config:
+      namespace: tailscale
+      string_data_secrets:
+        client_id: outputs.tailscale.oauth_client_k8s_operator_id
+        client_secret: outputs.tailscale.oauth_client_k8s_operator_secret
+```
+
+See [Kubernetes Secrets](kubernetes.md#secrets) for the rules, and [Dependency Ordering](../configuration/dependency-ordering.md#cross-provider-dependencies) for how tailscale is applied first.
+
+When an `acl` is declared, `oauth_client` depends on it like the other resources.
 
 ### device_subnet_routes and device_tags
 

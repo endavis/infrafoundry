@@ -459,6 +459,19 @@ ERROR_CATALOG: dict[str, ErrorInfo] = {
             "Ensure dependencies are in the same environment",
         ],
     ),
+    "IF-DEPENDENCY-003": ErrorInfo(
+        code="IF-DEPENDENCY-003",
+        title="Unresolved Output Reference",
+        description=(
+            "An outputs.<provider>.<output> reference could not be read from the "
+            "producing provider's Terraform state."
+        ),
+        suggestions=[
+            "Apply the producing provider first: 'foundry infra apply --env <env> -P <provider>'",
+            "Check the output name against the producer's generated outputs.tf",
+            "Check the producer's Terraform directory under generated/<env>/terraform/",
+        ],
+    ),
     # API errors (IF-API-XXX)
     "IF-API-001": ErrorInfo(
         code="IF-API-001",
@@ -647,6 +660,7 @@ _EXCEPTION_TO_CODE: dict[str, str] = {
     # Dependency errors
     "CircularDependencyError": "IF-DEPENDENCY-001",
     "MissingDependencyError": "IF-DEPENDENCY-002",
+    "OutputReferenceError": "IF-DEPENDENCY-003",
     "DependencyError": "IF-DEPENDENCY-001",  # Generic fallback
     # API errors
     "APIError": "IF-API-001",

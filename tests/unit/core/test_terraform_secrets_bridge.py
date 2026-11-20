@@ -388,3 +388,39 @@ class TestResolveSecretUris:
             resolve_secret_uris=True,
         )
         assert result == {"TF_VAR_test_tailnet": "example.com"}
+
+
+class TestOutputRefsSkipped:
+    """``outputs.*`` refs are resolved by the runner, not looked up in SOPS (#1536)."""
+
+    def test_output_ref_not_looked_up_in_secrets(self) -> None:
+        harness = _BridgeHarness(_make_env(secrets={"app": {"token": "abc"}}))
+        result = harness.build_terraform_env_vars(
+            provider_name="test",
+            mapping={},
+            resources=[
+                _resource(
+                    "vm-1",
+                    terraform_secrets=["outputs.tailscale.oauth_client_x_secret", "app.token"],
+                )
+            ],
+        )
+        assert result == {"TF_VAR_app_token": "abc"}
+
+    def test_output_ref_still_declared_as_variable(self) -> None:
+        refs = TerraformGeneratorMixin.collect_terraform_secret_refs(
+            [_resource("vm-1", terraform_secrets=["outputs.tailscale.oauth_client_x_secret"])]
+        )
+        assert refs == ["outputs.tailscale.oauth_client_x_secret"]
+        assert sanitize_secret_ref_to_tf_var(refs[0]) == "outputs_tailscale_oauth_client_x_secret"
+
+    def test_helper_rejects_output_refs_by_default(self) -> None:
+        report = ValidationReport()
+        validate_terraform_secrets_references(
+            "proxmox",
+            [_resource("vm-1", terraform_secrets=["outputs.tailscale.x"])],
+            _make_env(secrets={}),
+            report,
+        )
+        assert [r.passed for r in report.results] == [False]
+        assert "kubernetes provider only" in report.results[0].message

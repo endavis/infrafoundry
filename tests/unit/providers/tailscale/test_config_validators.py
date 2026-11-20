@@ -10,6 +10,7 @@ from infrafoundry.providers.tailscale.validators import (
     DeviceReferenceValidator,
     DnsValidator,
     NamingValidator,
+    OAuthClientValidator,
     TailnetKeyValidator,
 )
 from infrafoundry.providers.tailscale.validators.context import (
@@ -169,6 +170,66 @@ class TestTailnetKey:
             _ctx([res("k", "tailnet_key", tags=["tag:server"])], "oauth", POLICY)
         )
         assert not _warnings(report)
+
+
+class TestOAuthClient:
+    def test_valid(self) -> None:
+        report = ValidationReport()
+        OAuthClientValidator(report).validate(
+            _ctx(
+                [res("k", "oauth_client", scopes=["devices:core"], tags=["tag:server"])],
+                "oauth",
+                POLICY,
+            )
+        )
+        assert not _errors(report)
+        assert not _warnings(report)
+
+    def test_scopes_required_non_empty_strings(self) -> None:
+        report = ValidationReport()
+        OAuthClientValidator(report).validate(
+            _ctx(
+                [
+                    res("a", "oauth_client"),
+                    res("b", "oauth_client", scopes=[]),
+                    res("c", "oauth_client", scopes=["ok", 3]),
+                    res("d", "oauth_client", scopes="all"),
+                ]
+            )
+        )
+        assert _errors(report) == {
+            "tailscale_oauth_client_scopes_a",
+            "tailscale_oauth_client_scopes_b",
+            "tailscale_oauth_client_scopes_c",
+            "tailscale_oauth_client_scopes_d",
+        }
+
+    def test_description_must_be_string(self) -> None:
+        report = ValidationReport()
+        OAuthClientValidator(report).validate(
+            _ctx([res("k", "oauth_client", scopes=["all"], description=5)])
+        )
+        assert _errors(report) == {"tailscale_oauth_client_description_k"}
+
+    def test_bad_tag_format(self) -> None:
+        report = ValidationReport()
+        OAuthClientValidator(report).validate(
+            _ctx([res("k", "oauth_client", scopes=["all"], tags=["server"])])
+        )
+        assert _errors(report) == {"tailscale_tags_k"}
+
+    def test_tag_missing_from_tag_owners_warns(self) -> None:
+        report = ValidationReport()
+        OAuthClientValidator(report).validate(
+            _ctx([res("k", "oauth_client", scopes=["all"], tags=["tag:other"])], "oauth", POLICY)
+        )
+        assert not _errors(report)
+        assert _warnings(report) == {"tailscale_tag_owners_k"}
+
+    def test_other_types_ignored(self) -> None:
+        report = ValidationReport()
+        OAuthClientValidator(report).validate(_ctx([res("k", "tailnet_key")]))
+        assert not report.results
 
 
 class TestDevice:

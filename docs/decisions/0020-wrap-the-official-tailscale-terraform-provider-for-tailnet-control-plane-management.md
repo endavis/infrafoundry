@@ -41,6 +41,7 @@ Alternatives rejected:
 - Issue #870: Tailscale control-plane provider
 - Issue #787: OPNsense os-tailscale plugin (the node side)
 - Issue #1349: keep tags on destroy for tagged nodes
+- Issue #1536: `oauth_client` resource and consuming its credentials from another provider (see ADR-0029)
 
 ## Related Documentation
 

@@ -163,3 +163,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0026](0026-mikrotik-routeros-is-managed-natively-over-the-rest-api-by-a-direct-runner.md) | MikroTik RouterOS is managed natively over the REST API by a direct runner | Accepted |
 | [0027](0027-unmanaged-network-devices-are-backed-up-by-read-only-collectors.md) | Unmanaged network devices are backed up by read-only collectors | Accepted |
 | [0028](0028-openwrt-devices-are-managed-through-generated-communityopenwrt-playbooks-with-ubus-apply-rollback.md) | OpenWrt devices are managed through generated community.openwrt playbooks with ubus apply-rollback | Accepted |
+| [0029](0029-providers-consume-other-providers-terraform-outputs-through-outputs-references.md) | Providers consume other providers' Terraform outputs through outputs references | Accepted |

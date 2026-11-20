@@ -14,6 +14,7 @@ from infrafoundry.core.provider_mixins import (
     TerraformGeneratorMixin,
     sanitize_secret_ref_to_tf_var,
 )
+from infrafoundry.core.terraform_outputs import output_refs
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.kubernetes.names import CONFIG_NAME_TYPES, kubernetes_object_name
 from infrafoundry.providers.kubernetes.secret_refs import with_terraform_secrets
@@ -109,6 +110,20 @@ class KubernetesProvider(
             if value:
                 result[f"TF_VAR_{tf_var_name}"] = value
         return result
+
+    @override
+    def get_terraform_output_refs(self, resources: list[ResourceConfig] | None = None) -> list[str]:
+        """Return the ``outputs.<provider>.<output>`` refs the resources use (#1536).
+
+        Args:
+            resources: Resources to scan; ``None`` uses the last generation's.
+
+        Returns:
+            Ordered, de-duplicated output references.
+        """
+        source = self._last_terraform_resources if resources is None else resources
+        folded = [with_terraform_secrets(r) for r in source]
+        return output_refs(self.collect_terraform_secret_refs(folded))
 
     def _terraform_label(self, resource: ResourceConfig) -> str:
         """Return the Terraform resource label the templates declare for a resource.

@@ -50,6 +50,7 @@ from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.state import StateManager
 from infrafoundry.core.state.lock_context import environment_lock
+from infrafoundry.core.terraform_outputs import output_ref_dependencies
 from infrafoundry.core.warnings import emit_warning
 
 logger = logging.getLogger(__name__)
@@ -323,11 +324,17 @@ class Orchestrator:
 
         return all_resources, resources_by_provider
 
-    def _create_execution_planner(self, env_name: str) -> ExecutionPlanner:
+    def _create_execution_planner(
+        self,
+        env_name: str,
+        resources_by_provider: dict[str, list[ResourceConfig]] | None = None,
+    ) -> ExecutionPlanner:
         """Create an execution planner for an environment.
 
         Args:
             env_name: Environment name
+            resources_by_provider: The run's resources, used to order a provider that
+                reads another's Terraform outputs after it (#1536)
 
         Returns:
             ExecutionPlanner configured with environment's provider order
@@ -343,6 +350,7 @@ class Orchestrator:
         return ExecutionPlanner(
             provider_order=provider_order,
             dependency_graph=dependency_graph,
+            provider_dependencies=output_ref_dependencies(self.providers, resources_by_provider),
         )
 
     def _iter_provider_batches(
@@ -364,7 +372,11 @@ class Orchestrator:
             List of ProviderResourceBatch in execution order
         """
         # Create execution planner with environment config
-        planner = self._create_execution_planner(env_name) if env_name else ExecutionPlanner()
+        planner = (
+            self._create_execution_planner(env_name, resources_by_provider)
+            if env_name
+            else ExecutionPlanner()
+        )
 
         # Convert to set for O(1) lookups
         filter_set = set(resource_filter) if resource_filter else None
@@ -714,7 +726,10 @@ class Orchestrator:
             # Update execution planner with environment-specific provider order
             self.deployment_executor.provider_order = env_config.provider_order or None
             self.deployment_executor.execution_planner = ExecutionPlanner(
-                provider_order=env_config.provider_order or None
+                provider_order=env_config.provider_order or None,
+                provider_dependencies=output_ref_dependencies(
+                    self.providers, resources_by_provider
+                ),
             )
 
         return self.deployment_executor.apply_serial(
@@ -748,7 +763,10 @@ class Orchestrator:
             # Update execution planner with environment-specific provider order
             self.deployment_executor.provider_order = env_config.provider_order or None
             self.deployment_executor.execution_planner = ExecutionPlanner(
-                provider_order=env_config.provider_order or None
+                provider_order=env_config.provider_order or None,
+                provider_dependencies=output_ref_dependencies(
+                    self.providers, resources_by_provider
+                ),
             )
 
         return self.deployment_executor.apply_parallel(

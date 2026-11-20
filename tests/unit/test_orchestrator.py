@@ -785,3 +785,42 @@ class TestOrchestratorLocking:
         result = orchestrator.plan("dev")
         assert result == {}
         cast(MagicMock, orchestrator.plan_orchestrator.plan).assert_called_once()
+
+
+class TestOutputRefOrdering:
+    """A provider reading another's outputs runs after it (#1536)."""
+
+    def test_producer_batch_precedes_consumer(self, tmp_path: Path) -> None:
+        from infrafoundry.core.provider import ProviderBase, ResourceConfig
+
+        config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
+        config_manager.load_environment.return_value = None
+        orchestrator = Orchestrator(config_manager)
+        consumer = Mock(spec=ProviderBase)
+        consumer.get_terraform_output_refs.return_value = ["outputs.tailscale.some_output"]
+        producer = Mock(spec=ProviderBase)
+        producer.get_terraform_output_refs.return_value = []
+        orchestrator.providers = {"kubernetes": consumer, "tailscale": producer}
+        resources = {
+            "kubernetes": [
+                ResourceConfig(name="s", type="secrets", provider="kubernetes", config={})
+            ],
+            "tailscale": [
+                ResourceConfig(name="k", type="oauth_client", provider="tailscale", config={})
+            ],
+        }
+
+        with patch.object(orchestrator, "build_dependency_graph", return_value=None):
+            apply_order = [
+                b.name for b in orchestrator._iter_provider_batches(resources, None, env_name="e")
+            ]
+            destroy_order = [
+                b.name
+                for b in orchestrator._iter_provider_batches(
+                    resources, None, reverse=True, env_name="e"
+                )
+            ]
+
+        assert apply_order == ["tailscale", "kubernetes"]
+        assert destroy_order == ["kubernetes", "tailscale"]

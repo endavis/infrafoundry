@@ -25,3 +25,33 @@ output "tailnet_keys" {
   }
 }
 {% endif %}
+
+{% set clients = resources_by_type.get('oauth_client', []) %}
+{% if clients %}
+# The client secret is also in the Terraform state; other providers read it with
+# an `outputs.tailscale.oauth_client_<name>_secret` reference.
+{% for r in clients %}
+output "oauth_client_{{ r.name | to_terraform_name }}_id" {
+  description = "OAuth client ID for {{ r.name }}"
+  value       = tailscale_oauth_client.{{ r.name | to_terraform_name }}.id
+  sensitive   = true
+}
+
+output "oauth_client_{{ r.name | to_terraform_name }}_secret" {
+  description = "OAuth client secret for {{ r.name }}"
+  value       = tailscale_oauth_client.{{ r.name | to_terraform_name }}.key
+  sensitive   = true
+}
+
+{% endfor %}
+output "oauth_clients" {
+  description = "Non-sensitive OAuth client details"
+  value = {
+{% for r in clients %}
+    "{{ r.name }}" = {
+      created_at = tailscale_oauth_client.{{ r.name | to_terraform_name }}.created_at
+    }
+{% endfor %}
+  }
+}
+{% endif %}

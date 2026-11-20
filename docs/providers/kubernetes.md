@@ -100,6 +100,14 @@ config:
 
 The values reach Terraform as sensitive variables set through `TF_VAR_*` at apply, so they never appear in the generated `.tf` files. A resolved value still lands in the Terraform state, as with any Terraform-managed secret. `data_secrets` values must be base64, like `data`. A key in `string_data` or `string_data_secrets` is left out of `binary_data`. The same key in `string_data` and `string_data_secrets`, or in `data` and `data_secrets`, fails validation.
 
+A reference of the form `outputs.<provider>.<output>` takes the value from another provider's Terraform output instead of SOPS, for example `outputs.tailscale.oauth_client_k8s_operator_secret`:
+
+- It works in `string_data_secrets`, in `terraform_secrets` and in `set_sensitive[*].value_secret` of a Helm release. It is an error in `data_secrets` (an output is not base64), in another provider's `terraform_secrets`, and for the Kubernetes provider's own outputs.
+- `outputs` is a reserved prefix, so a top-level SOPS key named `outputs` cannot be referenced. Both parts after it use lowercase letters, digits and `_`.
+- The producer is applied first, and destroyed last. On `apply` the value is read with `terraform output -json` from `generated/<env>/terraform/<provider>/`. If the run does not include the producer (for example `-P kubernetes`), the value comes from its existing state. When that directory or the output is missing, apply fails and names the reference; run `infra apply --env <env> -P <provider>` first.
+- On `plan`, `destroy` and `validate` a missing output gets a placeholder value and a warning, so the preview of a first apply still works. The placeholder never reaches an apply.
+- The value is held in memory for the Terraform call, and is never logged or written to the generated files. It lands in this provider's Terraform state, as with any Terraform-managed secret.
+
 !!! note "Existing `string_data` secrets"
     Earlier versions wrapped `string_data` values in `base64encode()`, so the stored value was base64 text. The next apply updates such a secret in place to the plain string you wrote. A consumer that decoded the value twice to work around this must be updated.
 

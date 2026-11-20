@@ -480,6 +480,15 @@ See [CLI Reference — `deps sync`](../usage/cli-reference.md#deps-sync).
 2. Verify resource names in `depends_on` are correct
 3. Ensure dependencies are in the same environment
 
+### IF-DEPENDENCY-003: Unresolved Output Reference
+
+**Cause:** An `outputs.<provider>.<output>` reference could not be read from the producing provider's Terraform state during `infra apply`.
+
+**Solutions:**
+1. Apply the producing provider first: `foundry infra apply --env <env> -P <provider>`
+2. Check the output name against the producer's generated `outputs.tf`
+3. Check the producer's Terraform directory under `generated/<env>/terraform/`
+
 ---
 
 ## API Errors (IF-API)

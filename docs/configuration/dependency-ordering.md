@@ -57,6 +57,8 @@ provider_order:
   - tailscale
 ```
 
+A provider that reads another provider's Terraform outputs through an `outputs.<provider>.<output>` reference (see [Kubernetes Secrets](../providers/kubernetes.md#secrets)) always runs after that provider, whatever `provider_order` says. `provider_order` stays the tie-break between providers with no such link, and destroy reverses the whole order. A cycle of such references is refused.
+
 The sorting is done by `ExecutionPlanner.sort_providers`; the orchestrator builds the planner from the environment in `Orchestrator._create_execution_planner` and applies it in `Orchestrator._iter_provider_batches`.
 
 ## Within a Provider
@@ -95,7 +97,7 @@ resources:
 
 ## Cross-Provider Dependencies
 
-There is no ordering between individual resources of different providers at run time. `build_dependency_graph` only adds edges between resources of the same provider, so the graph has no edge from, say, a Kubernetes resource to a Proxmox virtual machine. The only cross-provider ordering is the provider order above, which orders whole providers.
+There is no ordering between individual resources of different providers at run time. `build_dependency_graph` only adds edges between resources of the same provider, so the graph has no edge from, say, a Kubernetes resource to a Proxmox virtual machine. The only cross-provider ordering is the provider order above, which orders whole providers, and the `outputs.<provider>.<output>` references, which put the producing provider before the one that reads its outputs.
 
 The help text of `-P` on `infra plan`, `infra apply` and `infra destroy` says that cross-provider dependencies pointing at filtered-out providers are skipped for the run. That is accurate but moot, because such edges are never created.
 
