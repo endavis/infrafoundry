@@ -69,7 +69,7 @@ def test_oci_k3s_cluster_example_loads_blueprint(loader: PackageLoader) -> None:
     assert variables["vcn_cidr"] == "192.0.2.0/24"
     assert variables["vcn_name"] == "k3s-vcn"
     assert variables["control_subnet_cidr"] == "192.0.2.0/25"
-    assert variables["worker_subnet_cidr"] == "198.51.100.0/24"
+    assert variables["worker_subnet_cidr"] == "192.0.2.128/25"
     assert variables["k3s_oci_firewall_fix"] is True
 
     # Default workers list has 2 entries
@@ -130,7 +130,7 @@ def test_oci_k3s_cluster_example_network_configs(loader: PackageLoader) -> None:
 
     worker_subnet = subnets_by_name["k3s-worker-subnet"].config
     assert worker_subnet["vcn"] == "k3s-vcn"
-    assert worker_subnet["cidr_block"] == "198.51.100.0/24"
+    assert worker_subnet["cidr_block"] == "192.0.2.128/25"
     assert worker_subnet["dns_label"] == "work"
     assert worker_subnet["public"] is False
 
@@ -672,3 +672,20 @@ def test_script_fails_fast_when_tailnet_policy_denies_ssh(tmp_path: Path) -> Non
     assert not (record / "args").exists()
     assert not (record / "sleeps").exists()
     assert (record / "ssh_count").read_text().strip() == "1"
+
+
+def test_oci_k3s_cluster_default_subnets_fit_the_default_vcn(loader: PackageLoader) -> None:
+    """The default subnets sit inside the default VCN and do not overlap (#1521)."""
+    import ipaddress
+
+    resources, _events, _variables = loader.load_package(
+        PACKAGE_DIR, provider="oci", env_name="oci-k3s"
+    )
+    vcn = next(r for r in resources if r.type == "vcn")
+    vcn_net = ipaddress.IPv4Network(vcn.config["cidr_block"])
+    subnet_nets = [
+        ipaddress.IPv4Network(r.config["cidr_block"]) for r in resources if r.type == "subnet"
+    ]
+    assert len(subnet_nets) == 2
+    assert all(net.subnet_of(vcn_net) for net in subnet_nets)
+    assert not subnet_nets[0].overlaps(subnet_nets[1])

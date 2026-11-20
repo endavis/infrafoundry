@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 from dataclasses import replace
 from typing import Any, cast
@@ -205,6 +206,7 @@ class OCIValidator:
         Checks:
         - Subnets reference valid VCNs
         - Instances reference valid subnets
+        - Subnet CIDRs lie inside their VCN's CIDR and do not overlap (#1521)
         - ``tailscale:`` schema is well-formed and mutually exclusive with
           ``cloud_init_snippets`` (issue #212)
         - ``terraform_secrets`` references resolve in env secrets
@@ -264,6 +266,8 @@ class OCIValidator:
                         message=f"Subnet '{resource.name}' VCN reference valid",
                     )
 
+        self._validate_subnet_cidrs(resources)
+
         # Validate instance -> subnet references
         for resource in resources:
             if resource.type == "instance":
@@ -284,6 +288,71 @@ class OCIValidator:
                         passed=True,
                         message=f"Instance '{resource.name}' subnet reference valid",
                     )
+
+    @staticmethod
+    def _parse_network(value: object) -> ipaddress.IPv4Network | ipaddress.IPv6Network | None:
+        """Parse a CIDR string, returning None when it is missing or unparsable."""
+        if not isinstance(value, str):
+            return None
+        try:
+            return ipaddress.ip_network(value, strict=False)
+        except ValueError:
+            return None
+
+    def _validate_subnet_cidrs(self, resources: list[ResourceConfig]) -> None:
+        """Check subnet CIDRs against their VCN and each other, offline (#1521).
+
+        Reports an ERROR when a subnet's ``cidr_block`` is not inside the
+        ``cidr_block`` of the VCN it references, or when two subnets of one VCN
+        overlap. A subnet whose VCN is not defined, or whose CIDR (or the VCN's)
+        is missing or unparsable, is skipped; the reference check reports the
+        former. Only failures are reported.
+
+        Args:
+            resources: List of resources to validate
+        """
+        vcn_nets: dict[str, ipaddress.IPv4Network | ipaddress.IPv6Network] = {}
+        for resource in resources:
+            if resource.type == "vcn":
+                net = self._parse_network(resource.config.get("cidr_block"))
+                if net is not None:
+                    vcn_nets[resource.name] = net
+
+        by_vcn: dict[str, list[tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network]]] = {}
+        for resource in resources:
+            if resource.type != "subnet":
+                continue
+            vcn_ref = resource.config.get("vcn")
+            subnet_net = self._parse_network(resource.config.get("cidr_block"))
+            if not isinstance(vcn_ref, str) or vcn_ref not in vcn_nets or subnet_net is None:
+                continue
+            vcn_net = vcn_nets[vcn_ref]
+            if subnet_net.version != vcn_net.version or not subnet_net.subnet_of(vcn_net):  # type: ignore[arg-type]
+                self.report.add_check(
+                    check_name=f"oci_subnet_{resource.name}_cidr_outside_vcn",
+                    passed=False,
+                    message=(
+                        f"Subnet '{resource.name}' cidr_block {subnet_net} is not inside "
+                        f"VCN '{vcn_ref}' cidr_block {vcn_net}"
+                    ),
+                    level=ValidationLevel.ERROR,
+                )
+                continue
+            by_vcn.setdefault(vcn_ref, []).append((resource.name, subnet_net))
+
+        for vcn_ref, subnets in by_vcn.items():
+            for i, (name_a, net_a) in enumerate(subnets):
+                for name_b, net_b in subnets[i + 1 :]:
+                    if net_a.version == net_b.version and net_a.overlaps(net_b):
+                        self.report.add_check(
+                            check_name=f"oci_subnet_{name_a}_{name_b}_cidr_overlap",
+                            passed=False,
+                            message=(
+                                f"Subnets '{name_a}' ({net_a}) and '{name_b}' ({net_b}) "
+                                f"in VCN '{vcn_ref}' have overlapping cidr_block ranges"
+                            ),
+                            level=ValidationLevel.ERROR,
+                        )
 
     def _validate_api_references(self, resources: list[ResourceConfig]) -> None:
         """Validate resources against live OCI API state.
