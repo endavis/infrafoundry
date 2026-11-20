@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795215252716,
+  "lastUpdate": 1795216779871,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4830,6 +4830,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000670429905243283",
             "extra": "mean: 101.0434126224124 usec\nrounds: 10426"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "acf34373d34a7065924422f061da3d3e86b25980",
+          "message": "fix: render config_map volumes in kubernetes jobs (merges PR #1560, addresses #1559)\n\njobs.tf.j2 read `volume.config_map.items`, which Jinja resolves to the dict's\nitems() method rather than the `items` key, so any job with a config_map\nvolume failed to render (\"'builtin_function_or_method' object is not\niterable\"), with or without items. pvc.tf.j2 had the same bug with\n`expr.values` in selector.match_expressions. Use key syntax in both, as\ndeployments.tf.j2 does. Output for configs without these keys is unchanged.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T23:18:29Z",
+          "tree_id": "c1b042d9e879cad406530633707c6606b46fd346",
+          "url": "https://github.com/endavis/infrafoundry/commit/acf34373d34a7065924422f061da3d3e86b25980"
+        },
+        "date": 1795216778786,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 58.475445664785184,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004156533262295353",
+            "extra": "mean: 17.101195016666892 msec\nrounds: 60"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10665.65628995979,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000049423052215229195",
+            "extra": "mean: 93.75888110526857 usec\nrounds: 11220"
           }
         ]
       }
