@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795192566155,
+  "lastUpdate": 1795192822534,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4260,6 +4260,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005376814327170427",
             "extra": "mean: 63.14522025135698 usec\nrounds: 16631"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b9f32c565094279c78f2f08e96d1a946797cc45e",
+          "message": "fix: wait for k3s nodes to join the tailnet instead of probing ssh in preflight (merges PR #1529, addresses #1526)\n\nThe OCI post-terraform script ran a one-shot remote ssh probe in Phase 0.\nOn first create the nodes have not joined the tailnet yet, so the name does\nnot resolve and the handler always failed before the wait loop.\n\nPhase 0 now checks only the local ssh-agent. Phase 1 keeps waiting on\nresolution, refused and timeout errors, and fails fast on authentication\nand host-key errors. Also fixes the EXIT trap dropping the inventory file\ncleanup.\n\nAddresses #1526\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T16:39:06Z",
+          "tree_id": "634120fbe40c16e9c7b21cb2a018e55c09f271c2",
+          "url": "https://github.com/endavis/infrafoundry/commit/b9f32c565094279c78f2f08e96d1a946797cc45e"
+        },
+        "date": 1795192822038,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 78.06175899777458,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003320467416231016",
+            "extra": "mean: 12.810369800000387 msec\nrounds: 80"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14293.679396914538,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004483452320672409",
+            "extra": "mean: 69.96099270394032 usec\nrounds: 15899"
           }
         ]
       }
