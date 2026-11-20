@@ -1,5 +1,16 @@
 # Outputs for OCI resources
 
+{% if resources_by_type.get('compartment') %}
+output "compartment_ids" {
+  description = "OCIDs of created compartments"
+  value = {
+    {% for compartment in resources_by_type['compartment'] %}
+    "{{ compartment.name }}" = oci_identity_compartment.{{ compartment.name | to_terraform_name }}.id
+    {% endfor %}
+  }
+}
+{% endif %}
+
 {% if resources_by_type.get('vcn') %}
 output "vcn_ids" {
   description = "OCIDs of created VCNs"

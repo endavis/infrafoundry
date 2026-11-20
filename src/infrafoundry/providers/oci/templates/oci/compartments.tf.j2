@@ -1,0 +1,11 @@
+# OCI Compartments
+
+{% for compartment in compartments %}
+resource "oci_identity_compartment" "{{ compartment.name | to_terraform_name }}" {
+  compartment_id = {{ compartment.config.get('parent_id_expr', 'var.oci_tenancy_ocid') }}
+  name           = {{ compartment.name | tojson }}
+  description    = {{ compartment.config.description | tojson }}
+  enable_delete  = {{ compartment.config.get('enable_delete', false) | lower }}
+}
+
+{% endfor %}

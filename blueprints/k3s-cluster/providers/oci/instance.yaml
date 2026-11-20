@@ -17,6 +17,9 @@
 instance:
   # --- Control plane (public subnet) ---
   - name: "{{ control_name }}"
+{% if compartment %}
+    compartment: "{{ compartment }}"
+{% endif %}
     shape: "{{ instance_shape }}"
     shape_config:
       ocpus: {{ control_ocpus }}
@@ -46,6 +49,9 @@ instance:
   # --- Worker nodes (private subnet, one per item in workers:) ---
 {% for worker in workers %}
   - name: "{{ worker.name }}"
+{% if compartment %}
+    compartment: "{{ compartment }}"
+{% endif %}
     shape: "{{ instance_shape }}"
     shape_config:
       ocpus: {{ worker.ocpus }}

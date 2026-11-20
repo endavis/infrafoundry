@@ -15,6 +15,7 @@ The OCI (Oracle Cloud Infrastructure) provider manages networking and compute re
 
 | Type | Description |
 |------|-------------|
+| `compartment` | Compartment (`oci_identity_compartment`), optionally nested under another |
 | `vcn` | Virtual Cloud Network with optional internet gateway and security list |
 | `subnet` | Public or private subnet within a VCN |
 | `instance` | Compute instance with flex shapes and cloud-init support |
@@ -40,7 +41,7 @@ Collect these from the OCI Console:
 
 - **Tenancy OCID**: Identity > Compartments (root compartment)
 - **User OCID**: Identity > Users > your user
-- **Compartment OCID**: Identity > Compartments > target compartment
+- **Compartment OCID** (optional when every resource sets `compartment`): Identity > Compartments > target compartment
 - **Fingerprint**: Shown after uploading the API key
 
 ## Configuration
@@ -80,6 +81,32 @@ envs/prod/oci/
 
 ## Resource Reference
 
+### Compartment
+
+```yaml
+compartment:
+  - name: workload-comp
+    description: "Compartment for the workload"
+    parent: ocid1.compartment.oc1..aaaaaaaexample   # optional: OCID or compartment name
+    enable_delete: false                            # optional
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Compartment name |
+| `description` | Yes | Compartment description |
+| `parent` | No | A compartment resource name or an OCID (default: the tenancy, `oci_tenancy_ocid`) |
+| `enable_delete` | No | Let `terraform destroy` delete the compartment (default: `false`) |
+
+VCNs, subnets and instances take an optional `compartment` field: a compartment resource
+name or an OCID. Without it, a resource uses `compartment_ocid` from the provider settings.
+A subnet does not inherit its VCN's compartment, so set the field on each resource.
+
+!!! warning "Home region"
+    OCI creates compartments only in the tenancy home region. Set `region` in the provider
+    settings to the home region when the environment has `compartment` resources.
+    `foundry infra doctor` reports an error otherwise.
+
 ### VCN
 
 ```yaml
@@ -104,6 +131,7 @@ vcn:
 |-------|----------|-------------|
 | `name` | Yes | VCN display name (used as Terraform resource ID) |
 | `cidr_block` | Yes | VCN CIDR block |
+| `compartment` | No | Compartment name or OCID (default: `compartment_ocid`) |
 | `dns_label` | No | DNS label for the VCN (max 15 alphanumeric chars) |
 | `internet_gateway` | No | Create an internet gateway and public route table |
 | `security_list` | No | Security list with ingress/egress rules |
@@ -126,6 +154,7 @@ subnet:
 | `cidr_block` | Yes | Subnet CIDR block (must be within VCN CIDR) |
 | `dns_label` | No | DNS label for the subnet |
 | `public` | No | If `true`, allows public IP assignment (default: `false`) |
+| `compartment` | No | Compartment name or OCID (default: `compartment_ocid`) |
 
 ### Instance
 
@@ -160,6 +189,7 @@ instance:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | Yes | Instance display name |
+| `compartment` | No | Compartment name or OCID (default: `compartment_ocid`) |
 | `shape` | Yes | Compute shape (e.g., `VM.Standard.A1.Flex`, `VM.Standard.E4.Flex`) |
 | `shape_config` | No | Required for Flex shapes: `ocpus` and `memory_in_gbs` |
 | `subnet` | Yes | Name of the subnet to attach to |
@@ -205,6 +235,10 @@ The OCI provider validates:
 
 - **Connectivity**: API access using signed requests (requires `cryptography` package)
 - **References**: Subnet-to-VCN and instance-to-subnet cross-references
+- **Compartments**: each compartment has a description, a known parent and no parent cycle;
+  every `compartment` reference is an OCID or a defined compartment; a resource with no
+  `compartment` needs `compartment_ocid` in the provider settings; the region is the
+  tenancy home region when compartments are managed
 
 ```bash
 foundry infra doctor --env prod
@@ -234,6 +268,7 @@ After `foundry infra plan`, the generated directory contains:
 generated/prod/terraform/oci/
 ├── provider.tf          # OCI provider configuration
 ├── variables.tf         # Input variables (values passed via TF_VAR_* env vars)
+├── compartments.tf     # Compartments (only when compartment resources exist)
 ├── vcn.tf              # VCN, subnet, IGW, route table, security list
 ├── instances.tf        # Compute instances with metadata
 └── outputs.tf          # VCN IDs, subnet IDs, instance IPs
@@ -257,7 +292,10 @@ generated/prod/ansible/oci/
 Resources are created in dependency order:
 
 ```
-vcn → subnet → instance
+compartment → vcn → subnet → instance
 ```
+
+Terraform orders these by the references in the generated files: a resource that names a
+compartment is created after it. `infra analyze` does not yet show the compartment edge.
 
 Subnets depend on VCNs, and instances depend on subnets.

@@ -120,5 +120,9 @@ See the original blueprint READMEs for the full variable reference:
 - OCI variables are documented in the `providers.oci.defaults` section of
   `blueprint.yaml`
 
+The OCI variant takes an optional `compartment` input (a compartment resource name or an
+OCID; default empty). When set, the VCN, subnets and instances use it; when empty they use
+`compartment_ocid` from the provider settings.
+
 Shared defaults (`cluster_name`, `k3s_version`, `k3s_server_args`) are at the
 top level and apply to both providers.

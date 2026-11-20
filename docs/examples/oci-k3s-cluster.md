@@ -266,6 +266,17 @@ ansible_vars:
   k3s_agent_args: "--node-label zone=private"
 ```
 
+### Use a Compartment
+
+Set the `compartment` variable (an OCID or the name of a `compartment` resource) in the
+package's `infrafoundry.yml` to place the VCN, subnets and instances there. Left empty, they
+use `compartment_ocid` from the provider settings.
+
+```yaml
+variables:
+  compartment: "ocid1.compartment.oc1..aaaaaaaexample"
+```
+
 ### Disable OCI Firewall Fix
 
 If running on a non-OCI cloud or with different firewall configuration:

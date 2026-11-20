@@ -18,6 +18,7 @@ from infrafoundry.core.validation_helpers import (
 )
 from infrafoundry.providers.oci.api_client import OCIClient
 
+from .compartments import find_parent_cycles, is_ocid
 from .validators import CompartmentValidator, ImageValidator, NetworkValidator
 from .validators.context import OCIApiContext
 
@@ -119,15 +120,84 @@ class OCIValidator:
             resources: List of resources to validate
         """
         self._validate_local_references(resources)
+        self._validate_compartments(resources, None)
         self._validate_api_references(resources)
 
-    def validate_offline(self, resources: list[ResourceConfig]) -> None:
+    def validate_offline(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
         """Run the local cross-reference checks, which need no OCI API (#1433).
 
         Args:
             resources: List of resources to validate
+            reference_resources: Every OCI resource in the environment, used to resolve
+                compartment names when ``resources`` is a filtered subset
         """
         self._validate_local_references(resources)
+        self._validate_compartments(resources, reference_resources)
+
+    def _validate_compartments(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None,
+    ) -> None:
+        """Validate compartment resources and the ``compartment`` references to them.
+
+        Checks that each compartment has a description, a known parent and no parent
+        cycle, that each ``compartment`` reference is an OCID or a defined compartment,
+        and that a resource without one has a ``compartment_ocid`` to fall back on.
+        """
+        pool = [*(reference_resources or []), *resources]
+        names = {r.name for r in pool if r.type == "compartment"}
+        fallback = self.provider_settings.get("compartment_ocid", "")
+
+        def fail(check: str, message: str) -> None:
+            self.report.add_check(
+                check_name=check, passed=False, message=message, level=ValidationLevel.ERROR
+            )
+
+        compartments = [r for r in resources if r.type == "compartment"]
+        for comp in compartments:
+            if not comp.config.get("description"):
+                fail(
+                    f"oci_compartment_{comp.name}_description",
+                    f"Compartment '{comp.name}' requires a description",
+                )
+            parent = comp.config.get("parent")
+            if parent and not is_ocid(str(parent)) and parent not in names:
+                fail(
+                    f"oci_compartment_{comp.name}_parent",
+                    f"Compartment '{comp.name}' has parent '{parent}' which is neither "
+                    f"an OCID nor a defined compartment",
+                )
+        cyclic = find_parent_cycles(r for r in pool if r.type == "compartment")
+        for comp in compartments:
+            if comp.name in cyclic:
+                fail(
+                    f"oci_compartment_{comp.name}_cycle",
+                    f"Compartment '{comp.name}' is part of a parent cycle",
+                )
+
+        for resource in resources:
+            if resource.type not in ("vcn", "subnet", "instance"):
+                continue
+            ref = resource.config.get("compartment")
+            check = f"oci_compartment_ref_{resource.type}_{resource.name}"
+            if ref:
+                if not is_ocid(str(ref)) and ref not in names:
+                    fail(
+                        check,
+                        f"{resource.type.capitalize()} '{resource.name}' references "
+                        f"compartment '{ref}' which is neither an OCID nor a defined compartment",
+                    )
+            elif not fallback:
+                fail(
+                    check,
+                    f"{resource.type.capitalize()} '{resource.name}' sets no compartment "
+                    f"and the provider settings have no compartment_ocid",
+                )
 
     def _validate_local_references(self, resources: list[ResourceConfig]) -> None:
         """Validate cross-references between resources in the configuration.
@@ -227,16 +297,33 @@ class OCIValidator:
         compartment_ocid = self.provider_settings.get("compartment_ocid", "")
         tenancy_ocid = self.provider_settings.get("tenancy_ocid", "")
 
-        if not compartment_ocid or not self.provider_settings.get("region", ""):
+        region = self.provider_settings.get("region", "")
+        has_compartments = any(r.type == "compartment" for r in resources)
+
+        if not region or not (compartment_ocid or has_compartments):
             return
 
         client = self._create_client()
         if not client:
             return
 
-        context = OCIApiContext(resources=resources, compartment_ocid=compartment_ocid)
+        context = OCIApiContext(
+            resources=resources, compartment_ocid=compartment_ocid, region=region
+        )
 
         try:
+            if has_compartments and tenancy_ocid:
+                subscriptions = self._safe_list(
+                    client,
+                    client.identity_url(),
+                    f"/20160918/tenancies/{tenancy_ocid}/regionSubscriptions",
+                )
+                context = replace(context, region_subscriptions=subscriptions)
+                self.compartment_validator.check_home_region(context)
+
+            if not compartment_ocid:
+                return
+
             # Fetch compartments (uses tenancy_ocid as parent)
             compartments = None
             if tenancy_ocid:
