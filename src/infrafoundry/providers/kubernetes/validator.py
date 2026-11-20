@@ -9,10 +9,15 @@ from typing import Any, cast
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.types import KubernetesProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
 from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.core.validation_helpers.terraform_secrets_validator import (
+    validate_terraform_secrets_references,
+)
 from infrafoundry.providers.kubernetes.names import kubernetes_object_name
+from infrafoundry.providers.kubernetes.secret_refs import shape_errors, with_terraform_secrets
 from infrafoundry.providers.kubernetes.validators import (
     CRDValidator,
     HelmValidator,
@@ -93,8 +98,9 @@ class KubernetesValidator:
     ) -> None:
         """Run the checks that need no kubeconfig, network or subprocess.
 
-        Covers local cross-references, secret ``data`` encoding, Helm releases and the
-        ``kubernetes_references`` summary.
+        Covers local cross-references, secret ``data`` encoding, ``terraform_secrets``
+        references (unresolved refs, base64 of ``data_secrets`` values), Helm releases and
+        the ``kubernetes_references`` summary.
 
         Args:
             resources: Resources to validate.
@@ -102,6 +108,7 @@ class KubernetesValidator:
                 ``resources``.
         """
         self._validate_local_references(resources, reference_resources)
+        self._validate_secret_refs(resources)
 
         helm_releases = [r for r in resources if r.type == "helm_releases"]
         self.helm_validator.validate(KubernetesHelmContext(helm_releases=helm_releases))
@@ -235,6 +242,62 @@ class KubernetesValidator:
                             f"Secret '{resource.name}' key '{key}' in 'data' is not valid "
                             f"base64; 'data' takes base64-encoded values, use 'string_data' "
                             f"for plain values"
+                        ),
+                        level=ValidationLevel.ERROR,
+                    )
+
+    def _validate_secret_refs(self, resources: list[ResourceConfig]) -> None:
+        """Check ``*_secrets`` maps, ``value_secret`` and ``terraform_secrets`` references.
+
+        Reports malformed fields, refs missing from the env's secrets, and ``data_secrets``
+        values that are not base64. Messages name keys and refs, never secret values.
+
+        Args:
+            resources: List of resources to validate
+        """
+        well_formed: list[ResourceConfig] = []
+        for resource in resources:
+            errors = shape_errors(resource)
+            for message in errors:
+                self.report.add_check(
+                    check_name=f"kubernetes_secret_refs_{resource.name}",
+                    passed=False,
+                    message=message,
+                    level=ValidationLevel.ERROR,
+                )
+            if errors:
+                continue
+            try:
+                well_formed.append(with_terraform_secrets(resource))
+            except TypeError as exc:
+                self.report.add_check(
+                    check_name=f"kubernetes_secret_refs_{resource.name}",
+                    passed=False,
+                    message=str(exc),
+                    level=ValidationLevel.ERROR,
+                )
+        validate_terraform_secrets_references(
+            "kubernetes", well_formed, self.env_config, self.report
+        )
+
+        flat = SecretManager.flatten_dict(getattr(self.env_config, "secrets", None))
+        for resource in resources:
+            if resource.type != "secrets" or shape_errors(resource):
+                continue
+            data_secrets = (resource.config or {}).get("data_secrets") or {}
+            for key, ref in data_secrets.items():
+                if ref not in flat:
+                    continue
+                try:
+                    base64.b64decode(flat[ref], validate=True)
+                except (binascii.Error, ValueError):
+                    self.report.add_check(
+                        check_name=f"kubernetes_secret_{resource.name}_data_secrets_{key}_base64",
+                        passed=False,
+                        message=(
+                            f"Secret '{resource.name}' key '{key}' in 'data_secrets' "
+                            f"(ref '{ref}') is not valid base64; 'data_secrets' values must "
+                            f"be base64-encoded, use 'string_data_secrets' for plain values"
                         ),
                         level=ValidationLevel.ERROR,
                     )

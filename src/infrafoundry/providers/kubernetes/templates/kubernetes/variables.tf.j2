@@ -3,3 +3,16 @@ variable "kubeconfig_path" {
   type        = string
   default     = "~/.kube/config"
 }
+
+{# Dynamic sensitive variables from ``terraform_secrets`` references (including those
+   folded in from ``*_secrets`` maps and ``value_secret``). Values are injected at apply
+   time via TF_VAR_* env vars; defaults stay empty so plan does not fail when unset. #}
+{% for var in terraform_secret_vars | default([]) %}
+variable "{{ var.name }}" {
+  description = "Injected from secret reference '{{ var.source }}' via TF_VAR_{{ var.name }}."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+{% endfor %}

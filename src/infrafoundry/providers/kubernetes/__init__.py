@@ -12,9 +12,11 @@ from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
+    sanitize_secret_ref_to_tf_var,
 )
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.kubernetes.names import CONFIG_NAME_TYPES, kubernetes_object_name
+from infrafoundry.providers.kubernetes.secret_refs import with_terraform_secrets
 from infrafoundry.providers.kubernetes.validator import KubernetesValidator
 
 
@@ -38,6 +40,10 @@ class KubernetesProvider(
         self._setup_template_environment()
         # Add custom filter for YAML serialization
         self.jinja_env.filters["toyaml"] = lambda x: yaml.dump(x, default_flow_style=False).rstrip()
+        # Variable name for a ``terraform_secrets`` ref (``app.token`` -> ``app_token``)
+        self.jinja_env.filters["secret_tf_var"] = sanitize_secret_ref_to_tf_var
+        # Resources of the last ``generate_terraform`` call, for ``TF_VAR_*`` secret injection
+        self._last_terraform_resources: list[ResourceConfig] = []
 
     @override
     def validate_config(self, config: dict[str, Any]) -> bool:
@@ -96,6 +102,7 @@ class KubernetesProvider(
         result = self.build_terraform_env_vars(
             provider_name="kubernetes",
             mapping=self._KUBERNETES_TFVARS_MAPPING,
+            resources=self._last_terraform_resources,
         )
         for env_key, tf_var_name in self._CREDENTIAL_ENV_MAPPING.items():
             value = os.environ.get(env_key)
@@ -160,6 +167,19 @@ class KubernetesProvider(
         """Generate Terraform configuration for Kubernetes resources."""
         resources_by_type = self.prepare_terraform_generation(resources)
 
+        # Fold value-secret refs into ``terraform_secrets`` so the variables are declared
+        # and injected by the shared secrets bridge.
+        resources_by_type = {
+            rtype: [with_terraform_secrets(r) for r in group]
+            for rtype, group in resources_by_type.items()
+        }
+        processed = [r for group in resources_by_type.values() for r in group]
+        self._last_terraform_resources = processed
+        secret_vars = [
+            {"name": sanitize_secret_ref_to_tf_var(ref), "source": ref}
+            for ref in self.collect_terraform_secret_refs(processed)
+        ]
+
         # Build dependency refs once for all templates
         dep_refs = self._build_dependency_refs(resources_by_type)
 
@@ -175,7 +195,7 @@ class KubernetesProvider(
         # Generate variables configuration
         self.render_and_write_terraform(
             "kubernetes/variables.tf.j2",
-            context={},
+            context={"terraform_secret_vars": secret_vars},
             output_name="variables.tf",
         )
 

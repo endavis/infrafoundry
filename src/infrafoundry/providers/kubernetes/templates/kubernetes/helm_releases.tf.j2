@@ -93,7 +93,11 @@ EOT
   {% for s in release.config.set_sensitive %}
   set_sensitive {
     name  = "{{ s.name }}"
+    {% if s.value_secret is defined %}
+    value = var.{{ s.value_secret | secret_tf_var }}
+    {% else %}
     value = "{{ s.value }}"
+    {% endif %}
   }
   {% endfor %}
   {% endif %}

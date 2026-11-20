@@ -105,7 +105,7 @@ Checks that need the network stay in `infra doctor`. Rollback and destroy do not
 | `host` | Host schema, `terraform_secrets` references | SSH reachability (a host created earlier in the same apply cannot be reached at plan time) |
 | `aws`, `esxi`, `tailscale` | All reference checks (none use the network) | Connectivity |
 
-| `kubernetes` | Local cross-references (configmaps, secrets, namespaces, service accounts, service selectors), secret `data` base64, Helm `chart` and `repository` | Kubeconfig and API connectivity; namespaces and CRD groups in the cluster |
+| `kubernetes` | Local cross-references (configmaps, secrets, namespaces, service accounts, service selectors), secret `data` base64, `terraform_secrets` references, Helm `chart` and `repository` | Kubeconfig and API connectivity; namespaces and CRD groups in the cluster |
 
 A kubeconfig that does not exist yet (a cluster created in the same apply) gives a warning and skips the cluster checks.
 

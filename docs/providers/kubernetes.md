@@ -82,9 +82,23 @@ resources:
 
 ### Secrets
 
-`namespace` (default `default`), `labels`, `annotations`, `type` (default `Opaque`), `data`, `string_data`.
+`namespace` (default `default`), `labels`, `annotations`, `type` (default `Opaque`), `data`, `string_data`, `data_secrets`, `string_data_secrets`.
 
 `data` values are base64-encoded, as in a Kubernetes Secret manifest, and are rendered to the Terraform provider's `binary_data` argument. A `data` value that is not valid base64 fails validation. `string_data` values are plain strings, rendered to the provider's `data` argument, which encodes them. You may set both; `string_data` wins on a duplicate key.
+
+To take a value from the environment's SOPS `secrets.yaml` instead of writing it in the config, use the `_secrets` maps. Each maps a key to a dotted secret reference:
+
+```yaml
+config:
+  string_data:
+    username: admin
+  string_data_secrets:        # rendered into `data`, as plain values
+    password: app.admin_token
+  data_secrets:               # rendered into `binary_data`; the secret must already be base64
+    tls.key: app.tls_key_b64
+```
+
+The values reach Terraform as sensitive variables set through `TF_VAR_*` at apply, so they never appear in the generated `.tf` files. A resolved value still lands in the Terraform state, as with any Terraform-managed secret. `data_secrets` values must be base64, like `data`. A key in `string_data` or `string_data_secrets` is left out of `binary_data`. The same key in `string_data` and `string_data_secrets`, or in `data` and `data_secrets`, fails validation.
 
 !!! note "Existing `string_data` secrets"
     Earlier versions wrapped `string_data` values in `base64encode()`, so the stored value was base64 text. The next apply updates such a secret in place to the plain string you wrote. A consumer that decoded the value twice to work around this must be updated.
@@ -274,7 +288,7 @@ resources:
 
 The keys `config` reads:
 
-`chart`, `repository`, `version`, `namespace` (default `default`), `create_namespace`, `timeout`, `max_history`, `values` (a mapping rendered as YAML), `set` (a list of `name`, `value`, `type`) and `set_sensitive` (a list of `name`, `value`).
+`chart`, `repository`, `version`, `namespace` (default `default`), `create_namespace`, `timeout`, `max_history`, `values` (a mapping rendered as YAML), `set` (a list of `name`, `value`, `type`) and `set_sensitive` (a list of `name` and either `value` or `value_secret`, a dotted reference into the environment's SOPS secrets, injected through `TF_VAR_*` like the secret `_secrets` maps).
 
 The booleans are `atomic`, `cleanup_on_fail`, `dependency_update`, `force_update`, `lint`, `recreate_pods`, `replace`, `reset_values`, `reuse_values`, `skip_crds`, `wait` and `wait_for_jobs`.
 
@@ -282,7 +296,7 @@ The booleans are `atomic`, `cleanup_on_fail`, `dependency_update`, `force_update
 
 ### Validation
 
-`infra plan` and `infra apply` run the offline checks (cross-references, secret `data` encoding, Helm releases). `infra doctor` adds the cluster checks. It finds the kubeconfig in the same order as Terraform: `KUBECONFIG`, then `kubeconfig_path`, then `~/.kube/config`. The cluster checks authenticate with a bearer `token`, a `tokenFile` or a client certificate (`client-certificate-data` / `client-key-data`, or the file path forms). A missing kubeconfig gives a warning, not an error, because the cluster may be created in the same apply.
+`infra plan` and `infra apply` run the offline checks (cross-references, secret `data` encoding, `terraform_secrets` references including unresolved refs and base64 of `data_secrets` values, Helm releases). `infra doctor` adds the cluster checks. It finds the kubeconfig in the same order as Terraform: `KUBECONFIG`, then `kubeconfig_path`, then `~/.kube/config`. The cluster checks authenticate with a bearer `token`, a `tokenFile` or a client certificate (`client-certificate-data` / `client-key-data`, or the file path forms). A missing kubeconfig gives a warning, not an error, because the cluster may be created in the same apply.
 
 ## Dependencies
 
