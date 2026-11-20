@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795189968239,
+  "lastUpdate": 1795191890313,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4184,6 +4184,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007751989037610217",
             "extra": "mean: 73.53124784578138 usec\nrounds: 15667"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2375193bed29a40280e4c06f49424341812e5ee1",
+          "message": "fix: remove the k3s-cluster tailscale-cleanup destroy handler (merges PR #1527, addresses #1525)\n\nThe OCI k3s-cluster blueprint's before_destroy tailscale-cleanup handler\nrequired TAILSCALE_API_KEY, which nothing sets (nodes enrol through an\nOAuth client), and filtered devices by a k3s- hostname prefix that the\nblueprint's own node names do not match.\n\nThe framework's destroy path already removes the tailnet devices of\ninstances with a tailscale: OAuth block, matching on hostname and tag. A\ndestroy of an OCI k3s package printed \"Removed tailnet device\" for each\nnode, while the handler failed on the missing key. Remove the handler and\nits script, and update the blueprint README, the OCI k3s example and the\nscript portability doc.\n\nAddresses #1525\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T16:23:28Z",
+          "tree_id": "7f67a38bb33c16130211e0484f815c31e076947c",
+          "url": "https://github.com/endavis/infrafoundry/commit/2375193bed29a40280e4c06f49424341812e5ee1"
+        },
+        "date": 1795191889768,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 46.77019771083846,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00040293902102713137",
+            "extra": "mean: 21.381136897958022 msec\nrounds: 49"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7819.365582067876,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008517842385172496",
+            "extra": "mean: 127.88761306841779 usec\nrounds: 8402"
           }
         ]
       }
