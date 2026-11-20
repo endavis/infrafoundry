@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795181268952,
+  "lastUpdate": 1795187512249,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4108,6 +4108,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004603727272994399",
             "extra": "mean: 77.99909925661262 usec\nrounds: 13722"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9133dd9f6c691b34c5e5f86f31df2a6a0e94aca5",
+          "message": "feat: add an oci compartment resource type (merges PR #1519, addresses #1518)\n\nAdd a `compartment` resource type to the OCI provider, rendered as\noci_identity_compartment, with an optional parent (resource name or\nOCID, default the tenancy root) and enable_delete (default false).\nvcn, subnet and instance take an optional `compartment` (name or OCID)\nand otherwise fall back to provider_settings.oci.compartment_ocid, so\nexisting configs render unchanged. compartment_ocid is now optional when\nevery resource names a compartment.\n\nThe validator reports unknown references, missing descriptions, parent\ncycles and resources with no compartment at all; infra doctor checks\nthat the configured region is the tenancy's home region. The k3s-cluster\nblueprint gains a `compartment` input.\n\nAddresses #1518\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T15:10:55Z",
+          "tree_id": "11ac7e7afb7cfe2a74029580693597cf0aa822d8",
+          "url": "https://github.com/endavis/infrafoundry/commit/9133dd9f6c691b34c5e5f86f31df2a6a0e94aca5"
+        },
+        "date": 1795187511267,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 48.992677833927225,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005344982744311898",
+            "extra": "mean: 20.411213352937082 msec\nrounds: 51"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7874.683982803366,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00001216805097868782",
+            "extra": "mean: 126.98922295596715 usec\nrounds: 8477"
           }
         ]
       }
