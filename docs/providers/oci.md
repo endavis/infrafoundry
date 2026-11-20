@@ -235,6 +235,9 @@ The OCI provider validates:
 
 - **Connectivity**: API access using signed requests (requires `cryptography` package)
 - **References**: Subnet-to-VCN and instance-to-subnet cross-references
+- **Subnet CIDRs**: each subnet `cidr_block` lies inside the `cidr_block` of the VCN it
+  references, and no two subnets of one VCN overlap (offline ERROR; a missing or unparsable CIDR
+  is skipped)
 - **Compartments**: each compartment has a description, a known parent and no parent cycle;
   every `compartment` reference is an OCID or a defined compartment; a resource with no
   `compartment` needs `compartment_ocid` in the provider settings; the region is the

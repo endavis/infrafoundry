@@ -45,6 +45,6 @@ subnet:
 
   - name: private-subnet
     vcn: dev-vcn
-    cidr_block: "198.51.100.0/24"
+    cidr_block: "192.0.2.128/25"
     dns_label: "private"
     public: false

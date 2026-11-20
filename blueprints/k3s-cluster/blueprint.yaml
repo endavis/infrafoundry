@@ -156,7 +156,7 @@ providers:
       - name: worker_subnet_name
         default: k3s-worker-subnet
       - name: worker_subnet_cidr
-        default: "198.51.100.0/24"
+        default: "192.0.2.128/25"
       - name: worker_subnet_dns_label
         default: work
 

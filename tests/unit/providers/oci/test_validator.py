@@ -8,7 +8,7 @@ import pytest
 
 from infrafoundry.core.exceptions import APIError, ConfigurationError
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.oci.validator import OCIValidator
 from infrafoundry.providers.oci.validators import (
     CompartmentValidator,
@@ -215,7 +215,7 @@ class TestValidateReferences:
                 name="subnet-1",
                 type="subnet",
                 provider="oci",
-                config={"vcn": "vcn-1", "cidr_block": "198.51.100.0/24"},
+                config={"vcn": "vcn-1", "cidr_block": "192.0.2.0/25"},
             ),
             ResourceConfig(
                 name="subnet-2",
@@ -467,3 +467,102 @@ class TestCreateClient:
             result = validator._create_client()
 
         assert result is mock_client
+
+
+def _vcn_res(name: str, cidr: Any) -> ResourceConfig:
+    return ResourceConfig(name=name, type="vcn", provider="oci", config={"cidr_block": cidr})
+
+
+def _subnet_res(name: str, vcn: str, cidr: Any) -> ResourceConfig:
+    return ResourceConfig(
+        name=name, type="subnet", provider="oci", config={"vcn": vcn, "cidr_block": cidr}
+    )
+
+
+def _cidr_failures(report: MagicMock) -> list[dict[str, Any]]:
+    return [
+        c[1]
+        for c in report.add_check.call_args_list
+        if c[1]["passed"] is False and "_cidr_" in c[1]["check_name"]
+    ]
+
+
+class TestSubnetCidrs:
+    """Offline subnet CIDR checks: inside the VCN, no overlap (#1521)."""
+
+    def test_valid_subnets_report_nothing(self, validator: OCIValidator, report: MagicMock) -> None:
+        """Subnets inside the VCN and disjoint add no CIDR failure."""
+        validator.validate_offline(
+            [
+                _vcn_res("v", "192.0.2.0/24"),
+                _subnet_res("a", "v", "192.0.2.0/25"),
+                _subnet_res("b", "v", "192.0.2.128/25"),
+            ]
+        )
+        assert _cidr_failures(report) == []
+
+    def test_subnet_outside_vcn_is_error(self, validator: OCIValidator, report: MagicMock) -> None:
+        """A subnet outside its VCN CIDR is an ERROR naming both CIDRs."""
+        validator.validate_offline(
+            [_vcn_res("v", "10.0.0.0/16"), _subnet_res("w", "v", "198.51.100.0/24")]
+        )
+        failures = _cidr_failures(report)
+        assert len(failures) == 1
+        assert failures[0]["check_name"] == "oci_subnet_w_cidr_outside_vcn"
+        assert failures[0]["level"] == ValidationLevel.ERROR
+        assert "198.51.100.0/24" in failures[0]["message"]
+        assert "10.0.0.0/16" in failures[0]["message"]
+
+    def test_overlapping_subnets_are_error(
+        self, validator: OCIValidator, report: MagicMock
+    ) -> None:
+        """Two overlapping subnets of one VCN are an ERROR."""
+        validator.validate_offline(
+            [
+                _vcn_res("v", "192.0.2.0/24"),
+                _subnet_res("a", "v", "192.0.2.0/25"),
+                _subnet_res("b", "v", "192.0.2.64/26"),
+            ]
+        )
+        failures = _cidr_failures(report)
+        assert len(failures) == 1
+        assert failures[0]["check_name"] == "oci_subnet_a_b_cidr_overlap"
+        assert failures[0]["level"] == ValidationLevel.ERROR
+
+    def test_same_cidr_in_different_vcns_is_not_overlap(
+        self, validator: OCIValidator, report: MagicMock
+    ) -> None:
+        """Overlap is only checked within one VCN."""
+        validator.validate_offline(
+            [
+                _vcn_res("v1", "192.0.2.0/24"),
+                _vcn_res("v2", "192.0.2.0/24"),
+                _subnet_res("a", "v1", "192.0.2.0/25"),
+                _subnet_res("b", "v2", "192.0.2.0/25"),
+            ]
+        )
+        assert _cidr_failures(report) == []
+
+    @pytest.mark.parametrize(
+        ("vcn_cidr", "subnet_cidr", "vcn_ref"),
+        [
+            ("192.0.2.0/24", "not-a-cidr", "v"),
+            ("not-a-cidr", "192.0.2.0/25", "v"),
+            ("192.0.2.0/24", "192.0.2.0/25", "missing-vcn"),
+            ("192.0.2.0/24", None, "v"),
+            (None, "192.0.2.0/25", "v"),
+        ],
+    )
+    def test_unresolvable_or_unparsable_is_skipped(
+        self,
+        validator: OCIValidator,
+        report: MagicMock,
+        vcn_cidr: Any,
+        subnet_cidr: Any,
+        vcn_ref: str,
+    ) -> None:
+        """Missing VCN, missing or unparsable CIDRs add no CIDR failure."""
+        validator.validate_offline(
+            [_vcn_res("v", vcn_cidr), _subnet_res("s", vcn_ref, subnet_cidr)]
+        )
+        assert _cidr_failures(report) == []
