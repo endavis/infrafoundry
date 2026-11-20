@@ -23,8 +23,8 @@ Plugin exemption (#790): the ``acmeclient/*`` controllers belong to the contrib 
 absent from the specs and that no endpoint that contacts a CA or a remote host
 (register, sign, revoke, removekey, automation, import, signallcerts, toggle) is ever
 registered. The same holds for ``tailscale/*`` (#787, ``os-tailscale``): only settings,
-authentication, the subnet CRUD and ``service/reconfigure`` are registered, never an
-endpoint that starts the service or joins a tailnet.
+authentication, the read-only status, the subnet CRUD and ``service/reconfigure`` are
+registered, never an endpoint that starts the service or joins a tailnet.
 
 Strict mode of ``opnsense-openapi`` (``validate_endpoints=True``) stays off. It
 needs a known box version, but the wrapper builds the client with
@@ -493,8 +493,9 @@ ACMECLIENT_ACTION_TEMPLATE = Endpoint("GET", "acmeclient/actions/get", EndpointK
 # settings/getSubnet (the item template). addSubnet, setSubnet, delSubnet and
 # tailscale/service/reconfigure were verified live on a test firewall (PR #1347, #787);
 # docs/development/opnsense-resource-coverage.md ("Verified and not verified" under
-# Tailscale) is the source of truth. Never registered on purpose: status, up, login and
-# any start/stop action; the provider does not start the service or join a tailnet.
+# Tailscale) is the source of truth. status/status is a read-only GET (#1510). Never
+# registered on purpose: up, login and any start/stop action; the provider does not start
+# the service or join a tailnet by itself.
 TAILSCALE_SETTINGS_GET = Endpoint("GET", "tailscale/settings/get", EndpointKind.PLUGIN)
 TAILSCALE_SETTINGS_SET = Endpoint("POST", "tailscale/settings/set", EndpointKind.PLUGIN)
 TAILSCALE_AUTH_GET = Endpoint("GET", "tailscale/authentication/get", EndpointKind.PLUGIN)
@@ -509,6 +510,7 @@ TAILSCALE_SUBNET = _crud(
     kind=EndpointKind.PLUGIN,
 )
 TAILSCALE_RECONFIGURE = Endpoint("POST", "tailscale/service/reconfigure", EndpointKind.PLUGIN)
+TAILSCALE_STATUS = Endpoint("GET", "tailscale/status/status", EndpointKind.PLUGIN)
 
 # --- monit (#791, core) -----------------------------------------------------------------
 # Monit ships with core OPNsense, so every endpoint is STOCK and the conformance test
@@ -722,6 +724,8 @@ RESOURCE_TYPE_ENDPOINTS: dict[str, tuple[Endpoint, ...]] = {
     "tailscale.auth": (
         TAILSCALE_AUTH_GET,
         TAILSCALE_AUTH_SET,
+        TAILSCALE_STATUS,
+        TAILSCALE_SETTINGS_GET,
         TAILSCALE_RECONFIGURE,
     ),
     "tailscale.subnets": (

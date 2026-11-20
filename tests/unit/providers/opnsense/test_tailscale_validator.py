@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validators import TailscaleValidator
@@ -96,3 +98,85 @@ def test_duplicate_normalized_cidrs() -> None:
         len(_errors(_subnet("a", subnet="2001:DB8::/64"), _subnet("b", subnet="2001:db8::/64")))
         == 1
     )
+
+
+CID = "secret://env_secrets/opnsense/tailscale/auth/oauth_client_id"
+CSEC = "secret://env_secrets/opnsense/tailscale/auth/oauth_client_secret"
+FAKE_SECRET = "tskey-client-FAKE-0003"
+
+
+def _mint(**overrides: Any) -> dict[str, Any]:
+    block: dict[str, Any] = {
+        "oauth_client_id": CID,
+        "oauth_client_secret": CSEC,
+        "tags": ["tag:example"],
+    }
+    block.update(overrides)
+    return block
+
+
+def _warnings(*resources: ResourceConfig) -> list[str]:
+    report = ValidationReport()
+    TailscaleValidator(report).validate(OPNsenseValidationContext(resources=list(resources)))
+    return [r.message for r in report.results if r.level == ValidationLevel.WARNING]
+
+
+def test_mint_valid_has_no_errors_or_warnings() -> None:
+    resource = _auth(
+        login_server="https://controlplane.tailscale.com",
+        mint=_mint(ephemeral=True, preauthorized=False, expiry_seconds=600),
+    )
+    assert _errors(resource) == []
+    assert _warnings(resource) == []
+
+
+def test_mint_excludes_pre_auth_key_and_update_flag() -> None:
+    assert len(_errors(_auth(mint=_mint(), pre_auth_key=URI))) == 1
+    assert len(_errors(_auth(mint=_mint(), update_pre_auth_key=True))) == 1
+
+
+def test_mint_literal_credentials_are_errors_without_the_value() -> None:
+    errors = _errors(
+        _auth(mint=_mint(oauth_client_secret=FAKE_SECRET, oauth_client_id="literal-id"))
+    )
+    assert len(errors) == 2
+    assert not any(FAKE_SECRET in e or "literal-id" in e for e in errors)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"tags": []},
+        {"tags": "tag:example"},
+        {"tags": ["example"]},
+        {"tags": [3]},
+        {"ephemeral": "yes"},
+        {"preauthorized": 1},
+        {"expiry_seconds": 0},
+        {"expiry_seconds": 7776001},
+        {"expiry_seconds": "60"},
+        {"expiry_seconds": True},
+        {"bogus": 1},
+        {"oauth_client_id": ""},
+    ],
+)
+def test_mint_field_rules(overrides: dict[str, Any]) -> None:
+    assert len(_errors(_auth(mint=_mint(**overrides)))) == 1
+
+
+def test_mint_missing_tags_and_non_mapping() -> None:
+    block = _mint()
+    del block["tags"]
+    assert len(_errors(_auth(mint=block))) == 1
+    assert len(_errors(_auth(mint="nope"))) == 1
+
+
+def test_mint_expiry_bounds_accepted() -> None:
+    assert _errors(_auth(mint=_mint(expiry_seconds=1))) == []
+    assert _errors(_auth(mint=_mint(expiry_seconds=7776000))) == []
+
+
+def test_mint_with_foreign_login_server_warns() -> None:
+    resource = _auth(login_server="https://hs.example.com", mint=_mint())
+    assert _errors(resource) == []
+    assert len(_warnings(resource)) == 1

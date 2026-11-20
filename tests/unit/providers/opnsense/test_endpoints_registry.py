@@ -274,6 +274,7 @@ def test_tailscale_registers_exactly_the_expected_endpoints() -> None:
         ("POST", "tailscale/settings/setSubnet/{uuid}"),
         ("POST", "tailscale/settings/delSubnet/{uuid}"),
         ("POST", "tailscale/service/reconfigure"),
+        ("GET", "tailscale/status/status"),
     }
     assert all(
         e.kind is EndpointKind.PLUGIN
@@ -292,6 +293,8 @@ def test_tailscale_types_register_their_endpoints() -> None:
     assert types["tailscale.auth"] == (
         endpoints.TAILSCALE_AUTH_GET,
         endpoints.TAILSCALE_AUTH_SET,
+        endpoints.TAILSCALE_STATUS,
+        endpoints.TAILSCALE_SETTINGS_GET,
         endpoints.TAILSCALE_RECONFIGURE,
     )
     assert endpoints.TAILSCALE_RECONFIGURE in types["tailscale.subnets"]

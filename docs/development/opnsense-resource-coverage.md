@@ -448,7 +448,7 @@ opnsense:
 
 ## Tailscale (#787)
 
-The `os-tailscale` plugin is managed through three direct-API types: `tailscale.settings` and `tailscale.auth` (singleton dicts) and `tailscale.subnets` (a list). The plugin is installed by `system.firmware`, so the three types run after it, in the order settings, auth, subnets. The endpoints are plugin-kind: the bundled specs cover core only, so the version check skips them (see [Endpoint registry and version check](#endpoint-registry-and-version-check-1239)). The provider never starts the service and never joins a tailnet: only the settings, authentication and subnet endpoints and `service/reconfigure` are registered.
+The `os-tailscale` plugin is managed through three direct-API types: `tailscale.settings` and `tailscale.auth` (singleton dicts) and `tailscale.subnets` (a list). The plugin is installed by `system.firmware`, so the three types run after it, in the order settings, auth, subnets. The endpoints are plugin-kind: the bundled specs cover core only, so the version check skips them (see [Endpoint registry and version check](#endpoint-registry-and-version-check-1239)). The provider never starts the service and never joins a tailnet by itself: only the settings, authentication and subnet endpoints, the read-only `status/status` and `service/reconfigure` are registered.
 
 Route approval and ACLs are on the control-plane side and are handled by the separate `tailscale` provider; see [Tailscale provider](../providers/tailscale.md).
 
@@ -503,6 +503,7 @@ Every key is optional; only declared keys are compared and written. Keys are sna
 | `login_server` | An `http(s)://` URL (`loginServer`). |
 | `pre_auth_key` | A `secret://` URI (`preAuthKey`). A literal is a validation ERROR. |
 | `update_pre_auth_key` | Bool. Forces the key to be written; see below. |
+| `mint` | Mapping. Mints the key from an OAuth client at apply time; see [Minting the key](#minting-the-key-1510). Excludes `pre_auth_key` and `update_pre_auth_key`. |
 
 **Key policy.** The key is resolved through the environment secrets and is never logged, put in an exception, shown in a plan or echoed back from the box.
 
@@ -511,6 +512,46 @@ Every key is optional; only declared keys are compared and written. Keys are sna
 - With `update_pre_auth_key: true` the key is always sent and counts as a change, like `update_password` on `system.users`. Remove the flag after the apply.
 - The write body echoes the live `loginServer` overwritten by the declared one, but never the live `preAuthKey`: echoing an empty or masked value would clear the stored key. A change to `login_server` alone therefore leaves the key untouched.
 - The plan shows the key as `[REDACTED]`.
+
+#### Minting the key (#1510)
+
+A pre-auth key lives at most 90 days, so a key kept in secrets is usually dead when a firewall is rebuilt. `mint` creates a fresh one at apply time from an OAuth client, which does not expire:
+
+```yaml
+opnsense:
+  tailscale:
+    auth:
+      login_server: https://controlplane.tailscale.com
+      mint:
+        oauth_client_id: secret://env_secrets/opnsense/tailscale/auth/oauth_client_id
+        oauth_client_secret: secret://env_secrets/opnsense/tailscale/auth/oauth_client_secret
+        tags: [tag:example]
+        expiry_seconds: 3600
+```
+
+| `mint` field | Meaning |
+| --- | --- |
+| `oauth_client_id`, `oauth_client_secret` | `secret://` URIs, required. A literal is a validation ERROR. |
+| `tags` | Required, a non-empty list of `tag:` strings the key assigns to the node. |
+| `ephemeral` | Bool, default `false`. |
+| `preauthorized` | Bool, default `true`. |
+| `expiry_seconds` | Integer 1 to 7776000, default 3600. |
+
+Unknown `mint` keys are an ERROR. A `login_server` other than `controlplane.tailscale.com` with `mint` is a WARNING, because the key is created through the Tailscale API.
+
+**OAuth scope.** The client needs the `auth_keys` scope (write) and must own every tag it asks for, otherwise Tailscale refuses the key. The plugin cannot take the client secret itself as a key: its settings have no tags option, and an OAuth secret is accepted as an auth key only together with `--advertise-tags`.
+
+**Flow.**
+
+1. At plan, `tailscale/status/status` is read. `BackendState: Running` means no change and nothing is minted. Otherwise the plan shows `pre_auth_key: [MINTED AT APPLY]`.
+2. At apply, the status is read again. A `Running` node is left alone. If the service is not enabled (`tailscale/settings/get` `enabled` is not `1`), the mint is skipped with a warning. Otherwise a single-use, tagged, short-lived key is created, written with `authentication/set` and the service is reconfigured.
+3. Apply then polls `BackendState` (6 reads, 5 seconds apart). If the node is not `Running`, it reconfigures once more and polls again, which covers the first case under [Node stays logged out after the key is set](#node-stays-logged-out-after-the-key-is-set). If it still is not `Running`, apply returns a warning pointing at the stale-profile recovery (SSH needed) and does not fail; the next apply mints a fresh key.
+
+**Rebuild flow.** Install the plugin (`system.firmware`), declare `tailscale.settings` with `enabled: true` and `tailscale.auth` with `mint`, and apply. The node joins with the declared tags and no key is kept in secrets. Re-applying a `Running` node changes nothing.
+
+The key, the OAuth credentials and the access token are never logged, shown in a plan, put in a warning or an exception, or stored; failures carry an HTTP status or an exception type only.
+
+**Not verified live:** `mint` was written against the Tailscale API and the plugin's documented responses and is covered by unit tests only. It has not been run against a firewall or a tailnet.
 
 ### Subnets (`tailscale.subnets`)
 
@@ -537,7 +578,7 @@ There are two cases:
 
 To recover:
 
-1. After an apply that writes `tailscale.auth`, read `tailscale/status/status` and check `BackendState`. `Running` means the node joined.
+1. After an apply that writes `tailscale.auth`, read `tailscale/status/status` and check `BackendState`. `Running` means the node joined. With `mint` the apply does this itself.
 2. If it is `NeedsLogin`, apply again, or call `tailscale/service/reconfigure`. That covers the first case.
 3. If it still is `NeedsLogin`, the profile is stale. The API cannot reset it; over SSH on the box, run:
 
