@@ -1227,21 +1227,53 @@ class NATRuleService(BaseService):
             YAML string with the nested ``opnsense:`` namespace and a
             ``firewall.nat`` list leaf.
         """
-        rules: list[LiveNATRule] = self.search_all_tolerant()
-        managed = [r for r in rules if r.managed_name is not None]
-        entries = [
+        return emit_nested_list_yaml("firewall.nat", self.export_entries())
+
+    def export_entries(self, rules: list[LiveNATRule] | None = None) -> list[dict[str, Any]]:
+        """Return the managed live rules as ``{"name", "config"}`` export entries.
+
+        Args:
+            rules: Live rules already fetched (for example with
+                :meth:`search_all_tolerant`); fetched when omitted.
+
+        Returns:
+            One entry per managed rule, in the order given.
+        """
+        live = self.search_all_tolerant() if rules is None else rules
+        return [
             {
                 "name": r.managed_name,
                 "config": _live_to_export_config(r),
             }
-            for r in managed
+            for r in live
+            if r.managed_name is not None
         ]
-        return emit_nested_list_yaml("firewall.nat", entries)
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers (row parsing / export)
 # ---------------------------------------------------------------------------
+
+
+def max_live_sequence(rules: list[LiveNATRule], kind: NATRuleKind = "outbound") -> int:
+    """Return the highest ``sequence`` among the live rows of one kind.
+
+    Args:
+        rules: Live rules, managed or not.
+        kind: Which kind to consider.
+
+    Returns:
+        The highest sequence, or ``0`` when there are no rows or none has a number.
+    """
+    highest = 0
+    for rule in rules:
+        if rule.kind != kind:
+            continue
+        try:
+            highest = max(highest, int(_normalize_field(rule.raw.get("sequence"))))
+        except ValueError:
+            continue
+    return highest
 
 
 def _row_to_live(row: dict[str, Any], kind: NATRuleKind) -> LiveNATRule:

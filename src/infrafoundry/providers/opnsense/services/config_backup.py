@@ -2,7 +2,8 @@
 
 ``GET core/backup/download/this`` returns the box's ``config.xml``. ``foundry config
 migrate --include-legacy`` reads it to export the legacy ``<filter><rule>`` rules, which
-the MVC filter API does not list.
+the MVC filter API does not list, and (#1509) the legacy ``<nat><outbound><rule>`` rules
+that the Source NAT API does not list.
 
 The document holds secrets (API keys, password hashes, pre-shared keys, certificate
 private keys). The text stays in memory: this service never logs it, never puts it in an

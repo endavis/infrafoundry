@@ -99,3 +99,42 @@ Safe order:
 5. Delete the legacy rules.
 
 The reverse order opens a policy gap. A legacy floating quick rule is evaluated before automation interface rules, so a legacy floating block can shadow an exported interface pass until it is disabled; check this before disabling anything. (Measured with low sequence numbers.)
+
+## Legacy Outbound NAT Rules
+
+Outbound NAT has the same split. Rules created on the legacy Firewall > NAT > Outbound page live in `<nat><outbound><rule>` in `config.xml`; the Source NAT API (`firewall/source_nat`) lists only rules created on the Source NAT page or through the API. A plain `foundry config migrate --component firewall.nat` therefore never sees the legacy ones.
+
+```bash
+foundry config migrate --env prod --provider opnsense --component firewall.nat --include-legacy --dry-run
+foundry config migrate --env prod --provider opnsense --component firewall.nat --include-legacy --allow-partial
+```
+
+The command is read-only (one GET of the configuration backup, plus the usual searches). The legacy rules are appended to the managed live rules as `kind: outbound` entries and handled like the filter rules: issues are listed in a header comment, the command exits non-zero, and `--allow-partial` writes the YAML anyway.
+
+### Outbound mapping
+
+| Legacy element | `firewall.nat` field |
+| :--- | :--- |
+| `interface` | `interface` (one known interface; otherwise skipped and reported) |
+| `ipprotocol` | `ipprotocol` (default `inet`; only `inet` and `inet6`) |
+| `protocol` | `protocol` (absent or `any` -> `any`, otherwise upper-case) |
+| `source`, `destination` (`any`, `address`, `network`, `not`, `port`) | `source_net`, `destination_net`, `*_not`, `*_port` (verbatim: aliases, CIDRs and interface network names all pass through) |
+| `sourceport`, `dstport`, `natport` | `source_port`, `destination_port`, `target_port` when non-empty (the last two element names are inferred, not measured) |
+| `target` | `target` (empty -> `<interface>ip`, the interface address; `other-subnet` is skipped and reported) |
+| `staticnatport`, `nonat`, `log` | `true` when set |
+| `disabled` | `enabled: false` |
+| `descr` | `description` (an identity marker is stripped and reported) |
+
+Reported, with the rest of the rule still exported: non-empty `category`, `poolopts`, `poolopts_sourcehashkey`, `tag`, `tagged` and unknown elements. `created` and `updated` are ignored. An empty `<rule/>`, which OPNsense leaves after every legacy rule is deleted, is skipped silently.
+
+Sequences start 100 above the highest live outbound `sequence` and step by 10, in document order.
+
+### Outbound cutover
+
+1. Apply the exported set while the legacy rules still exist, then verify that `foundry infra plan` is clean.
+2. Disable the legacy rules by hand and watch traffic.
+3. Delete the legacy rules.
+
+Manual outbound rules, legacy or not, only take effect when the outbound NAT mode is `hybrid` or `advanced`; see [Outbound NAT mode](../development/opnsense-resource-coverage.md#outbound-nat-mode-1333).
+
+Port forwards (`<nat><rule>`) and 1:1 NAT (`<nat><onetoone>`) legacy rules are not covered; they are tracked separately.
