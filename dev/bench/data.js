@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795210773797,
+  "lastUpdate": 1795211467579,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4716,6 +4716,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000053167106801012146",
             "extra": "mean: 93.40966862218035 usec\nrounds: 11250"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "93488a172b885d98ed2466e627f2d20174b33f18",
+          "message": "feat: support email on oci iam_user for identity domain tenancies (merges PR #1553, addresses #1552)\n\nTenancies that use Identity Domains reject a user without a primary\nemail (\"The primary email must be specified.\"), so iam_user could not be\ncreated there. Add an optional email field, rendered only when set,\nvalidated as a non-empty string containing \"@\", and documented with the\nIdentity Domains requirement. Users without email render as before.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T21:49:48Z",
+          "tree_id": "11b83b1a55faab4752a43dacb36d63122c17c5eb",
+          "url": "https://github.com/endavis/infrafoundry/commit/93488a172b885d98ed2466e627f2d20174b33f18"
+        },
+        "date": 1795211467057,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 43.205905120420596,
+            "unit": "iter/sec",
+            "range": "stddev: 0.002698731475992211",
+            "extra": "mean: 23.144984399999657 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7717.801033455976,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009655061662237204",
+            "extra": "mean: 129.5705856713706 usec\nrounds: 8235"
           }
         ]
       }
