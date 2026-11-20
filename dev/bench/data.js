@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795198764591,
+  "lastUpdate": 1795201507823,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4412,6 +4412,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000800931155020901",
             "extra": "mean: 124.9912265532142 usec\nrounds: 8466"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "816e7402e4b08a66d81552ac34f51a3d5f5071c0",
+          "message": "feat: let the kubernetes provider take secret values from sops (merges PR #1537, addresses #1535)\n\nSecret and Helm values in the kubernetes provider had to be written\nliterally in config YAML and were rendered into the generated .tf files.\nThey can now name a dotted secret reference, reusing the terraform_secrets\nbridge the aws, oci and proxmox providers already use.\n\n- secrets: string_data_secrets and data_secrets map a key to a ref and\n  render as sensitive variables in data / binary_data\n- helm_releases: a set_sensitive entry takes value_secret instead of value\n- the refs fold into terraform_secrets, declare sensitive variables and\n  are injected through TF_VAR_* at apply\n- offline validation reports malformed entries, unresolved refs, and\n  data_secrets values that are not base64 (never printing the value)\n- docs for the kubernetes provider and the validation reference\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T19:03:38Z",
+          "tree_id": "13259ed212229d9d83ed6be763962d5b3046f915",
+          "url": "https://github.com/endavis/infrafoundry/commit/816e7402e4b08a66d81552ac34f51a3d5f5071c0"
+        },
+        "date": 1795201507091,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 72.93745843130885,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004218164171102928",
+            "extra": "mean: 13.710376279998588 msec\nrounds: 75"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12833.962101688161,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006082301729251653",
+            "extra": "mean: 77.91826032184258 usec\nrounds: 13733"
           }
         ]
       }
