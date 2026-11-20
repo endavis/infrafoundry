@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795191890313,
+  "lastUpdate": 1795192566155,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4222,6 +4222,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008517842385172496",
             "extra": "mean: 127.88761306841779 usec\nrounds: 8402"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2fb3d983fd6b7a22e03478cd7cfad4abddf801fd",
+          "message": "fix: run pending on_create handlers on the next apply after a failed create (merges PR #1528, addresses #1524)\n\nRecord an on_create obligation in an append-only ledger of deployment_events\nrows when terraform creates a resource, before the runner failure is raised,\nand clear it only when the handlers run without an aborting result. The next\napply runs pending resource-level handlers and folds pending package-level\nnames into the aggregate resource_created event. No state schema change.\n\nAddresses #1524\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T16:34:49Z",
+          "tree_id": "3326a1bf140f76fd071cc34403db7a58befeba5f",
+          "url": "https://github.com/endavis/infrafoundry/commit/2fb3d983fd6b7a22e03478cd7cfad4abddf801fd"
+        },
+        "date": 1795192565398,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 92.68069657907319,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0019031988812649079",
+            "extra": "mean: 10.789733319999613 msec\nrounds: 100"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15836.511394201847,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005376814327170427",
+            "extra": "mean: 63.14522025135698 usec\nrounds: 16631"
           }
         ]
       }
