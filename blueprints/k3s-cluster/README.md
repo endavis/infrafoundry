@@ -41,6 +41,13 @@ default, so a config repo needs no `roles/` directory. To override them, put rol
 same names under `envs/<env>/roles/`; they take precedence over the blueprint's. The
 override applies to local runs only: the env directory is not copied to a jumphost.
 
+#### Tailscale SSH
+
+The post-terraform script reaches the nodes over Tailscale SSH. The tailnet policy's `ssh`
+rules must allow the controller's tag to SSH to the nodes' tags (for example `tag:controller`
+to `tag:k3s-node`). Without such a rule the script stops at once with
+"tailnet policy does not permit you to SSH to this node" instead of waiting.
+
 ## Usage
 
 ### Proxmox

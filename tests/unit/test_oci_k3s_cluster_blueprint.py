@@ -653,3 +653,21 @@ def test_script_fails_fast_on_auth_and_host_key_errors(tmp_path: Path, message: 
     assert not (record / "args").exists()
     assert not (record / "sleeps").exists()
     assert (record / "ssh_count").read_text().strip() == "1"
+
+
+def test_script_fails_fast_when_tailnet_policy_denies_ssh(tmp_path: Path) -> None:
+    """A Tailscale SSH policy denial does not retry and points at the ssh rules."""
+    message = (
+        "tailscale: tailnet policy does not permit you to SSH to this node\n"
+        "Connection closed by 100.64.0.1 port 22"
+    )
+    result, record = _run_script_with_failing_ssh(tmp_path, fail_times=1000, fail_msg=message)
+
+    assert result.returncode != 0
+    assert "tailnet policy" in result.stderr
+    assert "ssh rules" in result.stderr
+    assert "ctl.example.net" in result.stderr
+    assert "tailnet policy does not permit" in result.stderr
+    assert not (record / "args").exists()
+    assert not (record / "sleeps").exists()
+    assert (record / "ssh_count").read_text().strip() == "1"
