@@ -164,3 +164,100 @@ class TestCommands:
         result = _invoke(runner, orchestrator, "plan", "--env", "e", "-P", "opnsense")
         assert result.exit_code == 0, result.output
         assert orchestrator.plan.call_args.kwargs["provider_filter"] == ["opnsense"]
+
+
+# --- kubernetes clusters (#1539) -----------------------------------------------
+
+CLUSTERS: dict[str, Any] = {
+    "kubernetes": {"primary": "edge", "clusters": {"edge": {}, "cloud": {}, "extra": {}}}
+}
+K_PRESENT = ["kubernetes", "kubernetes@cloud", "proxmox"]
+
+
+class TestExpandClusters:
+    def test_provider_kubernetes_expands_to_clusters_with_resources(self) -> None:
+        orchestrator = _orchestrator(CLUSTERS, K_PRESENT)
+        result = expand_provider_filter(orchestrator, "e", ("kubernetes",), ())
+        assert result == ["kubernetes", "kubernetes@cloud"]
+
+    def test_cluster_maps_to_exact_ids(self) -> None:
+        orchestrator = _orchestrator(CLUSTERS, K_PRESENT)
+        assert expand_provider_filter(orchestrator, "e", (), (), clusters=("cloud",)) == [
+            "kubernetes@cloud"
+        ]
+        assert expand_provider_filter(orchestrator, "e", (), (), clusters=("edge",)) == [
+            "kubernetes"
+        ]
+
+    def test_unknown_cluster_is_a_usage_error(self) -> None:
+        orchestrator = _orchestrator(CLUSTERS, K_PRESENT)
+        with pytest.raises(click.UsageError, match=r"Unknown cluster\(s\) nope; declared: edge"):
+            expand_provider_filter(orchestrator, "e", (), (), clusters=("nope",))
+
+    def test_cluster_without_a_clusters_map_is_a_usage_error(self) -> None:
+        flat = {"kubernetes": {"kubeconfig_path": "/k/flat.yaml"}}
+        orchestrator = _orchestrator(flat, ["kubernetes"])
+        with pytest.raises(
+            click.UsageError, match=r"needs provider_settings\.kubernetes\.clusters"
+        ):
+            expand_provider_filter(orchestrator, "e", (), (), clusters=("cloud",))
+
+    def test_cluster_with_another_provider_only_is_a_usage_error(self) -> None:
+        orchestrator = _orchestrator(CLUSTERS, K_PRESENT)
+        with pytest.raises(click.UsageError, match=r"add '-P kubernetes' or drop -P"):
+            expand_provider_filter(orchestrator, "e", ("proxmox",), (), clusters=("cloud",))
+
+    def test_firewall_and_cluster_combine(self) -> None:
+        orchestrator = _orchestrator({**MULTI, **CLUSTERS}, [*PRESENT, *K_PRESENT])
+        result = expand_provider_filter(orchestrator, "e", (), ("fw-b",), clusters=("cloud",))
+        assert result == ["opnsense@fw-b", "kubernetes@cloud"]
+
+    def test_provider_list_may_name_both_families(self) -> None:
+        orchestrator = _orchestrator({**MULTI, **CLUSTERS}, [*PRESENT, *K_PRESENT])
+        result = expand_provider_filter(
+            orchestrator, "e", ("opnsense", "kubernetes"), ("fw-b",), clusters=("cloud",)
+        )
+        assert result == ["opnsense@fw-b", "kubernetes@cloud"]
+
+
+class TestClusterCommands:
+    @pytest.mark.parametrize("command", ["plan", "apply", "destroy"])
+    def test_cluster_becomes_an_exact_provider_filter(
+        self, runner: CliRunner, command: str
+    ) -> None:
+        orchestrator = _orchestrator(CLUSTERS, K_PRESENT)
+        args = [command, "--env", "e", "--cluster", "cloud"]
+        if command != "plan":
+            args.append("--auto-approve")
+        result = _invoke(runner, orchestrator, *args)
+        assert result.exit_code == 0, result.output
+        assert getattr(orchestrator, command).call_args.kwargs["provider_filter"] == [
+            "kubernetes@cloud"
+        ]
+
+    def test_doctor_passes_the_expanded_filter(self, runner: CliRunner) -> None:
+        orchestrator = _orchestrator(CLUSTERS, K_PRESENT)
+        orchestrator.validate.return_value = {"kubernetes@cloud": {"errors": 0, "warnings": 0}}
+        with patch(
+            "infrafoundry.cli.commands.infra.doctor._jumphost_preflight", return_value=False
+        ):
+            result = _invoke(runner, orchestrator, "doctor", "--env", "e", "--cluster", "cloud")
+        assert result.exit_code == 0, result.output
+        assert orchestrator.validate.call_args.kwargs["provider_filter"] == ["kubernetes@cloud"]
+
+    @pytest.mark.parametrize("flag", [["-r", "x"], ["-p", "pkg"]])
+    @pytest.mark.parametrize("command", ["plan", "apply", "destroy", "doctor"])
+    def test_cluster_excludes_package_and_resource(
+        self, runner: CliRunner, command: str, flag: list[str]
+    ) -> None:
+        result = _invoke(
+            runner,
+            _orchestrator(CLUSTERS, K_PRESENT),
+            command,
+            "--env",
+            "e",
+            "--cluster",
+            "cloud",
+            *flag,
+        )
+        assert result.exit_code != 0

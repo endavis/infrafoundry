@@ -33,8 +33,10 @@ The consumer's Terraform state holds the value, as with any Terraform-managed se
 
 ## Related Issues
 - Issue #1536: tailscale `oauth_client` resource whose credentials other providers can consume
+- Issue #1539: a non-primary Kubernetes cluster instance consumes `outputs.*` references (see ADR-0030)
 
 ## Related Documentation
 - [Tailscale provider](../providers/tailscale.md)
 - [Kubernetes provider](../providers/kubernetes.md)
 - [Dependency ordering](../configuration/dependency-ordering.md)
+- [ADR-0030: Kubernetes clusters are provider instances](0030-kubernetes-clusters-are-provider-instances-several-per-environment.md)

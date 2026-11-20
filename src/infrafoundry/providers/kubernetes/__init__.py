@@ -1,13 +1,13 @@
 """Kubernetes provider for InfraFoundry."""
 
-import os
 from pathlib import Path
-from typing import Any, ClassVar, override
+from typing import Any, ClassVar, Self, override
 
 import yaml
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.provider_instances import qualified_provider_id
 from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
@@ -16,6 +16,11 @@ from infrafoundry.core.provider_mixins import (
 )
 from infrafoundry.core.terraform_outputs import output_refs
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.providers.kubernetes.clusters import (
+    allows_env_override,
+    cluster_settings,
+    kubeconfig_env_override,
+)
 from infrafoundry.providers.kubernetes.names import CONFIG_NAME_TYPES, kubernetes_object_name
 from infrafoundry.providers.kubernetes.secret_refs import with_terraform_secrets
 from infrafoundry.providers.kubernetes.validator import KubernetesValidator
@@ -32,11 +37,19 @@ class KubernetesProvider(
     # Mapping from settings.yaml keys to terraform variable names
     _KUBERNETES_TFVARS_MAPPING: ClassVar[dict[str, str]] = {
         "kubeconfig_path": "kubeconfig_path",
+        "context": "kubeconfig_context",
     }
 
-    def __init__(self, config_dir: Path, output_dir: Path) -> None:
-        """Initialize Kubernetes provider."""
-        super().__init__("kubernetes", config_dir, output_dir)
+    def __init__(self, config_dir: Path, output_dir: Path, cluster: str | None = None) -> None:
+        """Initialize Kubernetes provider.
+
+        Args:
+            config_dir: Configuration directory.
+            output_dir: Base output directory.
+            cluster: Cluster name for a provider instance (#1539); the id becomes
+                ``kubernetes@<cluster>``. ``None`` is the primary (plain ``kubernetes``).
+        """
+        super().__init__(qualified_provider_id("kubernetes", cluster), config_dir, output_dir)
         # Use TemplateRendererMixin to set up Jinja2 environment
         self._setup_template_environment()
         # Add custom filter for YAML serialization
@@ -45,6 +58,41 @@ class KubernetesProvider(
         self.jinja_env.filters["secret_tf_var"] = sanitize_secret_ref_to_tf_var
         # Resources of the last ``generate_terraform`` call, for ``TF_VAR_*`` secret injection
         self._last_terraform_resources: list[ResourceConfig] = []
+
+    def spawn_instance(self, name: str) -> Self:
+        """Return a provider for the named cluster instance (#1539).
+
+        Args:
+            name: Cluster name from ``provider_settings.kubernetes.clusters``.
+
+        Returns:
+            A new provider named ``kubernetes@<name>`` sharing this provider's directories.
+        """
+        instance = type(self)(self.config_dir, self.base_output_dir, cluster=name)
+        current = getattr(self, "_current_environment", None)
+        if current:
+            instance.set_environment(current)
+        return instance
+
+    def _validator(
+        self, env_config: EnvironmentConfig, report: ValidationReport
+    ) -> KubernetesValidator:
+        """Build the validator for this provider's cluster (the primary uses the default)."""
+        if self.name == "kubernetes":
+            return KubernetesValidator(env_config, report)
+        return KubernetesValidator(env_config, report, provider_name=self.name)
+
+    @override
+    def _terraform_provider_settings(
+        self, env_config: EnvironmentConfig, provider_name: str
+    ) -> dict[str, Any] | None:
+        """Return this cluster's own settings, not the raw ``kubernetes`` mapping."""
+        return cluster_settings(env_config, provider_name)
+
+    @override
+    def _allows_settings_env_override(self, provider_name: str) -> bool:
+        """Allow gated env overrides for the primary cluster only (ADR-0024, ADR-0030)."""
+        return allows_env_override(provider_name)
 
     @override
     def validate_config(self, config: dict[str, Any]) -> bool:
@@ -57,7 +105,7 @@ class KubernetesProvider(
         self, env_config: EnvironmentConfig, report: ValidationReport
     ) -> None:
         """Validate the kubeconfig and connectivity to the Kubernetes API."""
-        KubernetesValidator(env_config, report).validate_connectivity()
+        self._validator(env_config, report).validate_connectivity()
 
     @override
     def validate_references(
@@ -67,7 +115,7 @@ class KubernetesProvider(
         report: ValidationReport,
     ) -> None:
         """Validate Kubernetes references, including cluster checks when connected."""
-        KubernetesValidator(env_config, report).validate_references(resources)
+        self._validator(env_config, report).validate_references(resources)
 
     def validate_references_in_context(
         self,
@@ -77,7 +125,7 @@ class KubernetesProvider(
         report: ValidationReport,
     ) -> None:
         """Validate *resources*, resolving names against *reference_resources* (#1435)."""
-        KubernetesValidator(env_config, report).validate_references(resources, reference_resources)
+        self._validator(env_config, report).validate_references(resources, reference_resources)
 
     def validate_offline(
         self,
@@ -87,11 +135,7 @@ class KubernetesProvider(
         report: ValidationReport,
     ) -> None:
         """Run the checks that need no kubeconfig or network (#1435)."""
-        KubernetesValidator(env_config, report).validate_offline(resources, reference_resources)
-
-    _CREDENTIAL_ENV_MAPPING: ClassVar[dict[str, str]] = {
-        "KUBECONFIG": "kubeconfig_path",
-    }
+        self._validator(env_config, report).validate_offline(resources, reference_resources)
 
     # Resource types whose templates label the Terraform resource from ``config.name``.
     # Every other type labels from the top-level ``name``.
@@ -101,14 +145,14 @@ class KubernetesProvider(
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* env vars for Kubernetes provider."""
         result = self.build_terraform_env_vars(
-            provider_name="kubernetes",
+            provider_name=self.name,
             mapping=self._KUBERNETES_TFVARS_MAPPING,
             resources=self._last_terraform_resources,
         )
-        for env_key, tf_var_name in self._CREDENTIAL_ENV_MAPPING.items():
-            value = os.environ.get(env_key)
-            if value:
-                result[f"TF_VAR_{tf_var_name}"] = value
+        # KUBECONFIG overrides kubeconfig_path for a flat configuration only (ADR-0030).
+        env_kubeconfig = kubeconfig_env_override(self._load_environment_config())
+        if env_kubeconfig:
+            result["TF_VAR_kubeconfig_path"] = env_kubeconfig
         return result
 
     @override

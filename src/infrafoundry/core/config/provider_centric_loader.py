@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from infrafoundry.core.config.package_loader import (
+    CLUSTER_FILE_KEY,
     FIREWALL_FILE_KEY,
     NESTED_PROVIDER_NAMESPACE,
     PackageLoader,
@@ -16,6 +17,7 @@ from infrafoundry.core.config.package_loader import (
 from infrafoundry.core.config.yaml_loader import load_config_yaml
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.provider_instances import own_instance_provider, stamp_selected
 from infrafoundry.core.secrets.provider import SecretProvider
 
 if TYPE_CHECKING:
@@ -127,13 +129,23 @@ class ProviderCentricLoader:
             ResourceConfig(
                 name=item["name"],
                 type=resource_type,
-                provider=provider,
+                provider=own_instance_provider(
+                    item,
+                    provider,
+                    str(resource_path),
+                    resource_type,
+                    only_selector=CLUSTER_FILE_KEY,
+                )
+                or provider,
                 config=item,
                 import_id=item.get("import_id"),
             )
             for item in resource_list
             if isinstance(item, dict) and "name" in item
         ]
+        file_cluster = data.get(CLUSTER_FILE_KEY) if isinstance(data, dict) else None
+        if isinstance(file_cluster, str):
+            stamp_selected(resources, {"cluster": file_cluster}, f"{resource_path}: 'cluster'")
 
         return resources
 

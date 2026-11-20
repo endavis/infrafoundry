@@ -4,6 +4,12 @@ variable "kubeconfig_path" {
   default     = "~/.kube/config"
 }
 
+variable "kubeconfig_context" {
+  description = "Kubeconfig context to use (empty uses the kubeconfig's current context)"
+  type        = string
+  default     = ""
+}
+
 {# Dynamic sensitive variables from ``terraform_secrets`` references (including those
    folded in from ``*_secrets`` maps and ``value_secret``). Values are injected at apply
    time via TF_VAR_* env vars; defaults stay empty so plan does not fail when unset. #}

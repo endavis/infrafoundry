@@ -17,7 +17,7 @@ from infrafoundry.core.orchestrator import Orchestrator
 
 from ...decorators import with_orchestrator
 from ...utils import console
-from ._firewall import FIREWALL_HELP, expand_provider_filter
+from ._firewall import CLUSTER_HELP, FIREWALL_HELP, expand_provider_filter
 
 _STATUS_STYLE = {
     Status.OK: "green",
@@ -58,6 +58,12 @@ _STATUS_STYLE = {
     help=FIREWALL_HELP,
 )
 @click.option(
+    "--cluster",
+    "cluster",
+    multiple=True,
+    help=CLUSTER_HELP,
+)
+@click.option(
     "--verbose",
     "-v",
     is_flag=True,
@@ -73,6 +79,7 @@ def doctor(
     package_name: str | None,
     provider: tuple[str, ...],
     firewall: tuple[str, ...],
+    cluster: tuple[str, ...],
     verbose: bool,
 ) -> None:
     """Validate infrastructure configuration against provider APIs.
@@ -114,7 +121,7 @@ def doctor(
         # Show detailed output with all passing checks
         infra doctor --env test --verbose
     """
-    if (provider or firewall) and (package_name or resource):
+    if (provider or firewall or cluster) and (package_name or resource):
         raise click.UsageError("--package, --resource, and --provider are mutually exclusive")
     if package_name and resource:
         raise click.UsageError("--package and --resource are mutually exclusive")
@@ -125,7 +132,9 @@ def doctor(
     else:
         resource_filter = list(resource) if resource else None
 
-    provider_filter = expand_provider_filter(orchestrator, env, provider, firewall)
+    provider_filter = expand_provider_filter(
+        orchestrator, env, provider, firewall, clusters=cluster
+    )
     # Only pass the filter when set, so unfiltered calls keep their original signature.
     extra: dict[str, list[str]] = {"provider_filter": provider_filter} if provider_filter else {}
 

@@ -45,8 +45,10 @@ Alternatives rejected:
 - Issue #1462: non-primary firewalls failed Terraform generation on the instance name
 - Issue #1442: trigger OPNsense HA config sync after destroy
 - Issue #1393: CARP health in infra doctor
+- Issue #1539: Kubernetes clusters reuse this model (see ADR-0030)
 
 ## Related Documentation
 
 - [OPNsense provider: several firewalls per environment](../providers/opnsense.md#several-firewalls-per-environment)
 - [ADR-0014: OPNsense direct API](0014-opnsense-direct-api-apply-mechanism.md)
+- [ADR-0030: Kubernetes clusters are provider instances](0030-kubernetes-clusters-are-provider-instances-several-per-environment.md)
