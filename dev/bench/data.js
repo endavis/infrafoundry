@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795208422677,
+  "lastUpdate": 1795209220161,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4640,6 +4640,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000014007595857247154",
             "extra": "mean: 130.95403368514496 usec\nrounds: 8342"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1abd42aeb160dc8313aad398fe76db2b80384670",
+          "message": "feat: support volumes, secret env and update strategy in kubernetes deployments (merges PR #1549, addresses #1548)\n\nDeployments now render what jobs and cronjobs already support:\n- container command and args;\n- env value_from with secret_key_ref or config_map_key_ref;\n- volume_mounts;\n- pod volumes (persistent_volume_claim, secret, config_map with optional\n  items, empty_dir);\n- strategy.type.\n\nExisting deployment configs render byte-for-byte as before, pinned by a\ngolden file generated from the previous template.\n\nOffline validation, scoped to deployments, rejects:\n- a mount that names an undeclared volume;\n- an env entry with both or neither of value and value_from;\n- a strategy.type other than RollingUpdate or Recreate.\n\nThe deployments -> persistentvolumeclaims dependency edge already existed;\nit is now covered by a test and shown in the docs diagram.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T21:12:11Z",
+          "tree_id": "d7c5f6b4e592faf8294d8a3c6317179e04a6d14d",
+          "url": "https://github.com/endavis/infrafoundry/commit/1abd42aeb160dc8313aad398fe76db2b80384670"
+        },
+        "date": 1795209219482,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 59.38932423037377,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00047892972179681514",
+            "extra": "mean: 16.838043081968006 msec\nrounds: 61"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10791.375931458897,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000054446208038372375",
+            "extra": "mean: 92.66658916819043 usec\nrounds: 11854"
           }
         ]
       }
