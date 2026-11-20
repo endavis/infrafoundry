@@ -53,6 +53,8 @@ class StorageIamValidator(SpecializedValidator[OCIStorageIamContext]):
         for res in resources:
             if res.type == "bucket":
                 self._bucket(res)
+            elif res.type == "iam_user":
+                self._user(res)
             elif res.type == "iam_group":
                 self._group(res, users)
             elif res.type == "iam_policy":
@@ -120,6 +122,16 @@ class StorageIamValidator(SpecializedValidator[OCIStorageIamContext]):
                 f"{check}_time_unit",
                 f"Bucket '{bucket}': lifecycle time_unit '{rule.get('time_unit')}'; "
                 f"allowed: {', '.join(LIFECYCLE_UNITS)}",
+            )
+
+    def _user(self, res: ResourceConfig) -> None:
+        if "email" not in res.config:
+            return
+        email = res.config["email"]
+        if not isinstance(email, str) or not email.strip() or "@" not in email:
+            self._error(
+                f"oci_iam_user_{res.name}_email",
+                f"User '{res.name}' email must be a non-empty string containing '@'",
             )
 
     def _group(self, res: ResourceConfig, users: set[str]) -> None:

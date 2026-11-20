@@ -5,6 +5,9 @@ resource "oci_identity_user" "{{ user.name | to_terraform_name }}" {
   compartment_id = var.oci_tenancy_ocid
   name           = {{ user.name | tojson }}
   description    = {{ user.config.get('description', 'Managed by InfraFoundry') | tojson }}
+{% if user.config.get('email') %}
+  email          = {{ user.config.email | tojson }}
+{% endif %}
 }
 
 {% endfor %}
