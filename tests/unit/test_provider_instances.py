@@ -230,3 +230,62 @@ def test_validate_instance_map_reports_shape_errors() -> None:
     assert validate_instance_map("opnsense", {"firewalls": {"a": {}, "b": {}}}, ()) == [
         "'primary' is required when more than one firewall is declared"
     ]
+
+
+# --- kubernetes clusters (#1539) -----------------------------------------------
+
+CLUSTERS: dict[str, Any] = {
+    "kubernetes": {
+        "primary": "edge",
+        "clusters": {"edge": {"kubeconfig_path": "/k/edge.yaml"}, "cloud": {}},
+    }
+}
+
+
+def test_kubernetes_cluster_ids_split_and_qualify() -> None:
+    assert split_provider_id("kubernetes@cloud") == ("kubernetes", "cloud")
+    assert qualified_provider_id("kubernetes", "cloud") == "kubernetes@cloud"
+    assert declared_instances("kubernetes", CLUSTERS) == ["edge", "cloud"]
+    assert primary_instance("kubernetes", CLUSTERS) == "edge"
+
+
+def test_normalize_rewrites_the_primary_cluster_and_rejects_unknown() -> None:
+    resources = [
+        ResourceConfig(name="a", type="namespaces", provider="kubernetes@edge", config={}),
+        ResourceConfig(name="b", type="namespaces", provider="kubernetes@cloud", config={}),
+    ]
+    normalize_instance_providers(resources, CLUSTERS)
+    assert [r.provider for r in resources] == ["kubernetes", "kubernetes@cloud"]
+    stray = [ResourceConfig(name="c", type="namespaces", provider="kubernetes@nope", config={})]
+    with pytest.raises(InvalidConfigurationError, match="not declared under provider_settings"):
+        normalize_instance_providers(stray, CLUSTERS)
+
+
+def test_cluster_selector_is_rejected_for_other_providers_and_bad_names() -> None:
+    other = ResourceConfig(name="vm", type="vm", provider="proxmox", config={})
+    with pytest.raises(InvalidConfigurationError, match="only supported for provider"):
+        stamp_instance(other, "cloud", "f.yaml", "cluster")
+    ns = ResourceConfig(name="a", type="namespaces", provider="kubernetes", config={})
+    with pytest.raises(InvalidConfigurationError, match="invalid cluster name"):
+        stamp_instance(ns, "Bad_Name", "f.yaml", "cluster")
+
+
+def test_register_instance_providers_spawns_non_primary_clusters_only() -> None:
+    class _Base:
+        def spawn_instance(self, name: str) -> str:
+            return f"spawned-{name}"
+
+    providers: dict[str, Any] = {"kubernetes": _Base()}
+    register_instance_providers(providers, CLUSTERS)
+    assert set(providers) == {"kubernetes", "kubernetes@cloud"}
+    assert providers["kubernetes@cloud"] == "spawned-cloud"
+
+
+def test_stamp_selected_uses_each_providers_own_selector() -> None:
+    resources = [
+        ResourceConfig(name="r", type="x", provider="opnsense", config={}),
+        ResourceConfig(name="n", type="namespaces", provider="kubernetes", config={}),
+        ResourceConfig(name="v", type="vm", provider="proxmox", config={}),
+    ]
+    stamp_selected(resources, {"firewall": "fw-b", "cluster": "cloud"}, "test")
+    assert [r.provider for r in resources] == ["opnsense@fw-b", "kubernetes@cloud", "proxmox"]

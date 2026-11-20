@@ -1,10 +1,11 @@
 """Provider instances: several targets of one provider in one environment (#1450).
 
-A provider that supports instances (see :data:`INSTANCE_SPECS`, currently ``opnsense``)
-is configured with an instance map in ``provider_settings`` (``firewalls:`` for
-OPNsense). Each extra entry is a separate provider instance whose id is
-``<provider>@<name>``. The primary entry keeps the plain provider id, so a flat
-configuration and state rows written before instances existed keep working unchanged.
+A provider that supports instances (see :data:`INSTANCE_SPECS`: ``opnsense`` and
+``kubernetes``) is configured with an instance map in ``provider_settings``
+(``firewalls:`` for OPNsense, ``clusters:`` for Kubernetes). Each extra entry is a
+separate provider instance whose id is ``<provider>@<name>``. The primary entry keeps
+the plain provider id, so a flat configuration and state rows written before instances
+existed keep working unchanged.
 
 Everything keyed by provider id (duplicate check, state rows, dependency graph
 nodes, executor batches, post-apply hooks, validation reports) therefore becomes
@@ -47,6 +48,7 @@ class InstanceSpec:
 #: base provider id -> how it names its instances
 INSTANCE_SPECS: dict[str, InstanceSpec] = {
     "opnsense": InstanceSpec("firewalls", "primary", "firewall", "firewall"),
+    "kubernetes": InstanceSpec("clusters", "primary", "cluster", "cluster"),
 }
 
 #: Every selector key (``firewall`` ...) some instance-capable provider honours.
@@ -193,6 +195,47 @@ def entry_instance_provider(
         )
         result = qualified_provider_id(base, value)
     return result
+
+
+def own_instance_provider(
+    item: Mapping[str, Any],
+    base: str,
+    source: str,
+    where: str,
+    *,
+    only_selector: str | None = None,
+) -> str | None:
+    """Return the instance provider id for an entry's own selector key, if it has one.
+
+    Unlike :func:`entry_instance_provider` this reads only the selector key of ``base``
+    itself. Flat provider-centric entries carry their whole configuration, so a foreign
+    selector key there is an ordinary setting, not a selection.
+
+    Args:
+        item: Resource entry mapping.
+        base: Base provider id of the entry.
+        source: Source filename for error messages.
+        where: Resource type or entry label for error messages.
+        only_selector: When set, honour the entry's key only if it is this selector key
+            (so a flat entry of another family keeps a same-named setting untouched).
+
+    Returns:
+        ``<base>@<name>``, or ``None`` when ``base`` has no instances or the entry sets none.
+
+    Raises:
+        InvalidConfigurationError: If the name is invalid.
+    """
+    base = base.partition(INSTANCE_SEPARATOR)[0]
+    spec = INSTANCE_SPECS.get(base)
+    if spec is not None and only_selector is not None and spec.selector_key != only_selector:
+        return None
+    value = item.get(spec.selector_key) if spec is not None else None
+    if spec is None or value is None:
+        return None
+    validate_instance_name(
+        base, value, f"{source}: entry '{item.get('name', '?')}' ({where})", spec.selector_key
+    )
+    return qualified_provider_id(base, value)
 
 
 def raw_provider_settings(settings_or_env_config: Any, provider_id: str) -> dict[str, Any] | None:

@@ -8,7 +8,7 @@ from infrafoundry.core.orchestrator import Orchestrator
 from ...decorators import with_orchestrator
 from ...progress import OperationTimer
 from ...utils import console
-from ._firewall import FIREWALL_HELP, expand_provider_filter
+from ._firewall import CLUSTER_HELP, FIREWALL_HELP, expand_provider_filter
 
 
 @click.command()
@@ -43,6 +43,12 @@ from ._firewall import FIREWALL_HELP, expand_provider_filter
     "firewall",
     multiple=True,
     help=FIREWALL_HELP,
+)
+@click.option(
+    "--cluster",
+    "cluster",
+    multiple=True,
+    help=CLUSTER_HELP,
 )
 @click.option(
     "--parallel",
@@ -95,6 +101,7 @@ def apply(
     package_name: str | None,
     provider: tuple[str, ...],
     firewall: tuple[str, ...],
+    cluster: tuple[str, ...],
     parallel: bool,
     max_workers: int,
     lock_timeout: int,
@@ -102,7 +109,7 @@ def apply(
     add_only: bool,
 ) -> None:
     """Apply infrastructure changes."""
-    if sum(bool(x) for x in (package_name, resource, provider or firewall)) > 1:
+    if sum(bool(x) for x in (package_name, resource, provider or firewall or cluster)) > 1:
         raise click.UsageError("--package, --resource, and --provider are mutually exclusive")
 
     resource_filter: list[str] | None = None
@@ -111,7 +118,9 @@ def apply(
     elif resource:
         resource_filter = list(resource)
 
-    provider_filter = expand_provider_filter(orchestrator, env, provider, firewall)
+    provider_filter = expand_provider_filter(
+        orchestrator, env, provider, firewall, clusters=cluster
+    )
 
     # If not auto-approve, ask for confirmation at InfraFoundry level
     if not auto_approve:
@@ -119,7 +128,7 @@ def apply(
             resource_desc = f" (package: {package_name})"
         elif resource:
             resource_desc = f" (resources: {', '.join(resource)})"
-        elif provider or firewall:
+        elif provider or firewall or cluster:
             resource_desc = f" (providers: {', '.join(provider_filter or [])})"
         else:
             resource_desc = ""

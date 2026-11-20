@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import os
 from typing import Any, cast
 
 from infrafoundry.core.config.models import EnvironmentConfig
@@ -15,6 +14,11 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_
 from infrafoundry.core.validation_helpers import BaseAPIValidator
 from infrafoundry.core.validation_helpers.terraform_secrets_validator import (
     validate_terraform_secrets_references,
+)
+from infrafoundry.providers.kubernetes.clusters import (
+    cluster_settings,
+    kubeconfig_env_override,
+    validate_clusters_settings,
 )
 from infrafoundry.providers.kubernetes.names import kubernetes_object_name
 from infrafoundry.providers.kubernetes.secret_refs import shape_errors, with_terraform_secrets
@@ -42,16 +46,24 @@ class KubernetesValidator:
     run; API-based checks only run when connectivity is established.
     """
 
-    def __init__(self, env_config: EnvironmentConfig, report: ValidationReport) -> None:
+    def __init__(
+        self,
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+        provider_name: str = "kubernetes",
+    ) -> None:
         """Initialize Kubernetes validator.
 
         Args:
             env_config: Environment configuration including provider_settings
             report: ValidationReport to add results to
+            provider_name: ``kubernetes`` (the primary) or ``kubernetes@<cluster>`` (#1539);
+                selects which cluster's settings the checks use.
         """
         self.env_config = env_config
         self.report = report
-        self.api_validator = BaseAPIValidator("kubernetes", env_config, report)
+        self.provider_name = provider_name
+        self.api_validator = self._cluster_api_validator(report)
         self.provider_settings = cast(
             KubernetesProviderSettings, self.api_validator.provider_settings
         )
@@ -62,17 +74,24 @@ class KubernetesValidator:
         self.crd_validator = CRDValidator(self.api_validator, report)
         self.helm_validator = HelmValidator(report)
 
+    def _cluster_api_validator(self, report: ValidationReport) -> BaseAPIValidator:
+        """Return an API validator whose settings are this cluster's own."""
+        validator = BaseAPIValidator("kubernetes", self.env_config, report)
+        validator.provider_settings = (
+            cluster_settings(validator.provider_settings, self.provider_name) or {}
+        )
+        return validator
+
     def _kubeconfig_context(self) -> KubeconfigContext:
         """Build the kubeconfig context in the order Terraform uses.
 
-        Order: first non-empty ``KUBECONFIG`` entry, then ``kubeconfig_path``, then the
-        default ``~/.kube/config`` (signalled by ``None``).
+        Order: first non-empty ``KUBECONFIG`` entry (a flat configuration only, ADR-0030),
+        then ``kubeconfig_path``, then the default ``~/.kube/config`` (signalled by ``None``).
 
         Returns:
             The context to validate.
         """
-        env_value = os.environ.get("KUBECONFIG", "")
-        env_path = next((p for p in env_value.split(os.pathsep) if p), None)
+        env_path = kubeconfig_env_override(self.env_config)
         kubeconfig_path = env_path or self.provider_settings.get("kubeconfig_path")
         return KubeconfigContext(
             kubeconfig_path=kubeconfig_path,
@@ -107,6 +126,13 @@ class KubernetesValidator:
             reference_resources: Resources names are resolved against; defaults to
                 ``resources``.
         """
+        if self.provider_name == "kubernetes":
+            for message in validate_clusters_settings(
+                self.env_config.get_provider_settings("kubernetes")
+            ):
+                self.api_validator.add_error(
+                    check_name="kubernetes_clusters_settings", message=message
+                )
         self._validate_local_references(resources, reference_resources)
         self._validate_secret_refs(resources)
 
@@ -159,9 +185,7 @@ class KubernetesValidator:
         if self.kubeconfig_validator.is_connected:
             return self.kubeconfig_validator.connection_info, None
         scratch = ValidationReport()
-        probe = KubeconfigValidator(
-            BaseAPIValidator("kubernetes", self.env_config, scratch), scratch
-        )
+        probe = KubeconfigValidator(self._cluster_api_validator(scratch), scratch)
         probe.validate(self._kubeconfig_context())
         if probe.is_connected:
             return probe.connection_info, probe
@@ -277,7 +301,7 @@ class KubernetesValidator:
                     level=ValidationLevel.ERROR,
                 )
         validate_terraform_secrets_references(
-            "kubernetes", well_formed, self.env_config, self.report, allow_output_refs=True
+            self.provider_name, well_formed, self.env_config, self.report, allow_output_refs=True
         )
 
         flat = SecretManager.flatten_dict(getattr(self.env_config, "secrets", None))

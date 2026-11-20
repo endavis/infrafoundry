@@ -104,6 +104,8 @@ section for details.
 | `name` | string | Yes | Package identifier |
 | `description` | string | No | Human-readable description |
 | `provider` | string | Env-root: Yes, Provider-scoped: No | Target provider name. Required for env-root packages; optional override for provider-scoped packages. |
+| `firewall` | string | No | Default OPNsense firewall (provider instance) for the package's `opnsense` resources. See [Several firewalls per environment](../providers/opnsense.md#several-firewalls-per-environment). |
+| `cluster` | string | No | Default Kubernetes cluster (provider instance) for the package's `kubernetes` resources, blueprint resources included. See [Several clusters per environment](../providers/kubernetes.md#several-clusters-per-environment). |
 | `variables` | dict | No | Key-value pairs for template rendering |
 | `resources` | list[string] | No | Resource template files to render and load |
 | `events` | dict | No | Event handlers (same format as `settings.yaml` events) |

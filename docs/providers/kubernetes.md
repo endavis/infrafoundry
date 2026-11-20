@@ -50,12 +50,47 @@ The `~` is automatically expanded using Terraform's `pathexpand()` function.
 
 The `KUBECONFIG` environment variable overrides `kubeconfig_path`: when it is set and not empty, the runner passes it to Terraform as `TF_VAR_kubeconfig_path`. Without either, the generated `variables.tf` defaults to `~/.kube/config`.
 
+`context` (optional) selects a kubeconfig context. It reaches Terraform as `TF_VAR_kubeconfig_context` and becomes `config_context` in the `kubernetes` and `helm` provider blocks, and `infra doctor` uses the same context. Without it Terraform uses the kubeconfig's current context.
+
 The generated Terraform pins the `hashicorp/kubernetes` provider to `~> 2.23`. It adds `hashicorp/helm` (`~> 2.12`) and a `helm` provider block only when the environment has `helm_releases`.
 
 !!! note "Naming rule"
     `namespaces`, `configmaps`, `deployments` and `services` take the object name and the Terraform label from `config.name`. Every other type uses the top-level `name`.
 
     The automatic `depends_on` references use the same label source, so `name` and `config.name` may differ: a namespace with `name: apps-ns` and `config.name: apps` is declared as `kubernetes_namespace.apps`, and the resources that depend on it point at `kubernetes_namespace.apps`.
+
+### Several clusters per environment
+
+One environment can manage several clusters. Each extra cluster is a provider instance, as for [OPNsense firewalls](opnsense.md#several-firewalls-per-environment) ([ADR-0030](../decisions/0030-kubernetes-clusters-are-provider-instances-several-per-environment.md)). Declare them under `clusters:`:
+
+```yaml
+provider_settings:
+  kubernetes:
+    primary: edge
+    clusters:
+      edge: {kubeconfig_path: ~/.kube/edge.yaml}
+      cloud: {kubeconfig_path: ~/.kube/cloud.yaml, context: cloud-admin}
+```
+
+| Key | Meaning |
+|:----|:--------|
+| `clusters` | Map of cluster name to `kubeconfig_path` and `context`. Names use lowercase letters, digits and `-` (1-32 characters). |
+| `primary` | The primary cluster. Required with more than one entry. |
+
+There are no shared defaults. Combining `clusters:` with a top-level `kubeconfig_path` or `context` is an error.
+
+**Choosing a cluster for a resource**, most specific first:
+
+1. The entry's own `cluster: <name>`.
+2. A file-level `cluster: <name>` beside `resources:` or the provider-centric list key. It stamps the `kubernetes` resources of the file only.
+3. The package manifest's `cluster: <name>`. It stamps the package's `kubernetes` resources only, including those a blueprint brings in, even when the package lives under another provider's directory.
+4. The primary.
+
+**Ids, files and state.** The primary keeps the id `kubernetes`, `generated/<env>/terraform/kubernetes/` and its state, so converting a flat configuration to `clusters:` changes nothing for it. Every other cluster is `kubernetes@<name>` with its own `terraform/kubernetes@<name>/` directory and state rows. The same resource name may exist on two clusters. Moving a resource between clusters removes it from one and creates it on the other.
+
+**CLI.** `-P kubernetes` selects the primary plus every declared cluster that has resources. `--cluster <name>` (repeatable) on `infra plan|apply|destroy|doctor` selects exact clusters. It cannot be combined with `-p` or `-r`, needs `-P kubernetes` if `-P` is used, and combines with `--firewall`.
+
+**`KUBECONFIG`.** With a flat configuration it still overrides `kubeconfig_path`. Once `clusters:` is declared it is ignored for every cluster, the primary included, and a warning is logged once, so a shell pointing at one cluster cannot redirect another's resources.
 
 ## Resource Reference
 
@@ -102,7 +137,7 @@ The values reach Terraform as sensitive variables set through `TF_VAR_*` at appl
 
 A reference of the form `outputs.<provider>.<output>` takes the value from another provider's Terraform output instead of SOPS, for example `outputs.tailscale.oauth_client_k8s_operator_secret`:
 
-- It works in `string_data_secrets`, in `terraform_secrets` and in `set_sensitive[*].value_secret` of a Helm release. It is an error in `data_secrets` (an output is not base64), in another provider's `terraform_secrets`, and for the Kubernetes provider's own outputs.
+- It works in `string_data_secrets`, in `terraform_secrets` and in `set_sensitive[*].value_secret` of a Helm release. It is an error in `data_secrets` (an output is not base64), in another provider's `terraform_secrets`, and for the Kubernetes provider's own outputs. A non-primary cluster (`kubernetes@<name>`) may read the primary's `outputs.kubernetes.*`. A non-primary cluster cannot be a producer, because the reference grammar excludes `@` and `-`.
 - `outputs` is a reserved prefix, so a top-level SOPS key named `outputs` cannot be referenced. Both parts after it use lowercase letters, digits and `_`.
 - The producer is applied first, and destroyed last. On `apply` the value is read with `terraform output -json` from `generated/<env>/terraform/<provider>/`. If the run does not include the producer (for example `-P kubernetes`), the value comes from its existing state. When that directory or the output is missing, apply fails and names the reference; run `infra apply --env <env> -P <provider>` first.
 - On `plan`, `destroy` and `validate` a missing output gets a placeholder value and a warning, so the preview of a first apply still works. The placeholder never reaches an apply.

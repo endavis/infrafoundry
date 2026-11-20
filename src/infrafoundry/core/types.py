@@ -94,6 +94,8 @@ class KubernetesProviderSettings(TypedDict, total=False):
 
     kubeconfig_path: str
     context: str
+    clusters: dict[str, Any]
+    primary: str
 
 
 class OPNsenseEnvironmentConfig(TypedDict, total=False):

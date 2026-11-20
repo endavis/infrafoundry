@@ -175,6 +175,8 @@ class PackageManifest(BaseModel):
     provider: str | None = None
     # Default firewall (provider instance) for the package's resources (#1450).
     firewall: str | None = None
+    # Default kubernetes cluster (provider instance) for the package's resources (#1539).
+    cluster: str | None = None
     blueprint: str | None = None
     variables: dict[str, Any] = Field(default_factory=dict)
     resources: list[str] = Field(default_factory=list)

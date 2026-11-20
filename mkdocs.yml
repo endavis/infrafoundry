@@ -178,6 +178,7 @@ nav:
     - ADR-0027 Unmanaged network devices are backed up by read-only collectors: decisions/0027-unmanaged-network-devices-are-backed-up-by-read-only-collectors.md
     - ADR-0028 OpenWrt devices are managed through generated community.openwrt playbooks with ubus apply-rollback: decisions/0028-openwrt-devices-are-managed-through-generated-communityopenwrt-playbooks-with-ubus-apply-rollback.md
     - "ADR-0029 Providers consume other providers' Terraform outputs through outputs references": decisions/0029-providers-consume-other-providers-terraform-outputs-through-outputs-references.md
+    - "ADR-0030 Kubernetes clusters are provider instances, several per environment": decisions/0030-kubernetes-clusters-are-provider-instances-several-per-environment.md
     - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
     - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
     - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md

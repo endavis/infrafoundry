@@ -30,6 +30,7 @@ from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_instances import (
     entry_instance_provider,
+    own_instance_provider,
     qualified_provider_id,
     stamp_selected,
     validate_instance_name,
@@ -153,6 +154,9 @@ NESTED_PROVIDER_NAMESPACE: str = "opnsense"
 
 # Top-level key beside ``opnsense:`` that selects the firewall for the whole file (#1450).
 FIREWALL_FILE_KEY: str = "firewall"
+# Top-level key beside ``resources:`` or the provider-centric list that selects the
+# kubernetes cluster for the whole file (#1539).
+CLUSTER_FILE_KEY: str = "cluster"
 
 
 class PackageLoader:
@@ -396,9 +400,11 @@ class PackageLoader:
             parsed = self._parse_resources_from_data(data, resource_file, effective_provider)
             resources.extend(parsed)
 
-        if manifest.firewall is not None:
+        if manifest.firewall is not None or manifest.cluster is not None:
             stamp_selected(
-                resources, {"firewall": manifest.firewall}, f"package '{manifest.name}' firewall"
+                resources,
+                {"firewall": manifest.firewall, "cluster": manifest.cluster},
+                f"package '{manifest.name}' instance selection",
             )
 
         # ----- Events -----
@@ -626,9 +632,14 @@ class PackageLoader:
                 firewall=data.get(FIREWALL_FILE_KEY),
             )
 
+        file_cluster = data.get(CLUSTER_FILE_KEY)
+        selections = {"cluster": file_cluster if isinstance(file_cluster, str) else None}
+
         # Check for resource-centric format
         if "resources" in data and isinstance(data["resources"], list):
-            return self._parse_resource_centric(data["resources"], resource_file, provider)
+            centric = self._parse_resource_centric(data["resources"], resource_file, provider)
+            stamp_selected(centric, selections, f"{resource_file}: 'cluster'")
+            return centric
 
         # Provider-centric: extract resource type from filename
         stem = Path(resource_file).stem
@@ -646,11 +657,20 @@ class PackageLoader:
                 f"got {type(resource_list).__name__}"
             )
 
-        return [
+        parsed = [
             ResourceConfig(
                 name=item["name"],
                 type=resource_type,
-                provider=item.get("provider", provider),
+                provider=(
+                    own_instance_provider(
+                        item,
+                        str(item.get("provider", provider)),
+                        resource_file,
+                        resource_type,
+                        only_selector=CLUSTER_FILE_KEY,
+                    )
+                    or item.get("provider", provider)
+                ),
                 config=item,
                 events=item.get("events"),
                 import_id=item.get("import_id"),
@@ -658,6 +678,8 @@ class PackageLoader:
             for item in resource_list
             if isinstance(item, dict) and "name" in item
         ]
+        stamp_selected(parsed, selections, f"{resource_file}: 'cluster'")
+        return parsed
 
     def _parse_nested_provider_format(
         self,

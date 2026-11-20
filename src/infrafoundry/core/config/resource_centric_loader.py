@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from infrafoundry.core.config.package_loader import (
+    CLUSTER_FILE_KEY,
     FIREWALL_FILE_KEY,
     NESTED_PROVIDER_NAMESPACE,
     PackageLoader,
@@ -14,6 +15,7 @@ from infrafoundry.core.config.package_loader import (
 from infrafoundry.core.config.yaml_loader import load_config_yaml
 from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.provider_instances import stamp_selected
 
 
 class ResourceCentricLoader:
@@ -146,6 +148,10 @@ class ResourceCentricLoader:
                     import_id=item.get("import_id"),
                 )
             )
+
+        file_cluster = data.get(CLUSTER_FILE_KEY)
+        if isinstance(file_cluster, str):
+            stamp_selected(resources, {"cluster": file_cluster}, f"{config_file}: 'cluster'")
 
         return resources
 
