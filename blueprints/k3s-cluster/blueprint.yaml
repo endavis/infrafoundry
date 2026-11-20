@@ -200,14 +200,6 @@ providers:
             - source: "{{ kubeconfig_local_path }}"
               dest: "{{ kubeconfig_local_path }}"
 
-      before_destroy:
-        - type: script
-          name: tailscale-cleanup
-          script: scripts/oci/cleanup-tailscale-devices.sh
-          description: "Remove Tailscale devices for this cluster before destroy"
-          timeout: 60
-          continue_on_error: true
-
       after_apply:
         - type: script
           name: verify-cluster

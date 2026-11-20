@@ -194,12 +194,7 @@ def test_oci_k3s_cluster_blueprint_inherits_events(loader: PackageLoader) -> Non
     assert handler["continue_on_error"] is False
     assert handler["requires"] == ["k3s-control"]
 
-    assert "before_destroy" in events
-    before_destroy = events["before_destroy"]
-    assert len(before_destroy) == 1
-    assert before_destroy[0]["name"] == "tailscale-cleanup"
-    assert before_destroy[0]["script"].endswith("scripts/oci/cleanup-tailscale-devices.sh")
-    assert before_destroy[0]["continue_on_error"] is True
+    assert "before_destroy" not in events
 
     assert "after_apply" in events
     after_apply = events["after_apply"]

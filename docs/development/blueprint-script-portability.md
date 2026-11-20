@@ -69,7 +69,7 @@ for i in json.load(sys.stdin).get("items",[]): print(i["name"])'` |
 for i in json.load(sys.stdin).get("items",[]):
     if i.get("x"): print(i["id"])'` |
 
-See `blueprints/k3s-cluster/scripts/proxmox/k3s-post-terraform.sh` (lines 34-37) and `blueprints/k3s-cluster/scripts/oci/cleanup-tailscale-devices.sh` for in-tree examples after the swap in PR #646.
+See `blueprints/k3s-cluster/scripts/proxmox/k3s-post-terraform.sh` (lines 34-37) for an in-tree example after the swap in PR #646.
 
 ## Tools outside the baseline
 

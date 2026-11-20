@@ -74,10 +74,8 @@ example-config/
 │   ├── oci/
 │   │   ├── network.yaml                 # VCN, subnets, gateways
 │   │   └── instances.yaml               # Control plane + workers
-│   ├── files/cloud-init-snippets/
-│   │   └── tailscale.yaml               # Bootstrap: DNS, Tailscale
-│   └── scripts/
-│       └── cleanup-tailscale.sh         # Pre-destroy Tailscale cleanup
+│   └── files/cloud-init-snippets/
+│       └── tailscale.yaml               # Bootstrap: DNS, Tailscale
 ```
 
 ## Key Design Decisions
@@ -174,23 +172,17 @@ kubectl get pods -A
 
 ## Destroy Workflow
 
-**Important:** Clean up Tailscale devices before destroying infrastructure to avoid orphaned entries.
+Destroy removes the tailnet device of every instance that has a `tailscale:` OAuth block, so no manual Tailscale cleanup step is needed.
 
 ```bash
-# 1. Clean up Tailscale devices
-TAILSCALE_API_KEY=tskey-api-xxx ./scripts/cleanup-tailscale.sh
-
-# 2. Destroy infrastructure
+# 1. Destroy infrastructure (also removes the tailnet devices)
 foundry infra destroy --env oci-k3s
 
-# 3. (Optional) Recreate
+# 2. (Optional) Recreate
 foundry infra apply --env oci-k3s
 ```
 
-Instances with a `tailscale:` OAuth block are also cleaned up generically on destroy; see [Removing the tailnet device on destroy](../providers/tailscale.md#removing-the-tailnet-device-on-destroy).
-
-Get your API key from: https://login.tailscale.com/admin/settings/keys
-Required scopes: `devices:read`, `devices:write`
+For how the device removal works and when it is skipped, see [Removing the tailnet device on destroy](../providers/tailscale.md#removing-the-tailnet-device-on-destroy).
 
 ## Ansible Roles
 
@@ -331,10 +323,7 @@ OCI free tier ARM instances are popular. Try different availability domains or o
 
 ### Orphaned Tailscale Devices
 
-After destroy, devices may remain in Tailscale admin console. Run cleanup script:
-```bash
-TAILSCALE_API_KEY=tskey-api-xxx ./scripts/cleanup-tailscale.sh
-```
+Destroy removes the tailnet device of each instance with a `tailscale:` OAuth block. If a device remains, check the destroy output, the `remove_on_destroy` setting and the auth mode (see [Removing the tailnet device on destroy](../providers/tailscale.md#removing-the-tailnet-device-on-destroy)), or remove the device in the Tailscale admin console.
 
 ## See Also
 

@@ -118,7 +118,6 @@ k3s-cluster/
       k3s-post-terraform.sh
     oci/
       k3s-post-terraform.sh
-      cleanup-tailscale-devices.sh
       verify-cluster.sh
 ```
 
