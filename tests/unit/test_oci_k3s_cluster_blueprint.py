@@ -573,3 +573,83 @@ def test_playbook_and_role_files_are_valid_yaml() -> None:
     assert len(files) > 1
     for path in files:
         assert yaml.safe_load(path.read_text(encoding="utf-8")) is not None, path
+
+
+_STATEFUL_SSH = """#!/bin/sh
+n=$(cat "$RECORD_DIR/ssh_count" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" > "$RECORD_DIR/ssh_count"
+if [ "$n" -le "$SSH_FAIL_TIMES" ]; then
+    echo "$SSH_FAIL_MSG" >&2
+    exit 255
+fi
+exit 0
+"""
+
+
+def _run_script_with_failing_ssh(
+    tmp_path: Path, *, fail_times: int, fail_msg: str
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    """Run the OCI script with an ssh stub that fails `fail_times` times, then succeeds."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    record = tmp_path / "record"
+    record.mkdir()
+    stubs = {
+        "ssh": _STATEFUL_SSH,
+        "ssh-add": "#!/bin/sh\necho key\n",
+        "sleep": '#!/bin/sh\necho x >> "$RECORD_DIR/sleeps"\n',
+        "ansible-playbook": _FAKE_ANSIBLE,
+    }
+    for name, body in stubs.items():
+        stub = bin_dir / name
+        stub.write_text(body)
+        stub.chmod(0o755)
+    env = {
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "HOME": str(tmp_path),
+        "RECORD_DIR": str(record),
+        "SSH_FAIL_TIMES": str(fail_times),
+        "SSH_FAIL_MSG": fail_msg,
+        "INFRAFOUNDRY_VAR_control_name": "ctl",
+        "INFRAFOUNDRY_VAR_cluster_name": "c",
+        "INFRAFOUNDRY_VAR_tailnet": "example.net",
+        "INFRAFOUNDRY_VAR_kubeconfig_local_path": str(tmp_path / "kube.yaml"),
+        "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"workers": [{"name": "w1"}]}),
+    }
+    result = subprocess.run(
+        ["bash", str(OCI_SCRIPT)], env=env, capture_output=True, text=True, check=False
+    )
+    return result, record
+
+
+def test_script_waits_for_control_node_to_resolve(tmp_path: Path) -> None:
+    """A name that does not resolve yet (node not on the tailnet) keeps waiting."""
+    result, record = _run_script_with_failing_ssh(
+        tmp_path,
+        fail_times=3,
+        fail_msg="ssh: Could not resolve hostname ctl.example.net: Name or service not known",
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert (record / "args").exists()
+    assert len((record / "sleeps").read_text().splitlines()) == 3
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "ubuntu@ctl.example.net: Permission denied (publickey).",
+        "Host key verification failed.",
+        "Received disconnect: Too many authentication failures",
+    ],
+)
+def test_script_fails_fast_on_auth_and_host_key_errors(tmp_path: Path, message: str) -> None:
+    """Authentication and host-key errors do not retry and never reach ansible."""
+    result, record = _run_script_with_failing_ssh(tmp_path, fail_times=1000, fail_msg=message)
+
+    assert result.returncode != 0
+    assert message in result.stderr
+    assert not (record / "args").exists()
+    assert not (record / "sleeps").exists()
+    assert (record / "ssh_count").read_text().strip() == "1"

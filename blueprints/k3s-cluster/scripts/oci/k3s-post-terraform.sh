@@ -135,7 +135,9 @@ SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectT
 
 # --- Phase 0: Preflight — catch obvious local SSH problems before the wait
 # loop. Loops that silently retry for minutes are confusing when ssh-agent has
-# no keys loaded or the first hop is fundamentally broken.
+# no keys loaded. Only local state is checked here: on first create the control
+# node has not joined the tailnet yet, so a remote probe would fail spuriously.
+# Remote problems are classified in Phase 1.
 echo ""
 echo "--- Phase 0: Preflight checks ---"
 
@@ -151,26 +153,25 @@ if ! ssh-add -l >/dev/null 2>&1; then
 fi
 echo "  ssh-agent: $(ssh-add -l | wc -l) key(s) loaded"
 
-PREFLIGHT_ERR=$(mktemp)
-trap 'rm -f "$PREFLIGHT_ERR"' EXIT
-if ! ${SSH} "ubuntu@${CONTROL_HOST}" "echo ok" >"${PREFLIGHT_ERR}" 2>&1; then
-    echo "ERROR: preflight ssh to ${CONTROL_NAME} (${CONTROL_HOST}) failed:" >&2
-    sed 's/^/    /' "${PREFLIGHT_ERR}" >&2
-    exit 1
-fi
-echo "  ssh probe to ${CONTROL_NAME} (${CONTROL_HOST}): OK"
-
 # --- Phase 1: wait for SSH reachability on every host ---
+# A new node needs time to boot and join the tailnet, so name-resolution,
+# refused, timed-out and no-route errors keep waiting. Authentication and
+# host-key errors will not fix themselves, so they fail fast.
 echo ""
 echo "--- Phase 1: waiting for SSH reachability ---"
 MAX_WAIT=600
 WAIT_ERR=$(mktemp)
-trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR"' EXIT
+trap 'rm -f "${INVENTORY_FILE}" "${WAIT_ERR}"' EXIT
 
 wait_for_ssh() {
     local host="$1"
     local elapsed=0
     while ! ${SSH} "ubuntu@${host}" "echo ready" >"${WAIT_ERR}" 2>&1; do
+        if grep -qiE 'Permission denied|Host key verification failed|Too many authentication failures' "${WAIT_ERR}"; then
+            echo "ERROR: ssh to ${host} failed with a non-retryable error:" >&2
+            sed 's/^/    /' "${WAIT_ERR}" >&2
+            return 1
+        fi
         if [ ${elapsed} -ge ${MAX_WAIT} ]; then
             echo "ERROR: ${host} not reachable after ${MAX_WAIT}s"
             echo "  Last ssh attempt:" >&2
