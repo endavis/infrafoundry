@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795195627436,
+  "lastUpdate": 1795196093709,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4336,6 +4336,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009470140894731374",
             "extra": "mean: 126.38791473237193 usec\nrounds: 8315"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3a1f48b4c0f0bb5f27d83165b6929b45cec3c2ad",
+          "message": "fix: fire package-level on_create handlers under infra apply --parallel (merges PR #1533, addresses #1531)\n\napply_parallel never emitted the aggregate RESOURCE_CREATED event, so\npackage-level on_create handlers (those with requires) never ran, and\npending package obligations were neither recorded nor retried.\n\nExtract the aggregate block of apply_serial into _emit_aggregate_created\nand call it from both apply paths. apply_parallel also records package\npending entries now. Remove the docs caveat.\n\nThe existing test test_apply_parallel_records_no_package_pending asserted\nthe old behaviour; it is renamed and inverted. The inversion was approved\nby the maintainer. It also aborts the aggregate event, because a\nper-resource abort is swallowed into an error result under parallel apply.\n\nAddresses #1531\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T17:33:36Z",
+          "tree_id": "668df28f0e6a2bce195ebd33ec0de134e365e54d",
+          "url": "https://github.com/endavis/infrafoundry/commit/3a1f48b4c0f0bb5f27d83165b6929b45cec3c2ad"
+        },
+        "date": 1795196092641,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 100.18640893160061,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0007656803512610298",
+            "extra": "mean: 9.981393790476323 msec\nrounds: 105"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16124.915271180453,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000043031025151769006",
+            "extra": "mean: 62.01582973817345 usec\nrounds: 17755"
           }
         ]
       }
