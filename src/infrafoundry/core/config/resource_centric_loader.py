@@ -129,7 +129,7 @@ class ResourceCentricLoader:
             # Extract config dict (everything except provider/type/name)
             config = item.get("config", {})
             # Include name in config for template convenience
-            config["name"] = item["name"]
+            config.setdefault("name", item["name"])
 
             provider = item["provider"]
             provider = (
