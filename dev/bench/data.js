@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795206466614,
+  "lastUpdate": 1795207778234,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4564,6 +4564,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004516564763140558",
             "extra": "mean: 76.35897425299127 usec\nrounds: 13788"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "db826a216633d6ab31a62ac953998e6eb111a528",
+          "message": "fix: keep an explicit config.name in the resource-centric loader (merges PR #1546, addresses #1544)\n\nThe loader overwrote config.name with the entry's top-level name, so a\nDeployment and a Service could not share an object name. Set it only\nwhen the entry's config has none, add tests, and document that a\ndiffering object name needs the resource-centric format.\n\nAddresses #1544\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T20:48:26Z",
+          "tree_id": "1ac065d28cbb62a28851d3ac9c6de48c8d3ff248",
+          "url": "https://github.com/endavis/infrafoundry/commit/db826a216633d6ab31a62ac953998e6eb111a528"
+        },
+        "date": 1795207777440,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.03880187057295,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0002493242907769787",
+            "extra": "mean: 20.392015340001137 msec\nrounds: 50"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7843.9907552787545,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009813545347207621",
+            "extra": "mean: 127.4861267942 usec\nrounds: 8360"
           }
         ]
       }
