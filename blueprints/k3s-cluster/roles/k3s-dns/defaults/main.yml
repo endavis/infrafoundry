@@ -1,0 +1,19 @@
+---
+# Resolvers k3s hands to pods through the kubelet. Empty = the role does nothing.
+k3s_dns_nameservers: []
+
+# Search domains (one cluster-wide list). Empty = no search line.
+k3s_dns_search: []
+
+# k3s config directory; resolv.conf and config.yaml.d/ live here.
+k3s_dns_config_dir: /etc/rancher/k3s
+
+# The role never installs k3s: it fails when this file is missing.
+k3s_dns_install_marker: /usr/local/bin/k3s
+
+# systemd unit to restart on a change: k3s (server) or k3s-agent (worker).
+k3s_dns_service: k3s
+
+# Owner and group of the files and directories this role writes.
+k3s_dns_file_owner: root
+k3s_dns_file_group: root

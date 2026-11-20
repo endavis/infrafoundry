@@ -1,0 +1,7 @@
+# Managed by InfraFoundry (k3s-dns role). Used by the kubelet for pod DNS.
+{% for server in k3s_dns_nameservers %}
+nameserver {{ server }}
+{% endfor %}
+{% if k3s_dns_search | length > 0 %}
+search {{ k3s_dns_search | join(' ') }}
+{% endif %}

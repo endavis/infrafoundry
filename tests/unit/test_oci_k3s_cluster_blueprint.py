@@ -199,10 +199,11 @@ def test_oci_k3s_cluster_blueprint_inherits_events(loader: PackageLoader) -> Non
 
     assert "after_apply" in events
     after_apply = events["after_apply"]
-    assert len(after_apply) == 1
-    assert after_apply[0]["name"] == "verify-cluster"
-    assert after_apply[0]["script"].endswith("scripts/oci/verify-cluster.sh")
+    assert [h["name"] for h in after_apply] == ["k3s-dns", "verify-cluster"]
+    assert after_apply[0]["script"].endswith("scripts/oci/k3s-dns.sh")
     assert after_apply[0]["continue_on_error"] is True
+    assert after_apply[1]["script"].endswith("scripts/oci/verify-cluster.sh")
+    assert after_apply[1]["continue_on_error"] is True
 
 
 def test_oci_k3s_cluster_example_uses_tailscale_module(loader: PackageLoader) -> None:
@@ -438,6 +439,16 @@ OCI_SCRIPT = BLUEPRINT / "scripts" / "oci" / "k3s-post-terraform.sh"
 _FAKE_ANSIBLE = """#!/bin/sh
 echo "$ANSIBLE_ROLES_PATH" > "$RECORD_DIR/roles_path"
 echo "$@" > "$RECORD_DIR/args"
+for arg in "$@"; do
+    case "$arg" in
+        @*) cp "${arg#@}" "$RECORD_DIR/extra_vars.json" ;;
+    esac
+done
+prev=""
+for arg in "$@"; do
+    [ "$prev" = "-i" ] && cp "$arg" "$RECORD_DIR/inventory.yml"
+    prev="$arg"
+done
 """
 
 
@@ -563,9 +574,10 @@ def test_blueprint_ships_roles_and_playbook_layout() -> None:
     """Roles live in the blueprint; the playbook sits in playbooks/, away from roles/."""
     assert not list(BLUEPRINT.glob("playbook*.yml"))
     assert not (BLUEPRINT / "playbooks" / "roles").exists()
-    for role in ("k3s-server", "k3s-agent"):
+    for role in ("k3s-server", "k3s-agent", "k3s-dns"):
         assert (BLUEPRINT / "roles" / role / "tasks" / "main.yml").is_file()
         assert not (REPO_ROOT / "example-config" / "roles" / role).exists()
+    assert (BLUEPRINT / "playbooks" / "k3s-dns.yml").is_file()
 
 
 def test_playbook_and_role_files_are_valid_yaml() -> None:

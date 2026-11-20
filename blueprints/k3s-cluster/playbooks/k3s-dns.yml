@@ -1,0 +1,48 @@
+---
+# k3s cluster DNS playbook.
+#
+# Runs only the k3s-dns role: it writes a resolver file and a kubelet drop-in,
+# restarts the existing k3s units when they changed, then restarts CoreDNS.
+# It never runs the install roles and never uninstalls k3s. It is imported at
+# the end of k3s.yml and run alone by scripts/oci/k3s-dns.sh on later applies.
+
+- name: Configure k3s cluster DNS on the control plane
+  hosts: k3s_control
+  gather_facts: false
+  become: true
+  vars:
+    k3s_dns_service: k3s
+  roles:
+    - k3s-dns
+
+- name: Configure k3s cluster DNS on workers
+  hosts: k3s_workers
+  gather_facts: false
+  become: true
+  serial: 1
+  vars:
+    k3s_dns_service: k3s-agent
+    k3s_control_host: "{{ groups['k3s_control'][0] }}"
+  roles:
+    - k3s-dns
+
+- name: Restart CoreDNS when any node changed
+  hosts: k3s_control
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Work out whether any node changed
+      ansible.builtin.set_fact:
+        k3s_dns_any_changed: >-
+          {{ groups['k3s_cluster']
+             | map('extract', hostvars, 'k3s_dns_changed')
+             | select('defined') | map('bool') | select | list | length > 0 }}
+
+    - name: Restart CoreDNS
+      ansible.builtin.command: /usr/local/bin/k3s kubectl -n kube-system rollout restart deployment/coredns
+      when: k3s_dns_any_changed | bool
+
+    - name: Wait for CoreDNS
+      ansible.builtin.command: /usr/local/bin/k3s kubectl -n kube-system rollout status deployment/coredns --timeout=180s
+      changed_when: false
+      when: k3s_dns_any_changed | bool

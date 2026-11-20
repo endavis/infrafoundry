@@ -40,6 +40,43 @@ The `k3s-server` and `k3s-agent` roles live in `roles/` in this blueprint and ar
 default, so a config repo needs no `roles/` directory. To override them, put roles of the
 same names under `envs/<env>/roles/`; they take precedence over the blueprint's. The
 override applies to local runs only: the env directory is not copied to a jumphost.
+The `k3s-dns` role (see [Cluster DNS](#cluster-dns)) is a third, standalone role.
+
+#### Cluster DNS
+
+**Cause.** The kubelet builds each pod's `resolv.conf` from the node's own. On a Tailscale node
+that is `100.100.100.100` plus the tailnet search domains, which musl-based pods (Alpine) cannot
+use for external names.
+
+**Fix.** The `k3s-dns` role gives k3s its own resolver file and points the kubelet at it:
+
+- `/etc/rancher/k3s/resolv.conf` with the configured nameservers and search domains.
+- a k3s config drop-in, `50-infrafoundry-dns.yaml` in `/etc/rancher/k3s/config.yaml.d`, with
+  `resolv-conf: <that file>`.
+
+It restarts `k3s` or `k3s-agent` only when one of the files changed, then restarts the CoreDNS
+deployment only if something changed. It never installs or uninstalls k3s, and never touches
+`/var/lib/rancher`. It runs in two places: imported at the end of `playbooks/k3s.yml` on create,
+and from the `k3s-dns` after_apply handler (`scripts/oci/k3s-dns.sh`, `playbooks/k3s-dns.yml`
+only) on every later apply, so existing clusters are fixed on their next apply.
+
+**Inputs.**
+
+| Input | Default | Meaning |
+| :--- | :--- | :--- |
+| `k3s_dns_nameservers` | `["169.254.169.254"]` | 1 to 3 resolvers (the OCI VCN resolver); `[]` turns the step off |
+| `k3s_dns_search` | `[]` | Cluster-wide search domains; `[]` derives `<vcn_dns_label>.oraclevcn.com` |
+
+The search list is one cluster-wide list because the kubelet passes it into every pod.
+
+**Limits.**
+
+- If the CoreDNS restart fails, run `kubectl -n kube-system rollout restart deployment/coredns`.
+- The after_apply handler runs on the operator host, not the jumphost, and does not fail the
+  apply (`continue_on_error`). On a jumphost setup the create-time import does the work.
+- Pods no longer resolve `*.ts.net` names, since the Tailscale resolver is out of the path.
+- The Proxmox variant is not wired: it installs k3s with an SSH script, not these roles, and
+  has no known platform resolver. The role is provider-neutral, so it can be wired in later.
 
 #### Tailscale SSH
 
@@ -110,9 +147,11 @@ k3s-cluster/
   blueprint.yaml           # Shared defaults + providers section
   playbooks/
     k3s.yml                # Ansible playbook (OCI variant)
+    k3s-dns.yml            # Cluster DNS only (OCI variant, also run after apply)
   roles/
     k3s-server/            # Control plane install (OCI variant)
     k3s-agent/             # Worker install (OCI variant)
+    k3s-dns/               # Cluster DNS isolation (OCI variant)
   providers/
     proxmox/
       vm.yaml              # Proxmox VM resource template
@@ -125,6 +164,8 @@ k3s-cluster/
       k3s-post-terraform.sh
     oci/
       k3s-post-terraform.sh
+      k3s-dns.sh           # after_apply: cluster DNS only
+      k3s-lib.sh           # shared helpers, sourced
       verify-cluster.sh
 ```
 

@@ -274,6 +274,15 @@ ansible_vars:
 
 ## Troubleshooting
 
+### Alpine (musl) pods cannot resolve external names
+
+**Symptom:** a pod based on Alpine times out on external names while glibc pods work.
+
+**Cause:** the kubelet copies the node's `resolv.conf` into pods, and on a Tailscale node that
+points at the Tailscale resolver and tailnet search domains. The blueprint's `k3s-dns` role
+fixes this on the next apply; see the blueprint README's "Cluster DNS" section. To skip it, set
+`k3s_dns_nameservers: []`.
+
 ### DNS Resolution Failures from Worker Pods
 
 **Symptom:** `nslookup kubernetes.default.svc` times out from worker pods

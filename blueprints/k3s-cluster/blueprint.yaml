@@ -176,6 +176,16 @@ providers:
       - name: k3s_oci_firewall_fix
         default: true
 
+      # --- Cluster DNS (k3s-dns role, #1554) ---
+      # k3s gets its own resolv.conf so pods do not inherit the node's
+      # tailscale DNS. [] disables the step.
+      - name: k3s_dns_nameservers
+        description: "Resolvers for pods (1-3 IPs); the OCI VCN resolver by default, [] disables"
+        default: ["169.254.169.254"]
+      - name: k3s_dns_search
+        description: "Cluster-wide search domains; [] derives <vcn_dns_label>.oraclevcn.com"
+        default: []
+
       # --- Local kubeconfig destination ---
       - name: kubeconfig_local_path
         default: "~/.kube/{{ cluster_name }}.yaml"
@@ -201,6 +211,20 @@ providers:
               dest: "{{ kubeconfig_local_path }}"
 
       after_apply:
+        # Workflow handlers get no package variables, so the values travel in env.
+        - type: script
+          name: k3s-dns
+          script: scripts/oci/k3s-dns.sh
+          description: "Give k3s its own cluster DNS resolver (idempotent, never reinstalls k3s)"
+          timeout: 900
+          continue_on_error: true
+          env:
+            K3S_CONTROL_NAME: "{{ control_name }}"
+            K3S_WORKER_NAMES: "{{ workers | map(attribute='name') | join(',') }}"
+            K3S_TAILNET: "{{ tailnet }}"
+            K3S_DNS_NAMESERVERS: "{{ k3s_dns_nameservers | join(',') }}"
+            K3S_DNS_SEARCH: "{{ k3s_dns_search | join(',') }}"
+            K3S_VCN_DNS_LABEL: "{{ vcn_dns_label }}"
         - type: script
           name: verify-cluster
           script: scripts/oci/verify-cluster.sh

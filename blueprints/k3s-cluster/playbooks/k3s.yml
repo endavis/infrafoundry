@@ -8,6 +8,8 @@
 # next to roles/ because Ansible prefers a roles/ directory beside the
 # playbook over ANSIBLE_ROLES_PATH, which would stop an env's own roles/
 # from overriding them. The wrapper script sets ANSIBLE_ROLES_PATH.
+#
+# The last step imports k3s-dns.yml (cluster DNS isolation, #1554).
 
 - name: Install k3s control plane
   hosts: k3s_control
@@ -24,3 +26,7 @@
     k3s_control_host: "{{ groups['k3s_control'][0] }}"
   roles:
     - k3s-agent
+
+# Cluster DNS: give k3s its own resolver so pods skip the node's tailscale DNS.
+# Runs only the k3s-dns role; see k3s-dns.yml.
+- import_playbook: k3s-dns.yml

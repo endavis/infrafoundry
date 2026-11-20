@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: k3s-dns
+  author: InfraFoundry
+  description: Give k3s its own resolver file so pods do not inherit the node's tailscale DNS
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bookworm
+dependencies: []
