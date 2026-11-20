@@ -116,7 +116,7 @@ Scripts receive these environment variables automatically:
 | Variable | Description |
 |----------|-------------|
 | `INFRAFOUNDRY_ENV` | Environment name (e.g., "prod") |
-| `INFRAFOUNDRY_CONFIG_DIR` | Path to environment config directory |
+| `INFRAFOUNDRY_CONFIG_DIR` | Path to the environment directory (`<config>/envs/<env>`), not the repo root |
 | `INFRAFOUNDRY_EVENT` | Lifecycle stage (e.g., "before_destroy") |
 | `INFRAFOUNDRY_RESOURCE` | Resource name (resource-level hooks only) |
 | `INFRAFOUNDRY_PROVIDER` | Provider name (resource-level hooks only) |

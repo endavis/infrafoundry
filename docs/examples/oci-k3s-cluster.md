@@ -78,15 +78,6 @@ example-config/
 │   │   └── tailscale.yaml               # Bootstrap: DNS, Tailscale
 │   └── scripts/
 │       └── cleanup-tailscale.sh         # Pre-destroy Tailscale cleanup
-└── roles/
-    ├── k3s-server/                      # Control plane + iptables
-    │   ├── tasks/main.yml
-    │   ├── defaults/main.yml
-    │   └── README.md
-    └── k3s-agent/                       # Worker nodes + iptables
-        ├── tasks/main.yml
-        ├── defaults/main.yml
-        └── README.md
 ```
 
 ## Key Design Decisions
@@ -202,6 +193,10 @@ Get your API key from: https://login.tailscale.com/admin/settings/keys
 Required scopes: `devices:read`, `devices:write`
 
 ## Ansible Roles
+
+The `k3s-server` and `k3s-agent` roles ship in the `k3s-cluster` blueprint
+(`blueprints/k3s-cluster/roles/`), so the config repo needs no `roles/` directory. To override
+them, add roles of the same names under `envs/<env>/roles/`.
 
 ### k3s-server
 

@@ -24,16 +24,22 @@ When the package sets `jumphost`, the install script runs there, so the kubeconf
 first written on the jumphost. The blueprint declares it under the handler's `outputs:`, and
 InfraFoundry copies it to the same `~` path on your workstation (`~/.kube/<cluster>.yaml`
 by default) once the script succeeds, so no manual `scp` is needed. The OCI variant
-cannot use `jumphost` yet: its Ansible roles come from the config repo
-(`${INFRAFOUNDRY_CONFIG_DIR}/roles`), which is not copied to the jumphost, so the script fails
-fast with a clear message.
+works with `jumphost` too: its Ansible roles ship in the blueprint's `roles/` directory,
+which is copied to the jumphost with the rest of the blueprint.
 
 ### OCI
 
 One control plane plus N worker nodes on OCI ARM instances. Creates a VCN with
 public and private subnets, provisions compute instances with Tailscale
-cloud-init, then runs ansible-playbook against the shared k3s-server /
-k3s-agent roles.
+cloud-init, then runs ansible-playbook against the k3s-server / k3s-agent
+roles shipped in this blueprint.
+
+#### Roles
+
+The `k3s-server` and `k3s-agent` roles live in `roles/` in this blueprint and are used by
+default, so a config repo needs no `roles/` directory. To override them, put roles of the
+same names under `envs/<env>/roles/`; they take precedence over the blueprint's. The
+override applies to local runs only: the env directory is not copied to a jumphost.
 
 ## Usage
 
@@ -95,7 +101,11 @@ worker nodes use the values.
 ```
 k3s-cluster/
   blueprint.yaml           # Shared defaults + providers section
-  playbook.yml             # Ansible playbook (OCI variant)
+  playbooks/
+    k3s.yml                # Ansible playbook (OCI variant)
+  roles/
+    k3s-server/            # Control plane install (OCI variant)
+    k3s-agent/             # Worker install (OCI variant)
   providers/
     proxmox/
       vm.yaml              # Proxmox VM resource template

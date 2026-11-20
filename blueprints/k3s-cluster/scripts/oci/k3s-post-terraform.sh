@@ -4,8 +4,9 @@
 # Triggered by the blueprint's on_create event after the OCI compute
 # instances are provisioned. Builds an Ansible inventory on the fly from
 # INFRAFOUNDRY_PACKAGE_VARS (so worker count is dynamic) and runs the
-# shared k3s-server / k3s-agent roles from the config repo via
-# ansible-playbook.
+# k3s-server / k3s-agent roles shipped with the blueprint (roles/) via
+# ansible-playbook. A config repo can override them with its own roles
+# under envs/<env>/roles/ (local runs only).
 #
 # Variable cardinality: the worker count is derived from the workers:
 # list in the package manifest. The script reads the JSON-serialized
@@ -15,15 +16,15 @@
 # Portability contract (runs on InfraFoundry host or jumphost):
 #   - bash 4+
 #   - python3 (stdlib only — json)
-#   - ansible-playbook (checked at startup — the shared k3s roles live
-#     in ${INFRAFOUNDRY_CONFIG_DIR}/roles)
+#   - ansible-playbook (checked at startup — the k3s roles ship in the
+#     blueprint's roles/ directory, which travels to the jumphost with it)
 #
 # Environment variables (injected by ScriptHandler):
 #   INFRAFOUNDRY_VAR_<key>     - Individual package variables
 #   INFRAFOUNDRY_PACKAGE_VARS  - JSON-serialized full variable dict
 #   INFRAFOUNDRY_EVENT         - Event type (e.g., "resource_created")
 #   INFRAFOUNDRY_ENV           - Environment name
-#   INFRAFOUNDRY_CONFIG_DIR    - Config repository root
+#   INFRAFOUNDRY_CONFIG_DIR    - Env directory (<config>/envs/<env>); optional roles/ override
 #   INFRAFOUNDRY_BLUEPRINT_DIR - Absolute path to the blueprint directory
 #
 # Additional (optional) env vars:
@@ -46,20 +47,19 @@ mapfile -t WORKER_NAMES < <(python3 -c 'import json,sys
 for w in json.load(sys.stdin).get("workers",[]): print(w["name"])' <<< "${INFRAFOUNDRY_PACKAGE_VARS}")
 
 # --- Paths ---
-BLUEPRINT_DIR="${INFRAFOUNDRY_BLUEPRINT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
-if [ -n "${INFRAFOUNDRY_ON_JUMPHOST:-}" ] && [ -z "${INFRAFOUNDRY_CONFIG_DIR:-}" ]; then
-    echo "ERROR: the k3s roles live in the config repo (\${INFRAFOUNDRY_CONFIG_DIR}/roles), which is not copied to the jumphost; unset jumphost for the oci variant" >&2
-    exit 1
-fi
-CONFIG_DIR="${INFRAFOUNDRY_CONFIG_DIR:?required: run via foundry, not directly}"
-ROLES_DIR="${CONFIG_DIR}/roles"
-PLAYBOOK="${BLUEPRINT_DIR}/playbook.yml"
+BLUEPRINT_DIR="${INFRAFOUNDRY_BLUEPRINT_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
+BLUEPRINT_ROLES_DIR="${BLUEPRINT_DIR}/roles"
+PLAYBOOK="${BLUEPRINT_DIR}/playbooks/k3s.yml"
+# Blueprint roles are the default; an env's own roles/ goes first and wins.
+# The env directory is not copied to a jumphost, so the override is local only.
+ROLES_PATH="${BLUEPRINT_ROLES_DIR}"
+if [ -z "${INFRAFOUNDRY_ON_JUMPHOST:-}" ] && [ -n "${INFRAFOUNDRY_CONFIG_DIR:-}" ] && [ -d "${INFRAFOUNDRY_CONFIG_DIR}/roles" ]; then ROLES_PATH="${INFRAFOUNDRY_CONFIG_DIR}/roles:${ROLES_PATH}"; fi
 INVENTORY_FILE="$(mktemp -t k3s-inventory-XXXXXX.yml)"
 trap 'rm -f "${INVENTORY_FILE}"' EXIT
 
-if [ ! -d "${ROLES_DIR}" ]; then
-    echo "ERROR: Roles directory not found: ${ROLES_DIR}"
-    echo "Expected k3s-server and k3s-agent roles under \${INFRAFOUNDRY_CONFIG_DIR}/roles"
+if [ ! -d "${BLUEPRINT_ROLES_DIR}" ]; then
+    echo "ERROR: Roles directory not found: ${BLUEPRINT_ROLES_DIR}"
+    echo "Expected k3s-server and k3s-agent roles in the blueprint's roles/ directory"
     exit 1
 fi
 
@@ -128,7 +128,7 @@ for name in "${WORKER_NAMES[@]}"; do
 done
 echo "Tailnet: ${TAILNET:-<direct>}"
 echo "Inventory: ${INVENTORY_FILE}"
-echo "Roles:     ${ROLES_DIR}"
+echo "Roles:     ${ROLES_PATH}"
 echo "Playbook:  ${PLAYBOOK}"
 
 SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
@@ -192,7 +192,7 @@ done
 # --- Phase 2: run the ansible playbook ---
 echo ""
 echo "--- Phase 2: running ansible-playbook ---"
-export ANSIBLE_ROLES_PATH="${ROLES_DIR}"
+export ANSIBLE_ROLES_PATH="${ROLES_PATH}"
 export ANSIBLE_HOST_KEY_CHECKING=False
 
 ansible-playbook -i "${INVENTORY_FILE}" "${PLAYBOOK}"

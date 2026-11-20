@@ -16,6 +16,8 @@ instance:
     freeform_tags:
       role: control-plane
       cluster: k3s-dev
+    # Illustrative: these roles are not shipped. The k3s roles live in
+    # blueprints/k3s-cluster/roles/.
     ansible_roles:
       - common
       - k3s-server
