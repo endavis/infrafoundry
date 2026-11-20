@@ -136,6 +136,10 @@ vcn:
 | `internet_gateway` | No | Create an internet gateway and public route table |
 | `security_list` | No | Security list with ingress/egress rules |
 
+A subnet that sets no `security_list_id` is attached to its VCN's `security_list` when the VCN
+declares one; otherwise it uses the OCI default security list. An explicit `security_list_id` on
+the subnet takes precedence.
+
 ### Subnet
 
 ```yaml
