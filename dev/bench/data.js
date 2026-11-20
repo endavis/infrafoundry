@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795127075094,
+  "lastUpdate": 1795165042686,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3956,6 +3956,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005313693792961475",
             "extra": "mean: 77.68191163307378 usec\nrounds: 13625"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cea35fadca4681180628278a793ea5130cd911de",
+          "message": "feat: export legacy opnsense outbound nat rules with --include-legacy (merges PR #1512, addresses #1509)\n\nExtend --include-legacy to config migrate -c firewall.nat. Rules from the\nlegacy Outbound NAT page (<nat><outbound><rule> in config.xml) are not listed\nby the firewall/source_nat API, so the export omitted them. They are now read\nfrom the config backup and mapped to nat_rules (kind: outbound) entries.\nAn empty legacy target maps to <interface>ip, sequences follow the highest\nlive outbound sequence, empty <rule/> placeholders are skipped, and\nunmappable elements are reported with --allow-partial as for filter rules.\n\nAddresses #1509\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T08:56:09Z",
+          "tree_id": "23ea2c80d1d263ec529f0759ffb702d97e8079ed",
+          "url": "https://github.com/endavis/infrafoundry/commit/cea35fadca4681180628278a793ea5130cd911de"
+        },
+        "date": 1795165042024,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 104.29610900217459,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00006723941688859565",
+            "extra": "mean: 9.588085399994643 msec\nrounds: 110"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15992.501300272246,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014353943939151806",
+            "extra": "mean: 62.52930553039734 usec\nrounds: 17648"
           }
         ]
       }
