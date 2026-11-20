@@ -379,6 +379,68 @@ def test_oci_k3s_cluster_blueprint_with_zero_workers(tmp_path: Path) -> None:
     assert events["on_create"][0]["requires"] == ["k3s-solo-control"]
 
 
+def _verify_cluster_env(tmp_path: Path, extra_vars: str = "") -> dict[str, str]:
+    """Render a package and return the env of its verify-cluster handler."""
+    envs = tmp_path / "envs"
+    pkg = envs / "test" / "example-k3s"
+    pkg.mkdir(parents=True)
+    (pkg / "infrafoundry.yml").write_text(
+        textwrap.dedent(
+            """\
+            name: example-k3s
+            description: "k3s with a non-default cluster name"
+            blueprint: k3s-cluster
+            provider: oci
+            variables:
+              cluster_name: example-k3s
+              control_name: example-k3s-control
+              image: "ocid1.image.oc1.iad.tttttttt"
+              ssh_public_key: "ssh-rsa AAAA-ts"
+              tailnet: "example.ts.net"
+              ts_tags: ["tag:example"]
+            """
+        )
+        + extra_vars
+    )
+    loader = PackageLoader(envs, blueprint_resolver=BlueprintResolver(envs))
+    _resources, events, _variables = loader.load_package(pkg, provider="oci", env_name="test")
+    handler = next(h for h in events["after_apply"] if h["name"] == "verify-cluster")
+    return dict(handler["env"])
+
+
+def test_verify_cluster_handler_uses_overridden_kubeconfig_path(tmp_path: Path) -> None:
+    """An overridden kubeconfig_local_path reaches the verify-cluster handler env."""
+    env = _verify_cluster_env(tmp_path, '  kubeconfig_local_path: "~/custom/example.yaml"\n')
+    assert env["KUBECONFIG"] == "~/custom/example.yaml"
+
+
+def test_verify_cluster_handler_uses_default_kubeconfig_path(tmp_path: Path) -> None:
+    """Without an override, the default path resolves from cluster_name."""
+    env = _verify_cluster_env(tmp_path)
+    assert env["KUBECONFIG"] == "~/.kube/example-k3s.yaml"
+
+
+def test_verify_cluster_script_expands_leading_tilde(tmp_path: Path) -> None:
+    """A leading ~ in KUBECONFIG is expanded to HOME before the file check."""
+    home = tmp_path / "home"
+    home.mkdir()
+    env = {
+        "PATH": os.environ["PATH"],
+        "HOME": str(home),
+        "KUBECONFIG": "~/x.yaml",
+    }
+    result = subprocess.run(
+        ["bash", str(BLUEPRINT / "scripts" / "oci" / "verify-cluster.sh")],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert f"Using kubeconfig: {home}/x.yaml" in result.stdout
+    assert f"Kubeconfig not found at {home}/x.yaml" in result.stdout
+
+
 def test_oci_k3s_cluster_blueprint_overrides_tailscale_secret_keys(tmp_path: Path) -> None:
     """ts_oauth_client_*_secret variables change the secret keys on every node."""
     envs = tmp_path / "envs"
