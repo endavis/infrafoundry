@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795192822534,
+  "lastUpdate": 1795195627436,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4298,6 +4298,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004483452320672409",
             "extra": "mean: 69.96099270394032 usec\nrounds: 15899"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "51c87e2787eb42e3861eca30b03ada4cbc103144",
+          "message": "fix: fail fast when a tailscale ssh policy denies the k3s install (merges PR #1532, addresses #1530)\n\n* fix: fail fast when a tailscale ssh policy denies the k3s ssh wait\n\nwait_for_ssh kept polling for the full timeout when the tailnet policy\nrefused the session. Add the denial text to the fast-fail patterns with\nan error pointing at the policy's ssh rules, test it, and document the\nrequired ssh rule in the k3s-cluster blueprint README.\n\nAddresses #1530\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* test: check the host in the tailscale-deny test with a regex\n\nCodeQL flagged `\"ctl.example.net\" in result.stderr` as incomplete URL\nsubstring sanitization; the test only checks that the error names the\nhost. Use a word-bounded regex instead, with the same meaning.\n\nAddresses #1530\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T17:25:55Z",
+          "tree_id": "f8edad4a00b47c2ee8e5235bbcfc7573a3c1d84b",
+          "url": "https://github.com/endavis/infrafoundry/commit/51c87e2787eb42e3861eca30b03ada4cbc103144"
+        },
+        "date": 1795195626635,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.56207051672115,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0002894051413312768",
+            "extra": "mean: 20.176719607842493 msec\nrounds: 51"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7912.148895861706,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009470140894731374",
+            "extra": "mean: 126.38791473237193 usec\nrounds: 8315"
           }
         ]
       }
