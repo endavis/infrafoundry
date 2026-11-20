@@ -1,0 +1,98 @@
+---
+# k3s cluster DNS isolation
+#
+# By default the kubelet builds pod resolv.conf from the node's /etc/resolv.conf.
+# On a tailscale node that is 100.100.100.100 plus the tailnet search domains,
+# which musl-based pods (Alpine) cannot use for external names. This role gives
+# k3s its own resolv.conf and points the kubelet at it with a config drop-in.
+#
+# Safety: this role only writes two files and restarts the existing k3s unit
+# when one of them changed. It never installs or uninstalls k3s and never
+# touches /var/lib/rancher.
+#
+# Variables: k3s_dns_nameservers, k3s_dns_search, k3s_dns_config_dir,
+#            k3s_dns_install_marker, k3s_dns_service, k3s_control_host (workers)
+
+- name: Skip when no cluster nameservers are configured
+  ansible.builtin.meta: end_host
+  when: k3s_dns_nameservers | length == 0
+
+- name: Check the nameserver count
+  ansible.builtin.assert:
+    that:
+      - k3s_dns_nameservers | length >= 1
+      - k3s_dns_nameservers | length <= 3
+    fail_msg: "k3s_dns_nameservers needs 1 to 3 entries (resolv.conf limit)"
+
+- name: Check that k3s is already installed
+  ansible.builtin.stat:
+    path: "{{ k3s_dns_install_marker }}"
+  register: k3s_dns_binary
+
+- name: Fail when k3s is missing
+  ansible.builtin.fail:
+    msg: "{{ k3s_dns_install_marker }} not found: this step never installs k3s"
+  when: not k3s_dns_binary.stat.exists
+
+- name: Create the k3s config directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ k3s_dns_file_owner }}"
+    group: "{{ k3s_dns_file_group }}"
+    mode: "0755"
+  loop:
+    - "{{ k3s_dns_config_dir }}"
+    - "{{ k3s_dns_config_dir }}/config.yaml.d"
+
+- name: Write the cluster resolv.conf
+  ansible.builtin.template:
+    src: resolv.conf.j2
+    dest: "{{ k3s_dns_config_dir }}/resolv.conf"
+    owner: "{{ k3s_dns_file_owner }}"
+    group: "{{ k3s_dns_file_group }}"
+    mode: "0644"
+  register: k3s_dns_resolv
+
+- name: Point the kubelet at the cluster resolv.conf
+  ansible.builtin.copy:
+    dest: "{{ k3s_dns_config_dir }}/config.yaml.d/50-infrafoundry-dns.yaml"
+    owner: "{{ k3s_dns_file_owner }}"
+    group: "{{ k3s_dns_file_group }}"
+    mode: "0644"
+    content: |
+      # Managed by InfraFoundry (k3s-dns role)
+      resolv-conf: {{ k3s_dns_config_dir }}/resolv.conf
+  register: k3s_dns_dropin
+
+- name: Record whether anything changed
+  ansible.builtin.set_fact:
+    k3s_dns_changed: "{{ k3s_dns_resolv is changed or k3s_dns_dropin is changed }}"
+
+- name: Restart k3s to pick up the resolver
+  ansible.builtin.service:
+    name: "{{ k3s_dns_service }}"
+    state: restarted
+  when: k3s_dns_changed | bool
+
+- name: Wait for the API server (control node)
+  ansible.builtin.command: /usr/local/bin/k3s kubectl get --raw=/readyz
+  register: k3s_dns_ready
+  retries: 30
+  delay: 5
+  until: k3s_dns_ready.rc == 0
+  changed_when: false
+  when:
+    - k3s_dns_changed | bool
+    - k3s_control_host is not defined
+
+- name: Wait for the node to be Ready (worker)
+  ansible.builtin.command: >-
+    /usr/local/bin/k3s kubectl wait --for=condition=Ready
+    node/{{ inventory_hostname }} --timeout=180s
+  # delegate_to is templated before `when`, so it needs a value on the control node too.
+  delegate_to: "{{ k3s_control_host | default(inventory_hostname) }}"
+  changed_when: false
+  when:
+    - k3s_dns_changed | bool
+    - k3s_control_host is defined

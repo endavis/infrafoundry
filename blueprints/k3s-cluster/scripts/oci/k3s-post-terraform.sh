@@ -75,49 +75,31 @@ if ! command -v ansible-playbook >/dev/null 2>&1; then
 fi
 
 # --- Compute ansible_host values (FQDN on the tailnet if provided) ---
-host_fqdn() {
-    local name="$1"
-    if [ -n "${TAILNET}" ]; then
-        echo "${name}.${TAILNET}"
-    else
-        echo "${name}"
-    fi
-}
+source "${BLUEPRINT_DIR}/scripts/oci/k3s-lib.sh"
 
 CONTROL_HOST=$(host_fqdn "${CONTROL_NAME}")
 
+# --- Cluster DNS inputs (k3s-dns role; empty nameservers = step disabled) ---
+eval "$(python3 -c 'import json,shlex,sys
+v = json.load(sys.stdin)
+def j(k):
+    x = v.get(k) or []
+    return ",".join(x) if isinstance(x, list) else str(x)
+print("export K3S_DNS_NAMESERVERS=" + shlex.quote(j("k3s_dns_nameservers")))
+print("export K3S_DNS_SEARCH=" + shlex.quote(j("k3s_dns_search")))
+print("export K3S_VCN_DNS_LABEL=" + shlex.quote(str(v.get("vcn_dns_label") or "")))' <<< "${INFRAFOUNDRY_PACKAGE_VARS}")"
+DNS_VARS_FILE="$(mktemp -t k3s-dns-vars-XXXXXX.json)"
+trap 'rm -f "${INVENTORY_FILE}" "${DNS_VARS_FILE}"' EXIT
+write_k3s_dns_extra_vars "${DNS_VARS_FILE}"
+
 # --- Write inventory ---
-{
-    echo "all:"
-    echo "  children:"
-    echo "    k3s_control:"
-    echo "      hosts:"
-    echo "        ${CONTROL_NAME}:"
-    echo "          ansible_host: ${CONTROL_HOST}"
-    echo "          ansible_user: ubuntu"
-    echo "    k3s_workers:"
-    echo "      hosts:"
-    if [ ${#WORKER_NAMES[@]} -eq 0 ]; then
-        echo "        {}"
-    else
-        for name in "${WORKER_NAMES[@]}"; do
-            echo "        ${name}:"
-            echo "          ansible_host: $(host_fqdn "${name}")"
-            echo "          ansible_user: ubuntu"
-        done
-    fi
-    echo "    k3s_cluster:"
-    echo "      children:"
-    echo "        k3s_control: {}"
-    echo "        k3s_workers: {}"
-    echo "      vars:"
-    echo "        cluster_name: ${CLUSTER_NAME}"
-    echo "        k3s_version: \"${K3S_VERSION}\""
-    echo "        k3s_server_args: \"${K3S_SERVER_ARGS}\""
-    echo "        k3s_oci_firewall_fix: ${K3S_OCI_FIREWALL_FIX}"
-    echo "        k3s_vcn_cidr: \"${K3S_VCN_CIDR}\""
-    echo "        kubeconfig_local_path: \"${KUBECONFIG_LOCAL}\""
-} > "${INVENTORY_FILE}"
+write_k3s_inventory "${INVENTORY_FILE}" \
+    "cluster_name: ${CLUSTER_NAME}" \
+    "k3s_version: \"${K3S_VERSION}\"" \
+    "k3s_server_args: \"${K3S_SERVER_ARGS}\"" \
+    "k3s_oci_firewall_fix: ${K3S_OCI_FIREWALL_FIX}" \
+    "k3s_vcn_cidr: \"${K3S_VCN_CIDR}\"" \
+    "kubeconfig_local_path: \"${KUBECONFIG_LOCAL}\""
 
 echo "=== k3s Cluster Setup (OCI) ==="
 echo "Cluster: ${CLUSTER_NAME}"
@@ -161,7 +143,7 @@ echo ""
 echo "--- Phase 1: waiting for SSH reachability ---"
 MAX_WAIT=600
 WAIT_ERR=$(mktemp)
-trap 'rm -f "${INVENTORY_FILE}" "${WAIT_ERR}"' EXIT
+trap 'rm -f "${INVENTORY_FILE}" "${DNS_VARS_FILE}" "${WAIT_ERR}"' EXIT
 
 wait_for_ssh() {
     local host="$1"
@@ -203,7 +185,7 @@ echo "--- Phase 2: running ansible-playbook ---"
 export ANSIBLE_ROLES_PATH="${ROLES_PATH}"
 export ANSIBLE_HOST_KEY_CHECKING=False
 
-ansible-playbook -i "${INVENTORY_FILE}" "${PLAYBOOK}"
+ansible-playbook -i "${INVENTORY_FILE}" -e "@${DNS_VARS_FILE}" "${PLAYBOOK}"
 
 echo ""
 echo "=== k3s Cluster Setup Complete ==="
