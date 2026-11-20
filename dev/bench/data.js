@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795207778234,
+  "lastUpdate": 1795208422677,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4602,6 +4602,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009813545347207621",
             "extra": "mean: 127.4861267942 usec\nrounds: 8360"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4f2ff3c5476024d97cd09b8ac748766ba5734f71",
+          "message": "feat: add oci object storage buckets and scoped iam access keys (merges PR #1547, addresses #1545)\n\nAdd bucket, iam_user, iam_group, iam_policy and customer_secret_key\nresource types to the oci provider, with a lifecycle policy per bucket,\ngroup memberships, offline validation and an objectstorage_namespace\noutput. Customer secret key id and secret are sensitive outputs consumed\nthrough outputs.oci.* references (ADR-0029). Documented in\ndocs/providers/oci.md.\n\nAddresses #1545\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T20:58:59Z",
+          "tree_id": "fe5f174255542fa74728b1dc2d27c26c41b9323c",
+          "url": "https://github.com/endavis/infrafoundry/commit/4f2ff3c5476024d97cd09b8ac748766ba5734f71"
+        },
+        "date": 1795208422183,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 45.32515980697202,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0009472045369909611",
+            "extra": "mean: 22.06280141666876 msec\nrounds: 48"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7636.267260039635,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000014007595857247154",
+            "extra": "mean: 130.95403368514496 usec\nrounds: 8342"
           }
         ]
       }
