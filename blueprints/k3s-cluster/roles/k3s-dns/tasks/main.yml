@@ -73,10 +73,12 @@
   ansible.builtin.service:
     name: "{{ k3s_dns_service }}"
     state: restarted
+  # Tag lets a test skip the real systemd restart.
+  tags: [k3s_dns_restart]
   when: k3s_dns_changed | bool
 
 - name: Wait for the API server (control node)
-  ansible.builtin.command: /usr/local/bin/k3s kubectl get --raw=/readyz
+  ansible.builtin.command: "{{ k3s_dns_bin }} kubectl get --raw=/readyz"
   register: k3s_dns_ready
   retries: 30
   delay: 5
@@ -86,10 +88,34 @@
     - k3s_dns_changed | bool
     - k3s_control_host is not defined
 
+- name: Find the k3s node name (worker)
+  # The node registers under node-name (config or --node-name) or else the machine
+  # hostname, which can differ from the inventory name. Later settings win.
+  ansible.builtin.shell:
+    cmd: |
+      name=$(cat "$CFG_DIR/config.yaml" "$CFG_DIR"/config.yaml.d/*.yaml 2>/dev/null \
+        | sed -n 's/^node-name:[[:space:]]*//p' | tail -n1 | tr -d "\"'[:space:]")
+      if [ -z "$name" ]; then
+        name=$(systemctl cat "$SERVICE" 2>/dev/null \
+          | grep -o -- '--node-name[= ][^ \\]*' | tail -n1 | sed 's/^--node-name[= ]//' \
+          | tr -d "\"'")
+      fi
+      if [ -z "$name" ]; then name=$(hostname); fi
+      printf '%s' "$name"
+    executable: /bin/sh
+  environment:
+    CFG_DIR: "{{ k3s_dns_config_dir }}"
+    SERVICE: "{{ k3s_dns_service }}"
+  register: k3s_dns_node_name
+  changed_when: false
+  when:
+    - k3s_dns_changed | bool
+    - k3s_control_host is defined
+
 - name: Wait for the node to be Ready (worker)
   ansible.builtin.command: >-
-    /usr/local/bin/k3s kubectl wait --for=condition=Ready
-    node/{{ inventory_hostname }} --timeout=180s
+    {{ k3s_dns_bin }} kubectl wait --for=condition=Ready
+    node/{{ k3s_dns_node_name.stdout }} --timeout=180s
   # delegate_to is templated before `when`, so it needs a value on the control node too.
   delegate_to: "{{ k3s_control_host | default(inventory_hostname) }}"
   changed_when: false
