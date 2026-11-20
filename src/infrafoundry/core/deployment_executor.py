@@ -222,6 +222,29 @@ class DeploymentExecutor:
             )
             results[provider_name] = result
 
+        self._emit_aggregate_created(
+            env_name, deployment_id, results, resources_by_provider, filter_set, package_filter
+        )
+
+        return results
+
+    def _emit_aggregate_created(
+        self,
+        env_name: str,
+        deployment_id: int,
+        results: dict[str, Any],
+        resources_by_provider: dict[str, list[ResourceConfig]],
+        filter_set: set[str] | None,
+        package_filter: str | None,
+    ) -> None:
+        """Emit the aggregate RESOURCE_CREATED event once all providers finished.
+
+        Shared by ``apply_serial`` and ``apply_parallel``. Provider results that are
+        not outcome dicts (e.g. ``{"error": ...}``) are skipped.
+
+        Raises:
+            EventAbortedError: If a handler fails with ``abort`` set.
+        """
         # Emit aggregate RESOURCE_CREATED event AFTER all providers complete.
         # This ensures group handlers (requires: [...]) only fire once when
         # all required resources exist across all providers.
@@ -278,8 +301,6 @@ class DeploymentExecutor:
                         self._ledger_done(
                             deployment_id, entry.provider, entry.name, "package", entry.address
                         )
-
-        return results
 
     def apply_parallel(
         self,
@@ -378,6 +399,7 @@ class DeploymentExecutor:
                         resource_filter=resource_filter,
                         package_filter=package_filter,
                         add_only=add_only,
+                        record_package_pending=True,
                     )
                     future_to_provider[future] = provider_name
 
@@ -407,6 +429,10 @@ class DeploymentExecutor:
                             self.console.print(traceback.format_exc(), style="dim red")
                             results[provider_name] = {"error": str(e)}
                         progress.update(task, advance=1)
+
+        self._emit_aggregate_created(
+            env_name, deployment_id, results, resources_by_provider, filter_set, package_filter
+        )
 
         return results
 
@@ -448,8 +474,8 @@ class DeploymentExecutor:
                 kwarg to ``runner.apply``). Honored by direct-API runners
                 only; other runners absorb the kwarg via ``**kwargs``.
             record_package_pending: If True, also record each primary create as a
-                pending package-level ``on_create`` obligation. ``apply_serial``
-                sets it because it emits the aggregate event afterwards.
+                pending package-level ``on_create`` obligation. ``apply_serial`` and
+                ``apply_parallel`` set it because both emit the aggregate event afterwards.
 
         Returns:
             Dict with apply results including terraform outcomes
