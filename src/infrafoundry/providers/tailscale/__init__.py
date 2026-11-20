@@ -30,6 +30,7 @@ from .validators import (
     DeviceReferenceValidator,
     DnsValidator,
     NamingValidator,
+    OAuthClientValidator,
     TailnetKeyValidator,
 )
 from .validators.context import TailscaleConfigContext, TailscaleCredentialsContext
@@ -117,6 +118,7 @@ class TailscaleProvider(
         return [
             "acl",
             "tailnet_key",
+            "oauth_client",
             "device_subnet_routes",
             "device_tags",
             "dns_nameservers",
@@ -147,6 +149,7 @@ class TailscaleProvider(
         return {
             "acl": [],
             "tailnet_key": ["acl"],
+            "oauth_client": ["acl"],
             "device_tags": ["acl"],
             "device_subnet_routes": ["acl"],
             "dns_nameservers": [],
@@ -213,6 +216,12 @@ class TailscaleProvider(
                 context={"keys": resources_by_type["tailnet_key"], "acl_tf": acl_tf},
                 output_name="tailnet_key.tf",
             )
+        if "oauth_client" in resources_by_type:
+            self.render_and_write_terraform(
+                "tailscale/oauth_client.tf.j2",
+                context={"clients": resources_by_type["oauth_client"], "acl_tf": acl_tf},
+                output_name="oauth_client.tf",
+            )
         if "device_subnet_routes" in resources_by_type:
             self.render_and_write_terraform(
                 "tailscale/device_subnet_routes.tf.j2",
@@ -272,6 +281,7 @@ class TailscaleProvider(
                 NamingValidator(report),
                 AclValidator(report),
                 TailnetKeyValidator(report),
+                OAuthClientValidator(report),
                 DeviceReferenceValidator(report),
                 DnsValidator(report),
             ),

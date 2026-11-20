@@ -248,6 +248,10 @@ class ResourceFilterError(InfraFoundryError):
     """Raised when resource filter matches no resources."""
 
 
+class OutputReferenceError(InfraFoundryError):
+    """Raised when an ``outputs.<provider>.<output>`` reference cannot be resolved (#1536)."""
+
+
 class FilteredDestroyRefusedError(InfraFoundryError):
     """Raised when a filtered destroy would cascade beyond the selected resources (#1153)."""
 
@@ -485,6 +489,7 @@ __all__ = [
     "MissingConfigurationError",
     "MissingCredentialError",
     "MissingDependencyError",
+    "OutputReferenceError",
     # Package
     "PackageMoveRollbackError",
     "PackageNotFoundError",

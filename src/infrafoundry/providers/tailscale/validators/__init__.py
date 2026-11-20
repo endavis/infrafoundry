@@ -9,6 +9,9 @@ from infrafoundry.providers.tailscale.validators.device_validator import (
 )
 from infrafoundry.providers.tailscale.validators.dns_validator import DnsValidator
 from infrafoundry.providers.tailscale.validators.naming_validator import NamingValidator
+from infrafoundry.providers.tailscale.validators.oauth_client_validator import (
+    OAuthClientValidator,
+)
 from infrafoundry.providers.tailscale.validators.tailnet_key_validator import (
     TailnetKeyValidator,
 )
@@ -19,5 +22,6 @@ __all__ = [
     "DeviceReferenceValidator",
     "DnsValidator",
     "NamingValidator",
+    "OAuthClientValidator",
     "TailnetKeyValidator",
 ]

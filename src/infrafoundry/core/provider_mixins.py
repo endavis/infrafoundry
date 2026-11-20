@@ -22,6 +22,16 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_instances import split_provider_id
 from infrafoundry.core.security.file_utils import secure_write
 
+#: Reserved prefix of a ``terraform_secrets`` entry that names another provider's Terraform
+#: output instead of a SOPS key (#1536).
+OUTPUT_REF_PREFIX = "outputs."
+
+
+def is_output_ref(ref: str) -> bool:
+    """Return True if a ``terraform_secrets`` entry is an ``outputs.*`` reference."""
+    return ref.startswith(OUTPUT_REF_PREFIX)
+
+
 _RESOURCE_DECL_RE = re.compile(r'^resource\s+"([^"]+)"\s+"([^"]+)"')
 
 #: Pattern matching legal Terraform variable name characters.
@@ -737,6 +747,9 @@ class TerraformGeneratorMixin:
         flat_secrets = SecretManager.flatten_dict(env_config.secrets)
         result: dict[str, str] = {}
         for ref in refs:
+            if is_output_ref(ref):
+                # Resolved from the producer's Terraform outputs by the runner (#1536).
+                continue
             if ref not in flat_secrets:
                 raise KeyError(
                     f"terraform_secrets reference '{ref}' is not present in "

@@ -277,7 +277,7 @@ class KubernetesValidator:
                     level=ValidationLevel.ERROR,
                 )
         validate_terraform_secrets_references(
-            "kubernetes", well_formed, self.env_config, self.report
+            "kubernetes", well_formed, self.env_config, self.report, allow_output_refs=True
         )
 
         flat = SecretManager.flatten_dict(getattr(self.env_config, "secrets", None))

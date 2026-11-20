@@ -13,6 +13,7 @@ import copy
 from typing import Any
 
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.provider_mixins import is_output_ref
 
 SECRET_MAP_FIELDS: tuple[str, ...] = ("string_data_secrets", "data_secrets")
 
@@ -114,6 +115,13 @@ def shape_errors(resource: ResourceConfig) -> list[str]:
                     f"reference strings"
                 )
                 continue
+            if field == "data_secrets":
+                errors.extend(
+                    f"Secret '{resource.name}' key '{key}' in 'data_secrets' uses an outputs "
+                    f"reference; outputs are not base64, use 'string_data_secrets'"
+                    for key, ref in mapping.items()
+                    if is_output_ref(ref)
+                )
             literal = config.get(_LITERAL_SIBLINGS[field])
             if isinstance(literal, dict):
                 for key in mapping:

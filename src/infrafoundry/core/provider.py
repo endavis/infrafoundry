@@ -217,6 +217,21 @@ class ProviderBase(ABC):
         """
         return {}
 
+    def get_terraform_output_refs(self, resources: list[ResourceConfig] | None = None) -> list[str]:
+        """Return the ``outputs.<provider>.<output>`` references this provider consumes.
+
+        Optional hook (#1536). The framework resolves each reference from the
+        producer provider's Terraform outputs and orders the producer first.
+
+        Args:
+            resources: The provider's resources; ``None`` means the ones its last
+                Terraform generation used
+
+        Returns:
+            Ordered, de-duplicated references; empty by default
+        """
+        return []
+
     @abstractmethod
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
         """Map InfraFoundry resource types to terraform resource types.

@@ -13,7 +13,7 @@ Covers:
 import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -245,3 +245,50 @@ class TestProviderBaseGetTerraformEnvVars:
 
         provider = ConcreteProvider("test", Path("/tmp"), Path("/tmp/out"))
         assert provider.get_terraform_env_vars() == {}
+
+
+class TestTerraformRunnerOutputRefs:
+    """``outputs.*`` refs are resolved per command (#1536)."""
+
+    REF = "outputs.tailscale.oauth_client_x_secret"
+
+    def _provider(self, refs: list[str], tmp_path: Path) -> MagicMock:
+        provider = MagicMock(spec=ProviderBase)
+        provider.get_terraform_env_vars.return_value = {}
+        provider.get_terraform_output_refs.return_value = refs
+        provider.terraform_dir = tmp_path / "kubernetes"
+        return provider
+
+    @pytest.mark.parametrize(
+        ("command", "strict"),
+        [("apply", True), ("plan", False), ("destroy", False), ("validate", False), (None, False)],
+    )
+    def test_strictness_follows_command(
+        self, command: str | None, strict: bool, tmp_path: Path
+    ) -> None:
+        runner = TerraformRunner(console=Mock())
+        provider = self._provider([self.REF], tmp_path)
+        with patch(
+            "infrafoundry.core.runners.terraform_runner.resolve_output_refs",
+            return_value={"TF_VAR_x": "v"},
+        ) as resolve:
+            env = runner._prepare_environment(provider, command)
+        assert env["TF_VAR_x"] == "v"
+        assert resolve.call_args.args == ([self.REF],)
+        assert resolve.call_args.kwargs["strict"] is strict
+        assert resolve.call_args.kwargs["terraform_root"] == tmp_path
+
+    def test_provider_without_list_refs_resolves_nothing(self, tmp_path: Path) -> None:
+        # A protocol-only plugin may lack the hook or return a non-list; no refs then.
+        runner = TerraformRunner(console=Mock())
+        provider = Mock()
+        provider.get_terraform_env_vars.return_value = {}
+        with patch("infrafoundry.core.runners.terraform_runner.resolve_output_refs") as resolve:
+            runner._prepare_environment(provider, "apply")
+        resolve.assert_not_called()
+
+    def test_no_refs_means_no_resolution(self, tmp_path: Path) -> None:
+        runner = TerraformRunner(console=Mock())
+        with patch("infrafoundry.core.runners.terraform_runner.resolve_output_refs") as resolve:
+            runner._prepare_environment(self._provider([], tmp_path), "apply")
+        resolve.assert_not_called()

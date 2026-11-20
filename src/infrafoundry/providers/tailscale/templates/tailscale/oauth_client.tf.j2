@@ -1,0 +1,16 @@
+{% for r in clients %}
+{% set tf = r.name | to_terraform_name %}
+resource "tailscale_oauth_client" "{{ tf }}" {
+{% if r.config.description is defined %}
+  description = {{ r.config.description | hcl_string }}
+{% endif %}
+  scopes      = {{ r.config.scopes | hcl_list }}
+{% if r.config.tags %}
+  tags        = {{ r.config.tags | hcl_list }}
+{% endif %}
+{% if acl_tf %}
+  depends_on  = [tailscale_acl.{{ acl_tf }}]
+{% endif %}
+}
+
+{% endfor %}

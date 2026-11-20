@@ -1,6 +1,9 @@
 """Tests for the ExecutionPlanner service."""
 
+import pytest
+
 from infrafoundry.core.dependencies import DependencyGraph
+from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.execution_planner import ExecutionPlanner, ProviderBatch
 from infrafoundry.core.provider import ResourceConfig
 
@@ -190,3 +193,48 @@ class TestProviderBatch:
             resources_by_provider={},
         )
         assert len(batch) == 3
+
+
+class TestProviderDependencies:
+    """Providers that read another's outputs sort after it (#1536)."""
+
+    def test_producer_before_consumer_on_apply_and_after_on_destroy(self) -> None:
+        planner = ExecutionPlanner(provider_dependencies={"kubernetes": {"tailscale"}})
+        names = ["kubernetes", "tailscale"]
+        assert planner.sort_providers(names) == ["tailscale", "kubernetes"]
+        assert planner.sort_providers(names, reverse=True) == ["kubernetes", "tailscale"]
+
+    def test_without_dependencies_unlisted_provider_stays_last(self) -> None:
+        planner = ExecutionPlanner()
+        assert planner.sort_providers(["tailscale", "kubernetes"]) == ["kubernetes", "tailscale"]
+
+    def test_tie_break_keeps_configured_order(self) -> None:
+        planner = ExecutionPlanner(
+            provider_order=["opnsense", "proxmox", "kubernetes"],
+            provider_dependencies={"kubernetes": {"tailscale"}},
+        )
+        assert planner.sort_providers(["kubernetes", "tailscale", "proxmox", "opnsense"]) == [
+            "opnsense",
+            "proxmox",
+            "tailscale",
+            "kubernetes",
+        ]
+
+    def test_absent_producer_is_ignored(self) -> None:
+        planner = ExecutionPlanner(provider_dependencies={"kubernetes": {"tailscale"}})
+        assert planner.sort_providers(["kubernetes", "oci"]) == ["oci", "kubernetes"]
+
+    def test_cycle_raises(self) -> None:
+        planner = ExecutionPlanner(provider_dependencies={"a": {"b"}, "b": {"a"}})
+        with pytest.raises(InvalidConfigurationError, match="cycle"):
+            planner.sort_providers(["a", "b"])
+
+    def test_plan_apply_uses_the_dependencies(self) -> None:
+        planner = ExecutionPlanner(provider_dependencies={"kubernetes": {"tailscale"}})
+        batches = planner.plan_apply(
+            {
+                "kubernetes": [make_resource("kubernetes", "s", "secrets")],
+                "tailscale": [make_resource("tailscale", "k", "oauth_client")],
+            }
+        )
+        assert [b.providers for b in batches] == [["tailscale"], ["kubernetes"]]

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, ClassVar
 
 from infrafoundry.core.dependencies import DependencyGraph
+from infrafoundry.core.exceptions import InvalidConfigurationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_instances import split_provider_id
 
@@ -45,6 +46,7 @@ class ExecutionPlanner:
         self,
         provider_order: list[str] | None = None,
         dependency_graph: DependencyGraph | None = None,
+        provider_dependencies: dict[str, set[str]] | None = None,
     ) -> None:
         """Initialize execution planner.
 
@@ -53,9 +55,13 @@ class ExecutionPlanner:
                            Providers earlier in the list are executed first.
                            Unlisted providers run after listed ones.
             dependency_graph: Optional dependency graph for cross-provider deps.
+            provider_dependencies: Optional map of consumer provider to the producer
+                providers whose outputs it reads (#1536). Producers sort before
+                consumers whatever ``provider_order`` says.
         """
         self.provider_order = provider_order or self.DEFAULT_PROVIDER_ORDER
         self.dependency_graph = dependency_graph
+        self.provider_dependencies = provider_dependencies or {}
 
     def get_provider_order_key(self, provider: str) -> int:
         """Get sort key for a provider based on configured order.
@@ -84,6 +90,9 @@ class ExecutionPlanner:
 
         Returns:
             Sorted list of provider names
+
+        Raises:
+            InvalidConfigurationError: If the provider dependencies form a cycle.
         """
 
         def sort_key(provider: str) -> tuple[int, bool, str]:
@@ -92,7 +101,34 @@ class ExecutionPlanner:
             instance = split_provider_id(provider)[1]
             return (self.get_provider_order_key(provider), instance is not None, instance or "")
 
-        return sorted(providers, key=sort_key, reverse=reverse)
+        if not self.provider_dependencies:
+            return sorted(providers, key=sort_key, reverse=reverse)
+
+        # Stable topological sort: producers first, the configured order as the tie-break.
+        # A producer that is not in this run is ignored.
+        present = set(providers)
+        remaining = sorted(providers, key=sort_key)
+        placed: set[str] = set()
+        ordered: list[str] = []
+        while remaining:
+            ready = [
+                p
+                for p in remaining
+                if all(
+                    dep in placed or dep not in present or dep == p
+                    for dep in self.provider_dependencies.get(p, set())
+                )
+            ]
+            if not ready:
+                raise InvalidConfigurationError(
+                    "Providers depend on each other's outputs in a cycle: "
+                    + ", ".join(sorted(remaining))
+                )
+            chosen = ready[0]
+            ordered.append(chosen)
+            placed.add(chosen)
+            remaining.remove(chosen)
+        return list(reversed(ordered)) if reverse else ordered
 
     def plan_apply(
         self,

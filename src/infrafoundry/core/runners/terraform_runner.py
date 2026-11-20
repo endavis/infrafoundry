@@ -27,6 +27,7 @@ from infrafoundry.core.result_types import (
 )
 from infrafoundry.core.runners import terraform_orphans
 from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY, BaseRunner
+from infrafoundry.core.terraform_outputs import resolve_output_refs
 from infrafoundry.core.types import ResourceOutcome
 
 logger = logging.getLogger(__name__)
@@ -283,7 +284,7 @@ class TerraformRunner(BaseRunner):
             return {"valid": False, "error": "Terraform directory does not exist"}
 
         try:
-            env = self._prepare_environment(provider)
+            env = self._prepare_environment(provider, "validate")
             result = subprocess.run(  # tool_path binary, runner-built list argv, no shell
                 [self.tool_path, "validate"],
                 cwd=tf_dir,
@@ -357,7 +358,7 @@ class TerraformRunner(BaseRunner):
         tf_dir = provider.terraform_dir
 
         # Load credentials and set environment variables
-        env = self._prepare_environment(provider)
+        env = self._prepare_environment(provider, command)
 
         # Initialize if needed
         init_result = self.initialize(tf_dir)
@@ -1323,23 +1324,52 @@ class TerraformRunner(BaseRunner):
             "raw_output": output,
         }
 
-    def _prepare_environment(self, provider: ProviderBase) -> dict[str, str]:
+    def _prepare_environment(
+        self, provider: ProviderBase, command: str | None = None
+    ) -> dict[str, str]:
         """Prepare environment variables for Terraform execution.
 
         Merges provider-specific ``TF_VAR_*`` variables into the process
         environment so that Terraform reads credentials and settings from
         the environment instead of ``.tfvars`` files on disk.
 
+        ``outputs.<provider>.<output>`` references are read from the producer's
+        Terraform outputs (#1536): strictly for ``apply``, with a placeholder and a
+        warning for any other command.
+
         Args:
             provider: Provider instance
+            command: The Terraform command about to run, if any
 
         Returns:
             Environment variables dict with TF_VAR_* entries
+
+        Raises:
+            OutputReferenceError: For ``apply``, if a referenced output cannot be read.
         """
         env = os.environ.copy()
 
         # Merge provider-specific TF_VAR_* env vars (settings + credentials)
         tf_vars = provider.get_terraform_env_vars()
         env.update(tf_vars)
+
+        # A provider plugin that implements the protocol without ProviderBase may lack
+        # the hook, or return something other than a list; it then has no output refs.
+        hook = getattr(provider, "get_terraform_output_refs", None)
+        raw_refs = hook() if callable(hook) else None
+        refs = (
+            [r for r in raw_refs if isinstance(r, str)]
+            if isinstance(raw_refs, (list, tuple))
+            else []
+        )
+        if refs:
+            env.update(
+                resolve_output_refs(
+                    refs,
+                    tool_path=self.tool_path,
+                    terraform_root=provider.terraform_dir.parent,
+                    strict=command == "apply",
+                )
+            )
 
         return env

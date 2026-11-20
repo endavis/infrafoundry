@@ -18,6 +18,7 @@ from .validators import (
     DeviceReferenceValidator,
     DnsValidator,
     NamingValidator,
+    OAuthClientValidator,
     TailnetKeyValidator,
 )
 from .validators.context import TailscaleConfigContext, TailscaleCredentialsContext
@@ -101,6 +102,7 @@ class TailscaleValidator:
                 NamingValidator(report),
                 AclValidator(report),
                 TailnetKeyValidator(report),
+                OAuthClientValidator(report),
                 DeviceReferenceValidator(report),
                 DnsValidator(report),
             ),
