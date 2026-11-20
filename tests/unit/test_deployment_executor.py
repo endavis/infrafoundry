@@ -1861,17 +1861,93 @@ def test_package_abort_stays_pending(rig_factory: Any) -> None:
     assert rig.pending("package") == ["web"]
 
 
-def test_apply_parallel_records_no_package_pending(rig_factory: Any) -> None:
-    rig = rig_factory([_ok(_create("web"))])
-    rig.abort_for = {"web"}
-    rig.executor.apply_parallel(
+def _parallel(rig: _LedgerRig, by_provider: dict[str, list[Any]]) -> Any:
+    return rig.executor.apply_parallel(
         env_name="dev",
         deployment_id=rig.deployment(),
-        resources_by_provider={"proxmox": [_resource_with_events("web", events=_ON_CREATE)]},
+        resources_by_provider=by_provider,
         resource_filter=None,
         auto_approve=True,
         max_workers=1,
     )
 
-    assert rig.pending("package") == []
+
+def test_apply_parallel_aborting_package_handler_leaves_package_pending(
+    rig_factory: Any,
+) -> None:
+    rig = rig_factory([_ok(_create("web"))])
+    rig.abort_for = {"web"}
+    per_resource = rig.events.emit_event.side_effect
+
+    def emit(et: Any, env: str, payload: Any, **kw: Any) -> list[EventResult]:
+        if "resources" in payload:  # the aggregate event: a package handler aborts too
+            return [EventResult(success=False, abort=True, reason="stop", handler_name="h")]
+        return per_resource(et, env, payload, **kw)  # type: ignore[no-any-return]
+
+    rig.events.emit_event.side_effect = emit
+    with pytest.raises(EventAbortedError):
+        _parallel(rig, {"proxmox": [_resource_with_events("web", events=_ON_CREATE)]})
+
+    assert rig.pending("package") == ["web"]
     assert rig.pending("resource") == ["web"]
+
+
+def test_apply_parallel_emits_one_aggregate_created_event(rig_factory: Any) -> None:
+    rig = rig_factory([_ok(_create("web"))])
+    _parallel(rig, {"proxmox": [_resource_with_events("web")]})
+
+    aggregates = rig.aggregates()
+    assert len(aggregates) == 1
+    assert aggregates[0].kwargs["target_resources"] == ["web"]
+
+
+def test_apply_parallel_package_pending_recorded_and_done_after_aggregate(
+    rig_factory: Any,
+) -> None:
+    rig = rig_factory([_ok(_create("web"))])
+    _parallel(rig, {"proxmox": [_resource_with_events("web")]})
+
+    assert len(rig.aggregates()) == 1
+    assert rig.pending() == []
+    assert rig.pending("package") == []
+
+
+def test_apply_parallel_package_handler_fires_once_for_two_providers(rig_factory: Any) -> None:
+    rig = rig_factory(
+        [_ok(_create("a")), _ok(_create("b"))],
+        providers={
+            "opnsense": "proxmox_virtual_environment_vm",
+            "proxmox": "proxmox_virtual_environment_vm",
+        },
+    )
+    _parallel(
+        rig,
+        {
+            "opnsense": [_resource_with_events("a", provider="opnsense")],
+            "proxmox": [_resource_with_events("b")],
+        },
+    )
+
+    aggregates = rig.aggregates()
+    assert len(aggregates) == 1
+    assert sorted(aggregates[0].kwargs["target_resources"]) == ["a", "b"]
+    assert rig.pending("package") == []
+
+
+def test_apply_parallel_aborted_package_event_is_retried_next_apply(rig_factory: Any) -> None:
+    rig = rig_factory([_ok(_create("web")), _ok()])
+    aborting = [True]
+
+    def emit(et: Any, env: str, payload: Any, **kw: Any) -> list[EventResult]:
+        if "resources" in payload and aborting[0]:
+            return [EventResult(success=False, abort=True, reason="stop", handler_name="h")]
+        return []
+
+    rig.events.emit_event.side_effect = emit
+    with pytest.raises(EventAbortedError):
+        _parallel(rig, {"proxmox": [_resource_with_events("web")]})
+    assert rig.pending("package") == ["web"]
+
+    aborting[0] = False
+    _parallel(rig, {"proxmox": [_resource_with_events("web")]})
+    assert rig.pending("package") == []

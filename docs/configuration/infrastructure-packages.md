@@ -493,7 +493,7 @@ it checks the apply result, and marks it done once the handlers ran.
   with `continue_on_error` counts as done.
 - Package-level handlers (those with `requires`) fire on the aggregate event,
   which now includes resources still pending from a failed apply. `apply_serial`
-  records and retries these; parallel apply does not emit the aggregate event.
+  and `apply_parallel` both record and retry these.
 - All handlers of the event run again together, so write `on_create` handlers to
   be idempotent.
 
