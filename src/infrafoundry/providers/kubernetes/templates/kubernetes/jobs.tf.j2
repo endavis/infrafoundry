@@ -145,8 +145,8 @@ resource "kubernetes_job" "{{ job.name | replace('-', '_') }}" {
           {% if volume.config_map is defined %}
           config_map {
             name = "{{ volume.config_map.name }}"
-            {% if volume.config_map.items is defined %}
-            {% for item in volume.config_map.items %}
+            {% if 'items' in volume.config_map %}
+            {% for item in volume.config_map['items'] %}
             items {
               key  = "{{ item.key }}"
               path = "{{ item.path }}"

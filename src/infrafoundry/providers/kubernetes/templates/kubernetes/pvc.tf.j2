@@ -62,8 +62,8 @@ resource "kubernetes_persistent_volume_claim" "{{ pvc.name | replace('-', '_') }
       match_expressions {
         key      = "{{ expr.key }}"
         operator = "{{ expr.operator }}"
-        {% if expr.values is defined %}
-        values   = [{% for v in expr.values %}"{{ v }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+        {% if 'values' in expr %}
+        values   = [{% for v in expr['values'] %}"{{ v }}"{% if not loop.last %}, {% endif %}{% endfor %}]
         {% endif %}
       }
       {% endfor %}
