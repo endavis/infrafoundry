@@ -117,6 +117,12 @@ resource "oci_core_subnet" "{{ subnet.name | to_terraform_name }}" {
   {% endif %}
   {% if subnet.config.get('security_list_id') %}
   security_list_ids = [{{ subnet.config.security_list_id }}]
+  {% else %}
+  {% for vcn in vcns %}
+  {% if vcn.name == subnet.config.vcn and vcn.config.get('security_list') %}
+  security_list_ids = [oci_core_security_list.{{ vcn_name }}_sl.id]
+  {% endif %}
+  {% endfor %}
   {% endif %}
   {% endif %}
 }

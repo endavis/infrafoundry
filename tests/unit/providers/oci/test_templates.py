@@ -211,6 +211,46 @@ class TestVCNTemplate:
         content = provider.render_template("oci/vcn.tf.j2", {"vcns": vcns, "subnets": subnets})
         assert "private_rt" not in content
 
+    @staticmethod
+    def _sl_vcn(with_security_list: bool) -> list[ResourceConfig]:
+        config: dict[str, Any] = {"cidr_block": "192.0.2.0/24"}
+        if with_security_list:
+            config["security_list"] = {
+                "ingress_rules": [{"source": "192.0.2.0/24", "protocol": "all"}]
+            }
+        return [ResourceConfig(name="my-vcn", type="vcn", provider="oci", config=config)]
+
+    @staticmethod
+    def _sl_subnet(**extra: Any) -> list[ResourceConfig]:
+        config: dict[str, Any] = {"vcn": "my-vcn", "cidr_block": "192.0.2.0/25", **extra}
+        return [ResourceConfig(name="sub", type="subnet", provider="oci", config=config)]
+
+    def test_subnet_defaults_to_vcn_security_list(self, provider: OCIProvider) -> None:
+        """A subnet without security_list_id uses its VCN's declared security list."""
+        content = provider.render_template(
+            "oci/vcn.tf.j2", {"vcns": self._sl_vcn(True), "subnets": self._sl_subnet()}
+        )
+        assert "security_list_ids = [oci_core_security_list.my_vcn_sl.id]" in content
+
+    def test_subnet_explicit_security_list_id_wins(self, provider: OCIProvider) -> None:
+        """An explicit security_list_id is kept and the VCN list is not added."""
+        content = provider.render_template(
+            "oci/vcn.tf.j2",
+            {
+                "vcns": self._sl_vcn(True),
+                "subnets": self._sl_subnet(security_list_id="var.custom_sl_id"),
+            },
+        )
+        assert "security_list_ids = [var.custom_sl_id]" in content
+        assert "security_list_ids = [oci_core_security_list" not in content
+
+    def test_subnet_without_vcn_security_list_has_no_ids(self, provider: OCIProvider) -> None:
+        """A VCN without security_list leaves the subnet on the OCI default list."""
+        content = provider.render_template(
+            "oci/vcn.tf.j2", {"vcns": self._sl_vcn(False), "subnets": self._sl_subnet()}
+        )
+        assert "security_list_ids" not in content
+
     def test_vcn_with_security_list(self, provider: OCIProvider) -> None:
         """Test VCN with security list configuration."""
         vcns = [
