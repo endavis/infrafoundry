@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795196093709,
+  "lastUpdate": 1795198764591,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4374,6 +4374,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000043031025151769006",
             "extra": "mean: 62.01582973817345 usec\nrounds: 17755"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6e9fa9146aaea6614830966c691f2bb9dd6f70b9",
+          "message": "fix: validate oci subnet cidrs against their vcn and fix k3s defaults (merges PR #1534, addresses #1521)\n\nThe k3s-cluster blueprint defaulted worker_subnet_cidr to a range outside\nthe default VCN, and nothing caught it before apply, which failed after\ncreating part of the stack.\n\n- blueprint: worker_subnet_cidr defaults to 192.0.2.128/25, beside the\n  192.0.2.0/25 control subnet in the 192.0.2.0/24 VCN\n- OCI validator: offline ERROR when a subnet's cidr_block is outside its\n  VCN's cidr_block, or when two subnets of one VCN overlap\n- example config and docs updated to match\n- tests for the validator and for the blueprint defaults; three existing\n  tests that pinned the out-of-VCN CIDR now use valid ranges (approved)\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T18:18:10Z",
+          "tree_id": "da40725dbcbc625a1390f7eab922924edbecef04",
+          "url": "https://github.com/endavis/infrafoundry/commit/6e9fa9146aaea6614830966c691f2bb9dd6f70b9"
+        },
+        "date": 1795198764132,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.44311204952066,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006096523588831734",
+            "extra": "mean: 20.225264117647605 msec\nrounds: 51"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8000.561540007423,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000800931155020901",
+            "extra": "mean: 124.9912265532142 usec\nrounds: 8466"
           }
         ]
       }
