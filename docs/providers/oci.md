@@ -9,7 +9,7 @@ tags:
 
 # OCI Provider
 
-The OCI (Oracle Cloud Infrastructure) provider manages networking and compute resources in Oracle Cloud.
+The OCI (Oracle Cloud Infrastructure) provider manages networking, compute, object storage and scoped IAM access in Oracle Cloud.
 
 ## Supported Resources
 
@@ -19,6 +19,11 @@ The OCI (Oracle Cloud Infrastructure) provider manages networking and compute re
 | `vcn` | Virtual Cloud Network with optional internet gateway and security list |
 | `subnet` | Public or private subnet within a VCN |
 | `instance` | Compute instance with flex shapes and cloud-init support |
+| `bucket` | Object Storage bucket (`oci_objectstorage_bucket`) with optional lifecycle rules |
+| `iam_user` | IAM user (`oci_identity_user`) |
+| `iam_group` | IAM group (`oci_identity_group`) with user memberships |
+| `iam_policy` | IAM policy (`oci_identity_policy`) from verbatim statements |
+| `customer_secret_key` | S3-compatible access key for a user (`oci_identity_customer_secret_key`) |
 
 ## Prerequisites
 
@@ -209,6 +214,91 @@ instance:
 | `ansible_vars` | No | Extra variables for Ansible inventory |
 | `ssh_user` | No | SSH user for Ansible (default: `ubuntu`) |
 
+## Object Storage and scoped access
+
+A bucket, a user limited to it and an S3-compatible key for that user:
+
+```yaml
+bucket:
+  - name: example-backups
+    storage_tier: Standard          # Standard | Archive
+    versioning: Enabled             # Enabled | Disabled (default)
+    access_type: NoPublicAccess     # NoPublicAccess (default) | ObjectRead | ObjectReadWithoutList
+    lifecycle:
+      - name: expire-old
+        action: DELETE              # DELETE | ARCHIVE | INFREQUENT_ACCESS | ABORT
+        time_amount: 90
+        time_unit: DAYS             # DAYS | YEARS
+        prefix: logs/               # optional
+        target: objects             # optional
+        enabled: true               # default
+
+iam_user:
+  - name: backup-writer
+
+iam_group:
+  - name: backup-writers
+    members: [backup-writer]        # iam_user names
+
+iam_policy:
+  - name: backup-writers-policy
+    statements:
+      - "Allow group backup-writers to manage objects in tenancy where target.bucket.name='example-backups'"
+
+customer_secret_key:
+  - name: backup-writer-key
+    user: backup-writer             # iam_user name
+```
+
+| Type | Field | Required | Description |
+|------|-------|----------|-------------|
+| `bucket` | `compartment` | No | Compartment name or OCID (default: `compartment_ocid`) |
+| `bucket` | `storage_tier`, `versioning`, `access_type` | No | Values above; defaults `Standard`, `Disabled`, `NoPublicAccess` |
+| `bucket` | `lifecycle` | No | List of rules. `name` (unique), `action`, `time_amount` (positive integer) and `time_unit` are required; `prefix`, `target` and `enabled` are optional |
+| `iam_user`, `iam_group` | `description` | No | Default `Managed by InfraFoundry` |
+| `iam_group` | `members` | No | Names of `iam_user` resources |
+| `iam_policy` | `statements` | Yes | Non-empty list, written to the policy unchanged |
+| `iam_policy` | `compartment` | No | Compartment name or OCID (default: the tenancy root) |
+| `iam_policy` | `description` | No | Default `Managed by InfraFoundry` |
+| `customer_secret_key` | `user` | Yes | Name of an `iam_user` resource |
+
+Users, groups and keys always live in the tenancy; a `compartment` on them is ignored with a validation warning. Each policy is created after every `iam_group` in the environment.
+
+### Outputs
+
+| Output | Sensitive | Description |
+|--------|-----------|-------------|
+| `objectstorage_namespace` | No | Tenancy Object Storage namespace; only with a `bucket` |
+| `customer_secret_key_<name>_id` | Yes | S3 access key ID |
+| `customer_secret_key_<name>_secret` | Yes | S3 secret key |
+
+`<name>` is the key's resource name with `-` replaced by `_`. A name that cannot match `^[a-z][a-z0-9_]*$` produces a validation warning, since it cannot be used in an `outputs.oci.*` reference.
+
+!!! danger "The secret is stored in Terraform state"
+    The secret key is kept in plaintext in the Terraform state of this provider, and again in the state of any provider that consumes it. Use an encrypted remote backend.
+
+Another provider takes the values with an `outputs.oci.<output>` reference ([ADR-0029](../decisions/0029-providers-consume-other-providers-terraform-outputs-through-outputs-references.md)), for example in a Kubernetes secret:
+
+```yaml
+secrets:
+  - name: backup-s3
+    config:
+      namespace: backup
+      string_data_secrets:
+        AWS_ACCESS_KEY_ID: outputs.oci.customer_secret_key_backup_writer_key_id
+        AWS_SECRET_ACCESS_KEY: outputs.oci.customer_secret_key_backup_writer_key_secret
+```
+
+See [Kubernetes Secrets](kubernetes.md#secrets) for the rules.
+
+The S3-compatible endpoint is `https://<namespace>.compat.objectstorage.<region>.oraclecloud.com`, where `<namespace>` is the `objectstorage_namespace` output.
+
+### Limits
+
+- A bucket cannot be destroyed while it holds objects; there is no `force_destroy`. Empty it first.
+- Lifecycle rules need a service policy that lets Object Storage act on the bucket (`Allow service objectstorage-<region> to manage object-family in tenancy`). Declare it as an `iam_policy`.
+- OCI allows at most two customer secret keys per user.
+
 ## Cloud-Init Snippets
 
 Place snippet files in your config repo at:
@@ -246,6 +336,10 @@ The OCI provider validates:
   every `compartment` reference is an OCID or a defined compartment; a resource with no
   `compartment` needs `compartment_ocid` in the provider settings; the region is the
   tenancy home region when compartments are managed
+- **Buckets and IAM** (offline): bucket `storage_tier`, `versioning` and `access_type`; lifecycle
+  rule fields and unique rule names; `iam_group.members`, `customer_secret_key.user` and
+  `iam_policy.compartment` references; non-empty policy `statements`. A `compartment` on a user,
+  group or key, and a key name unusable in an `outputs.oci.*` reference, are warnings
 
 ```bash
 foundry infra doctor --env prod
@@ -277,8 +371,10 @@ generated/prod/terraform/oci/
 ├── variables.tf         # Input variables (values passed via TF_VAR_* env vars)
 ├── compartments.tf     # Compartments (only when compartment resources exist)
 ├── vcn.tf              # VCN, subnet, IGW, route table, security list
+├── object_storage.tf   # Buckets and lifecycle policies (only when bucket resources exist)
+├── iam.tf              # Users, groups, policies, keys (only when IAM resources exist)
 ├── instances.tf        # Compute instances with metadata
-└── outputs.tf          # VCN IDs, subnet IDs, instance IPs
+└── outputs.tf          # VCN IDs, subnet IDs, instance IPs, namespace, key outputs
 
 generated/prod/ansible/oci/
 ├── playbook.yml        # Post-provisioning playbook
@@ -305,4 +401,4 @@ compartment → vcn → subnet → instance
 Terraform orders these by the references in the generated files: a resource that names a
 compartment is created after it. `infra analyze` does not yet show the compartment edge.
 
-Subnets depend on VCNs, and instances depend on subnets.
+Subnets depend on VCNs, and instances depend on subnets. Policies are created after groups.

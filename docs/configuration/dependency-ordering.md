@@ -70,7 +70,7 @@ Each provider declares which of its resource types depend on which (`get_depende
 | `kubernetes` | `configmaps`, `secrets`, `persistentvolumeclaims`, `serviceaccounts`, `roles` need `namespaces`; `rolebindings` need `namespaces`, `roles`, `serviceaccounts`; `deployments` need `namespaces`, `configmaps`, `secrets`, `serviceaccounts`, `persistentvolumeclaims`; `services` need `namespaces`, `deployments`; `ingresses` need `namespaces`, `services`; `manifests` need `namespaces`, `helm_releases` |
 | `proxmox` | `vm` needs `template`, `network`, `storage`, `sdn_vnet`; `container` needs `network`, `storage`, `sdn_vnet`; `sdn_vnet` needs `sdn_zone` |
 | `opnsense` | for example `firewall.rules` need `firewall.aliases`, `interfaces.vlans`, `interfaces.assignments`, `routing.gateways`; `interfaces.assignments` need `interfaces.vlans`; Kea reservations need their subnets |
-| `oci` | `instance` needs `vcn`, `subnet`; `subnet` needs `vcn` |
+| `oci` | `instance` needs `vcn`, `subnet`; `subnet` needs `vcn`; `iam_policy` needs `iam_group` |
 | `esxi` | `vm` and `ovf_deployment` need `vswitch`, `portgroup`; `portgroup` needs `vswitch` |
 | `tailscale` | `tailnet_key`, `device_tags`, `device_subnet_routes` need `acl` |
 

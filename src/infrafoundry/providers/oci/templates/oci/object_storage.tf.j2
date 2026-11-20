@@ -1,0 +1,45 @@
+# OCI Object Storage buckets
+
+data "oci_objectstorage_namespace" "this" {
+  compartment_id = var.oci_tenancy_ocid
+}
+
+{% for bucket in buckets %}
+{% set tf = bucket.name | to_terraform_name %}
+resource "oci_objectstorage_bucket" "{{ tf }}" {
+  compartment_id = {{ bucket.config.get('compartment_id_expr', 'var.oci_compartment_ocid') }}
+  namespace      = data.oci_objectstorage_namespace.this.namespace
+  name           = {{ bucket.name | tojson }}
+  storage_tier   = {{ bucket.config.get('storage_tier', 'Standard') | tojson }}
+  versioning     = {{ bucket.config.get('versioning', 'Disabled') | tojson }}
+  access_type    = {{ bucket.config.get('access_type', 'NoPublicAccess') | tojson }}
+}
+
+{% set rules = bucket.config.get('lifecycle') or [] %}
+{% if rules %}
+resource "oci_objectstorage_object_lifecycle_policy" "{{ tf }}" {
+  namespace = data.oci_objectstorage_namespace.this.namespace
+  bucket    = oci_objectstorage_bucket.{{ tf }}.name
+
+{% for rule in rules %}
+  rules {
+    name        = {{ rule.name | tojson }}
+    action      = {{ rule.action | tojson }}
+    is_enabled  = {{ rule.get('enabled', true) | lower }}
+    time_amount = {{ rule.time_amount }}
+    time_unit   = {{ rule.time_unit | tojson }}
+{% if rule.get('target') %}
+    target      = {{ rule.target | tojson }}
+{% endif %}
+{% if rule.get('prefix') %}
+    object_name_filter {
+      inclusion_prefixes = [{{ rule.prefix | tojson }}]
+    }
+{% endif %}
+  }
+
+{% endfor %}
+}
+
+{% endif %}
+{% endfor %}

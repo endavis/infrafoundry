@@ -74,6 +74,17 @@ def parent_id_expr(ref: str | None, compartment_names: Collection[str]) -> str:
     return _resolve(ref, compartment_names, DEFAULT_PARENT_EXPR, field="parent")
 
 
+def tenancy_compartment_id_expr(ref: str | None, compartment_names: Collection[str]) -> str:
+    """Return the Terraform expression for a ``compartment`` that defaults to the tenancy.
+
+    Used by IAM policies, which attach to the tenancy root unless told otherwise.
+
+    Raises:
+        ConfigurationError: If ``ref`` is a name that is not in ``compartment_names``.
+    """
+    return _resolve(ref, compartment_names, DEFAULT_PARENT_EXPR, field="compartment")
+
+
 def find_parent_cycles(compartments: Iterable[ResourceConfig]) -> set[str]:
     """Return the names of compartments that sit on a ``parent`` cycle.
 

@@ -1,0 +1,52 @@
+# OCI IAM users, groups, policies and customer secret keys
+
+{% for user in users %}
+resource "oci_identity_user" "{{ user.name | to_terraform_name }}" {
+  compartment_id = var.oci_tenancy_ocid
+  name           = {{ user.name | tojson }}
+  description    = {{ user.config.get('description', 'Managed by InfraFoundry') | tojson }}
+}
+
+{% endfor %}
+{% for group in groups %}
+resource "oci_identity_group" "{{ group.name | to_terraform_name }}" {
+  compartment_id = var.oci_tenancy_ocid
+  name           = {{ group.name | tojson }}
+  description    = {{ group.config.get('description', 'Managed by InfraFoundry') | tojson }}
+}
+
+{% for member in group.config.get('members_tf', []) %}
+resource "oci_identity_user_group_membership" "{{ group.name | to_terraform_name }}_{{ member }}" {
+  group_id = oci_identity_group.{{ group.name | to_terraform_name }}.id
+  user_id  = oci_identity_user.{{ member }}.id
+}
+
+{% endfor %}
+{% endfor %}
+{% for policy in policies %}
+resource "oci_identity_policy" "{{ policy.name | to_terraform_name }}" {
+  compartment_id = {{ policy.config.get('compartment_id_expr', 'var.oci_tenancy_ocid') }}
+  name           = {{ policy.name | tojson }}
+  description    = {{ policy.config.get('description', 'Managed by InfraFoundry') | tojson }}
+  statements = [
+{% for statement in policy.config.get('statements', []) %}
+    {{ statement | tojson }},
+{% endfor %}
+  ]
+{% if groups %}
+  depends_on = [
+{% for group in groups %}
+    oci_identity_group.{{ group.name | to_terraform_name }},
+{% endfor %}
+  ]
+{% endif %}
+}
+
+{% endfor %}
+{% for key in keys %}
+resource "oci_identity_customer_secret_key" "{{ key.name | to_terraform_name }}" {
+  display_name = {{ key.name | tojson }}
+  user_id      = oci_identity_user.{{ key.config.user_tf }}.id
+}
+
+{% endfor %}
