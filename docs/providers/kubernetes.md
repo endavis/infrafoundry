@@ -222,9 +222,11 @@ resources:
 
 ### Deployments
 
-`name`, `namespace` (default `default`), `labels`, `replicas` (default `1`), and `containers`.
+`name`, `namespace` (default `default`), `labels`, `replicas` (default `1`), `strategy`, `containers` and `volumes`.
 
-A container has `name`, `image`, `ports` (a list of `containerPort`, `name`, `protocol`), `env` (a list of `name` and `value`) and `resources.limits` and `resources.requests` (string maps).
+A container has `name`, `image`, `command`, `args`, `ports` (a list of `containerPort`, `name`, `protocol`), `env`, `volume_mounts` and `resources.limits` and `resources.requests` (string maps). `env`, `volume_mounts` and the pod `volumes` take the same shape as in [Jobs and CronJobs](#jobs-and-cronjobs): an `env` entry sets `value` or `value_from` (`secret_key_ref` or `config_map_key_ref`), and a volume is a `config_map` (with optional `items`), `secret`, `persistent_volume_claim` or `empty_dir`.
+
+`strategy.type` is `RollingUpdate` or `Recreate`. Use `Recreate` for a single replica that mounts a `ReadWriteOnce` volume, so the old pod releases it first.
 
 The pod selector is always `app: <config.name>`, and the pod template carries that label plus your `labels`.
 
@@ -362,12 +364,14 @@ The booleans are `atomic`, `cleanup_on_fail`, `dependency_update`, `force_update
 
 `infra plan` and `infra apply` run the offline checks (cross-references, secret `data` encoding, `terraform_secrets` references including unresolved refs and base64 of `data_secrets` values, Helm releases). `infra doctor` adds the cluster checks. It finds the kubeconfig in the same order as Terraform: `KUBECONFIG`, then `kubeconfig_path`, then `~/.kube/config`. The cluster checks authenticate with a bearer `token`, a `tokenFile` or a client certificate (`client-certificate-data` / `client-key-data`, or the file path forms). A missing kubeconfig gives a warning, not an error, because the cluster may be created in the same apply.
 
+For `deployments` only, the offline checks report an error when a `volume_mounts` entry names a volume that `volumes` does not declare, when an `env` entry sets both or neither of `value` and `value_from`, or when `strategy.type` is not `RollingUpdate` or `Recreate`.
+
 ## Dependencies
 
 Resources are created in dependency order:
 
 ```
-namespaces → configmaps/secrets/serviceaccounts → deployments → services → ingresses
+namespaces → configmaps/secrets/serviceaccounts/persistentvolumeclaims → deployments → services → ingresses
                                                                     ↓
                                                helm_releases → manifests
 ```
