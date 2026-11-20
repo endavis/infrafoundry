@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795165042686,
+  "lastUpdate": 1795165896891,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -3994,6 +3994,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000014353943939151806",
             "extra": "mean: 62.52930553039734 usec\nrounds: 17648"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0e9b52c71226be2bce40660e2d9811d3ff6c0784",
+          "message": "feat: mint the opnsense tailscale pre-auth key from an oauth client at apply time (merges PR #1513, addresses #1510)\n\nAdd a tailscale.auth.mint block. When the node is not Running, apply gets an\nOAuth token, creates a single-use tagged pre-auth key, writes it, reconfigures\nand polls status, with the documented recovery. A Running node mints nothing.\nThe key is never logged, planned or stored. mint excludes pre_auth_key.\n\nAddresses #1510\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T09:10:01Z",
+          "tree_id": "0e1c3237081ebd653800985ab1896b904c332d2f",
+          "url": "https://github.com/endavis/infrafoundry/commit/0e9b52c71226be2bce40660e2d9811d3ff6c0784"
+        },
+        "date": 1795165896113,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 62.30295449448815,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004885058799632044",
+            "extra": "mean: 16.050603187501622 msec\nrounds: 64"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10842.066827631006,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000873315338104265",
+            "extra": "mean: 92.23333667815994 usec\nrounds: 12457"
           }
         ]
       }
