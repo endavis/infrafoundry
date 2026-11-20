@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795201507823,
+  "lastUpdate": 1795202894806,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4450,6 +4450,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006082301729251653",
             "extra": "mean: 77.91826032184258 usec\nrounds: 13733"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a105dc555e346d5e2f013f10c1de1003651b43ec",
+          "message": "feat: add a tailscale oauth_client resource whose credentials other providers can consume (merges PR #1538, addresses #1536)\n\nfeat: add a tailscale oauth_client whose credentials other providers can consume\n\nA tailscale OAuth client can now be created by InfraFoundry and its\nsecret handed to a kubernetes secret or Helm value with no manual copy.\n\noauth_client resource type:\n- renders tailscale_oauth_client (description, scopes, tags), depending on\n  the ACL; tags are checked against tagOwners as tailnet_key does\n- sensitive outputs oauth_client_<name>_id and oauth_client_<name>_secret\n- the existing resource-type list test gains oauth_client (approved)\n\noutput references:\n- a kubernetes secret or Helm value can reference another provider's\n  Terraform output as outputs.<provider>.<output>\n- the runner reads the producer's outputs with `terraform output -json`\n  and injects them as TF_VAR_* for that one call; values are never logged\n  or written to the config repo or generated files\n- a reference orders the producer before the consumer on apply (reversed\n  on destroy) through a stable topological provider sort\n- apply fails on a missing output (IF-DEPENDENCY-003); plan, destroy and\n  validate use a masked placeholder and warn\n- only the kubernetes provider accepts these refs, and not in data_secrets\n- a protocol-only provider without the new hook has no output refs\n- ADR-0029 records the design; the SOPS write-back alternative is rejected\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T19:27:02Z",
+          "tree_id": "1676714870deaf48ebec48e9e0f9af7057f37680",
+          "url": "https://github.com/endavis/infrafoundry/commit/a105dc555e346d5e2f013f10c1de1003651b43ec"
+        },
+        "date": 1795202894074,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 55.65580723281905,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000148051124554858",
+            "extra": "mean: 17.96757696491232 msec\nrounds: 57"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9920.102950324072,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000690401958441141",
+            "extra": "mean: 100.8054054486735 usec\nrounds: 10608"
           }
         ]
       }
