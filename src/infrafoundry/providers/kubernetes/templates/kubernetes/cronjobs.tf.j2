@@ -25,7 +25,7 @@ resource "kubernetes_cron_job_v1" "{{ cronjob.name | replace('-', '_') }}" {
     schedule = "{{ cronjob.config.schedule }}"
 
     {% if cronjob.config.timezone is defined %}
-    time_zone = "{{ cronjob.config.timezone }}"
+    timezone = "{{ cronjob.config.timezone }}"
     {% endif %}
 
     {% if cronjob.config.concurrency_policy is defined %}

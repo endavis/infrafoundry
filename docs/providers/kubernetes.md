@@ -251,7 +251,7 @@ The pod selector is always `app: <config.name>`, and the pod template carries th
 
 `jobs`: `namespace` (default `default`), `labels`, `annotations`, `backoff_limit`, `completions`, `parallelism`, `active_deadline_seconds`, `ttl_seconds_after_finished`, `restart_policy` (default `Never`), `service_account_name`, `containers`, `volumes` and `wait_for_completion`.
 
-`cronjobs`: `namespace` (default `default`), `labels`, `annotations`, `schedule`, `timezone` (rendered as `time_zone`), `concurrency_policy`, `suspend`, `starting_deadline_seconds`, `successful_jobs_history_limit`, `failed_jobs_history_limit`, `backoff_limit`, `ttl_seconds_after_finished`, `restart_policy` (default `OnFailure`), `service_account_name`, `containers` and `volumes`.
+`cronjobs`: `namespace` (default `default`), `labels`, `annotations`, `schedule`, `timezone`, `concurrency_policy`, `suspend`, `starting_deadline_seconds`, `successful_jobs_history_limit`, `failed_jobs_history_limit`, `backoff_limit`, `ttl_seconds_after_finished`, `restart_policy` (default `OnFailure`), `service_account_name`, `containers` and `volumes`.
 
 Containers in both types have `name`, `image`, `command`, `args`, `env`, `resources` and `volume_mounts`.
 

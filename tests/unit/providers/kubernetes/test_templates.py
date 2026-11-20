@@ -405,6 +405,47 @@ class TestCronJobTemplate:
         )
         assert 'concurrency_policy = "Forbid"' in content
 
+    def test_cronjob_renders_timezone_attribute(self, provider: KubernetesProvider) -> None:
+        """The provider attribute is `timezone`, not `time_zone`."""
+        cronjobs = [
+            ResourceConfig(
+                name="tz-task",
+                type="cronjobs",
+                provider="kubernetes",
+                config={
+                    "schedule": "0 3 * * *",
+                    "timezone": "Europe/Madrid",
+                    "containers": [{"name": "task", "image": "task:latest"}],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/cronjobs.tf.j2", {"cronjobs": cronjobs, "dependency_refs": []}
+        )
+        assert 'timezone = "Europe/Madrid"' in content
+        assert "time_zone" not in content
+
+    def test_cronjob_without_timezone_renders_no_timezone(
+        self, provider: KubernetesProvider
+    ) -> None:
+        """No timezone key means no timezone line."""
+        cronjobs = [
+            ResourceConfig(
+                name="plain-task",
+                type="cronjobs",
+                provider="kubernetes",
+                config={
+                    "schedule": "0 3 * * *",
+                    "containers": [{"name": "task", "image": "task:latest"}],
+                },
+            )
+        ]
+        content = provider.render_template(
+            "kubernetes/cronjobs.tf.j2", {"cronjobs": cronjobs, "dependency_refs": []}
+        )
+        assert "timezone" not in content
+        assert "time_zone" not in content
+
     def test_cronjob_uses_config_namespace(self, provider: KubernetesProvider) -> None:
         """config.namespace is rendered rather than always using default."""
         res = [
