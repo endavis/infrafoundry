@@ -21,6 +21,11 @@ resource "kubernetes_deployment" "{{ deployment.config.name | replace('-', '_') 
         app = "{{ deployment.config.name }}"
       }
     }
+    {% if deployment.config.strategy is defined %}
+    strategy {
+      type = "{{ deployment.config.strategy.type }}"
+    }
+    {% endif %}
 
     template {
       metadata {
@@ -39,6 +44,12 @@ resource "kubernetes_deployment" "{{ deployment.config.name | replace('-', '_') 
         container {
           name  = "{{ container.name }}"
           image = "{{ container.image }}"
+          {% if container.command is defined %}
+          command = [{% for c in container.command %}"{{ c }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+          {% endif %}
+          {% if container.args is defined %}
+          args = [{% for a in container.args %}"{{ a }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+          {% endif %}
 
           {% if container.ports is defined %}
           {% for port in container.ports %}
@@ -58,7 +69,25 @@ resource "kubernetes_deployment" "{{ deployment.config.name | replace('-', '_') 
           {% for env in container.env %}
           env {
             name  = "{{ env.name }}"
+            {% if env.value is defined %}
             value = "{{ env.value }}"
+            {% endif %}
+            {% if env.value_from is defined %}
+            value_from {
+              {% if env.value_from.secret_key_ref is defined %}
+              secret_key_ref {
+                name = "{{ env.value_from.secret_key_ref.name }}"
+                key  = "{{ env.value_from.secret_key_ref.key }}"
+              }
+              {% endif %}
+              {% if env.value_from.config_map_key_ref is defined %}
+              config_map_key_ref {
+                name = "{{ env.value_from.config_map_key_ref.name }}"
+                key  = "{{ env.value_from.config_map_key_ref.key }}"
+              }
+              {% endif %}
+            }
+            {% endif %}
           }
           {% endfor %}
           {% endif %}
@@ -81,8 +110,55 @@ resource "kubernetes_deployment" "{{ deployment.config.name | replace('-', '_') 
             {% endif %}
           }
           {% endif %}
+          {% if container.volume_mounts is defined %}
+          {% for vm in container.volume_mounts %}
+          volume_mount {
+            name       = "{{ vm.name }}"
+            mount_path = "{{ vm.mount_path }}"
+            {% if vm.sub_path is defined %}
+            sub_path = "{{ vm.sub_path }}"
+            {% endif %}
+            {% if vm.read_only is defined %}
+            read_only = {{ vm.read_only | lower }}
+            {% endif %}
+          }
+          {% endfor %}
+          {% endif %}
         }
         {% endfor %}
+        {% if deployment.config.volumes is defined %}
+        {% for volume in deployment.config.volumes %}
+        volume {
+          name = "{{ volume.name }}"
+          {% if volume.config_map is defined %}
+          config_map {
+            name = "{{ volume.config_map.name }}"
+            {% if 'items' in volume.config_map %}
+            {% for item in volume.config_map['items'] %}
+            items {
+              key  = "{{ item.key }}"
+              path = "{{ item.path }}"
+            }
+            {% endfor %}
+            {% endif %}
+          }
+          {% endif %}
+          {% if volume.secret is defined %}
+          secret {
+            secret_name = "{{ volume.secret.secret_name }}"
+          }
+          {% endif %}
+          {% if volume.persistent_volume_claim is defined %}
+          persistent_volume_claim {
+            claim_name = "{{ volume.persistent_volume_claim.claim_name }}"
+          }
+          {% endif %}
+          {% if volume.empty_dir is defined %}
+          empty_dir {}
+          {% endif %}
+        }
+        {% endfor %}
+        {% endif %}
       }
     }
   }

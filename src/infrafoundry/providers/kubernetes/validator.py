@@ -326,6 +326,80 @@ class KubernetesValidator:
                         level=ValidationLevel.ERROR,
                     )
 
+    def _validate_deployment_pod_spec(self, resources: list[ResourceConfig]) -> None:
+        """Check deployment volume mounts, env sources and rollout strategy offline.
+
+        Scoped to ``deployments``; jobs and cronjobs are not checked.
+
+        Args:
+            resources: Resources to validate
+        """
+        for resource in resources:
+            if resource.type != "deployments":
+                continue
+            config = resource.config or {}
+            name = resource.name
+
+            volumes = config.get("volumes")
+            declared = (
+                {v.get("name") for v in volumes if isinstance(v, dict)}
+                if isinstance(volumes, list)
+                else set()
+            )
+
+            containers = config.get("containers")
+            for container in containers if isinstance(containers, list) else []:
+                if not isinstance(container, dict):
+                    continue
+                cname = container.get("name", "?")
+                mounts = container.get("volume_mounts")
+                for mount in mounts if isinstance(mounts, list) else []:
+                    if not isinstance(mount, dict):
+                        continue
+                    vol = mount.get("name")
+                    if vol not in declared:
+                        self.report.add_check(
+                            check_name=f"kubernetes_volume_mount_{name}_{cname}_{vol}",
+                            passed=False,
+                            message=(
+                                f"Deployment '{name}' container '{cname}' mounts volume "
+                                f"'{vol}' which is not declared in volumes"
+                            ),
+                            level=ValidationLevel.ERROR,
+                        )
+                envs = container.get("env")
+                for env in envs if isinstance(envs, list) else []:
+                    if not isinstance(env, dict):
+                        continue
+                    has_value = "value" in env
+                    has_from = "value_from" in env
+                    if has_value == has_from:
+                        problem = "both" if has_value else "neither"
+                        self.report.add_check(
+                            check_name=f"kubernetes_env_source_{name}_{cname}_{env.get('name')}",
+                            passed=False,
+                            message=(
+                                f"Deployment '{name}' container '{cname}' env "
+                                f"'{env.get('name')}' sets {problem} of 'value' and "
+                                f"'value_from'; set exactly one"
+                            ),
+                            level=ValidationLevel.ERROR,
+                        )
+
+            strategy = config.get("strategy")
+            if strategy is not None:
+                stype = strategy.get("type") if isinstance(strategy, dict) else None
+                if stype not in ("RollingUpdate", "Recreate"):
+                    self.report.add_check(
+                        check_name=f"kubernetes_strategy_{name}",
+                        passed=False,
+                        message=(
+                            f"Deployment '{name}' strategy.type must be 'RollingUpdate' or "
+                            f"'Recreate', got {stype!r}"
+                        ),
+                        level=ValidationLevel.ERROR,
+                    )
+
     def _validate_local_references(
         self,
         resources: list[ResourceConfig],
@@ -369,6 +443,7 @@ class KubernetesValidator:
                 )
 
         self._validate_secret_data_encoding(resources)
+        self._validate_deployment_pod_spec(resources)
 
         # Validate deployment references to configmaps/secrets
         for resource in resources:
