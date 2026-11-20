@@ -57,6 +57,27 @@ The generated Terraform pins the `hashicorp/kubernetes` provider to `~> 2.23`. I
 !!! note "Naming rule"
     `namespaces`, `configmaps`, `deployments` and `services` take the object name and the Terraform label from `config.name`. Every other type uses the top-level `name`.
 
+    A `name` that differs from the object name needs the resource-centric format. In the provider-centric format the config is the entry itself, so `config.name` always equals `name`. An explicit `config.name` is never overwritten by the top-level `name`. This lets a Deployment and a Service share one object name, which the Service's default selector relies on:
+
+    ```yaml
+    resources:
+      - provider: kubernetes
+        type: deployments
+        name: web
+        config:
+          name: web
+          containers:
+            - name: web
+              image: nginx:1.27
+      - provider: kubernetes
+        type: services
+        name: web-svc
+        config:
+          name: web
+          ports:
+            - port: 80
+    ```
+
     The automatic `depends_on` references use the same label source, so `name` and `config.name` may differ: a namespace with `name: apps-ns` and `config.name: apps` is declared as `kubernetes_namespace.apps`, and the resources that depend on it point at `kubernetes_namespace.apps`.
 
 ### Several clusters per environment
