@@ -135,6 +135,11 @@ providers:
             ocpus: 1
             memory_gb: 8
 
+      # --- Compartment (optional; empty = the provider's compartment_ocid) ---
+      - name: compartment
+        description: "Compartment resource name or OCID for the VCN, subnets and instances"
+        default: ""
+
       # --- Network ---
       - name: vcn_name
         default: k3s-vcn

@@ -16,6 +16,7 @@ from infrafoundry.core.provider_mixins import (
 from infrafoundry.core.tailscale import process_tailscale_config
 from infrafoundry.core.validation import ValidationReport
 
+from .compartments import compartment_id_expr, parent_id_expr
 from .validator import OCIValidator
 
 
@@ -80,7 +81,7 @@ class OCIProvider(
         report: ValidationReport,
     ) -> None:
         """Run the checks that need no OCI API call (#1433)."""
-        OCIValidator(env_config, report).validate_offline(resources)
+        OCIValidator(env_config, report).validate_offline(resources, reference_resources)
 
     @override
     def get_terraform_env_vars(self) -> dict[str, str]:
@@ -94,7 +95,7 @@ class OCIProvider(
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for OCI resources."""
-        resources_by_type = self.prepare_terraform_generation(resources)
+        resources_by_type = self._resolve_compartments(self.prepare_terraform_generation(resources))
 
         # Pre-process instances FIRST so any ``tailscale:`` blocks
         # auto-populate ``terraform_secrets`` on the resource. This must
@@ -134,6 +135,14 @@ class OCIProvider(
             variables_context={"terraform_secret_vars": terraform_secret_vars},
         )
 
+        # Compartments come first in the file set; Terraform orders by reference.
+        if resources_by_type.get("compartment"):
+            self.render_and_write_terraform(
+                "oci/compartments.tf.j2",
+                context={"compartments": resources_by_type["compartment"]},
+                output_name="compartments.tf",
+            )
+
         # Generate VCN and subnet resources
         if "vcn" in resources_by_type or "subnet" in resources_by_type:
             self._generate_vcn_terraform(
@@ -151,6 +160,39 @@ class OCIProvider(
 
         # Generate outputs
         self.render_outputs_terraform(resources_by_type)
+
+    @staticmethod
+    def _resolve_compartments(
+        resources_by_type: dict[str, list[ResourceConfig]],
+    ) -> dict[str, list[ResourceConfig]]:
+        """Store each resource's compartment expression on a copy of its config.
+
+        Compartments get ``parent_id_expr``; VCNs, subnets and instances get
+        ``compartment_id_expr``. Resources without a reference are left as they are,
+        so templates fall back to ``var.oci_compartment_ocid``.
+
+        Raises:
+            ConfigurationError: If a reference names an undefined compartment.
+        """
+        names = {c.name for c in resources_by_type.get("compartment", [])}
+        resolved: dict[str, list[ResourceConfig]] = {}
+        for type_name, type_resources in resources_by_type.items():
+            if type_name == "compartment":
+                key, field, fn = "parent_id_expr", "parent", parent_id_expr
+            elif type_name in ("vcn", "subnet", "instance"):
+                key, field, fn = "compartment_id_expr", "compartment", compartment_id_expr
+            else:
+                resolved[type_name] = type_resources
+                continue
+            copies: list[ResourceConfig] = []
+            for resource in type_resources:
+                item = copy.deepcopy(resource)
+                ref = item.config.get(field)
+                if ref:
+                    item.config[key] = fn(ref, names)
+                copies.append(item)
+            resolved[type_name] = copies
+        return resolved
 
     def _generate_vcn_terraform(
         self, vcns: list[ResourceConfig], subnets: list[ResourceConfig]
@@ -247,12 +289,13 @@ class OCIProvider(
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return ["vcn", "subnet", "instance"]
+        return ["compartment", "vcn", "subnet", "instance"]
 
     @override
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
         """Map InfraFoundry resource types to terraform resource types."""
         return {
+            "compartment": ["oci_identity_compartment"],
             "instance": ["oci_core_instance"],
             "vcn": ["oci_core_vcn"],
         }
@@ -261,6 +304,7 @@ class OCIProvider(
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies."""
         return {
+            "compartment": [],
             "instance": ["vcn", "subnet"],
             "subnet": ["vcn"],
             "vcn": [],

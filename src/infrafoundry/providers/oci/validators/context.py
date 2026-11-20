@@ -20,6 +20,8 @@ class OCIApiContext(ValidationContext):
         existing_vcns: VCN dicts from the OCI API.
         existing_subnets: Subnet dicts from the OCI API.
         existing_images: Image dicts from the OCI API.
+        region: The region from provider settings.
+        region_subscriptions: Region subscription dicts for the tenancy.
     """
 
     compartment_ocid: str
@@ -27,3 +29,5 @@ class OCIApiContext(ValidationContext):
     existing_vcns: list[dict[str, Any]] | None = None
     existing_subnets: list[dict[str, Any]] | None = None
     existing_images: list[dict[str, Any]] | None = None
+    region: str = ""
+    region_subscriptions: list[dict[str, Any]] | None = None

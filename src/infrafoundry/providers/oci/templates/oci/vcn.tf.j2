@@ -2,7 +2,7 @@
 
 {% for vcn in vcns %}
 resource "oci_core_vcn" "{{ vcn.name | to_terraform_name }}" {
-  compartment_id = var.oci_compartment_ocid
+  compartment_id = {{ vcn.config.get('compartment_id_expr', 'var.oci_compartment_ocid') }}
   cidr_blocks    = ["{{ vcn.config.cidr_block }}"]
   display_name   = "{{ vcn.name }}"
   {% if vcn.config.get('dns_label') %}
@@ -12,13 +12,13 @@ resource "oci_core_vcn" "{{ vcn.name | to_terraform_name }}" {
 
 {% if vcn.config.get('internet_gateway', false) %}
 resource "oci_core_internet_gateway" "{{ vcn.name | to_terraform_name }}_igw" {
-  compartment_id = var.oci_compartment_ocid
+  compartment_id = {{ vcn.config.get('compartment_id_expr', 'var.oci_compartment_ocid') }}
   vcn_id         = oci_core_vcn.{{ vcn.name | to_terraform_name }}.id
   display_name   = "{{ vcn.name }}-igw"
 }
 
 resource "oci_core_route_table" "{{ vcn.name | to_terraform_name }}_public_rt" {
-  compartment_id = var.oci_compartment_ocid
+  compartment_id = {{ vcn.config.get('compartment_id_expr', 'var.oci_compartment_ocid') }}
   vcn_id         = oci_core_vcn.{{ vcn.name | to_terraform_name }}.id
   display_name   = "{{ vcn.name }}-public-rt"
 
@@ -31,13 +31,13 @@ resource "oci_core_route_table" "{{ vcn.name | to_terraform_name }}_public_rt" {
 
 {% if vcn.config.get('nat_gateway', false) %}
 resource "oci_core_nat_gateway" "{{ vcn.name | to_terraform_name }}_nat" {
-  compartment_id = var.oci_compartment_ocid
+  compartment_id = {{ vcn.config.get('compartment_id_expr', 'var.oci_compartment_ocid') }}
   vcn_id         = oci_core_vcn.{{ vcn.name | to_terraform_name }}.id
   display_name   = "{{ vcn.name }}-nat-gw"
 }
 
 resource "oci_core_route_table" "{{ vcn.name | to_terraform_name }}_private_rt" {
-  compartment_id = var.oci_compartment_ocid
+  compartment_id = {{ vcn.config.get('compartment_id_expr', 'var.oci_compartment_ocid') }}
   vcn_id         = oci_core_vcn.{{ vcn.name | to_terraform_name }}.id
   display_name   = "{{ vcn.name }}-private-rt"
 
@@ -50,7 +50,7 @@ resource "oci_core_route_table" "{{ vcn.name | to_terraform_name }}_private_rt" 
 
 {% if vcn.config.get('security_list') %}
 resource "oci_core_security_list" "{{ vcn.name | to_terraform_name }}_sl" {
-  compartment_id = var.oci_compartment_ocid
+  compartment_id = {{ vcn.config.get('compartment_id_expr', 'var.oci_compartment_ocid') }}
   vcn_id         = oci_core_vcn.{{ vcn.name | to_terraform_name }}.id
   display_name   = "{{ vcn.name }}-security-list"
 
@@ -92,7 +92,7 @@ resource "oci_core_security_list" "{{ vcn.name | to_terraform_name }}_sl" {
 
 {% for subnet in subnets %}
 resource "oci_core_subnet" "{{ subnet.name | to_terraform_name }}" {
-  compartment_id = var.oci_compartment_ocid
+  compartment_id = {{ subnet.config.get('compartment_id_expr', 'var.oci_compartment_ocid') }}
   vcn_id         = oci_core_vcn.{{ subnet.config.vcn | to_terraform_name }}.id
   cidr_block     = "{{ subnet.config.cidr_block }}"
   display_name   = "{{ subnet.name }}"

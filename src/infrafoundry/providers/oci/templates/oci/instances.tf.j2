@@ -46,7 +46,7 @@ TSEOT
 {% endfor %}
 {% for instance in instances %}
 resource "oci_core_instance" "{{ instance.name | to_terraform_name }}" {
-  compartment_id      = var.oci_compartment_ocid
+  compartment_id      = {{ instance.config.get('compartment_id_expr', 'var.oci_compartment_ocid') }}
 {% if instance.config.get('availability_domain') %}
   availability_domain = "{{ instance.config.availability_domain }}"
 {% else %}

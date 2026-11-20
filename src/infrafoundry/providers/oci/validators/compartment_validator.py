@@ -26,15 +26,53 @@ class CompartmentValidator(SpecializedValidator[OCIApiContext]):
 
     @override
     def validate(self, context: OCIApiContext) -> None:
-        """Validate that compartment_ocid exists in the pre-fetched compartments list.
+        """Validate that compartment_ocid exists, when one is set.
 
         Args:
             context: The compartment OCID and the pre-fetched compartments
                 (None if the API call failed).
         """
+        self._check_compartment_exists(context)
+
+    def check_home_region(self, context: OCIApiContext) -> None:
+        """Require the configured region to be the home region when compartments are managed.
+
+        OCI creates compartments only in the tenancy's home region.
+
+        Args:
+            context: The region, its subscriptions and the resources in scope.
+        """
+        if not any(r.type == "compartment" for r in context.resources):
+            return
+        subscriptions = context.region_subscriptions
+        if not subscriptions:
+            return
+        home = next((s for s in subscriptions if s.get("isHomeRegion")), None)
+        if home is None:
+            return
+        home_name = str(home.get("regionName", ""))
+        if context.region == home_name:
+            self.report.add_check(
+                check_name="oci_compartment_home_region",
+                passed=True,
+                message=f"Region '{context.region}' is the tenancy home region",
+            )
+            return
+        self.report.add_check(
+            check_name="oci_compartment_home_region",
+            passed=False,
+            message=(
+                f"Compartments can only be created in the tenancy home region "
+                f"'{home_name}', but region is '{context.region}'"
+            ),
+            level=ValidationLevel.ERROR,
+        )
+
+    def _check_compartment_exists(self, context: OCIApiContext) -> None:
+        """Check that the configured fallback compartment exists, when one is set."""
         compartment_ocid = context.compartment_ocid
         compartments = context.compartments
-        if compartments is None:
+        if not compartment_ocid or compartments is None:
             return
 
         compartment_map = {c.get("id", ""): c.get("name", "") for c in compartments}
