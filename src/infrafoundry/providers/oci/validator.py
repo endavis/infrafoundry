@@ -20,8 +20,13 @@ from infrafoundry.core.validation_helpers import (
 from infrafoundry.providers.oci.api_client import OCIClient
 
 from .compartments import find_parent_cycles, is_ocid
-from .validators import CompartmentValidator, ImageValidator, NetworkValidator
-from .validators.context import OCIApiContext
+from .validators import (
+    CompartmentValidator,
+    ImageValidator,
+    NetworkValidator,
+    StorageIamValidator,
+)
+from .validators.context import OCIApiContext, OCIStorageIamContext
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +58,7 @@ class OCIValidator:
         self.compartment_validator = CompartmentValidator(report)
         self.network_validator = NetworkValidator(report)
         self.image_validator = ImageValidator(report)
+        self.storage_iam_validator = StorageIamValidator(report)
 
     def _create_client(self) -> OCIClient | None:
         """Create an OCIClient from provider settings.
@@ -122,6 +128,7 @@ class OCIValidator:
         """
         self._validate_local_references(resources)
         self._validate_compartments(resources, None)
+        self.storage_iam_validator.validate(OCIStorageIamContext(resources=resources))
         self._validate_api_references(resources)
 
     def validate_offline(
@@ -138,6 +145,11 @@ class OCIValidator:
         """
         self._validate_local_references(resources)
         self._validate_compartments(resources, reference_resources)
+        self.storage_iam_validator.validate(
+            OCIStorageIamContext(
+                resources=resources, reference_resources=list(reference_resources or [])
+            )
+        )
 
     def _validate_compartments(
         self,
@@ -182,7 +194,7 @@ class OCIValidator:
                 )
 
         for resource in resources:
-            if resource.type not in ("vcn", "subnet", "instance"):
+            if resource.type not in ("vcn", "subnet", "instance", "bucket"):
                 continue
             ref = resource.config.get("compartment")
             check = f"oci_compartment_ref_{resource.type}_{resource.name}"

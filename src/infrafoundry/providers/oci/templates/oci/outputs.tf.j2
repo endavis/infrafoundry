@@ -52,3 +52,30 @@ output "instance_private_ips" {
   }
 }
 {% endif %}
+
+{% if resources_by_type.get('bucket') %}
+output "objectstorage_namespace" {
+  description = "Object Storage namespace of the tenancy"
+  value       = data.oci_objectstorage_namespace.this.namespace
+}
+{% endif %}
+
+{% set secret_keys = resources_by_type.get('customer_secret_key', []) %}
+{% if secret_keys %}
+# The secret is also in the Terraform state; other providers read it with an
+# `outputs.oci.customer_secret_key_<name>_secret` reference.
+{% for r in secret_keys %}
+output "customer_secret_key_{{ r.name | to_terraform_name }}_id" {
+  description = "Access key ID for {{ r.name }}"
+  value       = oci_identity_customer_secret_key.{{ r.name | to_terraform_name }}.id
+  sensitive   = true
+}
+
+output "customer_secret_key_{{ r.name | to_terraform_name }}_secret" {
+  description = "Secret key for {{ r.name }}"
+  value       = oci_identity_customer_secret_key.{{ r.name | to_terraform_name }}.key
+  sensitive   = true
+}
+
+{% endfor %}
+{% endif %}

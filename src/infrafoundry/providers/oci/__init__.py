@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, ClassVar, override
 
 from infrafoundry.core.config.models import EnvironmentConfig
+from infrafoundry.core.exceptions import ConfigurationError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
     CloudInitMixin,
@@ -16,7 +17,12 @@ from infrafoundry.core.provider_mixins import (
 from infrafoundry.core.tailscale import process_tailscale_config
 from infrafoundry.core.validation import ValidationReport
 
-from .compartments import compartment_id_expr, parent_id_expr
+from .compartments import (
+    compartment_id_expr,
+    parent_id_expr,
+    tenancy_compartment_id_expr,
+    terraform_name,
+)
 from .validator import OCIValidator
 
 
@@ -95,7 +101,9 @@ class OCIProvider(
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
         """Generate Terraform configuration for OCI resources."""
-        resources_by_type = self._resolve_compartments(self.prepare_terraform_generation(resources))
+        resources_by_type = self._resolve_iam_refs(
+            self._resolve_compartments(self.prepare_terraform_generation(resources))
+        )
 
         # Pre-process instances FIRST so any ``tailscale:`` blocks
         # auto-populate ``terraform_secrets`` on the resource. This must
@@ -150,6 +158,28 @@ class OCIProvider(
                 resources_by_type.get("subnet", []),
             )
 
+        if resources_by_type.get("bucket"):
+            self.render_and_write_terraform(
+                "oci/object_storage.tf.j2",
+                context={"buckets": resources_by_type["bucket"]},
+                output_name="object_storage.tf",
+            )
+
+        if any(
+            resources_by_type.get(t)
+            for t in ("iam_user", "iam_group", "iam_policy", "customer_secret_key")
+        ):
+            self.render_and_write_terraform(
+                "oci/iam.tf.j2",
+                context={
+                    "users": resources_by_type.get("iam_user", []),
+                    "groups": resources_by_type.get("iam_group", []),
+                    "policies": resources_by_type.get("iam_policy", []),
+                    "keys": resources_by_type.get("customer_secret_key", []),
+                },
+                output_name="iam.tf",
+            )
+
         # Generate compute instances (already processed above)
         if processed_instances:
             self.render_and_write_terraform(
@@ -179,8 +209,10 @@ class OCIProvider(
         for type_name, type_resources in resources_by_type.items():
             if type_name == "compartment":
                 key, field, fn = "parent_id_expr", "parent", parent_id_expr
-            elif type_name in ("vcn", "subnet", "instance"):
+            elif type_name in ("vcn", "subnet", "instance", "bucket"):
                 key, field, fn = "compartment_id_expr", "compartment", compartment_id_expr
+            elif type_name == "iam_policy":
+                key, field, fn = "compartment_id_expr", "compartment", tenancy_compartment_id_expr
             else:
                 resolved[type_name] = type_resources
                 continue
@@ -192,6 +224,43 @@ class OCIProvider(
                     item.config[key] = fn(ref, names)
                 copies.append(item)
             resolved[type_name] = copies
+        return resolved
+
+    @staticmethod
+    def _resolve_iam_refs(
+        resources_by_type: dict[str, list[ResourceConfig]],
+    ) -> dict[str, list[ResourceConfig]]:
+        """Resolve ``iam_group.members`` and ``customer_secret_key.user`` to Terraform names.
+
+        Raises:
+            ConfigurationError: If a reference names an undefined ``iam_user``.
+        """
+        users = {u.name for u in resources_by_type.get("iam_user", [])}
+
+        def lookup(owner: str, ref: object) -> str:
+            if not isinstance(ref, str) or ref not in users:
+                raise ConfigurationError(f"OCI {owner} references undefined iam_user '{ref}'")
+            return terraform_name(ref)
+
+        resolved = dict(resources_by_type)
+        groups: list[ResourceConfig] = []
+        for group in resources_by_type.get("iam_group", []):
+            item = copy.deepcopy(group)
+            item.config["members_tf"] = [
+                lookup(f"iam_group '{item.name}'", m) for m in item.config.get("members") or []
+            ]
+            groups.append(item)
+        if groups:
+            resolved["iam_group"] = groups
+        keys: list[ResourceConfig] = []
+        for key in resources_by_type.get("customer_secret_key", []):
+            item = copy.deepcopy(key)
+            item.config["user_tf"] = lookup(
+                f"customer_secret_key '{item.name}'", item.config.get("user")
+            )
+            keys.append(item)
+        if keys:
+            resolved["customer_secret_key"] = keys
         return resolved
 
     def _generate_vcn_terraform(
@@ -289,7 +358,17 @@ class OCIProvider(
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return ["compartment", "vcn", "subnet", "instance"]
+        return [
+            "compartment",
+            "vcn",
+            "subnet",
+            "instance",
+            "bucket",
+            "iam_user",
+            "iam_group",
+            "iam_policy",
+            "customer_secret_key",
+        ]
 
     @override
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
@@ -298,6 +377,11 @@ class OCIProvider(
             "compartment": ["oci_identity_compartment"],
             "instance": ["oci_core_instance"],
             "vcn": ["oci_core_vcn"],
+            "bucket": ["oci_objectstorage_bucket"],
+            "iam_user": ["oci_identity_user"],
+            "iam_group": ["oci_identity_group"],
+            "iam_policy": ["oci_identity_policy"],
+            "customer_secret_key": ["oci_identity_customer_secret_key"],
         }
 
     @override
@@ -308,4 +392,8 @@ class OCIProvider(
             "instance": ["vcn", "subnet"],
             "subnet": ["vcn"],
             "vcn": [],
+            "bucket": [],
+            "iam_user": [],
+            "iam_group": [],
+            "iam_policy": ["iam_group"],
         }

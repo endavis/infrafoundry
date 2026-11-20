@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
+from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationContext
 
 
@@ -31,3 +32,15 @@ class OCIApiContext(ValidationContext):
     existing_images: list[dict[str, Any]] | None = None
     region: str = ""
     region_subscriptions: list[dict[str, Any]] | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class OCIStorageIamContext(ValidationContext):
+    """Context for the offline bucket and IAM checks.
+
+    Attributes:
+        reference_resources: Every OCI resource in the environment, used to resolve
+            names when ``resources`` is a filtered subset.
+    """
+
+    reference_resources: list[ResourceConfig] = field(default_factory=list)
