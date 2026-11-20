@@ -469,12 +469,36 @@ as package-level event paths. A path like `scripts/setup.sh` in a package at
 ### Why resource-level events?
 
 - **Idempotent:** Handlers only fire when the resource outcome matches (e.g.,
-  `on_create` only fires on first creation, not every apply)
+  `on_create` fires after the resource is created, not on every apply; if the
+  apply fails first, the next apply fires it, see
+  [When an apply fails](#when-an-apply-fails))
 - **No blocking:** Eliminates the problem where `RUNNER_COMPLETED` handlers
   block subsequent providers
 - **Self-contained:** The resource carries its config, provider, and lifecycle
   events -- no cross-referencing by name
 - **Portable:** Move or rename a resource and its events move with it
+
+### When an apply fails
+
+Terraform can create a resource and then fail the apply, for example on a later
+resource. The next apply then sees no `create` outcome for it. To keep
+`on_create` handlers from being lost, InfraFoundry records an `on_create`
+obligation in the state database as soon as terraform reports the create, before
+it checks the apply result, and marks it done once the handlers ran.
+
+- On the next apply, a resource whose `on_create` handlers did not finish fires
+  them before its `on_update` handlers, as long as it is still in scope
+  (not removed from the config and not excluded by a resource filter).
+- A handler that fails with `abort` leaves the obligation pending; a failure
+  with `continue_on_error` counts as done.
+- Package-level handlers (those with `requires`) fire on the aggregate event,
+  which now includes resources still pending from a failed apply. `apply_serial`
+  records and retries these; parallel apply does not emit the aggregate event.
+- All handlers of the event run again together, so write `on_create` handlers to
+  be idempotent.
+
+The obligations are `deployment_events` rows (`on_create_pending`,
+`on_create_done`); there is no schema change and no CLI output for them.
 
 ### Deprecation of runner lifecycle events
 

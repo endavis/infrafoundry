@@ -23,6 +23,10 @@ from infrafoundry.core.state.models import (
     Resource,
     ResourceState,
 )
+from infrafoundry.core.state.pending_on_create import PendingKind, PendingOnCreate
+from infrafoundry.core.state.pending_on_create import get_pending as _get_pending
+from infrafoundry.core.state.pending_on_create import record_done as _record_done
+from infrafoundry.core.state.pending_on_create import record_pending as _record_pending
 from infrafoundry.core.state.pool_config import build_engine_kwargs
 from infrafoundry.core.state.prune import prune_environment as _prune_environment
 from infrafoundry.core.state.reconcile import ReconcileCandidate
@@ -233,6 +237,62 @@ class StateManager(BaseManager):
             StateError: If another environment's resources reference its deployments
         """
         return _prune_environment(self.SessionLocal, environment, dry_run=dry_run)
+
+    def record_pending_on_create(
+        self,
+        deployment_id: int,
+        provider: str,
+        name: str,
+        kind: PendingKind,
+        address: str = "",
+    ) -> None:
+        """Record that a resource's ``on_create`` handlers still have to run (#1524).
+
+        Args:
+            deployment_id: Deployment the ledger row belongs to
+            provider: Provider name
+            name: Resource name
+            kind: ``resource`` or ``package``
+            address: Terraform address of the create outcome
+        """
+        _record_pending(self.SessionLocal, deployment_id, provider, name, kind, address)
+
+    def record_on_create_done(
+        self,
+        deployment_id: int,
+        provider: str,
+        name: str,
+        kind: PendingKind,
+        address: str = "",
+    ) -> None:
+        """Record that a resource's ``on_create`` handlers completed.
+
+        Args:
+            deployment_id: Deployment the ledger row belongs to
+            provider: Provider name
+            name: Resource name
+            kind: ``resource`` or ``package``
+            address: Terraform address of the create outcome
+        """
+        _record_done(self.SessionLocal, deployment_id, provider, name, kind, address)
+
+    def get_pending_on_create(
+        self,
+        environment: str,
+        kind: PendingKind | None = None,
+        provider: str | None = None,
+    ) -> list[PendingOnCreate]:
+        """Get ``on_create`` obligations that have not completed.
+
+        Args:
+            environment: Environment name
+            kind: Restrict to one kind
+            provider: Restrict to one provider
+
+        Returns:
+            Pending obligations, oldest first
+        """
+        return _get_pending(self.SessionLocal, environment, kind=kind, provider=provider)
 
     def reconcile_planned(
         self, environment: str, *, user: str | None = None, dry_run: bool = False

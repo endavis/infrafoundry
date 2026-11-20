@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -1543,3 +1544,334 @@ def test_successful_apply_never_marks_error() -> None:
     states = [c.kwargs["state"] for c in state_manager.update_resource_state.call_args_list]
     assert ResourceState.ERROR not in states
     assert _emitted(event_manager, EventType.RESOURCE_FAILED) == []
+
+
+# ---------------------------------------------------------------------------
+# on_create ledger: handlers survive a failed apply (#1524)
+# ---------------------------------------------------------------------------
+
+_ON_CREATE = {"on_create": [{"type": "script", "script": "setup.sh"}]}
+_ON_UPDATE = {"on_update": [{"type": "script", "script": "update.sh"}]}
+
+
+def _create(name: str, prefix: str = "proxmox_virtual_environment_vm") -> ResourceOutcome:
+    return ResourceOutcome(address=f"{prefix}.{name}", action="create", resource_name=name)
+
+
+class _LedgerRig:
+    """An executor on a real SQLite ledger with scripted runner and handler results."""
+
+    def __init__(
+        self,
+        tmp_path: Path,
+        apply_results: list[dict[str, Any]],
+        providers: dict[str, str] | None = None,
+    ) -> None:
+        from infrafoundry.core.state import StateManager
+
+        self.state = StateManager(f"sqlite:///{tmp_path / 'state.db'}")
+        self.state.initialize()
+        self.apply_results = apply_results
+        self.abort_for: set[str] = set()
+        self.continue_for: set[str] = set()
+        runner = MagicMock()
+        runner.priority = 0
+        runner.apply = MagicMock(side_effect=self._apply)
+        runner.plan = MagicMock()
+        runner.destroy = MagicMock()
+        runner.get_resource_ids = MagicMock(return_value={})
+        registry = MagicMock()
+        registry.list_runners.return_value = ["terraform"]
+        registry.create_runner.return_value = runner
+        self.events = MagicMock()
+        self.events.emit_event.side_effect = self._emit
+        tf_types = providers or {"proxmox": "proxmox_virtual_environment_vm"}
+        self.providers: dict[str, Any] = {}
+        for name, tf_type in tf_types.items():
+            provider = MagicMock()
+            provider.get_terraform_resource_types.return_value = {"vm": [tf_type]}
+            self.providers[name] = provider
+        self.executor = DeploymentExecutor(
+            runner_registry=registry,
+            state_manager=self.state,
+            event_manager=self.events,
+            providers=self.providers,
+        )
+
+    def _apply(self, *_a: Any, **_k: Any) -> dict[str, Any]:
+        return self.apply_results.pop(0)
+
+    def _emit(self, event_type: Any, _env: str, payload: Any, **kwargs: Any) -> list[EventResult]:
+        name = kwargs.get("resource")
+        if name in self.abort_for:
+            return [EventResult(success=False, abort=True, reason="boom", handler_name="h")]
+        if name in self.continue_for:
+            return [EventResult(success=False, abort=False, reason="soft", handler_name="h")]
+        return []
+
+    def deployment(self) -> int:
+        return self.state.create_deployment("dev", "apply")
+
+    def apply(self, resources: list[MagicMock], provider: str = "proxmox") -> Any:
+        return self.executor.apply_single_provider(
+            env_name="dev",
+            deployment_id=self.deployment(),
+            provider_name=provider,
+            provider=self.providers[provider],
+            resources=resources,  # type: ignore[arg-type]
+            auto_approve=True,
+        )
+
+    def apply_serial(self, by_provider: dict[str, list[MagicMock]], **kwargs: Any) -> Any:
+        return self.executor.apply_serial(
+            env_name="dev",
+            deployment_id=self.deployment(),
+            resources_by_provider=by_provider,  # type: ignore[arg-type]
+            resource_filter=kwargs.get("resource_filter"),
+            auto_approve=True,
+        )
+
+    def fired(self, event_type: EventType = EventType.RESOURCE_CREATED) -> list[str]:
+        """Names of per-resource lifecycle emits of ``event_type``, in order."""
+        return [
+            c.kwargs["resource"]
+            for c in self.events.emit_event.call_args_list
+            if c.args[0] == event_type and "resource" in c.kwargs
+        ]
+
+    def aggregates(self) -> list[Any]:
+        return [
+            c
+            for c in self.events.emit_event.call_args_list
+            if c.args[0] == EventType.RESOURCE_CREATED and "resources" in c.args[2]
+        ]
+
+    def pending(self, kind: Any = None) -> list[str]:
+        return [p.name for p in self.state.get_pending_on_create("dev", kind=kind)]
+
+
+@pytest.fixture
+def rig_factory(tmp_path: Path) -> Any:
+    rigs: list[_LedgerRig] = []
+
+    def make(apply_results: list[dict[str, Any]], **kwargs: Any) -> _LedgerRig:
+        rig = _LedgerRig(tmp_path, apply_results, **kwargs)
+        rigs.append(rig)
+        return rig
+
+    yield make
+    for rig in rigs:
+        rig.state.cleanup()
+
+
+def _ok(*outcomes: ResourceOutcome) -> dict[str, Any]:
+    return {"success": True, "resource_outcomes": list(outcomes)}
+
+
+def _failed(*outcomes: ResourceOutcome) -> dict[str, Any]:
+    return {"success": False, "resource_outcomes": list(outcomes)}
+
+
+def test_failed_apply_records_pending_and_no_done(rig_factory: Any) -> None:
+    rig = rig_factory([_failed(_create("web"))])
+    with pytest.raises(TerraformError):
+        rig.apply([_resource_with_events("web", events=_ON_CREATE)])
+
+    assert rig.pending("resource") == ["web"]
+    assert rig.fired() == []
+
+
+def test_aborting_handler_leaves_pending(rig_factory: Any) -> None:
+    rig = rig_factory([_ok(_create("web"))])
+    rig.abort_for = {"web"}
+    with pytest.raises(EventAbortedError):
+        rig.apply([_resource_with_events("web", events=_ON_CREATE)])
+
+    assert rig.pending("resource") == ["web"]
+
+
+def test_success_records_pending_then_done(rig_factory: Any) -> None:
+    rig = rig_factory([_ok(_create("web"))])
+    rig.apply([_resource_with_events("web", events=_ON_CREATE)])
+
+    assert rig.fired() == ["web"]
+    assert rig.pending() == []
+    with rig.state.SessionLocal() as session:
+        from infrafoundry.core.state.models import DeploymentEvent
+
+        types = [e.event_type for e in session.query(DeploymentEvent).order_by(DeploymentEvent.id)]
+    assert types == ["on_create_pending", "on_create_done"]
+
+
+def test_continue_on_error_failure_counts_as_done(rig_factory: Any) -> None:
+    rig = rig_factory([_ok(_create("web"))])
+    rig.continue_for = {"web"}
+    rig.apply([_resource_with_events("web", events=_ON_CREATE)])
+
+    assert rig.pending() == []
+
+
+def test_resource_without_on_create_handlers_records_nothing(rig_factory: Any) -> None:
+    rig = rig_factory([_failed(_create("web"))])
+    with pytest.raises(TerraformError):
+        rig.apply([_resource_with_events("web", events=None)])
+
+    assert rig.pending("resource") == []
+
+
+def test_helper_resource_outcome_is_not_recorded(rig_factory: Any) -> None:
+    helper = _create("web", prefix="proxmox_virtual_environment_file")
+    rig = rig_factory([_failed(helper)])
+    with pytest.raises(TerraformError):
+        rig.apply([_resource_with_events("web", events=_ON_CREATE)])
+
+    assert rig.pending() == []
+
+
+def test_retry_fires_pending_on_create_once(rig_factory: Any) -> None:
+    rig = rig_factory([_failed(_create("web")), _ok(), _ok()])
+    resources = [_resource_with_events("web", events=_ON_CREATE)]
+    with pytest.raises(TerraformError):
+        rig.apply(resources)
+
+    rig.apply(resources)
+    assert rig.fired() == ["web"]
+    assert rig.pending() == []
+
+    rig.apply(resources)
+    assert rig.fired() == ["web"]
+
+
+def test_retry_skipped_when_resource_filtered_out(rig_factory: Any) -> None:
+    rig = rig_factory([_failed(_create("web")), _ok()])
+    with pytest.raises(TerraformError):
+        rig.apply([_resource_with_events("web", events=_ON_CREATE)])
+
+    rig.apply([_resource_with_events("other", events=_ON_CREATE)])
+    assert rig.fired() == []
+    assert rig.pending("resource") == ["web"]
+
+
+def test_retry_fires_before_update(rig_factory: Any) -> None:
+    update = ResourceOutcome(
+        address="proxmox_virtual_environment_vm.db", action="update", resource_name="db"
+    )
+    rig = rig_factory([_failed(_create("web")), _ok(update)])
+    resources = [
+        _resource_with_events("web", events=_ON_CREATE),
+        _resource_with_events("db", events=_ON_UPDATE),
+    ]
+    with pytest.raises(TerraformError):
+        rig.apply(resources)
+
+    rig.apply(resources)
+    order = [
+        (c.args[0], c.kwargs["resource"])
+        for c in rig.events.emit_event.call_args_list
+        if "resource" in c.kwargs
+    ]
+    assert order == [
+        (EventType.RESOURCE_CREATED, "web"),
+        (EventType.RESOURCE_UPDATED, "db"),
+    ]
+
+
+def test_retry_abort_stays_pending(rig_factory: Any) -> None:
+    rig = rig_factory([_failed(_create("web")), _ok()])
+    resources = [_resource_with_events("web", events=_ON_CREATE)]
+    with pytest.raises(TerraformError):
+        rig.apply(resources)
+
+    rig.abort_for = {"web"}
+    with pytest.raises(EventAbortedError):
+        rig.apply(resources)
+    assert rig.pending("resource") == ["web"]
+
+
+def test_ledger_errors_do_not_break_the_apply(rig_factory: Any) -> None:
+    rig = rig_factory([_ok(_create("web"))])
+    for attr in ("record_pending_on_create", "record_on_create_done", "get_pending_on_create"):
+        setattr(rig.state, attr, MagicMock(side_effect=RuntimeError("db down")))
+
+    rig.apply([_resource_with_events("web", events=_ON_CREATE)])
+    assert rig.fired() == ["web"]
+
+
+def test_ledger_write_error_does_not_mask_the_runner_error(rig_factory: Any) -> None:
+    rig = rig_factory([_failed(_create("web"))])
+    rig.state.record_pending_on_create = MagicMock(side_effect=RuntimeError("db down"))
+    with pytest.raises(TerraformError):
+        rig.apply([_resource_with_events("web", events=_ON_CREATE)])
+
+
+# Package kind --------------------------------------------------------------
+
+
+def test_package_pending_recorded_and_done_after_aggregate(rig_factory: Any) -> None:
+    rig = rig_factory([_ok(_create("web"))])
+    rig.apply_serial({"proxmox": [_resource_with_events("web")]})
+
+    assert len(rig.aggregates()) == 1
+    assert rig.pending() == []
+    assert rig.pending("package") == []
+
+
+def test_cross_provider_failure_keeps_package_pending(rig_factory: Any) -> None:
+    rig = rig_factory(
+        [_ok(_create("a")), _failed(_create("b", "proxmox_virtual_environment_vm"))],
+        providers={
+            "opnsense": "proxmox_virtual_environment_vm",
+            "proxmox": "proxmox_virtual_environment_vm",
+        },
+    )
+    by_provider = {
+        "opnsense": [_resource_with_events("a", provider="opnsense")],
+        "proxmox": [_resource_with_events("b")],
+    }
+    with pytest.raises(TerraformError):
+        rig.apply_serial(by_provider)
+
+    assert rig.aggregates() == []
+    assert sorted(rig.pending("package")) == ["a", "b"]
+
+
+def test_retry_merges_old_and_new_names_into_one_aggregate(rig_factory: Any) -> None:
+    rig = rig_factory([_failed(_create("a")), _ok(_create("b"))])
+    first = {"proxmox": [_resource_with_events("a")]}
+    with pytest.raises(TerraformError):
+        rig.apply_serial(first)
+
+    rig.apply_serial({"proxmox": [_resource_with_events("a"), _resource_with_events("b")]})
+    aggregates = rig.aggregates()
+    assert len(aggregates) == 1
+    assert aggregates[0].kwargs["target_resources"] == ["b", "a"]
+    assert rig.pending("package") == []
+
+
+def test_package_abort_stays_pending(rig_factory: Any) -> None:
+    rig = rig_factory([_ok(_create("web"))])
+    rig.events.emit_event.side_effect = lambda et, env, payload, **kw: (
+        [EventResult(success=False, abort=True, reason="stop", handler_name="h")]
+        if "resources" in payload
+        else []
+    )
+    with pytest.raises(EventAbortedError):
+        rig.apply_serial({"proxmox": [_resource_with_events("web")]})
+
+    assert rig.pending("package") == ["web"]
+
+
+def test_apply_parallel_records_no_package_pending(rig_factory: Any) -> None:
+    rig = rig_factory([_ok(_create("web"))])
+    rig.abort_for = {"web"}
+    rig.executor.apply_parallel(
+        env_name="dev",
+        deployment_id=rig.deployment(),
+        resources_by_provider={"proxmox": [_resource_with_events("web", events=_ON_CREATE)]},
+        resource_filter=None,
+        auto_approve=True,
+        max_workers=1,
+    )
+
+    assert rig.pending("package") == []
+    assert rig.pending("resource") == ["web"]

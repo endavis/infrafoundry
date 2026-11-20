@@ -270,6 +270,12 @@ once, after all required resources are destroyed, with its package's variables.
 On apply, `on_create` emits one `RESOURCE_CREATED` per package-variables group
 (not one merged event), so handlers never see another package's variables.
 
+If an apply fails after terraform created a resource, its `on_create` handlers
+have not run. InfraFoundry keeps that obligation as `on_create_pending` and
+`on_create_done` rows in `deployment_events` and fires the handlers on the next
+apply, so they are not lost. See
+[When an apply fails](../configuration/infrastructure-packages.md#when-an-apply-fails).
+
 ### Drift Events
 
 `DRIFT_DETECTED` carries the provider and the runner's `DriftInfo`:
