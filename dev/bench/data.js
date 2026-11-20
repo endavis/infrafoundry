@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795187512249,
+  "lastUpdate": 1795189968239,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4146,6 +4146,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00001216805097868782",
             "extra": "mean: 126.98922295596715 usec\nrounds: 8477"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "88fd29bad2426077192097a26c4410d0531c632e",
+          "message": "feat: ship the k3s ansible roles with the k3s-cluster blueprint (merges PR #1523, addresses #1522)\n\nThe OCI k3s-install script loaded the k3s-server and k3s-agent roles from\n${INFRAFOUNDRY_CONFIG_DIR}/roles, which is the env directory and never has\nthem, so k3s-install failed on any config repo that had not copied the\nroles in.\n\nMove both roles into blueprints/k3s-cluster/roles/ and the playbook into\nplaybooks/k3s.yml, so a roles/ next to the playbook cannot shadow an\noverride. The script uses the blueprint roles by default and puts\n<env>/roles first when it exists (local runs only). Jumphost runs now\nwork because the roles travel with the blueprint, and the script's\nBLUEPRINT_DIR fallback resolves to the blueprint root. Docs state that\nINFRAFOUNDRY_CONFIG_DIR is <config>/envs/<env>.\n\nAddresses #1522\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T15:51:41Z",
+          "tree_id": "42aa4baf619d3f559034d9b7d2f39f1e1bd81ef2",
+          "url": "https://github.com/endavis/infrafoundry/commit/88fd29bad2426077192097a26c4410d0531c632e"
+        },
+        "date": 1795189967477,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 77.74705214277857,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00036144725693233406",
+            "extra": "mean: 12.86222399999874 msec\nrounds: 79"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13599.660406924153,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007751989037610217",
+            "extra": "mean: 73.53124784578138 usec\nrounds: 15667"
           }
         ]
       }
