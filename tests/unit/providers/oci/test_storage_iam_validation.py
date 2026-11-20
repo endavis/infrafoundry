@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.oci.validator import OCIValidator
@@ -113,3 +115,16 @@ def test_warnings() -> None:
         "oci_iam_user_u_compartment",
         "oci_customer_secret_key_Bad_name",
     ]
+
+
+def test_user_email_valid_and_unset_accepted() -> None:
+    """A valid email, or none, is accepted."""
+    report = _run([_res("u", "iam_user", email="u@example.com"), _res("v", "iam_user")])
+    assert _names(report, ValidationLevel.ERROR) == []
+
+
+@pytest.mark.parametrize("email", ["", "  ", 5, "no-at-sign", None])
+def test_user_email_invalid(email: Any) -> None:
+    """An empty, non-string or @-less email is an error."""
+    report = _run([_res("u", "iam_user", email=email)])
+    assert _names(report, ValidationLevel.ERROR) == ["oci_iam_user_u_email"]

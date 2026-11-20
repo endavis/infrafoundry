@@ -235,6 +235,7 @@ bucket:
 
 iam_user:
   - name: backup-writer
+    email: backup-writer@example.com  # required in Identity Domains tenancies
 
 iam_group:
   - name: backup-writers
@@ -256,6 +257,7 @@ customer_secret_key:
 | `bucket` | `storage_tier`, `versioning`, `access_type` | No | Values above; defaults `Standard`, `Disabled`, `NoPublicAccess` |
 | `bucket` | `lifecycle` | No | List of rules. `name` (unique), `action`, `time_amount` (positive integer) and `time_unit` are required; `prefix`, `target` and `enabled` are optional |
 | `iam_user`, `iam_group` | `description` | No | Default `Managed by InfraFoundry` |
+| `iam_user` | `email` | No | Primary email of the user. Tenancies that use Identity Domains require it; without it OCI rejects the user with "The primary email must be specified." Must contain `@` |
 | `iam_group` | `members` | No | Names of `iam_user` resources |
 | `iam_policy` | `statements` | Yes | Non-empty list, written to the policy unchanged |
 | `iam_policy` | `compartment` | No | Compartment name or OCID (default: the tenancy root) |
@@ -338,7 +340,7 @@ The OCI provider validates:
   tenancy home region when compartments are managed
 - **Buckets and IAM** (offline): bucket `storage_tier`, `versioning` and `access_type`; lifecycle
   rule fields and unique rule names; `iam_group.members`, `customer_secret_key.user` and
-  `iam_policy.compartment` references; non-empty policy `statements`. A `compartment` on a user,
+  `iam_policy.compartment` references; `iam_user.email` is a non-empty string containing `@` when set; non-empty policy `statements`. A `compartment` on a user,
   group or key, and a key name unusable in an `outputs.oci.*` reference, are warnings
 
 ```bash

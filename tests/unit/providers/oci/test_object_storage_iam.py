@@ -123,6 +123,13 @@ class TestIam:
         assert 'resource "oci_identity_user_group_membership" "app_group_app_user"' in content
         assert "user_id  = oci_identity_user.app_user.id" in content
 
+    def test_user_email_rendered_only_when_set(self, provider: OCIProvider) -> None:
+        """The email is rendered when set and absent otherwise."""
+        provider.generate_terraform([_res("u", "iam_user", email="backup-writer@example.com")])
+        assert 'email          = "backup-writer@example.com"' in _tf(provider, "iam.tf")
+        provider.generate_terraform([_res("u", "iam_user")])
+        assert "email" not in _tf(provider, "iam.tf")
+
     def test_unknown_member_raises(self, provider: OCIProvider) -> None:
         """An undefined member raises ConfigurationError."""
         with pytest.raises(ConfigurationError):
