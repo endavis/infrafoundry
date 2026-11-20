@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795214064417,
+  "lastUpdate": 1795215252716,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4792,6 +4792,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011059651549898383",
             "extra": "mean: 80.3990974087509 usec\nrounds: 13777"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dc24e1f9322ef8c3cb7ef08d6c6b7b3c4f3f4c40",
+          "message": "fix: wait on the real kubernetes node name in the k3s-dns role (merges PR #1558, addresses #1556)\n\nAfter restarting k3s-agent, the role waited on node/<inventory_hostname>. k3s\nregisters a node under its node-name setting or the machine hostname, which can\ndiffer from the inventory name (on OCI, the hostname label). The wait then\nfailed, later workers were skipped and CoreDNS was not restarted.\n\nLook up the node name on the worker first: node-name from the k3s config and\nits drop-ins, then --node-name from the unit, then the hostname. Wait on that\nname from the control node. Add a k3s_dns_bin var (defaulting to the install\nmarker) so tests can stub the k3s binary, and tag the restart task.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-20T22:52:58Z",
+          "tree_id": "90ecf333e9104d72780369c8b45ea9dcd9a3b439",
+          "url": "https://github.com/endavis/infrafoundry/commit/dc24e1f9322ef8c3cb7ef08d6c6b7b3c4f3f4c40"
+        },
+        "date": 1795215252061,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 54.254717004481016,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00015269898564085305",
+            "extra": "mean: 18.431577109090952 msec\nrounds: 55"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9896.736205227795,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000670429905243283",
+            "extra": "mean: 101.0434126224124 usec\nrounds: 10426"
           }
         ]
       }
