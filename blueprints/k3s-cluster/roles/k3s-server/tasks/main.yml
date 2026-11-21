@@ -49,7 +49,7 @@
   copy:
     dest: /etc/rancher/k3s/config.yaml
     content: |
-      write-kubeconfig-mode: "0644"
+      write-kubeconfig-mode: "0600"
       tls-san:
         - {{ ansible_host }}
         - {{ inventory_hostname }}
@@ -95,6 +95,13 @@
     src: /etc/rancher/k3s/k3s.yaml
     dest: "{{ kubeconfig_local_path }}"
     flat: true
+
+- name: Restrict the local kubeconfig to its owner
+  delegate_to: localhost
+  become: false
+  file:
+    path: "{{ kubeconfig_local_path }}"
+    mode: "0600"
 
 - name: Update server endpoint in fetched kubeconfig
   delegate_to: localhost

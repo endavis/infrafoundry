@@ -201,13 +201,14 @@ def test_oci_k3s_cluster_blueprint_inherits_events(loader: PackageLoader) -> Non
     after_apply = events["after_apply"]
     assert [h["name"] for h in after_apply] == [
         "k3s-bootstrap",
+        "k3s-kubeconfig-mode",
         "k3s-dns",
         "verify-cluster",
     ]
-    assert after_apply[1]["script"].endswith("scripts/oci/k3s-dns.sh")
-    assert after_apply[1]["continue_on_error"] is True
-    assert after_apply[2]["script"].endswith("scripts/oci/verify-cluster.sh")
+    assert after_apply[2]["script"].endswith("scripts/oci/k3s-dns.sh")
     assert after_apply[2]["continue_on_error"] is True
+    assert after_apply[3]["script"].endswith("scripts/oci/verify-cluster.sh")
+    assert after_apply[3]["continue_on_error"] is True
 
 
 def test_oci_k3s_cluster_example_uses_tailscale_module(loader: PackageLoader) -> None:

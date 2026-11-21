@@ -489,3 +489,42 @@ def test_invalid_k3s_version_is_rejected(tmp_path: Path) -> None:
     """A k3s_version with shell metacharacters never reaches the remote command."""
     with pytest.raises(AssertionError, match="invalid k3s_version"):
         _run_post_terraform(tmp_path, k3s_version="v1; rm -rf /", jumphost="")
+
+
+def test_server_install_uses_owner_only_kubeconfig_mode(tmp_path: Path) -> None:
+    """The server install writes an owner-only kubeconfig on the node."""
+    installs = _install_calls(_run_post_terraform(tmp_path, k3s_version=None, jumphost=""))
+
+    server_install = installs[0]
+    assert "--write-kubeconfig-mode 600" in server_install
+    assert "--write-kubeconfig-mode 644" not in server_install
+
+
+@pytest.mark.parametrize("preexisting", [False, True])
+def test_local_kubeconfig_is_owner_only(tmp_path: Path, preexisting: bool) -> None:
+    """The locally saved kubeconfig is mode 0600, also over an existing file."""
+    kube_dir = tmp_path / "kube"
+    if preexisting:
+        kube_dir.mkdir()
+        existing = kube_dir / "c.yaml"
+        existing.write_text("old")
+        existing.chmod(0o644)
+
+    _run_post_terraform(tmp_path, k3s_version=None, jumphost="")
+
+    saved = list(kube_dir.glob("*.yaml"))
+    assert len(saved) == 1
+    assert saved[0].stat().st_mode & 0o777 == 0o600
+
+
+@pytest.mark.parametrize("jumphost", ["", "jump.example"])
+def test_kubeconfig_reads_on_the_node_are_privileged(tmp_path: Path, jumphost: str) -> None:
+    """kubectl calls and the kubeconfig read run through sudo (owner-only node file)."""
+    calls = _run_post_terraform(tmp_path, k3s_version=None, jumphost=jumphost)
+
+    kubectl = [c for c in calls if "kubectl get nodes" in c]
+    assert kubectl
+    assert all("sudo env KUBECONFIG=/etc/rancher/k3s/k3s.yaml" in c for c in kubectl)
+    reads = [c for c in calls if "cat /etc/rancher/k3s/k3s.yaml" in c]
+    assert len(reads) == 1
+    assert "sudo" in reads[0]
