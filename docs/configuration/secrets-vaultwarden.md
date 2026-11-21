@@ -42,6 +42,14 @@ provider_settings:
     password: secret://bitwarden/Router Admin/password
 ```
 
+### Where provider settings resolve
+
+Provider settings resolve for every provider, wherever the provider reads them: the API clients, the Terraform environment variables and the live validators. The values are resolved in memory when they are read, never when the environment config loads, so `bw` starts only when a `secret://bitwarden/...` value is actually used.
+
+- `infra plan` and the offline validation, plus validators that only check a setting is present, check a settings URI offline: its shape and that its backend is configured. No vault is contacted.
+- `infra doctor` runs live checks against the provider APIs, so it resolves the settings first. A bitwarden URI queries the vault there.
+- The Terraform environment variable builder resolves only the settings keys it maps to a variable.
+
 ### Credential sources
 
 `client_id`, `client_secret` and `master_password` are `secret://` URIs. Only two backends are accepted, so a credential can never point back into the vault:

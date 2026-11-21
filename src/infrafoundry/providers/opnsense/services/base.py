@@ -47,12 +47,19 @@ class BaseService(ABC):  # noqa: B024  # ABC marks the base; no abstract methods
 
         Raises:
             ValueError: If provider settings not found
+            SecretResolutionError: If a ``secret://`` setting cannot be resolved.
         """
         from infrafoundry.core.config import ConfigManager
 
         config_manager = ConfigManager(config_dir)
         env_config = config_manager.load_environment(env_name)
-        provider_settings = firewall_settings(env_config, provider_name)
+        from infrafoundry.secrets.environment import resolve_secret_settings
+
+        # Resolve ``secret://`` URIs here so ``resolve_credentials`` stays pure and the
+        # redirect warning compares the env URL against the resolved settings URL.
+        provider_settings = resolve_secret_settings(
+            env_config, firewall_settings(env_config, provider_name)
+        )
 
         if not provider_settings:
             raise ValueError(

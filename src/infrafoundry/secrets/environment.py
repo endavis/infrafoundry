@@ -7,12 +7,21 @@ through this module, so a backend added to ``settings.yaml`` works everywhere at
 Backends configured for an environment: ``env_secrets`` (the decrypted ``secrets.yaml``) always,
 and ``bitwarden`` when ``secret_backends.bitwarden`` is set. ``env`` and ``file`` are deliberately
 not opened to config fields or to the Terraform/Ansible bridges.
+
+Provider settings resolve at each consumer, never when the environment config loads, so ``bw``
+starts only when a bitwarden URI is actually resolved. :func:`resolved_provider_settings` and
+:func:`with_resolved_provider_settings` hand a reader resolved copies; the original, possibly
+cached, ``EnvironmentConfig`` is never changed. :func:`provider_settings_secret_problems` is the
+offline counterpart for readers that only check presence or shape.
 """
 
 from __future__ import annotations
 
+import copy
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
+from infrafoundry.core.provider_instances import split_provider_id
 from infrafoundry.secrets.resolver import (
     SecretResolutionError,
     SecretResolver,
@@ -56,6 +65,137 @@ def build_secret_resolver(env_config: EnvironmentConfig) -> SecretResolver:
         config["env_secrets"] = env_secrets
         resolver.configure_backend("bitwarden", config)
     return resolver
+
+
+def _contains_secret_uri(value: Any) -> bool:
+    """Return True when ``value`` holds a ``secret://`` string at any depth."""
+    if isinstance(value, str):
+        return is_secret_uri(value)
+    if isinstance(value, Mapping):
+        return any(_contains_secret_uri(v) for v in value.values())
+    if isinstance(value, list | tuple):
+        return any(_contains_secret_uri(v) for v in value)
+    return False
+
+
+def resolve_secret_settings(
+    env_config: EnvironmentConfig, settings: Mapping[str, Any] | None
+) -> dict[str, Any] | None:
+    """Return a copy of ``settings`` with every ``secret://`` URI resolved, in memory only.
+
+    A mapping without a URI is deep-copied and no resolver is built, so no vault is contacted.
+
+    Args:
+        env_config: The environment, with its decrypted ``secrets`` populated.
+        settings: Any settings mapping, or ``None``.
+
+    Returns:
+        A new dict, or ``None`` when ``settings`` is ``None``.
+
+    Raises:
+        SecretResolutionError: If a URI cannot be resolved. The message names the URI, never
+            a value.
+    """
+    if settings is None:
+        return None
+    if not _contains_secret_uri(settings):
+        return copy.deepcopy(dict(settings))
+    resolver = build_secret_resolver(env_config)
+    try:
+        return resolver.resolve_config(dict(settings))
+    finally:
+        resolver.close()
+
+
+def resolved_provider_settings(
+    env_config: EnvironmentConfig, provider_name: str
+) -> dict[str, Any] | None:
+    """Return ``provider_settings[<base>]`` with its ``secret://`` URIs resolved.
+
+    ``opnsense@fw-b`` reads the ``opnsense`` block. Values nested under ``firewalls:`` and
+    ``clusters:`` are covered.
+
+    Returns:
+        The resolved settings, or ``None`` when the provider has no settings.
+
+    Raises:
+        SecretResolutionError: If a URI cannot be resolved.
+    """
+    base, _ = split_provider_id(provider_name)
+    raw = (env_config.provider_settings or {}).get(base)
+    if raw is None:
+        return None
+    return resolve_secret_settings(env_config, raw)
+
+
+def with_resolved_provider_settings(
+    env_config: EnvironmentConfig, provider_name: str
+) -> EnvironmentConfig:
+    """Return a copy of ``env_config`` whose ``provider_settings[<base>]`` is resolved.
+
+    The original object, which a ``ConfigManager`` may have cached, is not changed.
+
+    Raises:
+        SecretResolutionError: If a URI cannot be resolved.
+    """
+    base, _ = split_provider_id(provider_name)
+    resolved = resolved_provider_settings(env_config, base)
+    if resolved is None:
+        return env_config.model_copy()
+    settings = {**(env_config.provider_settings or {}), base: resolved}
+    return env_config.model_copy(update={"provider_settings": settings})
+
+
+def resolved_environment_data(env_config: EnvironmentConfig, provider_name: str) -> dict[str, Any]:
+    """Return ``env_config.model_dump()`` with the provider's settings secret-resolved.
+
+    For consumers that take the environment as plain data (the Proxmox exporter and dumper).
+
+    Raises:
+        SecretResolutionError: If a URI cannot be resolved.
+    """
+    base, _ = split_provider_id(provider_name)
+    data: dict[str, Any] = env_config.model_dump()
+    settings = data.get("provider_settings") or {}
+    resolved = resolve_secret_settings(env_config, settings.get(base))
+    if resolved is not None:
+        data["provider_settings"] = {**settings, base: resolved}
+    return data
+
+
+def provider_settings_secret_problems(
+    env_config: EnvironmentConfig, provider_name: str, *, check_presence: bool = True
+) -> list[str]:
+    """Check the provider's settings URIs offline: shape and configured backend only.
+
+    With ``check_presence`` False an ``env_secrets`` path is not looked up either.
+
+    Returns:
+        Messages ``provider_settings.<base>.<path>: '<uri>': <problem>``; never a value.
+    """
+    base, _ = split_provider_id(provider_name)
+    raw = (env_config.provider_settings or {}).get(base)
+    if not raw:
+        return []
+    problems: list[str] = []
+    lookup = SecretRefLookup(env_config)
+
+    def walk(node: Any, path: str) -> None:
+        if isinstance(node, str):
+            if is_secret_uri(node):
+                reason = lookup.problem(node, check_presence=check_presence)
+                if reason is not None:
+                    problems.append(f"provider_settings.{path}: '{node}': {reason}")
+        elif isinstance(node, Mapping):
+            for key, value in node.items():
+                walk(value, f"{path}.{key}")
+        elif isinstance(node, list | tuple):
+            for index, value in enumerate(node):
+                walk(value, f"{path}[{index}]")
+
+    walk(raw, base)
+    lookup.close()
+    return problems
 
 
 class SecretRefLookup:
@@ -102,11 +242,12 @@ class SecretRefLookup:
             self._flat = SecretManager.flatten_dict(self._env_config.secrets)
         return self._flat
 
-    def problem(self, ref: str) -> str | None:
+    def problem(self, ref: str, *, check_presence: bool = True) -> str | None:
         """Return why ``ref`` cannot resolve, checked offline, or ``None`` when it looks fine.
 
         A ``bitwarden`` URI is checked for shape and a configured backend only; the vault is
-        queried at apply time.
+        queried at apply time. With ``check_presence`` False an ``env_secrets`` URI is checked
+        for shape and backend only, not for the path in the decrypted secrets.
         """
         if not is_secret_uri(ref):
             if ref in self._flat_secrets():
@@ -120,6 +261,8 @@ class SecretRefLookup:
         if backend not in allowed:
             return f"backend '{backend}' is not configured (configured: {sorted(allowed)})"
         if backend == "env_secrets":
+            if not check_presence:
+                return None
             node: Any = self._env_config.secrets or {}
             for part in key.split("/"):
                 if not isinstance(node, dict) or part not in node:

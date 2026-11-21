@@ -13,10 +13,18 @@ from infrafoundry.core.provider_mixins import (
     TerraformGeneratorMixin,
 )
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation_helpers import resolved_env_or_report
+from infrafoundry.secrets.environment import resolve_secret_settings
+from infrafoundry.secrets.resolver import is_secret_uri
 
 from .validator import EsxiValidator
 
 logger = logging.getLogger(__name__)
+
+
+def _is_uri(value: Any) -> bool:
+    """Return True when ``value`` is a ``secret://`` URI string."""
+    return isinstance(value, str) and is_secret_uri(value)
 
 
 class EsxiProvider(
@@ -69,8 +77,10 @@ class EsxiProvider(
         self, env_config: EnvironmentConfig, report: ValidationReport
     ) -> None:
         """Validate connectivity to ESXi hosts."""
-        validator = EsxiValidator(env_config, report)
-        validator.validate_connectivity()
+        resolved = resolved_env_or_report(env_config, "esxi", report)
+        if resolved is None:
+            return
+        EsxiValidator(resolved, report).validate_connectivity()
 
     @override
     def validate_references(
@@ -202,6 +212,33 @@ class EsxiProvider(
             key=lambda h: h["name"],
         )
 
+    @override
+    def get_terraform_env_vars(self) -> dict[str, str]:
+        """Return ``TF_VAR_esxi_{hostname,username}_<alias>`` for ``secret://`` host settings.
+
+        Only a field whose configured value is a ``secret://`` URI is emitted, resolved in
+        memory; plaintext values keep going through ``terraform.tfvars``.
+
+        Raises:
+            SecretResolutionError: If a URI cannot be resolved. The message names the URI.
+        """
+        env_config = self._load_environment_config()
+        if not env_config:
+            return {}
+        raw_hosts = (env_config.get_provider_settings("esxi") or {}).get("hosts") or {}
+        if not isinstance(raw_hosts, dict):
+            return {}
+        resolved_hosts = resolve_secret_settings(env_config, raw_hosts) or {}
+        result: dict[str, str] = {}
+        for name, raw in raw_hosts.items():
+            if not isinstance(raw, dict):
+                continue
+            alias = self._host_alias(name)
+            for field in ("hostname", "username"):
+                if _is_uri(raw.get(field)):
+                    result[f"TF_VAR_esxi_{field}_{alias}"] = str(resolved_hosts[name][field])
+        return result
+
     def _generate_multi_host_tfvars(self, hosts: list[dict[str, str]]) -> None:
         """Generate terraform.tfvars with per-host non-sensitive settings.
 
@@ -230,8 +267,11 @@ class EsxiProvider(
             hostname = host_settings.get("hostname", host["name"])
             username = host_settings.get("username", "root")
 
-            lines.append(self._format_tfvar_line(f"esxi_hostname_{alias}", hostname))
-            lines.append(self._format_tfvar_line(f"esxi_username_{alias}", username))
+            # A ``secret://`` value never reaches disk: get_terraform_env_vars emits it.
+            if not _is_uri(hostname):
+                lines.append(self._format_tfvar_line(f"esxi_hostname_{alias}", hostname))
+            if not _is_uri(username):
+                lines.append(self._format_tfvar_line(f"esxi_username_{alias}", username))
             # Password is sensitive — provide via TF_VAR_esxi_password_<alias>
 
         self._write_tfvars_lines(lines)

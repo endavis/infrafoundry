@@ -324,7 +324,7 @@ class TestTerraformSecretsValidator:
 
 
 class TestResolveSecretUris:
-    """``resolve_secret_uris`` resolves ``secret://env_secrets/...`` in settings."""
+    """Settings ``secret://env_secrets/...`` URIs resolve by default (#870, #1594)."""
 
     _SECRET = "sentinel-client-secret-870"  # pragma: allowlist secret
 
@@ -340,12 +340,21 @@ class TestResolveSecretUris:
             secrets=secrets,
         )
 
-    def test_default_passes_uri_through(self) -> None:
+    def test_default_resolves_uri(self) -> None:
         harness = _BridgeHarness(self._env({"test": {"client_id": "id-1"}}))
         result = harness.build_terraform_env_vars(
             provider_name="test", mapping={"client_id": "test_client_id"}
         )
-        assert result == {"TF_VAR_test_client_id": "secret://env_secrets/test/client_id"}
+        assert result == {"TF_VAR_test_client_id": "id-1"}
+
+    def test_resolve_secret_uris_kwarg_is_gone(self) -> None:
+        harness = _BridgeHarness(self._env({"test": {"client_id": "id-1"}}))
+        with pytest.raises(TypeError):
+            harness.build_terraform_env_vars(  # type: ignore[call-arg]
+                provider_name="test",
+                mapping={"client_id": "test_client_id"},
+                resolve_secret_uris=True,
+            )
 
     def test_enabled_resolves_against_secrets(self) -> None:
         harness = _BridgeHarness(
@@ -358,7 +367,6 @@ class TestResolveSecretUris:
                 "client_secret": "test_client_secret",
                 "tailnet": "test_tailnet",
             },
-            resolve_secret_uris=True,
         )
         assert result == {
             "TF_VAR_test_client_id": "id-1",
@@ -374,7 +382,6 @@ class TestResolveSecretUris:
             harness.build_terraform_env_vars(
                 provider_name="test",
                 mapping={"client_secret": "test_client_secret"},
-                resolve_secret_uris=True,
             )
         assert "client_secret" in str(excinfo.value)
         assert self._SECRET not in str(excinfo.value)
@@ -387,7 +394,6 @@ class TestResolveSecretUris:
         result = _BridgeHarness(env).build_terraform_env_vars(
             provider_name="test",
             mapping={"tailnet": "test_tailnet"},
-            resolve_secret_uris=True,
         )
         assert result == {"TF_VAR_test_tailnet": "example.com"}
 

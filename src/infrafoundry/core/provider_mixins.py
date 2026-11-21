@@ -663,7 +663,8 @@ class TerraformGeneratorMixin:
         .. deprecated::
             This method writes secrets to disk. Use
             :meth:`build_terraform_env_vars` instead, which returns
-            ``TF_VAR_*`` environment variables for the runner.
+            ``TF_VAR_*`` environment variables for the runner. It deliberately does
+            not resolve ``secret://`` URIs: that would write secrets into the file.
         """
         env_config = self._load_environment_config()
         if not env_config:
@@ -691,7 +692,6 @@ class TerraformGeneratorMixin:
         include_ssh: bool = False,
         ssh_prefix: str | None = None,
         resources: list[ResourceConfig] | None = None,
-        resolve_secret_uris: bool = False,
     ) -> dict[str, str]:
         """Build TF_VAR_* env vars from provider settings (and resource secrets).
 
@@ -708,6 +708,10 @@ class TerraformGeneratorMixin:
         path so misconfiguration is caught early. Sensitive values are
         never logged.
 
+        Only the keys in ``mapping`` are resolved: ``secret://`` URIs in the provider
+        settings (env_secrets or bitwarden) resolve after any gated env-var override, and
+        an unmapped URI never starts a vault client.
+
         Args:
             provider_name: Provider name used to look up settings
             mapping: Maps settings.yaml keys to terraform variable names
@@ -716,11 +720,6 @@ class TerraformGeneratorMixin:
             resources: Optional resource list. When provided, each
                 resource's ``terraform_secrets`` field is resolved against
                 the env's decrypted secrets and emitted as TF vars.
-            resolve_secret_uris: When True, ``secret://env_secrets/...`` URIs
-                in the provider settings are resolved against the env's
-                decrypted secrets (after any gated env-var override) before
-                they are mapped. Defaults to False, which passes settings
-                through unchanged.
 
         Returns:
             Dict mapping ``TF_VAR_<name>`` to string values
@@ -728,8 +727,8 @@ class TerraformGeneratorMixin:
         Raises:
             KeyError: If a resource references a secret path that does not
                 exist in ``env_config.secrets``.
-            SecretResolutionError: If ``resolve_secret_uris`` is set and a URI
-                cannot be resolved. The message names the URI, never a value.
+            SecretResolutionError: If a mapped settings URI cannot be resolved. The
+                message names the URI, never a value.
         """
         env_config = self._load_environment_config()
         if not env_config:
@@ -741,10 +740,8 @@ class TerraformGeneratorMixin:
             # Gated <PROVIDER>_<KEY> env vars can redirect the apply (#783).
             if self._allows_settings_env_override(provider_name):
                 provider_settings = resolve_settings(provider_name, provider_settings, mapping)
-            if resolve_secret_uris:
-                provider_settings = self._resolve_settings_secret_uris(
-                    env_config, provider_settings
-                )
+            selected = {k: provider_settings[k] for k in mapping if k in provider_settings}
+            provider_settings = self._resolve_settings_secret_uris(env_config, selected)
             for source_key, tfvar_name in mapping.items():
                 value = provider_settings.get(source_key)
                 if value not in (None, ""):
@@ -787,13 +784,9 @@ class TerraformGeneratorMixin:
             SecretResolutionError: If a URI cannot be resolved.
         """
         # Local import to avoid a circular import at module load time.
-        from infrafoundry.secrets.environment import build_secret_resolver
+        from infrafoundry.secrets.environment import resolve_secret_settings
 
-        resolver = build_secret_resolver(env_config)
-        try:
-            return resolver.resolve_config(provider_settings)
-        finally:
-            resolver.close()
+        return resolve_secret_settings(env_config, provider_settings) or {}
 
     @staticmethod
     def collect_terraform_secret_refs(

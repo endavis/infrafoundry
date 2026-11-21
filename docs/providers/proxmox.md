@@ -68,6 +68,8 @@ provider_settings:
     node: "node1"           # optional default node for exports/migrations
 ```
 
+Settings values may be `secret://` URIs; see [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md).
+
 !!! warning "Encrypt with SOPS"
     In production, encrypt your settings file so the token never lands
     in git in plaintext:

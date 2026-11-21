@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.exceptions import InfraFoundryError
-from infrafoundry.secrets.environment import build_secret_resolver
+from infrafoundry.secrets.environment import resolved_provider_settings
 
 PROVIDER_NAME = "mikrotik"
 DEFAULT_TIMEOUT = 10
@@ -95,9 +95,5 @@ def load_settings(config_dir: Path, env_name: str) -> MikroTikSettings:
         raise MikroTikSettingsError(
             f"No provider_settings.mikrotik found for environment '{env_name}'"
         )
-    resolver = build_secret_resolver(env_config)
-    try:
-        resolved = resolver.resolve_config(dict(raw))
-    finally:
-        resolver.close()
+    resolved = resolved_provider_settings(env_config, PROVIDER_NAME) or {}
     return settings_from_mapping(resolved)

@@ -377,7 +377,11 @@ class InterfaceAssignmentManager(BaseComponentManager):
         """
         config_manager = ConfigManager(self.config_dir)
         env_config = config_manager.load_environment(env_name)
-        return dict(firewall_settings(env_config, provider_name) or {})
+        from infrafoundry.secrets.environment import resolve_secret_settings
+
+        return (
+            resolve_secret_settings(env_config, firewall_settings(env_config, provider_name)) or {}
+        )
 
     def _resolve_ssh_target(self, env_name: str, provider_name: str) -> SshTarget:
         """Resolve the installer's SSH target from the env's provider settings.

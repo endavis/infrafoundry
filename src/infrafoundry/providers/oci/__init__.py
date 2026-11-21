@@ -21,6 +21,7 @@ from infrafoundry.core.ssh_host_keys import (
 )
 from infrafoundry.core.tailscale import process_tailscale_config
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation_helpers import resolved_env_or_report
 
 from .compartments import (
     compartment_id_expr,
@@ -84,8 +85,10 @@ class OCIProvider(
         self, env_config: EnvironmentConfig, report: ValidationReport
     ) -> None:
         """Validate connectivity to OCI API."""
-        validator = OCIValidator(env_config, report)
-        validator.validate_connectivity()
+        resolved = resolved_env_or_report(env_config, "oci", report)
+        if resolved is None:
+            return
+        OCIValidator(resolved, report).validate_connectivity()
 
     @override
     def validate_references(
@@ -95,8 +98,10 @@ class OCIProvider(
         report: ValidationReport,
     ) -> None:
         """Validate that referenced OCI resources exist."""
-        validator = OCIValidator(env_config, report)
-        validator.validate_references(resources)
+        resolved = resolved_env_or_report(env_config, "oci", report)
+        if resolved is None:
+            return
+        OCIValidator(resolved, report).validate_references(resources)
 
     def validate_references_in_context(
         self,
@@ -106,7 +111,10 @@ class OCIProvider(
         report: ValidationReport,
     ) -> None:
         """Validate *resources*, resolving names against *reference_resources* (#1568)."""
-        OCIValidator(env_config, report).validate_references(resources, reference_resources)
+        resolved = resolved_env_or_report(env_config, "oci", report)
+        if resolved is None:
+            return
+        OCIValidator(resolved, report).validate_references(resources, reference_resources)
 
     def validate_offline(
         self,

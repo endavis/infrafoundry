@@ -36,6 +36,10 @@ Alternatives rejected:
 - **Exposing `dns_configuration`.** It overlaps the three DNS resources; offering both invites conflicting writes to the same settings.
 - **Not exposing the key.** The end-to-end flow (joining a firewall to a tailnet) needs the key, and withholding the output would not remove it from the state.
 
+## Amendments
+
+- `build_terraform_env_vars` resolves settings `secret://` URIs by default and the `resolve_secret_uris` flag is removed (#1594, [ADR-0034](0034-a-bitwarden-secret-backend-resolves-through-the-bw-cli-with-private-per-run-cli-state.md)).
+
 ## Related Issues
 
 - Issue #870: Tailscale control-plane provider

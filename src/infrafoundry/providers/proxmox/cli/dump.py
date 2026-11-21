@@ -11,6 +11,7 @@ from infrafoundry.cli.utils import console, raise_cli_error
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.types import EnvironmentData
 from infrafoundry.providers.proxmox.dumper import ProxmoxStateDumper
+from infrafoundry.secrets.environment import resolved_environment_data
 
 
 @click.command(name="dump")
@@ -42,7 +43,10 @@ def dump(ctx: click.Context, env: str, output: Path, timeout: int) -> None:
     try:
         config_repo = ctx.obj.get("config_dir")
         config_manager = ConfigManager(base_dir=config_repo / "envs" if config_repo else None)
-        env_config = cast(EnvironmentData, config_manager.load_environment(env).model_dump())
+        env_config = cast(
+            EnvironmentData,
+            resolved_environment_data(config_manager.load_environment(env), "proxmox"),
+        )
 
         dumper = ProxmoxStateDumper(env_config, timeout=timeout)
         result = dumper.dump(output)

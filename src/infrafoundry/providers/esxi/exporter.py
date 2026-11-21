@@ -26,7 +26,9 @@ class EsxiConfigExporter:
         """Initialize the ESXi config exporter.
 
         Args:
-            env_config: Environment configuration containing ESXi host settings
+            env_config: Environment configuration containing ESXi host settings. Must be
+                secret-resolved: pass
+                ``with_resolved_provider_settings(env, "esxi").model_dump()``.
         """
         self.env_config = env_config
         provider_settings = env_config.get("provider_settings", {}).get("esxi", {})

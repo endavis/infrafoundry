@@ -168,6 +168,9 @@ def resolve_credentials(
 ) -> tuple[str, str, str, bool, str | None]:
     """Resolve OPNsense client credentials, honoring env-var overrides if gated.
 
+    ``provider_settings`` must already be secret-resolved (see
+    ``infrafoundry.secrets.environment.resolve_secret_settings``); this helper stays pure.
+
     When ``INFRAFOUNDRY_ALLOW_ENV_OVERRIDE`` is set to a truthy value, each
     of the five fields (the four credentials plus the optional ``proxy``) is
     resolved env-FIRST: a non-empty ``OPNSENSE_*`` env var wins, otherwise the
@@ -282,6 +285,8 @@ def resolve_ssh_settings(
     provider_settings: dict[str, Any], *, allow_env_override: bool = True
 ) -> SshSettings:
     """Resolve the SSH target fields for the controller installer.
+
+    ``provider_settings`` must already be secret-resolved (#1594).
 
     Args:
         provider_settings: The OPNsense entry of the env's

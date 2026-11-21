@@ -16,6 +16,7 @@ from infrafoundry.core.provider_mixins import (
     TerraformGeneratorMixin,
 )
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation_helpers import resolved_env_or_report
 
 from .firewalls import allows_env_override, firewall_label, firewall_settings
 from .validator import OPNsenseValidator
@@ -1016,6 +1017,8 @@ class OPNsenseProvider(
         env_config: EnvironmentConfig,
         report: ValidationReport,
         checks: Callable[[OPNsenseValidator], None],
+        *,
+        resolve: bool,
     ) -> None:
         """Run ``checks`` for this firewall, labelling its new results (#1450).
 
@@ -1027,8 +1030,16 @@ class OPNsenseProvider(
             env_config: Environment configuration.
             report: Report the validator adds to.
             checks: Callable running the checks on the per-firewall validator.
+            resolve: Resolve ``secret://`` settings first (live checks). Offline checks pass
+                False so no vault is contacted.
         """
-        validator = OPNsenseValidator(env_config, report, provider_name=self.name)
+        validator_env = env_config
+        if resolve:
+            resolved = resolved_env_or_report(env_config, self.name, report)
+            if resolved is None:
+                return
+            validator_env = resolved
+        validator = OPNsenseValidator(validator_env, report, provider_name=self.name)
         start = len(report.results)
         checks(validator)
         label = firewall_label(env_config, self.name)
@@ -1042,7 +1053,7 @@ class OPNsenseProvider(
         self, env_config: EnvironmentConfig, report: ValidationReport
     ) -> None:
         """Validate connectivity to OPNsense API."""
-        self._run_labelled(env_config, report, lambda v: v.validate_connectivity())
+        self._run_labelled(env_config, report, lambda v: v.validate_connectivity(), resolve=True)
 
     @override
     def validate_references(
@@ -1058,7 +1069,7 @@ class OPNsenseProvider(
             validator.validate_endpoint_support(resources)
             validator.validate_ha_health()  # #1393
 
-        self._run_labelled(env_config, report, checks)
+        self._run_labelled(env_config, report, checks, resolve=True)
 
     def validate_references_in_context(
         self,
@@ -1074,7 +1085,7 @@ class OPNsenseProvider(
             validator.validate_endpoint_support(resources)
             validator.validate_ha_health()  # #1393
 
-        self._run_labelled(env_config, report, checks)
+        self._run_labelled(env_config, report, checks, resolve=True)
 
     def validate_offline(
         self,
@@ -1088,7 +1099,10 @@ class OPNsenseProvider(
         Endpoint support is not checked here: the direct runner's plan already does.
         """
         self._run_labelled(
-            env_config, report, lambda v: v.validate_offline(resources, reference_resources)
+            env_config,
+            report,
+            lambda v: v.validate_offline(resources, reference_resources),
+            resolve=False,
         )
 
     def reset_kea_dhcpv4(self, env_name: str) -> None:

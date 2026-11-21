@@ -10,7 +10,7 @@ from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.types import TailscaleProviderSettings
 from infrafoundry.core.validation import ValidationReport, run_validators
-from infrafoundry.core.validation_helpers import BaseAPIValidator
+from infrafoundry.core.validation_helpers import BaseAPIValidator, report_settings_secret_problems
 
 from .validators import (
     AclValidator,
@@ -76,7 +76,14 @@ class TailscaleValidator:
         )
 
     def validate_connectivity(self) -> None:
-        """Check the credential settings are consistent (no network call)."""
+        """Check the credential settings are consistent (no network call).
+
+        A ``secret://`` URI is checked for shape and a configured backend only; the value is
+        never fetched here.
+        """
+        report_settings_secret_problems(
+            self.env_config, "tailscale", self.report, check_presence=False
+        )
         CredentialsValidator(self.report).validate(
             TailscaleCredentialsContext(
                 provider_settings=cast(dict[str, Any], self.provider_settings),

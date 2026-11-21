@@ -60,7 +60,7 @@ provider_settings:
     verify_ssl: true
 ```
 
-With a `secret_backends.bitwarden` block in `settings.yaml`, `secret://bitwarden/<item>/<field>` works wherever `secret://env_secrets/...` does. See [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md).
+With a `secret_backends.bitwarden` block in `settings.yaml`, `secret://bitwarden/<item>/<field>` works wherever `secret://env_secrets/...` does. See [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md). These values resolve for the API client and for `infra doctor`. Values under `firewalls.<name>` resolve per firewall, and the gated `OPNSENSE_*` environment override still applies first.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
