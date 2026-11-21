@@ -7,12 +7,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from infrafoundry.core.config.models import BitwardenBackendConfig, SecretBackendsConfig
 from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.validator import OPNsenseValidator
 from infrafoundry.providers.opnsense.validators.carp_pair_validator import CarpPairValidator
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from tests.helpers.env import make_env_config
+from tests.unit.secrets.bw_stub import SERVER, StubBw, install_stub
 
 
 def _status(*rows: tuple[str, str, str]) -> dict[str, Any]:
@@ -213,3 +215,74 @@ def test_declared_backup_node_is_checked_as_a_backup() -> None:
     assert results["opnsense_carp_vip_1"].passed
     assert not report.has_errors()
     assert not report.has_warnings()
+
+
+# ---------------------------------------------------------------------------
+# ha_backup entry with secret:// URIs (#1596)
+# ---------------------------------------------------------------------------
+
+_BACKUP_KEY_URI = "secret://bitwarden/Router Admin/api_key"
+_BACKUP_KEY_VALUE = "fixture-api-456"
+
+
+def _env_with_backup_key(api_key: str) -> Any:
+    return make_env_config(
+        secrets={"db": {"password": "from-sops"}},
+        secret_backends=SecretBackendsConfig(bitwarden=BitwardenBackendConfig(server=SERVER)),
+        provider_settings={
+            "opnsense": {
+                "primary": "fw-a",
+                "firewalls": {
+                    "fw-a": {
+                        "api_url": "https://fw-a.example.com",
+                        "api_key": "ka",
+                        "api_secret": "sa",
+                        "ha_backup": "fw-b",
+                    },
+                    "fw-b": {
+                        "api_url": "https://fw-b.example.com",
+                        "api_key": api_key,
+                        "api_secret": "sb",
+                    },
+                },
+            }
+        },
+    )
+
+
+def test_backup_entry_secret_uri_is_resolved_for_the_backup_client(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stub: StubBw = install_stub(tmp_path, monkeypatch)
+    env = _env_with_backup_key(_BACKUP_KEY_URI)
+    primary = _client(_status(("1", "192.0.2.1", "MASTER")), sync_target="192.0.2.2")
+    backup = _client(_status(("1", "192.0.2.1", "BACKUP")))
+    clients = {"https://fw-a.example.com": primary, "https://fw-b.example.com": backup}
+    keys: dict[str, str] = {}
+
+    def factory(**kwargs: Any) -> MagicMock:
+        keys[kwargs["base_url"]] = kwargs["api_key"]
+        return clients[kwargs["base_url"]]
+
+    report = ValidationReport()
+    with patch(f"{_V}.OPNsenseClient", side_effect=factory):
+        OPNsenseValidator(env, report, provider_name="opnsense").validate_ha_health()
+    assert keys["https://fw-b.example.com"] == _BACKUP_KEY_VALUE
+    assert keys["https://fw-a.example.com"] == "ka"
+    assert _by_name(report)["opnsense_carp_pair_1"].passed
+    assert not report.has_errors()
+    assert stub.calls()
+
+
+def test_backup_entry_unresolvable_uri_is_a_warning_naming_the_uri() -> None:
+    uri = "secret://env_secrets/db/missing"
+    env = _env_with_backup_key(uri)
+    primary = _client(_status(("1", "192.0.2.1", "MASTER")), sync_target="192.0.2.2")
+    report, built = _validate(env, primary, MagicMock())
+    assert built == ["https://fw-a.example.com"]
+    result = _by_name(report)["opnsense_carp_pair_read"]
+    assert result.level is ValidationLevel.WARNING
+    assert "fw-b" in result.message
+    assert uri in result.message
+    assert "from-sops" not in result.message
+    assert not report.has_errors()
