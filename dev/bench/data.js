@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795261263806,
+  "lastUpdate": 1795261625513,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5096,6 +5096,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000028748282979387006",
             "extra": "mean: 60.77322652562999 usec\nrounds: 17764"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ecc573226a86997f4f7864d2c19990cd31c1a873",
+          "message": "fix: use the configured oci pass_phrase for an encrypted api signing key (merges PR #1572, addresses #1569)\n\nThe OCI API client loaded the signing key with no password, so an\nencrypted key failed to load and doctor skipped the API checks. The\npass_phrase setting was read nowhere, and the generated Terraform\nprovider block never set private_key_password.\n\nOCIClient now passes pass_phrase to load_pem_private_key. When a\npass_phrase is set, provider.tf.j2 emits private_key_password from a\nsensitive oci_private_key_password variable, fed through a TF_VAR_*\nenvironment variable. Without a pass_phrase the generated files are\nunchanged. The value is never logged, put in an error message or\nwritten to a generated file.\n\nAddresses #1569\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T11:45:45Z",
+          "tree_id": "59b34dc9d23d72b41d504ddd8ad4067e5cc5a828",
+          "url": "https://github.com/endavis/infrafoundry/commit/ecc573226a86997f4f7864d2c19990cd31c1a873"
+        },
+        "date": 1795261625039,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 70.58022706781124,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004474282484095935",
+            "extra": "mean: 14.168274055554283 msec\nrounds: 72"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12829.627472174761,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004889755530171934",
+            "extra": "mean: 77.94458585557739 usec\nrounds: 13645"
           }
         ]
       }
