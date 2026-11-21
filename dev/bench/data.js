@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795298376999,
+  "lastUpdate": 1795303025691,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5628,6 +5628,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000003310507283024108",
             "extra": "mean: 61.40973847176251 usec\nrounds: 18021"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ee25ccebbffa38e57116adcfda172b903994c10b",
+          "message": "fix: accept interface net keywords for every assigned opnsense interface (merges PR #1599, addresses #1598)\n\nThe firewall-rule and NAT-rule validators checked source_net,\ndestination_net and target against a static keyword set naming only the\nlan/wan forms, so <iface> and <iface>ip for optional interfaces warned\nalthough OPNsense accepts them.\n\nBoth validators now share one accepted set: the static fallback, <id> and\n<id>ip for every managed interface assignment and every live interface\nidentifier, and the networks the box itself offers through\nfirewall/filter/listNetworkSelectOptions. infra doctor reads that endpoint\nread-only, only when rules are in scope; a failed read falls back to the\nderived set. An unknown interface such as opt99 still warns, and offline\nvalidation makes no API call.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T23:15:50Z",
+          "tree_id": "2f48a3450bdbfbc90b95a292d11f348138138e92",
+          "url": "https://github.com/endavis/infrafoundry/commit/ee25ccebbffa38e57116adcfda172b903994c10b"
+        },
+        "date": 1795303024724,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 98.28196747123731,
+            "unit": "iter/sec",
+            "range": "stddev: 0.001156901679609574",
+            "extra": "mean: 10.174806485153594 msec\nrounds: 101"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16349.781882060666,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000035804388273127012",
+            "extra": "mean: 61.16289545716947 usec\nrounds: 17457"
           }
         ]
       }
