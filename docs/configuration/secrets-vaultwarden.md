@@ -34,7 +34,7 @@ The provider can automatically log in and unlock the vault if the following envi
 *   `BW_PASSWORD`: Master Password (required to decrypt secrets)
 *   *(Optional)* `BW_SERVER`: If using a self-hosted instance (Vaultwarden), set this to your server URL.
 
-**Security Note:** Providing the Master Password in CI variables (`BW_PASSWORD`) is necessary because the standard `bw` CLI requires it to generate the keys for decryption. Ensure this variable is masked/protected in your CI system.
+**Security Note:** Providing the Master Password in CI variables (`BW_PASSWORD`) is necessary because the standard `bw` CLI requires it to generate the keys for decryption. Ensure this variable is masked/protected in your CI system. The provider hands the password to `bw unlock` with `--passwordenv BW_PASSWORD`, so `bw` reads it from the environment and it never appears on the command line (where other local users could see it in the process list).
 
 ## Configuration
 
