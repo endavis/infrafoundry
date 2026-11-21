@@ -63,7 +63,10 @@ class VaultwardenProvider(SecretProvider):
         except subprocess.CalledProcessError as e:
             stderr = e.stderr.lower()
             if "not found" in stderr:
-                raise SecretNotFoundError(f"Bitwarden item not found: {args}") from e
+                # Name only the subcommand: other args may carry secret values.
+                raise SecretNotFoundError(
+                    f"Bitwarden item not found (bw {args[0] if args else ''})"
+                ) from e
             raise SecretError(f"Bitwarden CLI error: {e.stderr}") from e
 
     def _authenticate_if_needed(self) -> None:
@@ -121,8 +124,9 @@ class VaultwardenProvider(SecretProvider):
 
         logger.info("Unlocking Bitwarden/Vaultwarden vault...")
         try:
-            # bw unlock <password> --raw returns just the session key
-            key = self._run_bw(["unlock", password, "--raw"])
+            # The password is read by bw from BW_PASSWORD (inherited via the
+            # environment), never placed on the command line where ps shows it.
+            key = self._run_bw(["unlock", "--passwordenv", "BW_PASSWORD", "--raw"])
             self.session_key = key.strip()
             # Export to env so subsequent calls use it
             os.environ["BW_SESSION"] = self.session_key
