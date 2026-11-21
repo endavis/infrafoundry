@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795267676359,
+  "lastUpdate": 1795270674225,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5286,6 +5286,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000061589061401925275",
             "extra": "mean: 99.35715150373142 usec\nrounds: 10607"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4e69a616fb6bf622e40cc770d87e5fb6bc4eb1dc",
+          "message": "feat: give blueprint proxmox vms pre-generated ssh host keys that scripts pin (merges PR #1584, addresses #1581)\n\nAdd `foundry secrets host-keys`, which records an ed25519 host key per VM\nthat sets `ssh_host_key` in its package's SOPS secrets.yaml. A VM not yet\ndeployed gets a generated key pair that cloud-init installs at first boot;\na deployed VM is pinned to the key it presents now, so it is not replaced.\n\nThe Proxmox provider writes the private key into the cloud-config only as a\nsensitive Terraform variable reference, never as a literal. The package\nloader exposes the pinned keys as `ssh_known_hosts`, and the aiqum,\nconsole-connector and k3s-cluster scripts connect with\nStrictHostKeyChecking=yes against them, including the jumphost hop, and\nfail fast on a mismatch.\n\nADR-0032 records the design and where the private key travels.\n\nBREAKING CHANGE: the aiqum, console-connector and Proxmox k3s-cluster\nblueprints now require a recorded host key per VM. Run\n`foundry secrets host-keys --env <env>` before the next plan or apply;\nplan fails with an error naming that command until it has run.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T14:16:48Z",
+          "tree_id": "c11c1df9a4b133f9cdd370beb724e06180a7c9f0",
+          "url": "https://github.com/endavis/infrafoundry/commit/4e69a616fb6bf622e40cc770d87e5fb6bc4eb1dc"
+        },
+        "date": 1795270672959,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 47.42389905790995,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00042132970045515787",
+            "extra": "mean: 21.08641465306104 msec\nrounds: 49"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7945.737163155166,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008098949586054499",
+            "extra": "mean: 125.85364698911218 usec\nrounds: 8436"
           }
         ]
       }
