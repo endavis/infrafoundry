@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795258003150,
+  "lastUpdate": 1795259464683,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4982,6 +4982,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000433380506856554",
             "extra": "mean: 70.0464989193364 usec\nrounds: 16193"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "04218f08444e0c260f01bce7a31ee9afb57ace5d",
+          "message": "feat: resolve secret refs from the owning package's secrets.yaml (merges PR #1566, addresses #1565)\n\nA package's secrets.yaml could be used only as Jinja variables. The\nsecret-backed fields resolved their refs only against the env secrets file:\nkubernetes string_data_secrets and data_secrets, helm value_secret, and any\nresource's terraform_secrets. A service's secret could therefore not live\nwith its package without being rendered into a generated .tf file.\n\nA `package.<key>` ref now resolves from the `variables:` of the secrets.yaml\nin the package that defines the resource, with no fallback to the env file\nor to manifest variables:\n\n- the loader attaches the raw package secrets (excluded from dumps and\n  reprs), the package name and the package path to each package resource;\n- the value travels as TF_VAR_package_<slug(package path)>_<key>, declared\n  sensitive, so two packages using the same key get separate variables and\n  no value reaches a generated file or log line;\n- a shared collector names the variables for the aws, oci, proxmox and\n  kubernetes providers and refuses two sources that map to one name;\n- plan-time validation and apply-time resolution report a missing key, a\n  missing secrets.yaml, an empty key and a package ref outside a package,\n  naming the resource, ref and package but never a value;\n- `package` is a reserved ref prefix, like `outputs`.\n\nUnprefixed and outputs. refs are unchanged. ADR-0031 records the decision.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T11:09:40Z",
+          "tree_id": "4bb3c3b2d0e3f69821f67a43fa373e63e27ca573",
+          "url": "https://github.com/endavis/infrafoundry/commit/04218f08444e0c260f01bce7a31ee9afb57ace5d"
+        },
+        "date": 1795259463696,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 60.154358687791635,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004356046594963979",
+            "extra": "mean: 16.623899278689354 msec\nrounds: 61"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 11214.07459347526,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005095389326267177",
+            "extra": "mean: 89.17365331079881 usec\nrounds: 12429"
           }
         ]
       }
