@@ -29,6 +29,7 @@ class OCIProviderSettings(TypedDict, total=False):
     user_ocid: str
     fingerprint: str
     private_key_path: str
+    pass_phrase: str
     region: str
     compartment_ocid: str
 

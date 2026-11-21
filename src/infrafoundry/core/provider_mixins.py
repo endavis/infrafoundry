@@ -997,6 +997,7 @@ class TerraformGeneratorMixin:
         provider_template: str | None = None,
         variables_template: str | None = None,
         variables_context: dict[str, Any] | None = None,
+        provider_context: dict[str, Any] | None = None,
     ) -> None:
         """Render provider.tf and variables.tf using common defaults.
 
@@ -1007,11 +1008,13 @@ class TerraformGeneratorMixin:
             variables_template: Template name for variables. Defaults to
                 ``<provider type>/variables.tf.j2`` when omitted.
             variables_context: Context passed to the variables template.
+            provider_context: Context passed to the provider template.
         """
         provider = cast("_TerraformProviderProtocol", self)
 
         self.render_and_write_terraform(
             provider_template or f"{split_provider_id(provider.name)[0]}/provider.tf.j2",
+            context=provider_context or {},
             output_name="provider.tf",
         )
 

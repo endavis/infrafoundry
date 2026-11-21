@@ -18,6 +18,14 @@ variable "oci_private_key_path" {
   type        = string
 }
 
+{% if private_key_password | default(false) %}
+variable "oci_private_key_password" {
+  description = "Passphrase of the encrypted API signing key (TF_VAR_oci_private_key_password)"
+  type        = string
+  sensitive   = true
+}
+
+{% endif %}
 variable "oci_region" {
   description = "OCI region"
   type        = string
