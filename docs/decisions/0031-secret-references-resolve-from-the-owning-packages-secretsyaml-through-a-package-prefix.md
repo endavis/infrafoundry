@@ -31,6 +31,10 @@ It reuses the secrets-to-`TF_VAR_*` bridge, so the secret never reaches a genera
 
 Alternative rejected: falling back from the env file to the package file for unprefixed references. It would make the source ambiguous and let a package secret shadow a shared one.
 
+## Amendments
+
+- `secret://` URIs are checked before `package.` and are named `secret_<backend>_<slug>` (#1520, [ADR-0034](0034-a-bitwarden-secret-backend-resolves-through-the-bw-cli-with-private-per-run-cli-state.md)).
+
 ## Related Issues
 - Issue #1565: resolve secret refs from the owning package's secrets.yaml
 - Issue #1567: show secret sources in `infra doctor`

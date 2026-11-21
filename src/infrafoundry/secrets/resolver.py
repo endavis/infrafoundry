@@ -32,6 +32,29 @@ _DISCOVERY_LOCK = threading.Lock()
 SECRET_URI_PATTERN = re.compile(r"^secret://([^/]+)/(.+)$")
 
 
+def is_secret_uri(value: str) -> bool:
+    """Return True when ``value`` starts with ``secret://`` (well-formed or not).
+
+    A malformed ``secret://`` value is still a URI attempt: callers report it as an error
+    instead of treating it as some other kind of reference.
+    """
+    return value.startswith("secret://")
+
+
+def parse_secret_uri(value: str) -> tuple[str, str]:
+    """Split a ``secret://<backend>/<key>`` URI into ``(backend, key)``.
+
+    Raises:
+        SecretResolutionError: If the URI does not match ``secret://<backend>/<key>``.
+    """
+    match = SECRET_URI_PATTERN.match(value)
+    if not match:
+        raise SecretResolutionError(
+            f"Invalid secret URI format: {value}. Expected: secret://<backend>/<key>"
+        )
+    return match.group(1), match.group(2)
+
+
 def ensure_secret_backends_registered(registry: "PluginRegistry") -> None:
     """Discover installed ``secret_backend`` plugins and register missing ones.
 
@@ -158,7 +181,6 @@ class SecretResolver:
 
             # Cache it
             self._backends[backend_name] = backend
-            logger.debug(f"Loaded backend: {backend_name}")
 
             return backend
 
@@ -205,16 +227,7 @@ class SecretResolver:
             >>> print(backend, key)
             'env' 'db/password'
         """
-        match = SECRET_URI_PATTERN.match(uri)
-        if not match:
-            raise SecretResolutionError(
-                f"Invalid secret URI format: {uri}. Expected: secret://<backend>/<key>"
-            )
-
-        backend_name = match.group(1)
-        secret_key = match.group(2)
-
-        return backend_name, secret_key
+        return parse_secret_uri(uri)
 
     def resolve(self, value: str) -> str:
         """Resolve a secret:// URI to its actual value.

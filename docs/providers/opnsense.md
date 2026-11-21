@@ -60,6 +60,8 @@ provider_settings:
     verify_ssl: true
 ```
 
+With a `secret_backends.bitwarden` block in `settings.yaml`, `secret://bitwarden/<item>/<field>` works wherever `secret://env_secrets/...` does. See [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md).
+
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `api_url` | empty | Base URL of the firewall |

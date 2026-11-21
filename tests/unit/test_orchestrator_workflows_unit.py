@@ -2231,6 +2231,28 @@ def test_destroy_removes_tailnet_device_of_deleted_instance(console: Console) ->
     assert secrets == {"tailscale": {"oauth_client_id": "x", "oauth_client_secret": "y"}}
 
 
+def test_destroy_passes_a_lookup_that_resolves_uris_and_dotted_refs(console: Console) -> None:
+    deleted = ResourceOutcome(
+        address="aws_instance.node_a", action="delete", resource_name="node-a"
+    )
+    orchestrator = _tailnet_destroy(console, [deleted], names=("node-a",))
+    seen: dict[str, str | None] = {}
+
+    def fake_remove(*args: Any, **kwargs: Any) -> MagicMock:
+        lookup = kwargs["lookup"]
+        seen["dotted"] = lookup("tailscale.oauth_client_id")
+        seen["uri"] = lookup("secret://env_secrets/tailscale/oauth_client_secret")
+        seen["missing"] = lookup("secret://env_secrets/tailscale/nope")
+        return MagicMock(removed=[], skipped=[], warnings=[])
+
+    with patch(
+        "infrafoundry.core.orchestrator_workflows.remove_tailnet_devices", side_effect=fake_remove
+    ):
+        _destroy(orchestrator)
+
+    assert seen == {"dotted": "x", "uri": "y", "missing": None}
+
+
 def test_destroy_of_a_host_reaches_tailnet_cleanup(console: Console) -> None:
     deleted = ResourceOutcome(address="host.vps-01", action="delete", resource_name="vps-01")
     orchestrator = _tailnet_destroy(console, [deleted], names=("vps-01",))

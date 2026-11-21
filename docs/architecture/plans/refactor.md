@@ -148,7 +148,7 @@ tags:
 | State tracking | ✅ COMPLETE | SQLite/PostgreSQL, rollback |
 | Policy enforcement | ✅ COMPLETE | 4 evaluator types |
 | Event orchestration | ✅ COMPLETE | 19 lifecycle events |
-| Secret providers | ✅ COMPLETE | SOPS, AWS, Azure, Vaultwarden |
+| Secret providers | ✅ COMPLETE | SOPS, AWS, Azure |
 | Notifications | ✅ COMPLETE | Slack, Discord, webhooks |
 | Dependency graphing | ✅ COMPLETE | Mermaid, DOT export |
 | Cost estimation | ⚠️ PARTIAL | Planned, not implemented |

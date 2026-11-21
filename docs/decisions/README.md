@@ -168,3 +168,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0031](0031-secret-references-resolve-from-the-owning-packages-secretsyaml-through-a-package-prefix.md) | Secret references resolve from the owning package's secrets.yaml through a package prefix | Accepted |
 | [0032](0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md) | Blueprint VMs get pre-generated SSH host keys that scripts pin | Accepted |
 | [0033](0033-package-ssh-connections-check-host-keys-against-the-operators-known-hosts.md) | Package SSH connections check host keys against the operator's known_hosts | Accepted |
+| [0034](0034-a-bitwarden-secret-backend-resolves-through-the-bw-cli-with-private-per-run-cli-state.md) | A bitwarden secret:// backend resolves through the bw CLI with private per-run CLI state | Accepted |

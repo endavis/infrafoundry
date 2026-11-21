@@ -37,14 +37,15 @@ from __future__ import annotations
 import copy
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
 import requests
 
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.core.provider_mixins import sanitize_secret_ref_to_tf_var
+from infrafoundry.core.provider_mixins import sanitize_secret_ref_to_tf_var, secret_uri_tf_var
+from infrafoundry.secrets.resolver import is_secret_uri
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,8 @@ def _validate_auth_block(resource_name: str, auth: Any) -> dict[str, Any]:
     Returns a dict describing the resolved auth mode with keys:
 
     - ``mode``: ``"auth_key"`` or ``"oauth"``
-    - ``secret_refs``: list of dotted secret paths that must be resolvable
+    - ``secret_refs``: list of secret references (dotted paths or ``secret://`` URIs) that
+      must be resolvable
     - for ``auth_key``: ``auth_key_ref``
     - for ``oauth``: ``client_secret_ref`` and ``client_id_ref`` (``None``
       when ``client_id_secret`` is absent; it is optional for the module but
@@ -102,7 +104,7 @@ def _validate_auth_block(resource_name: str, auth: Any) -> dict[str, Any]:
         if not isinstance(ref, str) or not ref:
             raise TailscaleSchemaError(
                 f"Resource '{resource_name}' tailscale.auth.auth_key_secret "
-                f"must be a non-empty dotted secret reference string."
+                f"must be a non-empty secret reference (dotted path or secret:// URI)."
             )
         return {
             "mode": "auth_key",
@@ -122,14 +124,14 @@ def _validate_auth_block(resource_name: str, auth: Any) -> dict[str, Any]:
         if not isinstance(client_id, str) or not client_id:
             raise TailscaleSchemaError(
                 f"Resource '{resource_name}' tailscale.auth.oauth."
-                f"client_id_secret must be a non-empty dotted secret "
-                f"reference string."
+                f"client_id_secret must be a non-empty secret "
+                f"reference (dotted path or secret:// URI)."
             )
     if not isinstance(client_secret, str) or not client_secret:
         raise TailscaleSchemaError(
             f"Resource '{resource_name}' tailscale.auth.oauth."
-            f"client_secret_secret must be a non-empty dotted secret "
-            f"reference string."
+            f"client_secret_secret must be a non-empty secret "
+            f"reference (dotted path or secret:// URI)."
         )
     return {
         "mode": "oauth",
@@ -348,7 +350,11 @@ def process_tailscale_config(
 
     # OAuth mode passes the client secret as the module's ``auth_key``.
     auth_ref = auth_info["auth_key_ref" if auth_info["mode"] == "auth_key" else "client_secret_ref"]
-    module_config["auth_key_var"] = sanitize_secret_ref_to_tf_var(auth_ref)
+    module_config["auth_key_var"] = (
+        secret_uri_tf_var(auth_ref)
+        if is_secret_uri(auth_ref)
+        else sanitize_secret_ref_to_tf_var(auth_ref)
+    )
 
     # Auto-populate terraform_secrets so Phase 1's bridge declares the
     # sensitive variables and injects values at apply time. Dedup while
@@ -623,6 +629,7 @@ def remove_tailnet_devices(
     cleanups: list[TailnetDeviceCleanup],
     secrets: dict[str, Any] | None,
     *,
+    lookup: Callable[[str], str | None] | None = None,
     session: requests.Session | None = None,
     api_base: str = TAILSCALE_API_BASE,
     timeout: float = 30.0,
@@ -636,6 +643,9 @@ def remove_tailnet_devices(
     Args:
         cleanups: Targets from :func:`plan_tailnet_cleanup`.
         secrets: The environment's decrypted ``secrets`` mapping.
+        lookup: Resolves one secret reference (dotted path or ``secret://`` URI) to its value,
+            or ``None`` when it does not resolve. Without it the references are looked up in
+            ``secrets`` only.
         session: HTTP session, injectable for tests.
         api_base: Tailscale API base URL.
         timeout: Per-request timeout in seconds.
@@ -650,13 +660,15 @@ def remove_tailnet_devices(
         return report
     http = session or requests.Session()
     flat = SecretManager.flatten_dict(secrets or {})
+    find: Callable[[str], str | None] = lookup if lookup is not None else flat.get
 
     groups: dict[tuple[str, str], list[TailnetDeviceCleanup]] = {}
     for cleanup in cleanups:
         groups.setdefault((cleanup.client_id_ref, cleanup.client_secret_ref), []).append(cleanup)
 
     for (id_ref, secret_ref), members in groups.items():
-        missing = [ref for ref in (id_ref, secret_ref) if not flat.get(ref)]
+        values = {ref: find(ref) for ref in (id_ref, secret_ref)}
+        missing = [ref for ref in (id_ref, secret_ref) if not values[ref]]
         if missing:
             report.warnings.append(
                 "Tailnet cleanup skipped: secret not found: " + ", ".join(missing)
@@ -664,7 +676,7 @@ def remove_tailnet_devices(
             continue
         try:
             token, devices = _fetch_devices(
-                http, api_base, (str(flat[id_ref]), str(flat[secret_ref])), timeout
+                http, api_base, (str(values[id_ref]), str(values[secret_ref])), timeout
             )
         except requests.RequestException as exc:
             report.warnings.append(

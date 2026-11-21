@@ -12,7 +12,7 @@ from pathlib import Path
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.provider import ResourceConfig
-from infrafoundry.secrets.resolver import SecretResolver
+from infrafoundry.secrets.environment import build_secret_resolver
 
 
 def resolve_resource_secrets(
@@ -38,9 +38,7 @@ def resolve_resource_secrets(
     if not any(r.type == resource_type for r in resources):
         return list(resources)
     env_config = ConfigManager(config_dir).load_environment(env_name)
-    env_secrets = env_config.secrets if env_config.secrets is not None else {}
-    resolver = SecretResolver()
-    resolver.configure_backend("env_secrets", {"secrets": env_secrets})
+    resolver = build_secret_resolver(env_config)
     try:
         resolved: list[ResourceConfig] = []
         for resource in resources:

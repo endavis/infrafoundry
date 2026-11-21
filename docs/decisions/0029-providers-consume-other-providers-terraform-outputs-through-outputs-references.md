@@ -31,6 +31,10 @@ Alternative rejected: writing the credentials into SOPS `secrets.yaml` on first 
 
 The consumer's Terraform state holds the value, as with any Terraform-managed secret.
 
+## Amendments
+
+- `secret://` URIs are a fourth form of `terraform_secrets` entry and are checked before `outputs.` (#1520, [ADR-0034](0034-a-bitwarden-secret-backend-resolves-through-the-bw-cli-with-private-per-run-cli-state.md)).
+
 ## Related Issues
 - Issue #1536: tailscale `oauth_client` resource whose credentials other providers can consume
 - Issue #1539: a non-primary Kubernetes cluster instance consumes `outputs.*` references (see ADR-0030)

@@ -3,7 +3,7 @@
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from infrafoundry.core.config.backend_config import BackendConfig
 from infrafoundry.core.hooks.models import HooksConfig
@@ -87,6 +87,48 @@ class CollectorsConfig(BaseModel):
         return self
 
 
+_CREDENTIAL_URI_PREFIXES = ("secret://env/", "secret://env_secrets/")
+
+
+class BitwardenBackendConfig(BaseModel):
+    """The ``secret_backends.bitwarden`` block of ``settings.yaml``.
+
+    ``client_id``, ``client_secret`` and ``master_password`` are ``secret://`` URIs naming
+    where the bootstrap credentials come from. Only the ``env`` and ``env_secrets`` backends
+    are accepted, so a credential can never point back into the vault.
+    """
+
+    server: str
+    organization: str | None = None
+    collection: str | None = None
+    client_id: str = "secret://env/bw_clientid"
+    client_secret: str = "secret://env/bw_clientsecret"
+    master_password: str = "secret://env/bw_password"
+
+    @field_validator("server")
+    @classmethod
+    def _https_only(cls, value: str) -> str:
+        if not value.startswith("https://") or len(value) <= len("https://"):
+            raise ValueError("server must be an https:// URL")
+        return value
+
+    @field_validator("client_id", "client_secret", "master_password")
+    @classmethod
+    def _credential_uri(cls, value: str) -> str:
+        if not value.startswith(_CREDENTIAL_URI_PREFIXES) or value.endswith("/"):
+            raise ValueError(
+                "must be a secret://env/<key> or secret://env_secrets/<path> URI "
+                "(a credential cannot be read from the vault itself)"
+            )
+        return value
+
+
+class SecretBackendsConfig(BaseModel):
+    """The ``secret_backends:`` section of ``settings.yaml``."""
+
+    bitwarden: BitwardenBackendConfig | None = None
+
+
 class NotificationChannelConfig(BaseModel):
     """Configuration for a single notification channel."""
 
@@ -135,6 +177,8 @@ class EnvironmentConfig(BaseModel):
     iac_tool: IaCTool = IaCTool.TERRAFORM
     # Read-only collectors for unmanaged network devices (``infra collect``)
     collectors: CollectorsConfig | None = None
+    # Extra ``secret://`` backends (e.g. ``bitwarden``) for this environment
+    secret_backends: SecretBackendsConfig | None = None
     # Decrypted secrets for this environment.
     #
     # NOTE: This field is NOT loaded from settings.yaml. It is populated by

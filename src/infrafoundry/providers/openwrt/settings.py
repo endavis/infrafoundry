@@ -13,7 +13,7 @@ from typing import Any
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.exceptions import InfraFoundryError
-from infrafoundry.secrets.resolver import SecretResolver
+from infrafoundry.secrets.environment import build_secret_resolver
 
 PROVIDER_NAME = "openwrt"
 DEFAULT_SSH_USER = "root"
@@ -113,8 +113,7 @@ def load_settings(config_dir: Path, env_name: str) -> OpenWrtSettings:
         raise OpenWrtSettingsError(
             f"No provider_settings.openwrt found for environment '{env_name}'"
         )
-    resolver = SecretResolver()
-    resolver.configure_backend("env_secrets", {"secrets": env_config.secrets or {}})
+    resolver = build_secret_resolver(env_config)
     try:
         resolved = resolver.resolve_config(dict(raw))
     finally:

@@ -67,7 +67,7 @@ def tailscale_auth_ref(resource: ResourceConfig) -> str | None:
         resource: A host resource whose ``tailscale:`` block already validated.
 
     Returns:
-        The dotted secret path (the auth key, or the OAuth client secret), or
+        The dotted secret path or ``secret://`` URI (the auth key, or the OAuth client secret), or
         ``None`` when the host has no ``tailscale:`` block.
     """
     block = (resource.config or {}).get("tailscale")

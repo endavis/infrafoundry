@@ -40,7 +40,7 @@ provider_settings:
     timeout: 10        # seconds, default
 ```
 
-`secret://env_secrets/...` references resolve from the environment's SOPS secrets. The password never appears in logs or error messages.
+`secret://env_secrets/...` references resolve from the environment's SOPS secrets. The password never appears in logs or error messages. With a `secret_backends.bitwarden` block in `settings.yaml`, `secret://bitwarden/<item>/<field>` works wherever `secret://env_secrets/...` does ([Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md)).
 
 `api_url` may use `http`: RouterOS can serve REST on `www` without TLS. Basic-auth credentials then travel in plaintext, so `infra doctor` warns.
 

@@ -2,8 +2,9 @@
 
 Lists, for the resources a scoped ``infra doctor`` run covers, where each secret reference
 resolves from: the owning package's ``secrets.yaml`` (``package.<key>``), another provider's
-Terraform outputs at apply time (``outputs.<provider>.<output>``), or the environment's
-``secrets.yaml``. Rows hold the reference and its source, never a secret value.
+Terraform outputs at apply time (``outputs.<provider>.<output>``), a ``secret://`` backend
+(``env_secrets`` from the environment's ``secrets.yaml``, ``bitwarden`` at apply time), or the
+environment's ``secrets.yaml``. Rows hold the reference and its source, never a secret value.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from typing import Any
 
 from rich.markup import escape
 
+from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.package_secret_refs import is_package_ref, package_ref_problem
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_instances import split_provider_id
@@ -23,6 +25,8 @@ from infrafoundry.core.secrets.secret_manager import DEFAULT_SECRETS_FILENAME, S
 from infrafoundry.core.terraform_outputs import parse_output_ref
 from infrafoundry.core.validation_helpers.terraform_secrets_validator import output_ref_problem
 from infrafoundry.providers.kubernetes.secret_refs import SECRET_MAP_FIELDS, shape_errors
+from infrafoundry.secrets.environment import SecretRefLookup
+from infrafoundry.secrets.resolver import is_secret_uri, parse_secret_uri
 
 from ...utils import console
 
@@ -122,10 +126,29 @@ def _collect_fields(
     return pairs, bad
 
 
+def _uri_row(
+    resource: ResourceConfig, field: str, ref: str, env_name: str, env_config: EnvironmentConfig
+) -> SecretSourceRow:
+    """Return the row of a ``secret://`` reference, checked offline (no vault call)."""
+    problem = SecretRefLookup(env_config).problem(ref)
+    if problem is not None:
+        return _unresolved(resource, field, ref, f"'{ref}': {problem}")
+    backend, _ = parse_secret_uri(ref)
+    if backend == "env_secrets":
+        source = f"envs/{env_name}/{DEFAULT_SECRETS_FILENAME}"
+        status = SourceStatus.RESOLVED
+    else:
+        source = f"{backend} (apply time)"
+        status = SourceStatus.APPLY_TIME
+    return SecretSourceRow(resource.name, resource.provider, field, ref, source, status)
+
+
 def collect_secret_sources(
     resources: list[ResourceConfig],
     env_name: str,
     env_secrets: Callable[[], dict[str, Any] | None],
+    *,
+    env_config: Callable[[], EnvironmentConfig | None] | None = None,
 ) -> list[SecretSourceRow]:
     """Return one row per secret reference of the given resources.
 
@@ -134,17 +157,26 @@ def collect_secret_sources(
         env_name: Environment name, used to build source paths.
         env_secrets: Loader for the environment's secrets dict. Called at most once, and
             only when a reference falls back to the environment's secrets file.
+        env_config: Loader for the environment, used to know which ``secret://`` backends are
+            configured. Called at most once. Without it only ``env_secrets`` URIs are accepted.
 
     Returns:
         Rows in resource order; never holds a secret value.
     """
     flat: dict[str, str] | None = None
+    loaded_env: EnvironmentConfig | None = None
     rows: list[SecretSourceRow] = []
     for resource in resources:
         pairs, bad = _collect_fields(resource)
         rows.extend(bad)
         for field, ref in pairs:
-            if is_package_ref(ref):
+            if is_secret_uri(ref):
+                if loaded_env is None:
+                    loaded_env = (env_config() if env_config else None) or EnvironmentConfig(
+                        name=env_name, secrets=env_secrets()
+                    )
+                rows.append(_uri_row(resource, field, ref, env_name, loaded_env))
+            elif is_package_ref(ref):
                 source = (
                     f"envs/{env_name}/{resource.package_path}/{DEFAULT_SECRETS_FILENAME}"
                     if resource.package_path

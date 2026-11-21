@@ -8,7 +8,7 @@ from typing import Protocol
 from urllib.parse import urlparse
 
 from infrafoundry.core.config.models import CollectorDeviceConfig, EnvironmentConfig
-from infrafoundry.secrets.resolver import SecretResolver
+from infrafoundry.secrets.environment import build_secret_resolver
 
 from .base import CollectorConfigError
 
@@ -102,8 +102,7 @@ def resolve_device(
     Raises:
         CollectorConfigError: If a reference or required field is bad. Never carries values.
     """
-    resolver = SecretResolver()
-    resolver.configure_backend("env_secrets", {"secrets": env_config.secrets or {}})
+    resolver = build_secret_resolver(env_config)
     try:
         resolved = resolver.resolve_config(device.model_dump())
     except Exception as exc:

@@ -23,9 +23,10 @@ from infrafoundry.core.provider_mixins import (
     TemplateRendererMixin,
     TerraformGeneratorMixin,
 )
-from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.tailscale import process_tailscale_config
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.secrets.environment import SecretRefLookup
+from infrafoundry.secrets.resolver import is_secret_uri
 
 from .schema import DEFAULT_SSH_PORT, check_hosts, tailscale_auth_ref
 from .validator import HostValidator
@@ -227,15 +228,24 @@ class HostProvider(
         """Return the secret a ``tailscale:`` auth reference points at.
 
         Args:
-            ref: Dotted secret path from the host's ``tailscale.auth`` block.
+            ref: Dotted secret path or ``secret://`` URI from the host's ``tailscale.auth``
+                block.
 
         Raises:
             ValueError: If the reference does not resolve. The message holds the
-                reference only, never a secret value.
+                reference and a value-free reason, never a secret value.
         """
         env_config = self._load_environment_config()
-        flat = SecretManager.flatten_dict(env_config.secrets if env_config else None)
-        value = flat.get(ref)
+        if env_config is None:
+            raise ValueError(f"Tailscale auth secret '{ref}' does not resolve in the env secrets")
+        try:
+            with SecretRefLookup(env_config) as lookup:
+                value = lookup.lookup(ref)
+        except KeyError as exc:
+            raise ValueError(
+                f"Tailscale auth secret '{ref}' does not resolve in the env secrets"
+                + (f": {exc.args[0]}" if is_secret_uri(ref) else "")
+            ) from None
         if not value:
             raise ValueError(f"Tailscale auth secret '{ref}' does not resolve in the env secrets")
         return str(value)

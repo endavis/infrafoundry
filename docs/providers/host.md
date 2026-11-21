@@ -48,6 +48,8 @@ host:
       advertise_tags: [tag:example]
 ```
 
+`client_id_secret`, `client_secret_secret` and `auth_key_secret` take a dotted secret path or a `secret://env_secrets/...` or `secret://bitwarden/...` URI. See [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md).
+
 | Field | Meaning |
 | :--- | :--- |
 | `name` | Host name; the inventory host and the resource name. |

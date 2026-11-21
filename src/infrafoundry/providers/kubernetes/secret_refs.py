@@ -111,8 +111,7 @@ def shape_errors(resource: ResourceConfig) -> list[str]:
                 isinstance(k, str) and isinstance(v, str) for k, v in mapping.items()
             ):
                 errors.append(
-                    f"Secret '{resource.name}' '{field}' must map keys to dotted secret "
-                    f"reference strings"
+                    f"Secret '{resource.name}' '{field}' must map keys to secret reference strings"
                 )
                 continue
             if field == "data_secrets":
@@ -143,6 +142,6 @@ def shape_errors(resource: ResourceConfig) -> list[str]:
             elif has_ref and not isinstance(entry["value_secret"], str):
                 errors.append(
                     f"Helm release '{resource.name}' set_sensitive '{name}' "
-                    f"'value_secret' must be a dotted secret reference string"
+                    f"'value_secret' must be a secret reference string"
                 )
     return errors

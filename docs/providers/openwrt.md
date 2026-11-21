@@ -53,7 +53,7 @@ provider_settings:
     connect_timeout: 10               # seconds, default 10
 ```
 
-`secret://env_secrets/...` references resolve from the environment's SOPS secrets. The provider stores no password.
+`secret://env_secrets/...` references resolve from the environment's SOPS secrets. The provider stores no password. With a `secret_backends.bitwarden` block in `settings.yaml`, `secret://bitwarden/<item>/<field>` works wherever `secret://env_secrets/...` does ([Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md)).
 
 Several devices per environment are not supported yet.
 
