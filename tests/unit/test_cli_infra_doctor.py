@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -431,3 +433,200 @@ class TestInfraDoctorProviderFilter:
 
         assert result.exit_code == 0, result.output
         mock_check.assert_called_once()
+
+
+_PLACEHOLDER = "PLACEHOLDER-SECRET-VALUE-1567"
+
+
+def _app(config: dict[str, Any], **kwargs: Any) -> ResourceConfig:
+    return ResourceConfig(
+        name="example-app",
+        type="vm",
+        provider="proxmox",
+        config=config,
+        package_name="example-app",
+        package_path="apps/example-app",
+        **kwargs,
+    )
+
+
+@pytest.mark.unit
+class TestInfraDoctorSecretSources:
+    """Tests for the secret sources section of a scoped doctor run (#1567)."""
+
+    def _setup(
+        self,
+        mock_get_orch: MagicMock,
+        resources: list[ResourceConfig],
+        env_secrets: dict[str, Any] | None = None,
+    ) -> MagicMock:
+        orch = _mock_orchestrator()
+        orch.config_manager.resolve_package_filter.return_value = ["example-app"]
+        orch.config_manager.get_all_resources_all_providers.return_value = resources
+        orch.config_manager.get_package_events.return_value = {}
+        orch.config_manager.load_environment.return_value.secrets = env_secrets
+        orch.state_manager.get_resources.return_value = []
+        mock_get_orch.return_value = orch
+        return orch
+
+    def _invoke(self, cli_runner: CliRunner, tmp_path: Path, *args: str) -> Any:
+        return cli_runner.invoke(
+            main, ["-c", str(tmp_path), "infra", "doctor", "--env", "test", *args]
+        )
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_package_scope_lists_sources(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """-p prints each ref with its source and keeps the brackets."""
+        self._setup(
+            mock_get_orch,
+            [
+                _app(
+                    {"terraform_secrets": ["package.admin_token", "db.password"]},
+                    package_secrets={"admin_token": _PLACEHOLDER},
+                )
+            ],
+            {"db": {"password": _PLACEHOLDER}},
+        )
+
+        result = self._invoke(cli_runner, tmp_path, "-p", "example-app")
+
+        assert result.exit_code == 0, result.output
+        assert "Secret sources (package example-app):" in result.output
+        assert "terraform_secrets[0]" in result.output
+        assert "terraform_secrets[1]" in result.output
+        assert "Secret sources: 2 resolved" in result.output
+        assert _PLACEHOLDER not in result.output
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_resource_scope_and_unresolved_exits_one(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """-r scopes the section; an unresolved ref fails doctor."""
+        self._setup(mock_get_orch, [_app({"terraform_secrets": ["package.admin_token"]})])
+
+        result = self._invoke(cli_runner, tmp_path, "-r", "example-app")
+
+        assert result.exit_code == 1
+        assert "Secret sources (resource(s) example-app):" in result.output
+        assert "1 unresolved" in result.output
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_unscoped_has_no_section(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """Without -p or -r the output has no secret sources and nothing is loaded."""
+        orch = self._setup(mock_get_orch, [_app({"terraform_secrets": ["db.missing"]})])
+
+        result = self._invoke(cli_runner, tmp_path)
+
+        assert result.exit_code == 0, result.output
+        assert "Secret sources" not in result.output
+        orch.config_manager.load_environment.assert_not_called()
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_scoped_without_refs(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """A scoped run with no references says so and exits 0."""
+        self._setup(mock_get_orch, [_app({})])
+
+        result = self._invoke(cli_runner, tmp_path, "-p", "example-app")
+
+        assert result.exit_code == 0, result.output
+        assert "no secret references" in result.output
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_json_scoped(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """--format json prints one document on stdout; text goes to stderr."""
+        self._setup(
+            mock_get_orch,
+            [
+                _app(
+                    {"terraform_secrets": [{"token": _PLACEHOLDER}, "package.admin_token"]},
+                    package_secrets={"admin_token": _PLACEHOLDER},
+                )
+            ],
+        )
+
+        result = self._invoke(cli_runner, tmp_path, "-p", "example-app", "--format", "json")
+
+        data = json.loads(result.stdout)
+        assert result.exit_code == 1
+        assert data["environment"] == "test"
+        assert data["passed"] is False
+        assert data["providers"] == {"proxmox": {"errors": 0, "warnings": 0}}
+        statuses = [r["status"] for r in data["secret_sources"]["rows"]]
+        assert statuses == ["unresolved", "resolved"]
+        assert "Secret sources" in result.stderr
+        assert _PLACEHOLDER not in result.stdout
+        assert _PLACEHOLDER not in result.stderr
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_json_unscoped(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+    ) -> None:
+        """Unscoped --format json has a null secret_sources."""
+        self._setup(mock_get_orch, [_app({})])
+
+        result = self._invoke(cli_runner, tmp_path, "--format", "json")
+
+        data = json.loads(result.stdout)
+        assert result.exit_code == 0
+        assert data["passed"] is True
+        assert data["secret_sources"] is None
+
+    @patch("infrafoundry.cli.main._get_orchestrator")
+    @patch("infrafoundry.cli.main._load_env_credentials")
+    def test_no_value_in_logs(
+        self,
+        mock_creds: MagicMock,
+        mock_get_orch: MagicMock,
+        cli_runner: CliRunner,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """No secret value reaches output or logs, in text mode."""
+        self._setup(
+            mock_get_orch,
+            [_app({"terraform_secrets": ["package.admin_token"]}, package_secrets={"a": "b"})],
+            {"admin_token": _PLACEHOLDER},
+        )
+        with caplog.at_level(logging.DEBUG):
+            result = self._invoke(cli_runner, tmp_path, "-p", "example-app")
+
+        assert _PLACEHOLDER not in result.output
+        assert _PLACEHOLDER not in caplog.text

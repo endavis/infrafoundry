@@ -49,6 +49,7 @@ manager.save_secret("envs/dev/settings.yaml", data)
   ```bash
   sops --decrypt envs/dev/settings.yaml >/dev/null
   ```
+- `infra doctor -p <package>` or `-r <resource>` lists where each secret reference resolves from (package, env or another provider's outputs) without showing values; see [Secret Sources](../usage/validation.md#secret-sources).
 - For custom providers, add availability/credential checks and meaningful errors (`SecretError`/`SecretNotFoundError`).
 
 ## Examples
