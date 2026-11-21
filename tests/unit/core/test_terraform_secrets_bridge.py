@@ -22,7 +22,9 @@ from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_mixins import (
     TerraformGeneratorMixin,
+    collect_terraform_secret_vars,
     sanitize_secret_ref_to_tf_var,
+    secret_ref_tf_var,
 )
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.core.validation_helpers import validate_terraform_secrets_references
@@ -424,3 +426,118 @@ class TestOutputRefsSkipped:
         )
         assert [r.passed for r in report.results] == [False]
         assert "kubernetes provider only" in report.results[0].message
+
+
+# ---------------------------------------------------------------------------
+# package.<key> references (#1565)
+# ---------------------------------------------------------------------------
+
+
+def _pkg_resource(
+    path: str | None,
+    refs: list[str],
+    secrets: dict[str, Any] | None,
+    name: str = "app-admin",
+) -> ResourceConfig:
+    return ResourceConfig(
+        name=name,
+        type="secrets",
+        provider="test",
+        config={"terraform_secrets": refs},
+        package_name="example-app",
+        package_path=path,
+        package_secrets=secrets,
+    )
+
+
+class TestPackageSecretRefs:
+    """``package.<key>`` refs resolve from the owning package only."""
+
+    def test_emits_own_tf_var_with_package_value(self) -> None:
+        harness = _BridgeHarness(_make_env(secrets={"package": {"admin_token": "env-value"}}))
+        res = _pkg_resource(
+            "kubernetes/example-app", ["package.admin_token"], {"admin_token": "pkg"}
+        )
+        result = harness.build_terraform_env_vars("test", {}, resources=[res])
+        assert result == {"TF_VAR_package_kubernetes_example_app_admin_token": "pkg"}
+
+    def test_two_packages_same_key_get_distinct_vars(self) -> None:
+        harness = _BridgeHarness(_make_env(secrets={}))
+        a = _pkg_resource("kubernetes/app-a", ["package.admin_token"], {"admin_token": "value-a"})
+        b = _pkg_resource("kubernetes/app-b", ["package.admin_token"], {"admin_token": "value-b"})
+        result = harness.build_terraform_env_vars("test", {}, resources=[a, b])
+        assert result == {
+            "TF_VAR_package_kubernetes_app_a_admin_token": "value-a",
+            "TF_VAR_package_kubernetes_app_b_admin_token": "value-b",
+        }
+
+    def test_env_key_does_not_satisfy_package_ref(self) -> None:
+        harness = _BridgeHarness(_make_env(secrets={"admin_token": "env-value"}))
+        res = _pkg_resource("kubernetes/example-app", ["package.admin_token"], {"other": "x"})
+        with pytest.raises(KeyError) as exc:
+            harness.build_terraform_env_vars("test", {}, resources=[res])
+        assert "env-value" not in str(exc.value)
+
+    def test_unprefixed_refs_unchanged_next_to_package_refs(self) -> None:
+        harness = _BridgeHarness(_make_env(secrets={"tailscale": {"key": "abc"}}))
+        res = _pkg_resource(
+            "kubernetes/example-app",
+            ["tailscale.key", "package.admin_token"],
+            {"admin_token": "pkg"},
+        )
+        result = harness.build_terraform_env_vars("test", {}, resources=[res])
+        assert result["TF_VAR_tailscale_key"] == "abc"
+        assert result["TF_VAR_package_kubernetes_example_app_admin_token"] == "pkg"
+
+    def test_package_only_refs_need_no_env_secrets(self) -> None:
+        harness = _BridgeHarness(_make_env(secrets=None))
+        res = _pkg_resource("example-app", ["package.admin_token"], {"admin_token": "pkg"})
+        assert harness.build_terraform_env_vars("test", {}, resources=[res]) == {
+            "TF_VAR_package_example_app_admin_token": "pkg"
+        }
+
+    @pytest.mark.parametrize(
+        ("path", "secrets"),
+        [
+            ("kubernetes/example-app", {"other": "not-a-real-secret"}),
+            ("kubernetes/example-app", None),
+            (None, {"admin_token": "not-a-real-secret"}),
+        ],
+    )
+    def test_unresolvable_refs_raise_without_value(
+        self, path: str | None, secrets: dict[str, Any] | None
+    ) -> None:
+        harness = _BridgeHarness(_make_env(secrets={}))
+        res = _pkg_resource(path, ["package.admin_token"], secrets)
+        with pytest.raises(KeyError) as exc:
+            harness.build_terraform_env_vars("test", {}, resources=[res])
+        assert "not-a-real-secret" not in str(exc.value)
+        assert "package.admin_token" in str(exc.value)
+
+    def test_slug_collision_raises(self) -> None:
+        a = _pkg_resource("kubernetes/app-a", ["package.k"], {"k": "1"})
+        b = _pkg_resource("kubernetes/app_a", ["package.k"], {"k": "2"})
+        with pytest.raises(ValueError, match="both map to Terraform variable"):
+            collect_terraform_secret_vars([a, b])
+        harness = _BridgeHarness(_make_env(secrets={}))
+        with pytest.raises(ValueError, match="both map to Terraform variable"):
+            harness.build_terraform_env_vars("test", {}, resources=[a, b])
+
+    def test_same_package_same_ref_dedupes(self) -> None:
+        a = _pkg_resource("kubernetes/app", ["package.k"], {"k": "1"}, name="one")
+        b = _pkg_resource("kubernetes/app", ["package.k"], {"k": "1"}, name="two")
+        assert collect_terraform_secret_vars([a, b]) == [
+            {"name": "package_kubernetes_app_k", "source": "package.k (kubernetes/app)"}
+        ]
+
+    def test_secret_ref_tf_var_needs_package_for_package_ref(self) -> None:
+        with pytest.raises(ValueError, match="needs a resource from a package"):
+            secret_ref_tf_var("package.k", _pkg_resource(None, [], None))
+        assert secret_ref_tf_var("a.b") == "a_b"
+
+    def test_value_never_logged(self, caplog: pytest.LogCaptureFixture) -> None:
+        caplog.set_level("DEBUG")
+        harness = _BridgeHarness(_make_env(secrets={}))
+        res = _pkg_resource("example-app", ["package.k"], {"k": "not-a-real-secret"})
+        harness.build_terraform_env_vars("test", {}, resources=[res])
+        assert "not-a-real-secret" not in caplog.text

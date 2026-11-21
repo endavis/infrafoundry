@@ -7,6 +7,11 @@ import binascii
 from typing import Any, cast
 
 from infrafoundry.core.config.models import EnvironmentConfig
+from infrafoundry.core.package_secret_refs import (
+    is_package_ref,
+    package_ref_problem,
+    resolve_package_secret,
+)
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.types import KubernetesProviderSettings
@@ -310,10 +315,16 @@ class KubernetesValidator:
                 continue
             data_secrets = (resource.config or {}).get("data_secrets") or {}
             for key, ref in data_secrets.items():
-                if ref not in flat:
+                if is_package_ref(ref):
+                    if package_ref_problem(resource, ref) is not None:
+                        continue  # reported by validate_terraform_secrets_references
+                    value = resolve_package_secret(resource, ref)
+                elif ref in flat:
+                    value = flat[ref]
+                else:
                     continue
                 try:
-                    base64.b64decode(flat[ref], validate=True)
+                    base64.b64decode(value, validate=True)
                 except (binascii.Error, ValueError):
                     self.report.add_check(
                         check_name=f"kubernetes_secret_{resource.name}_data_secrets_{key}_base64",

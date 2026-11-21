@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.hooks.models import HooksConfig
@@ -25,6 +25,12 @@ class ResourceConfig(BaseModel):
     hooks: HooksConfig | None = None
     events: dict[str, list[dict[str, Any]]] | None = None
     package_variables: dict[str, Any] | None = None
+    # Raw ``variables:`` of the owning package's secrets.yaml (None: no secrets.yaml). Only
+    # ``package.<key>`` secret refs read it; kept out of dumps and reprs (#1565).
+    package_secrets: dict[str, Any] | None = Field(default=None, exclude=True, repr=False)
+    package_name: str | None = None
+    # Package directory relative to ``envs/<env>`` in POSIX form; unique within an env.
+    package_path: str | None = None
     import_id: str | None = None
 
 

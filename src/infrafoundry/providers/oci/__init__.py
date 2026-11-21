@@ -12,7 +12,7 @@ from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
-    sanitize_secret_ref_to_tf_var,
+    collect_terraform_secret_vars,
 )
 from infrafoundry.core.tailscale import process_tailscale_config
 from infrafoundry.core.validation import ValidationReport
@@ -133,10 +133,7 @@ class OCIProvider(
         # Build the set of dynamic sensitive vars driven by resource-level
         # ``terraform_secrets`` references so the variables.tf template can
         # declare them.
-        secret_refs = self.collect_terraform_secret_refs(all_processed)
-        terraform_secret_vars = [
-            {"name": sanitize_secret_ref_to_tf_var(ref), "source": ref} for ref in secret_refs
-        ]
+        terraform_secret_vars = collect_terraform_secret_vars(all_processed)
 
         # Generate provider configuration and variables
         self.render_provider_and_variables(

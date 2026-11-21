@@ -12,7 +12,8 @@ from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
-    sanitize_secret_ref_to_tf_var,
+    collect_terraform_secret_vars,
+    secret_ref_tf_var,
 )
 from infrafoundry.core.terraform_outputs import output_refs
 from infrafoundry.core.validation import ValidationReport
@@ -54,8 +55,9 @@ class KubernetesProvider(
         self._setup_template_environment()
         # Add custom filter for YAML serialization
         self.jinja_env.filters["toyaml"] = lambda x: yaml.dump(x, default_flow_style=False).rstrip()
-        # Variable name for a ``terraform_secrets`` ref (``app.token`` -> ``app_token``)
-        self.jinja_env.filters["secret_tf_var"] = sanitize_secret_ref_to_tf_var
+        # Variable name for a ``terraform_secrets`` ref (``app.token`` -> ``app_token``); a resource
+        # argument names ``package.<key>`` refs after the owning package
+        self.jinja_env.filters["secret_tf_var"] = secret_ref_tf_var
         # Resources of the last ``generate_terraform`` call, for ``TF_VAR_*`` secret injection
         self._last_terraform_resources: list[ResourceConfig] = []
 
@@ -234,10 +236,7 @@ class KubernetesProvider(
         }
         processed = [r for group in resources_by_type.values() for r in group]
         self._last_terraform_resources = processed
-        secret_vars = [
-            {"name": sanitize_secret_ref_to_tf_var(ref), "source": ref}
-            for ref in self.collect_terraform_secret_refs(processed)
-        ]
+        secret_vars = collect_terraform_secret_vars(processed)
 
         # Build dependency refs once for all templates
         dep_refs = self._build_dependency_refs(resources_by_type)

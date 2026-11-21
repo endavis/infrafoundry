@@ -165,3 +165,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0028](0028-openwrt-devices-are-managed-through-generated-communityopenwrt-playbooks-with-ubus-apply-rollback.md) | OpenWrt devices are managed through generated community.openwrt playbooks with ubus apply-rollback | Accepted |
 | [0029](0029-providers-consume-other-providers-terraform-outputs-through-outputs-references.md) | Providers consume other providers' Terraform outputs through outputs references | Accepted |
 | [0030](0030-kubernetes-clusters-are-provider-instances-several-per-environment.md) | Kubernetes clusters are provider instances, several per environment | Accepted |
+| [0031](0031-secret-references-resolve-from-the-owning-packages-secretsyaml-through-a-package-prefix.md) | Secret references resolve from the owning package's secrets.yaml through a package prefix | Accepted |

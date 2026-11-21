@@ -18,6 +18,12 @@ from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.credential_override import resolve_settings
 from infrafoundry.core.exceptions import TemplateError
+from infrafoundry.core.package_secret_refs import (
+    is_package_ref,
+    package_ref_key,
+    package_secret_var_name,
+    resolve_package_secret,
+)
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_instances import split_provider_id
 from infrafoundry.core.security.file_utils import secure_write
@@ -70,6 +76,77 @@ def sanitize_secret_ref_to_tf_var(dotted_path: str) -> str:
             f"(must match ^[a-zA-Z][a-zA-Z0-9_]*$)."
         )
     return sanitized
+
+
+def secret_ref_tf_var(ref: str, resource: ResourceConfig | None = None) -> str:
+    """Return the Terraform variable name for a secret reference on a resource.
+
+    Unprefixed and ``outputs.`` refs keep the name ``sanitize_secret_ref_to_tf_var`` gives.
+    A ``package.<key>`` ref is named after the owning package so two packages that use the
+    same key get distinct variables: ``package_<slug(package_path)>_<key>``.
+
+    Args:
+        ref: The secret reference.
+        resource: The resource carrying the reference. Required for ``package.`` refs.
+
+    Returns:
+        A Terraform-safe variable name (without the ``TF_VAR_`` prefix).
+
+    Raises:
+        ValueError: If a ``package.`` ref has no resource from a package, or the name is
+            not a legal Terraform variable identifier.
+    """
+    if not is_package_ref(ref):
+        return sanitize_secret_ref_to_tf_var(ref)
+    if resource is None or resource.package_path is None:
+        raise ValueError(
+            f"Secret reference '{ref}' needs a resource from a package to name its variable"
+        )
+    name = package_secret_var_name(resource.package_path, package_ref_key(ref))
+    if not _TF_VAR_NAME_RE.match(name):
+        raise ValueError(
+            f"Secret reference '{ref}' on resource '{resource.name}' sanitizes to '{name}', "
+            f"which is not a valid Terraform variable name"
+        )
+    return name
+
+
+def collect_terraform_secret_vars(resources: list[ResourceConfig]) -> list[dict[str, str]]:
+    """Return the unique Terraform secret variables the resources declare.
+
+    Walks each resource's ``terraform_secrets`` and names every ref with
+    ``secret_ref_tf_var``. Entries are ``{"name": ..., "source": ...}`` in first-seen
+    order, de-duplicated by name.
+
+    Args:
+        resources: Resource configs to scan.
+
+    Returns:
+        Ordered list of variable declarations for the ``variables.tf`` template.
+
+    Raises:
+        ValueError: If two different sources produce the same variable name.
+        TypeError: If a ``terraform_secrets`` value is malformed.
+    """
+    seen: dict[str, tuple[str | None, str]] = {}
+    result: list[dict[str, str]] = []
+    for resource in resources:
+        for ref in TerraformGeneratorMixin.collect_terraform_secret_refs([resource]):
+            name = secret_ref_tf_var(ref, resource)
+            package_path = resource.package_path if is_package_ref(ref) else None
+            identity = (package_path, ref)
+            if name in seen:
+                if seen[name] != identity:
+                    raise ValueError(
+                        f"Secret references {seen[name][1]!r} (package {seen[name][0]!r}) and "
+                        f"{ref!r} (package {package_path!r}) both map to Terraform variable "
+                        f"'{name}'"
+                    )
+                continue
+            seen[name] = identity
+            source = f"{ref} ({package_path})" if package_path else ref
+            result.append({"name": name, "source": source})
+    return result
 
 
 if TYPE_CHECKING:
@@ -740,25 +817,30 @@ class TerraformGeneratorMixin:
         # Local import to avoid a circular import at module load time.
         from infrafoundry.core.secrets.secret_manager import SecretManager
 
-        refs = self.collect_terraform_secret_refs(resources)
-        if not refs:
-            return {}
-
-        flat_secrets = SecretManager.flatten_dict(env_config.secrets)
+        flat_secrets: dict[str, str] | None = None
         result: dict[str, str] = {}
-        for ref in refs:
-            if is_output_ref(ref):
-                # Resolved from the producer's Terraform outputs by the runner (#1536).
-                continue
-            if ref not in flat_secrets:
-                raise KeyError(
-                    f"terraform_secrets reference '{ref}' is not present in "
-                    f"env '{env_config.name}' secrets. "
-                    f"Available top-level keys: "
-                    f"{sorted({k.split('.')[0] for k in flat_secrets})}"
-                )
-            tf_name = sanitize_secret_ref_to_tf_var(ref)
-            result[f"TF_VAR_{tf_name}"] = flat_secrets[ref]
+        for resource in resources:
+            for ref in self.collect_terraform_secret_refs([resource]):
+                if is_output_ref(ref):
+                    # Resolved from the producer's Terraform outputs by the runner (#1536).
+                    continue
+                if is_package_ref(ref):
+                    value = resolve_package_secret(resource, ref)  # KeyError, no value
+                    result[f"TF_VAR_{secret_ref_tf_var(ref, resource)}"] = value
+                    continue
+                tf_name = secret_ref_tf_var(ref, resource)
+                if flat_secrets is None:
+                    flat_secrets = SecretManager.flatten_dict(env_config.secrets)
+                if ref not in flat_secrets:
+                    raise KeyError(
+                        f"terraform_secrets reference '{ref}' is not present in "
+                        f"env '{env_config.name}' secrets. "
+                        f"Available top-level keys: "
+                        f"{sorted({k.split('.')[0] for k in flat_secrets})}"
+                    )
+                result[f"TF_VAR_{tf_name}"] = flat_secrets[ref]
+        # Raises when two different sources map to the same TF variable name.
+        collect_terraform_secret_vars(resources)
         return result
 
     def _generate_import_blocks(self, rendered: str, context: dict[str, Any]) -> str:

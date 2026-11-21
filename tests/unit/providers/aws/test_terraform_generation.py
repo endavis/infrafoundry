@@ -285,3 +285,13 @@ def test_credentials_in_settings_raise(
     with pytest.raises(SchemaValidationError, match="aws_settings_secret_key") as exc:
         provider.generate_terraform([res("web", "security_group", vpc_id="vpc-0123456789abcdef0")])
     assert "sentinel" not in str(exc.value)
+
+
+class TestPackageSecretVariable:
+    def test_package_ref_declares_package_scoped_variable(self, provider: AWSProvider) -> None:
+        resource = instance(terraform_secrets=["package.admin_token"])
+        resource.package_path = "aws/example-app"
+        resource.package_secrets = {"admin_token": "not-a-real-secret"}
+        files = _generate(provider, resource)
+        assert 'variable "package_aws_example_app_admin_token"' in files["variables.tf"]
+        assert all("not-a-real-secret" not in content for content in files.values())

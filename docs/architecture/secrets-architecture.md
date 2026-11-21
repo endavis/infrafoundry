@@ -158,7 +158,9 @@ This file is SOPS-encrypted and automatically decrypted during package loading:
 - Scripts read configuration from env vars rather than re-parsing files
 
 See [Infrastructure Packages: Per-Package Secrets](../configuration/infrastructure-packages.md#per-package-secrets)
-for format and usage details.
+for format and usage details. Secret-backed fields can also read these values without
+rendering them into generated files, through `package.<key>` references; see
+[Package Secret References](../configuration/infrastructure-packages.md#package-secret-references).
 
 ## Related Documentation
 
