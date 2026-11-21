@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795261026852,
+  "lastUpdate": 1795261263806,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5058,6 +5058,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004504643831236156",
             "extra": "mean: 77.55624599603931 usec\nrounds: 13549"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "930dc0c9ad07b671644767d5e4dae213a52d7615",
+          "message": "fix: resolve references outside the package when infra doctor is scoped to a package (merges PR #1571, addresses #1568)\n\nfix: resolve references outside the package when infra doctor is scoped\n\nA scoped `infra doctor` (-p, -r) handed validators only the selected\nresources, so a name defined elsewhere in the environment, such as an OCI\ncompartment, VCN or subnet, an SDN vnet or an ESXi vswitch, looked undefined\nand doctor exited 1 although the unscoped run passed.\n\nOCI, Proxmox, ESXi, AWS, MikroTik and Tailscale now implement\nvalidate_references_in_context. They report only on the selected resources and\nresolve names against all of the provider's resources in the environment. The\norchestrator already passed that list to providers with the hook. Behaviour\nwithout a scope is unchanged. ValidationContext gains an additive\nreference_resources field for the ESXi sub-validators. OCI and MikroTik drop\nreference entries that duplicate a selected resource.\n\nTest change, approved by the user: test_opnsense_resolves_references_in_context\nused Proxmox as the provider that keeps the plain hook. Proxmox now implements\nthe hook for its SDN vnet lookups, so that assertion pointed at the wrong\nprovider. It now uses OpenWrt, which has no cross-resource name lookups. The\nassertion's intent is unchanged.\n\nAddresses #1568\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T11:39:53Z",
+          "tree_id": "321b26cbe65ce6c75cb44fffc01c7d1a7e4ab109",
+          "url": "https://github.com/endavis/infrafoundry/commit/930dc0c9ad07b671644767d5e4dae213a52d7615"
+        },
+        "date": 1795261263307,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 103.10032972044927,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00015745664348194022",
+            "extra": "mean: 9.699290028571621 msec\nrounds: 105"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16454.61426304671,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000028748282979387006",
+            "extra": "mean: 60.77322652562999 usec\nrounds: 17764"
           }
         ]
       }
