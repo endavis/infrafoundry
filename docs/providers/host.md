@@ -63,7 +63,7 @@ Unknown keys are reported as warnings.
 
 ## What Apply Does
 
-`foundry infra apply --env prod` writes `generated/prod/ansible/host/` (`inventory.yml`, `ansible.cfg` and, when a host has a `tailscale:` block, `tailscale.yml`) and then runs, for each host, `ansible-playbook -i inventory.yml --limit <host> <playbook>`: the enrollment playbook first, then the host's own playbooks. The Ansible `roles_path` is the config repo's `roles/` directory.
+`foundry infra apply --env prod` writes `generated/prod/ansible/host/` (`inventory.yml`, `ansible.cfg` and, when a host has a `tailscale:` block, `tailscale.yml`) and then runs, for each host, `ansible-playbook -i inventory.yml --limit <host> <playbook>`: the enrollment playbook first, then the host's own playbooks. The Ansible `roles_path` is the config repo's `roles/` directory. The generated `ansible.cfg` sets `host_key_checking = True`, so each host's key must be in your `~/.ssh/known_hosts` (see [SSH Host Key Checking](../guides/ssh-host-key-checking.md)).
 
 The host is a tracked resource. It appears in `infra deployed`, and `-r vps-01` and `-P host` scope a run to it. The first apply records a `create`, later ones an `update`, so `on_create` and `on_update` handlers fire. The generated Terraform is an empty `terraform {}` block, since nothing is managed through Terraform.
 

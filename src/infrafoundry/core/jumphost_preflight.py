@@ -10,7 +10,9 @@ first.
 Targets are the package's VMs that have a DHCP reservation (the same lookup
 ``known_hosts`` uses). A deployed target must accept SSH from the jumphost; a
 target that is not deployed yet must have a route from the jumphost and an
-address nothing answers on. ``outputs:`` destinations are checked on the
+address nothing answers on. A deployed target is probed strictly against the host key the
+package pinned in ``ssh_known_hosts``, and skipped when it pinned none. The jumphost itself
+is checked against the operator's ``known_hosts``. ``outputs:`` destinations are checked on the
 workstation, where the script handler copies them.
 
 All checks for one jumphost run in a single SSH session, opened the way the
@@ -34,26 +36,29 @@ import jinja2
 from infrafoundry.core.config.filters import create_jinja2_env
 from infrafoundry.core.known_hosts import RESERVATION_TYPE, reservation_ips
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.ssh_host_keys import FIX_HINT, KNOWN_HOSTS_VARIABLE, known_hosts_for
+from infrafoundry.core.ssh_options import STRICT_HOST_KEY_ARGS, host_key_hint
 from infrafoundry.core.state.models import ResourceState
 
-# Same host-key handling as the script handler's jumphost transport, plus
-# BatchMode so a missing key fails instead of prompting.
+# Same host-key handling as the script handler's jumphost transport (strict, against the
+# operator's known_hosts), plus BatchMode so a missing key fails instead of prompting.
 _SSH_OPTS = [
     "-o",
     "BatchMode=yes",
     "-o",
     "ConnectTimeout=10",
-    "-o",
-    "StrictHostKeyChecking=no",
+    *STRICT_HOST_KEY_ARGS,
 ]
 _TIMEOUT_SECONDS = 60
 
-# Target SSH uses the blueprint scripts' options: host keys are not checked
-# and not recorded, so a reused IP can't block them.
+# Target SSH checks strictly against the keys the package pinned in ``ssh_known_hosts``,
+# staged in a temporary file on the jumphost (``$kh``). ``HostKeyAlias`` makes ssh look the
+# VM up by name, so a reservation IP that differs from the pinned address still matches.
 _TARGET_SSH = (
-    "ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=no "
-    "-o UserKnownHostsFile=/dev/null"
+    "ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=yes "
+    '-o UserKnownHostsFile="$kh" -o GlobalKnownHostsFile=/dev/null'
 )
+_NO_PINNED_KEY = f"no pinned host key; {FIX_HINT}"
 
 # The script handler rsyncs scripts into /tmp, runs them with bash and needs
 # python3 to export package variables; scripts reach targets with ssh/scp and
@@ -105,6 +110,8 @@ class Target:
     user: str | None
     deployed: bool | None
     """``True`` if deployed, ``False`` if not yet, ``None`` if the state is in between."""
+    host_keys: tuple[str, ...] = ()
+    """The package's pinned ``known_hosts`` lines for this VM."""
 
 
 class _StateLookup(Protocol):
@@ -230,19 +237,34 @@ def targets_by_jumphost(
             jumphost.split("@", 1)[0] if "@" in jumphost else None
         )
         state = deployed(resource)
+        host_keys = known_hosts_for(str(pkg_vars.get(KNOWN_HOSTS_VARIABLE, "")), resource.name)
         for ip in ips.get(resource.name, []):
-            result.setdefault(jumphost, []).append(Target(resource.name, ip, user, state))
+            result.setdefault(jumphost, []).append(
+                Target(resource.name, ip, user, state, host_keys)
+            )
     return result
+
+
+def _probes(target: Target) -> bool:
+    return bool(target.deployed and target.user and target.host_keys)
 
 
 def _target_lines(targets: Sequence[Target]) -> list[str]:
     lines: list[str] = []
+    staged = [line for t in targets if _probes(t) for line in t.host_keys]
+    if staged:
+        # mktemp creates the file with mode 0600; it is removed after the probes.
+        quoted = " ".join(shlex.quote(line) for line in dict.fromkeys(staged))
+        lines.append(
+            f"kh=$(mktemp /tmp/infrafoundry-doctor-kh-XXXXXX) && printf '%s\\n' {quoted} >\"$kh\""
+        )
     for i, target in enumerate(targets):
-        if target.deployed and target.user:
+        if _probes(target):
             dest = shlex.quote(f"{target.user}@{target.ip}")
+            alias = shlex.quote(target.name)
             # Keep ssh's last error line: it says why ("Permission denied", ...).
             lines.append(
-                f"o=$({_TARGET_SSH} {dest} true 2>&1 </dev/null); c=$?; "
+                f"o=$({_TARGET_SSH} -o HostKeyAlias={alias} {dest} true 2>&1 </dev/null); c=$?; "
                 f'echo "target {i} ssh $c"; '
                 f"[ \"$c\" -eq 0 ] || printf 'target-error {i} %s\\n' "
                 f'"$(printf \'%s\' "$o" | tail -n 1)"'
@@ -251,6 +273,8 @@ def _target_lines(targets: Sequence[Target]) -> list[str]:
             ip = shlex.quote(target.ip)
             lines.append(f'ip route get {ip} >/dev/null 2>&1; echo "target {i} route $?"')
             lines.append(f'ping -c 1 -W 1 {ip} >/dev/null 2>&1; echo "target {i} ping $?"')
+    if staged:
+        lines.append('rm -f "$kh"')
     return lines
 
 
@@ -261,6 +285,8 @@ def _target_check(target: Target, codes: dict[str, int], error: str = "") -> Che
     if target.deployed:
         if not target.user:
             return Check(name, Status.SKIP, "no ssh_user, and jumphost has no user@ part")
+        if not target.host_keys:
+            return Check(name, Status.SKIP, _NO_PINNED_KEY)
         code = codes.get("ssh")
         if code == 0:
             return Check(name, Status.OK, f"ssh as {target.user}")
@@ -433,13 +459,12 @@ def check_jumphost(
 
     parsed = _parse(result.stdout or "")
     if result.returncode != 0 or not parsed["connect"]:
-        detail = (result.stderr or "").strip().splitlines()
+        stderr = result.stderr or ""
+        detail = stderr.strip().splitlines()
+        message = f"ssh exited {result.returncode}" + (f": {detail[-1]}" if detail else "")
+        hint = host_key_hint(stderr, jumphost)
         report.checks.append(
-            Check(
-                "SSH to jumphost",
-                Status.FAIL,
-                f"ssh exited {result.returncode}" + (f": {detail[-1]}" if detail else ""),
-            )
+            Check("SSH to jumphost", Status.FAIL, f"{message}. {hint}" if hint else message)
         )
         return report
 

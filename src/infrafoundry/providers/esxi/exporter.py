@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 
+from infrafoundry.core.ssh_options import STRICT_HOST_KEY_ARGS, host_key_hint
 from infrafoundry.core.types import EnvironmentData
 
 logger = logging.getLogger(__name__)
@@ -90,23 +91,26 @@ class EsxiConfigExporter:
         Raises:
             subprocess.CalledProcessError: If SSH command fails
         """
-        result = subprocess.run(
-            [
-                "ssh",
-                "-o",
-                "StrictHostKeyChecking=no",
-                "-o",
-                "UserKnownHostsFile=/dev/null",
-                "-o",
-                f"ConnectTimeout={self.timeout}",
-                f"{username}@{hostname}",
-                command,
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=self.timeout + 10,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    "ssh",
+                    *STRICT_HOST_KEY_ARGS,
+                    "-o",
+                    f"ConnectTimeout={self.timeout}",
+                    f"{username}@{hostname}",
+                    command,
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=self.timeout + 10,
+            )
+        except subprocess.CalledProcessError as exc:
+            hint = host_key_hint(str(exc.stderr or ""), hostname)
+            if hint:
+                logger.error("SSH to %s failed: %s", hostname, hint)
+            raise
         return result.stdout
 
     def _export_vswitches(self, host_name: str, hostname: str, username: str) -> dict[str, str]:

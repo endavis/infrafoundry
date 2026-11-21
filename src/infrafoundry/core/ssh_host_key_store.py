@@ -26,6 +26,7 @@ from infrafoundry.core.ssh_host_keys import (
     HOST_KEYS_VARIABLE,
     host_key_entry,
 )
+from infrafoundry.core.ssh_options import STRICT_HOST_KEY_ARGS
 
 Run = Callable[..., "subprocess.CompletedProcess[Any]"]
 
@@ -33,7 +34,7 @@ _TIMEOUT_SECONDS = 60
 _NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 _PUBLIC_KEY_RE = re.compile(r"^ssh-ed25519 [A-Za-z0-9+/]+={0,3}$")
 _SCAN_OPTS = ["-T", "10", "-t", "ed25519"]
-_JUMP_OPTS = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=10"]
+_JUMP_OPTS = ["-o", "BatchMode=yes", *STRICT_HOST_KEY_ARGS, "-o", "ConnectTimeout=10"]
 
 
 class HostKeyAction(StrEnum):

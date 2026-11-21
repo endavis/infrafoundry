@@ -487,7 +487,7 @@ class TestAnsibleCfgTemplate:
             "oci/ansible.cfg.j2", {"roles_path": "/home/user/infra/roles"}
         )
         assert "roles_path = /home/user/infra/roles" in content
-        assert "host_key_checking = False" in content
+        assert "host_key_checking = True" in content
         assert "pipelining = True" in content
 
 

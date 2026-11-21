@@ -393,7 +393,9 @@ generated/prod/ansible/oci/
 └── inventory.yml       # Dynamic inventory from Terraform outputs
 ```
 
-## Common Shapes
+The generated `ansible.cfg` sets `host_key_checking = True`: each target's host key must be in your `~/.ssh/known_hosts`, and k3s runs use the host keys the package pinned. See [SSH Host Key Checking](../guides/ssh-host-key-checking.md).
+
+
 
 | Shape | Architecture | Free Tier |
 |-------|-------------|-----------|

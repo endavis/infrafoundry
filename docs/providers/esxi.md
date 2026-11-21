@@ -29,6 +29,7 @@ The ESXi provider validates connectivity via SSH (port 22) to each configured ho
 - SSH is enabled on the ESXi host(s)
 - The configured user has sufficient privileges (typically `root`)
 - Network connectivity exists between the InfraFoundry host and the ESXi hosts
+- Each ESXi host's SSH host key is in your `~/.ssh/known_hosts` (OVF deployments, destroy and the exporter check host keys strictly); see [SSH Host Key Checking](../guides/ssh-host-key-checking.md)
 
 ### Terraform Provider
 

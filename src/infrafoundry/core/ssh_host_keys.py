@@ -50,6 +50,8 @@ _PUBLIC_KEY_RE = re.compile(r"^ssh-ed25519 [A-Za-z0-9+/]+={0,3}$")
 _PRIVATE_KEY_ARMOUR = "-----BEGIN OPENSSH " + "PRIVATE KEY-----"
 
 _FIX_HINT = "run 'foundry secrets host-keys --env <env>'"
+FIX_HINT = _FIX_HINT
+"""The hint that tells the operator how to pin a VM's host key."""
 
 
 @dataclass(frozen=True)
@@ -229,6 +231,25 @@ def known_hosts_value(resources: Iterable[ResourceConfig]) -> str:
         if line not in lines:
             lines.append(line)
     return ";".join(lines)
+
+
+def known_hosts_for(value: str, name: str) -> tuple[str, ...]:
+    """Pick the lines of an ``ssh_known_hosts`` value that name one VM.
+
+    Args:
+        value: The ``;``-separated ``ssh_known_hosts`` package variable.
+        name: The VM name.
+
+    Returns:
+        The lines whose first field, split on commas, contains *name*.
+    """
+    lines: list[str] = []
+    for raw in value.split(";"):
+        line = raw.strip()
+        fields = line.split(None, 1)
+        if fields and name in fields[0].split(","):
+            lines.append(line)
+    return tuple(lines)
 
 
 def _describe(resource: ResourceConfig) -> str:

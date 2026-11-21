@@ -168,6 +168,8 @@ tools the blueprint script itself needs. SSH must be reachable from the
 operator's host using the value of `jumphost` as a destination (e.g.
 `ansible@jump.example.com` or an alias defined in `~/.ssh/config`).
 
+**Host keys:** the jumphost transport (ssh, rsync and scp) checks the jumphost's host key against your `known_hosts`; record it first, see [SSH Host Key Checking](../guides/ssh-host-key-checking.md).
+
 **Host keys after destroy:** after `foundry infra destroy`, the framework
 removes each destroyed resource from the jumphost's `~/.ssh/known_hosts`, so a
 VM recreated on the same IP doesn't fail with "REMOTE HOST IDENTIFICATION HAS

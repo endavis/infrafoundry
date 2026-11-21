@@ -403,6 +403,8 @@ foundry infra doctor --env prod --package k3s-cluster --format json
 
 Note: `--resource` and `--package` are mutually exclusive. They limit which resources are checked; for providers that support it (OPNsense), references still resolve against the whole environment, so a reservation may name a subnet from another package.
 
+**Jumphost preflight (host keys):** the SSH hop to the jumphost checks its host key against your `known_hosts`, and a deployed VM is probed against the keys the package pinned in `ssh_known_hosts` (skipped, with a hint, when it pinned none).
+
 **Jumphost preflight:** for every in-scope package that sets `jumphost`, doctor also checks the jumphost in one SSH session: SSH access, an ssh-agent with keys loaded, the package's public key among them (where the package declares one, as `ssh_public_key` or a VM's `ssh_keys`), the tools the scripts need (`rsync`, `bash`, `python3`, `ssh`, `scp`), a writable `/tmp`, each VM the scripts will reach (SSH if deployed; a route and an unused IP if not) and the `outputs:` destinations on the workstation. Any `FAIL` makes doctor exit 1. See [Validation — Jumphost preflight](validation.md#jumphost-preflight).
 
 ### `infra plan`

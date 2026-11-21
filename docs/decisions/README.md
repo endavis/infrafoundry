@@ -167,3 +167,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0030](0030-kubernetes-clusters-are-provider-instances-several-per-environment.md) | Kubernetes clusters are provider instances, several per environment | Accepted |
 | [0031](0031-secret-references-resolve-from-the-owning-packages-secretsyaml-through-a-package-prefix.md) | Secret references resolve from the owning package's secrets.yaml through a package prefix | Accepted |
 | [0032](0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md) | Blueprint VMs get pre-generated SSH host keys that scripts pin | Accepted |
+| [0033](0033-package-ssh-connections-check-host-keys-against-the-operators-known-hosts.md) | Package SSH connections check host keys against the operator's known_hosts | Accepted |

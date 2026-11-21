@@ -25,6 +25,7 @@ import jinja2
 from infrafoundry.core.config.filters import create_jinja2_env
 from infrafoundry.core.events.context import EventContext, EventResult
 from infrafoundry.core.events.handlers.base import BaseHandler
+from infrafoundry.core.ssh_options import STRICT_HOST_KEY_ARGS, STRICT_HOST_KEY_OPTS, host_key_hint
 from infrafoundry.core.warnings import emit_warning
 
 if TYPE_CHECKING:
@@ -64,6 +65,12 @@ JUMPHOST_FORWARDED_ENV: frozenset[str] = frozenset(
 _ENV_KEY_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 
 _TERMINATE_GRACE_SECONDS = 10
+
+
+def _with_host_key_hint(reason: str, stderr: str, host: str) -> str:
+    """Append the host-key fix hint to *reason* when ssh's *stderr* reports a host-key failure."""
+    hint = host_key_hint(stderr or "", host)
+    return f"{reason}\n{hint}" if hint else reason
 
 
 def _terminate_process_group(
@@ -554,7 +561,7 @@ class ScriptHandler(BaseHandler):
         remote_vars.pop("jumphost", None)
         remote_vars_json = json.dumps(remote_vars)
 
-        ssh_opts = ["-o", "StrictHostKeyChecking=no"]
+        ssh_opts = list(STRICT_HOST_KEY_ARGS)
         mkdir_cmd = [
             "ssh",
             *ssh_opts,
@@ -612,7 +619,11 @@ class ScriptHandler(BaseHandler):
             return EventResult(
                 success=False,
                 abort=not self.config.get("continue_on_error", False),
-                reason=f"remote mkdir failed: {mkdir_result.stderr.strip()}",
+                reason=_with_host_key_hint(
+                    f"remote mkdir failed: {mkdir_result.stderr.strip()}",
+                    mkdir_result.stderr,
+                    jumphost,
+                ),
                 stdout=mkdir_result.stdout,
                 stderr=mkdir_result.stderr,
                 duration_seconds=time.monotonic() - start_time,
@@ -764,7 +775,7 @@ class ScriptHandler(BaseHandler):
             "rsync",
             "-a",
             "-e",
-            "ssh -o StrictHostKeyChecking=no",
+            f"ssh {STRICT_HOST_KEY_OPTS}",
             f"{local_dir}/",
             f"{jumphost}:{remote_path}/",
         ]
@@ -791,7 +802,11 @@ class ScriptHandler(BaseHandler):
             return EventResult(
                 success=False,
                 abort=not self.config.get("continue_on_error", False),
-                reason=f"rsync setup failed: {rsync_result.stderr.strip()}",
+                reason=_with_host_key_hint(
+                    f"rsync setup failed: {rsync_result.stderr.strip()}",
+                    rsync_result.stderr,
+                    jumphost,
+                ),
                 stdout=rsync_result.stdout,
                 stderr=rsync_result.stderr,
                 duration_seconds=time.monotonic() - start_time,
@@ -872,7 +887,7 @@ class ScriptHandler(BaseHandler):
 
         Args:
             jumphost: SSH destination.
-            ssh_opts: Shared ssh options (e.g. ``-o StrictHostKeyChecking=no``).
+            ssh_opts: Shared ssh options (e.g. ``-o StrictHostKeyChecking=yes``).
             remote_warnings_path: Absolute path on the jumphost.
             local_warnings_path: The orchestrator's local warnings file to
                 append the remote content to.
@@ -964,7 +979,7 @@ class ScriptHandler(BaseHandler):
             jumphost: SSH destination when the script ran on a jumphost.
                 ``None`` for local execution.
             ssh_opts: Shared ssh options (e.g.
-                ``["-o", "StrictHostKeyChecking=no"]``). Only used when
+                ``["-o", "StrictHostKeyChecking=yes"]``). Only used when
                 ``jumphost`` is set.
         """
         if not outputs:

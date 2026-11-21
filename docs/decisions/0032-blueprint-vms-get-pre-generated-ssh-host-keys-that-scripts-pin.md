@@ -44,6 +44,8 @@ OCI exposure: the private key reaches Terraform state (the Tailscale module's da
 
 Out of scope: OCI instances without `tailscale:`, and the other SSH call sites in the framework (handler and preflight jumphost connections, ESXi, the Proxmox node snippet upload).
 
+The other SSH call sites (handler and preflight jumphost connections, ESXi, Proxmox) are covered by [ADR-0033](0033-package-ssh-connections-check-host-keys-against-the-operators-known-hosts.md).
+
 ## Related Issues
 - Issue #1581: pin pre-generated ssh host keys for VMs built by blueprints
 - Issue #1583: the same for k3s-cluster on OCI over Tailscale SSH (OCI instances with `tailscale:`)
