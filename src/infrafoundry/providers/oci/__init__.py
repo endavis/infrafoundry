@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, ClassVar, override
 
 from infrafoundry.core.config.models import EnvironmentConfig
-from infrafoundry.core.exceptions import ConfigurationError
+from infrafoundry.core.exceptions import ConfigurationError, SchemaValidationError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
     CloudInitMixin,
@@ -13,6 +13,11 @@ from infrafoundry.core.provider_mixins import (
     TemplateRendererMixin,
     TerraformGeneratorMixin,
     collect_terraform_secret_vars,
+)
+from infrafoundry.core.ssh_host_keys import (
+    apply_host_key,
+    cloud_config_part,
+    oci_host_key_problems,
 )
 from infrafoundry.core.tailscale import process_tailscale_config
 from infrafoundry.core.validation import ValidationReport
@@ -24,6 +29,15 @@ from .compartments import (
     terraform_name,
 )
 from .validator import OCIValidator
+
+
+def _raise_host_key_problems(instance: ResourceConfig, parts: list[dict[str, Any]] | None) -> None:
+    """Raise ``SchemaValidationError`` when an instance's ``ssh_host_key`` cannot be delivered."""
+    problems = oci_host_key_problems(instance, parts)
+    if problems:
+        raise SchemaValidationError(
+            "OCI instance SSH host key problems:\n" + "\n".join(f"  - {p}" for p in problems)
+        )
 
 
 class OCIProvider(
@@ -340,8 +354,16 @@ class OCIProvider(
         # ``base64_encode = true`` matches that, so we pass True here.
         tailscale_module_config = process_tailscale_config(instance_copy, base64_encode=True)
         if tailscale_module_config is not None:
+            _raise_host_key_problems(instance_copy, tailscale_module_config["additional_parts"])
+            host_key = apply_host_key(instance_copy)
+            if host_key is not None:
+                tailscale_module_config["additional_parts"] = [
+                    *tailscale_module_config["additional_parts"],
+                    cloud_config_part(*host_key),
+                ]
             instance_copy.config["tailscale_module_config"] = tailscale_module_config
             return instance_copy
+        _raise_host_key_problems(instance_copy, None)
         merged = self._merge_cloud_init_snippets(instance_copy.config)
         if merged:
             instance_copy.config["cloud_init_merged"] = merged

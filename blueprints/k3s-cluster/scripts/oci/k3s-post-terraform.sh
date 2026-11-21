@@ -57,7 +57,7 @@ PLAYBOOK="${BLUEPRINT_DIR}/playbooks/k3s.yml"
 ROLES_PATH="${BLUEPRINT_ROLES_DIR}"
 if [ -z "${INFRAFOUNDRY_ON_JUMPHOST:-}" ] && [ -n "${INFRAFOUNDRY_CONFIG_DIR:-}" ] && [ -d "${INFRAFOUNDRY_CONFIG_DIR}/roles" ]; then ROLES_PATH="${INFRAFOUNDRY_CONFIG_DIR}/roles:${ROLES_PATH}"; fi
 INVENTORY_FILE="$(mktemp -t k3s-inventory-XXXXXX.yml)"
-trap 'rm -f "${INVENTORY_FILE}"' EXIT
+trap 'rm -f "${INVENTORY_FILE}"; k3s_ssh_cleanup' EXIT
 
 if [ ! -d "${BLUEPRINT_ROLES_DIR}" ]; then
     echo "ERROR: Roles directory not found: ${BLUEPRINT_ROLES_DIR}"
@@ -78,6 +78,8 @@ fi
 
 # --- Compute ansible_host values (FQDN on the tailnet if provided) ---
 source "${BLUEPRINT_DIR}/scripts/oci/k3s-lib.sh"
+# Strict host key checking against the pinned keys (#1583); fails closed when none.
+k3s_pin_host_keys || exit 1
 
 CONTROL_HOST=$(host_fqdn "${CONTROL_NAME}")
 
@@ -91,7 +93,7 @@ print("export K3S_DNS_NAMESERVERS=" + shlex.quote(j("k3s_dns_nameservers")))
 print("export K3S_DNS_SEARCH=" + shlex.quote(j("k3s_dns_search")))
 print("export K3S_VCN_DNS_LABEL=" + shlex.quote(str(v.get("vcn_dns_label") or "")))' <<< "${INFRAFOUNDRY_PACKAGE_VARS}")"
 DNS_VARS_FILE="$(mktemp -t k3s-dns-vars-XXXXXX.json)"
-trap 'rm -f "${INVENTORY_FILE}" "${DNS_VARS_FILE}"' EXIT
+trap 'rm -f "${INVENTORY_FILE}" "${DNS_VARS_FILE}"; k3s_ssh_cleanup' EXIT
 write_k3s_dns_extra_vars "${DNS_VARS_FILE}"
 
 # --- Validate the SSH public key before any connection (it feeds the bootstrap) ---
@@ -123,7 +125,7 @@ echo "Inventory: ${INVENTORY_FILE}"
 echo "Roles:     ${ROLES_PATH}"
 echo "Playbook:  ${PLAYBOOK}"
 
-SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
+SSH="${K3S_SSH}"
 
 # --- Phase 0: Preflight — catch obvious local SSH problems before the wait
 # loop. Loops that silently retry for minutes are confusing when ssh-agent has
@@ -153,14 +155,21 @@ echo ""
 echo "--- Phase 1: waiting for SSH reachability ---"
 MAX_WAIT=600
 WAIT_ERR=$(mktemp)
-trap 'rm -f "${INVENTORY_FILE}" "${DNS_VARS_FILE}" "${WAIT_ERR}"' EXIT
+trap 'rm -f "${INVENTORY_FILE}" "${DNS_VARS_FILE}" "${WAIT_ERR}"; k3s_ssh_cleanup' EXIT
 
 wait_for_ssh() {
     local user="$1"
     local host="$2"
     local elapsed=0
     while ! ${SSH} "${user}@${host}" "echo ready" >"${WAIT_ERR}" 2>&1; do
-        if grep -qiE 'Permission denied|Host key verification failed|Too many authentication failures' "${WAIT_ERR}"; then
+        if k3s_host_key_error "${WAIT_ERR}"; then
+            echo "ERROR: ${host} does not present the pinned SSH host key." >&2
+            echo "  The key recorded under ssh_host_keys.${host%%.*} in the package's secrets.yaml does not match." >&2
+            echo "  Re-pin it with 'foundry secrets host-keys --env <env> --regenerate ${host%%.*}' if the node was rebuilt." >&2
+            sed 's/^/    /' "${WAIT_ERR}" >&2
+            return 1
+        fi
+        if grep -qiE 'Permission denied|Too many authentication failures' "${WAIT_ERR}"; then
             echo "ERROR: ssh to ${user}@${host} failed with a non-retryable error:" >&2
             sed 's/^/    /' "${WAIT_ERR}" >&2
             return 1
@@ -210,7 +219,6 @@ wait_for_all "${K3S_LOGIN_USER}"
 echo ""
 echo "--- Phase 2: running ansible-playbook ---"
 export ANSIBLE_ROLES_PATH="${ROLES_PATH}"
-export ANSIBLE_HOST_KEY_CHECKING=False
 
 ansible-playbook -i "${INVENTORY_FILE}" -e "@${DNS_VARS_FILE}" "${PLAYBOOK}"
 

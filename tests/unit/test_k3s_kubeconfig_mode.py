@@ -65,10 +65,16 @@ done
 exit "${FAKE_ANSIBLE_RC:-0}"
 """
 
+_PINNED = (
+    "ctl,ctl.example.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest;"
+    "w0,w0.example.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest"
+)
+
 _HANDLER_ENV = {
     "K3S_CONTROL_NAME": "ctl",
     "K3S_WORKER_NAMES": "w0,w1",
     "K3S_TAILNET": "example.net",
+    "K3S_KNOWN_HOSTS": _PINNED,
 }
 
 
@@ -151,7 +157,12 @@ def test_handler_is_wired_after_bootstrap_and_continues_on_error() -> None:
     handler = handlers[names.index("k3s-kubeconfig-mode")]
     assert handler["script"] == "scripts/oci/k3s-kubeconfig-mode.sh"
     assert handler["continue_on_error"] is True
-    assert set(handler["env"]) == {"K3S_CONTROL_NAME", "K3S_WORKER_NAMES", "K3S_TAILNET"}
+    assert set(handler["env"]) == {
+        "K3S_CONTROL_NAME",
+        "K3S_WORKER_NAMES",
+        "K3S_TAILNET",
+        "K3S_KNOWN_HOSTS",
+    }
 
 
 def test_role_only_edits_the_mode_setting_and_file_mode() -> None:

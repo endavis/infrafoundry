@@ -148,9 +148,9 @@ variables:
       ip: "192.0.2.71"
 ```
 
-#### SSH host keys (Proxmox)
+#### SSH host keys (Proxmox and OCI)
 
-The post-apply scripts check each node against a pinned SSH host key
+The Proxmox and OCI post-apply scripts check each node against a pinned SSH host key
 (`StrictHostKeyChecking=yes`), not the first key the node presents. InfraFoundry generates
 one key pair per node, cloud-init installs it, and the public keys reach the scripts as
 `ssh_known_hosts`.
@@ -162,12 +162,16 @@ one key pair per node, cloud-init installs it, and the public keys reach the scr
 - Before rebuilding a node, destroy it, then run
   `foundry secrets host-keys --env <env> --regenerate <node-name>` to give the new node a
   fresh key.
-- `Host key verification failed` from a script means a node does not present the recorded
-  key, for example after a rebuild without `--regenerate`.
+- `Host key verification failed` from a script or from Ansible means a node does not present
+  the recorded key, for example after a rebuild without `--regenerate`.
+- On OCI the nodes are reached over Tailscale SSH, which presents the node's `/etc/ssh`
+  ed25519 key, so the same key pair is installed through an extra cloud-config part of the
+  Tailscale module. Existing nodes are pinned by scanning `<node>.<tailnet>`; run the command
+  from a host on the tailnet. Ansible runs with `ANSIBLE_HOST_KEY_CHECKING=True` against the
+  pinned file.
 
 See [Infrastructure Packages: SSH Host Keys](../../docs/configuration/infrastructure-packages.md#ssh-host-keys)
 and [ADR-0032](../../docs/decisions/0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md).
-The OCI variant is not covered (#1583).
 
 ### OCI
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import ipaddress
 import logging
 from dataclasses import replace
@@ -10,6 +11,7 @@ from typing import Any, cast
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import APIError, ConfigurationError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.ssh_host_keys import HOST_KEY_FIELD, apply_host_key, oci_host_key_problems
 from infrafoundry.core.tailscale import TailscaleSchemaError, process_tailscale_config
 from infrafoundry.core.types import OCIProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
@@ -273,7 +275,32 @@ class OCIValidator:
                     level=ValidationLevel.ERROR,
                 )
 
-        validate_terraform_secrets_references("oci", resources, self.env_config, self.report)
+        # Host keys (#1583): report what stops delivery, and add the private key reference
+        # (on a copy) before the terraform_secrets check so it is resolved too.
+        checked: list[ResourceConfig] = []
+        for resource in resources:
+            if resource.type == "instance" and (resource.config or {}).get(HOST_KEY_FIELD):
+                copied = copy.deepcopy(resource)
+                parts: list[dict[str, Any]] | None = None
+                if (copied.config or {}).get("tailscale") is not None:
+                    try:
+                        module = process_tailscale_config(copied, base64_encode=True)
+                        parts = module["additional_parts"] if module else None
+                    except TailscaleSchemaError:
+                        parts = None  # already reported above
+                for problem in oci_host_key_problems(copied, parts, require_entry=True):
+                    self.report.add_check(
+                        check_name=f"oci_ssh_host_key_{resource.name}",
+                        passed=False,
+                        message=problem,
+                        level=ValidationLevel.ERROR,
+                    )
+                apply_host_key(copied)
+                checked.append(copied)
+            else:
+                checked.append(resource)
+
+        validate_terraform_secrets_references("oci", checked, self.env_config, self.report)
         # Collect resource names by type
         vcn_names: set[str] = set()
         subnet_names: set[str] = set()

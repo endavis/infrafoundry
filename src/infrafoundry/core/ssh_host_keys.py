@@ -14,6 +14,8 @@ variables:
 
 cloud-init installs the private key at first boot and the blueprint scripts connect with
 ``StrictHostKeyChecking=yes`` against a ``known_hosts`` file built from the public keys.
+On OCI the key travels the same way, as a ``text/cloud-config`` part of the Tailscale module's
+``additional_parts`` (OCI instances with ``tailscale:`` only, #1583).
 A VM that is already deployed is *pinned*: only ``ed25519_public`` is recorded, so the VM,
 its cloud-init snippet and its Terraform resources do not change.
 
@@ -27,6 +29,8 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
+
+import yaml
 
 from infrafoundry.core.package_secret_refs import PACKAGE_REF_PREFIX
 from infrafoundry.core.provider import ResourceConfig
@@ -179,6 +183,23 @@ def cloud_config_fragment(tf_var: str, public: str) -> str:
     )
 
 
+def cloud_config_part(tf_var: str, public: str) -> dict[str, str]:
+    """Return a Tailscale module ``additional_parts`` entry that installs the host key.
+
+    Args:
+        tf_var: Terraform variable holding the private key.
+        public: The public key line.
+
+    Returns:
+        A ``text/cloud-config`` part; the private key is only a Terraform expression.
+    """
+    return {
+        "filename": "infrafoundry-ssh-host-key.cfg",
+        "content_type": "text/cloud-config",
+        "content": "#cloud-config\n" + cloud_config_fragment(tf_var, public),
+    }
+
+
 def known_hosts_value(resources: Iterable[ResourceConfig]) -> str:
     """Build the ``ssh_known_hosts`` package variable.
 
@@ -221,6 +242,7 @@ def host_key_problems(
     cloud_init_data: dict[str, Any] | None = None,
     *,
     require_entry: bool = True,
+    allow_tailscale: bool = False,
 ) -> list[str]:
     """Return what stops a resource's host key from being delivered.
 
@@ -230,6 +252,8 @@ def host_key_problems(
         require_entry: Report a missing ``ssh_host_keys.<name>`` entry. Plan-time validation
             sets it; Terraform generation does not, since a missing entry is already an
             ERROR by then and the scripts fail closed on an empty ``ssh_known_hosts``.
+        allow_tailscale: Accept a ``tailscale`` block. Only OCI instances deliver the key
+            through the Tailscale module's ``additional_parts`` (#1583).
 
     Returns:
         Messages naming the resource and the fix. Never a key. Empty when the resource has
@@ -252,10 +276,10 @@ def host_key_problems(
             f"letters, digits, '_' and '-' to name a host key"
         ]
     problems: list[str] = []
-    if (resource.config or {}).get("tailscale") is not None:
+    if not allow_tailscale and (resource.config or {}).get("tailscale") is not None:
         problems.append(
             f"{_describe(resource)} sets both 'tailscale' and '{HOST_KEY_FIELD}'; pinned host "
-            f"keys do not support Tailscale VMs yet (#1583)"
+            f"keys support 'tailscale' only on OCI instances, not on Proxmox VMs (#1583)"
         )
     if isinstance(cloud_init_data, dict) and "ssh_keys" in cloud_init_data:
         problems.append(
@@ -290,4 +314,57 @@ def host_key_problems(
             f"{_describe(resource)}: '{HOST_KEYS_VARIABLE}.{resource.name}.ed25519_private' "
             f"is not an OpenSSH private key"
         )
+    return problems
+
+
+def _cloud_config_parts_data(parts: Iterable[dict[str, Any]] | None) -> dict[str, Any] | None:
+    """Merge the cloud-config ``additional_parts`` so an ``ssh_keys`` clash is visible."""
+    merged: dict[str, Any] = {}
+    for part in parts or []:
+        content = str(part.get("content", ""))
+        if part.get("content_type") != "text/cloud-config" and not content.startswith(
+            "#cloud-config"
+        ):
+            continue
+        try:
+            loaded = yaml.safe_load(content)
+        except yaml.YAMLError:
+            continue
+        if isinstance(loaded, dict):
+            merged.update(loaded)
+    return merged or None
+
+
+def oci_host_key_problems(
+    resource: ResourceConfig,
+    parts: Iterable[dict[str, Any]] | None,
+    *,
+    require_entry: bool = False,
+) -> list[str]:
+    """Return what stops an OCI instance's host key from being delivered (#1583).
+
+    Args:
+        resource: An OCI ``instance`` resource.
+        parts: The instance's Tailscale ``additional_parts``, or None.
+        require_entry: Report a missing ``ssh_host_keys.<name>`` entry.
+
+    Returns:
+        Messages naming the resource and the fix. Empty when there is no ``ssh_host_key``.
+    """
+    if (resource.config or {}).get(HOST_KEY_FIELD) is None:
+        return []
+    problems: list[str] = []
+    if (resource.config or {}).get("tailscale") is None:
+        problems.append(
+            f"{_describe(resource)} sets '{HOST_KEY_FIELD}': ssh_host_key on OCI instances "
+            f"needs a 'tailscale' block, which carries the key in its cloud-init parts"
+        )
+    problems.extend(
+        host_key_problems(
+            resource,
+            _cloud_config_parts_data(parts),
+            require_entry=require_entry,
+            allow_tailscale=True,
+        )
+    )
     return problems

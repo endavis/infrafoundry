@@ -105,11 +105,17 @@ def _run_handler(
     return result, record
 
 
+_PINNED = (
+    "ctl,ctl.example.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest;"
+    "w0,w0.example.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest"
+)
+
 _HANDLER_ENV = {
     "K3S_CONTROL_NAME": "ctl",
     "K3S_WORKER_NAMES": "w0,w1",
     "K3S_TAILNET": "example.net",
     "K3S_SSH_PUBLIC_KEY": KEY,
+    "K3S_KNOWN_HOSTS": _PINNED,
 }
 
 
@@ -126,6 +132,7 @@ def _run_post(
         "INFRAFOUNDRY_VAR_cluster_name": "c",
         "INFRAFOUNDRY_VAR_ssh_public_key": key,
         "INFRAFOUNDRY_VAR_tailnet": "example.net",
+        "INFRAFOUNDRY_VAR_ssh_known_hosts": _PINNED,
         "INFRAFOUNDRY_VAR_kubeconfig_local_path": str(tmp_path / "kube.yaml"),
         "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"workers": [{"name": "w1"}]}),
     }
@@ -312,6 +319,7 @@ def test_handler_env_for_an_override_package(tmp_path: Path) -> None:
         "K3S_WORKER_NAMES": "w0",
         "K3S_TAILNET": "example.net",
         "K3S_SSH_PUBLIC_KEY": KEY,
+        "K3S_KNOWN_HOSTS": "",
     }
 
 

@@ -3,12 +3,63 @@
 #
 # Expects the caller to set TAILNET, CONTROL_NAME, CONTROL_HOST and the
 # WORKER_NAMES array before it calls write_k3s_inventory.
+#
+# The nodes' SSH host keys are pinned (#1583): InfraFoundry generated them, cloud-init
+# installed them (or `foundry secrets host-keys` recorded the key a deployed node
+# presents), and K3S_KNOWN_HOSTS (or the INFRAFOUNDRY_VAR_ssh_known_hosts package variable)
+# holds the public halves as ";"-separated "<name>,<address> ssh-ed25519 <key>" lines.
+# Call k3s_pin_host_keys before any connection: it writes them to a temporary file, sets
+# K3S_SSH (a strict ssh command) and makes ansible strict too. Call k3s_ssh_cleanup from
+# the EXIT trap to remove the file.
 
 # Login users. Every connection uses K3S_LOGIN_USER (ansible) once the
 # k3s-bootstrap role has created it; the bootstrap itself connects as
 # K3S_BOOTSTRAP_USER (ubuntu), the only user a fresh image has.
 K3S_LOGIN_USER="${K3S_LOGIN_USER:-ansible}"
 K3S_BOOTSTRAP_USER="${K3S_BOOTSTRAP_USER:-ubuntu}"
+
+K3S_KNOWN_HOSTS_FILE=""
+K3S_SSH=""
+K3S_SSH_OPTS=""
+
+# Remove the temporary known_hosts file.
+k3s_ssh_cleanup() {
+    if [ -n "${K3S_KNOWN_HOSTS_FILE}" ]; then
+        rm -f "${K3S_KNOWN_HOSTS_FILE}"
+        K3S_KNOWN_HOSTS_FILE=""
+    fi
+}
+
+# True when the ssh error file FILE shows the pinned host key did not match: retrying
+# cannot help.
+k3s_host_key_error() {
+    grep -Eq 'Host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED|No ED25519 host key is known' "$1"
+}
+
+# k3s_pin_host_keys: write the pinned host keys to a temporary file and make ssh and
+# ansible verify against it only. Returns 1, with a message, when no key is recorded or a
+# line is malformed.
+k3s_pin_host_keys() {
+    local value="${K3S_KNOWN_HOSTS:-${INFRAFOUNDRY_VAR_ssh_known_hosts:-}}"
+    if [ -z "${value}" ]; then
+        echo "ERROR: no pinned SSH host keys (K3S_KNOWN_HOSTS / ssh_known_hosts is empty)." >&2
+        echo "       Run 'foundry secrets host-keys --env <env>' and re-apply." >&2
+        return 1
+    fi
+    k3s_ssh_cleanup
+    K3S_KNOWN_HOSTS_FILE=$(mktemp)
+    printf '%s\n' "${value//;/$'\n'}" >"${K3S_KNOWN_HOSTS_FILE}"
+    if grep -Evq '^[A-Za-z0-9._:,-]+ ssh-ed25519 [A-Za-z0-9+/]+={0,3}$' "${K3S_KNOWN_HOSTS_FILE}"; then
+        echo "ERROR: the pinned SSH host keys hold a malformed line; run 'foundry secrets host-keys --env <env>'" >&2
+        k3s_ssh_cleanup
+        return 1
+    fi
+    local opts="-o StrictHostKeyChecking=yes -o UserKnownHostsFile=${K3S_KNOWN_HOSTS_FILE} -o GlobalKnownHostsFile=/dev/null"
+    K3S_SSH_OPTS="${opts}"
+    K3S_SSH="ssh ${opts} -o ConnectTimeout=10"
+    export ANSIBLE_HOST_KEY_CHECKING=True
+    export ANSIBLE_SSH_COMMON_ARGS="${opts}"
+}
 
 # host_fqdn NAME: the ansible_host for a node (FQDN on the tailnet if provided).
 host_fqdn() {
@@ -127,7 +178,7 @@ PY
 
 # run_k3s_bootstrap: run playbooks/k3s-bootstrap.yml as K3S_BOOTSTRAP_USER. Needs
 # BLUEPRINT_DIR, CONTROL_NAME, CONTROL_HOST, WORKER_NAMES and K3S_SSH_PUBLIC_KEY.
-# Uses only the blueprint's own roles. Returns ansible-playbook's exit code.
+# Uses only the blueprint's own roles. Call k3s_pin_host_keys first. Returns ansible-playbook's exit code.
 run_k3s_bootstrap() {
     local inv vars rc=0
     inv="$(mktemp -t k3s-bootstrap-inventory-XXXXXX.yml)"
@@ -137,7 +188,7 @@ run_k3s_bootstrap() {
         return 1
     fi
     K3S_INVENTORY_USER="${K3S_BOOTSTRAP_USER}" write_k3s_inventory "${inv}"
-    ANSIBLE_ROLES_PATH="${BLUEPRINT_DIR}/roles" ANSIBLE_HOST_KEY_CHECKING=False \
+    ANSIBLE_ROLES_PATH="${BLUEPRINT_DIR}/roles" \
         ansible-playbook -i "${inv}" -e "@${vars}" "${BLUEPRINT_DIR}/playbooks/k3s-bootstrap.yml" || rc=$?
     rm -f "${inv}" "${vars}"
     return "${rc}"
