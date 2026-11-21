@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795284937186,
+  "lastUpdate": 1795285562248,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5476,6 +5476,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006023656786034548",
             "extra": "mean: 89.4520294237336 usec\nrounds: 12201"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b2edd8332eb55cca3a3be5dd0a7147598b4a5e29",
+          "message": "docs: move contributor material out of the readme and make it an entry point to the docs (merges PR #1592, addresses #1582)\n\nREADME.md is now the user entry point:\n- what InfraFoundry is;\n- an accurate provider and secrets-backend list;\n- a quick start matching the two setup scripts;\n- the core concepts;\n- the everyday doctor, plan and apply command flow;\n- a map of the docs sections.\n\nThe contributor sections moved to docs/development/. Setup, environment\nvariables, manual setup and tooling go to the new contributor-setup.md.\nThe gh requirement goes to AI_SETUP.md. Tasks, tests, pre-commit and\nreleases were already covered by doit-tasks-reference.md, ci-cd-testing.md\nand release-and-automation.md, which are now linked instead of duplicated.\n\nThe README.md entry in pyproject-template-divergences.md records the new\ndivergence, so a template sync does not restore the dev sections.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T18:24:28Z",
+          "tree_id": "02a511e9d5ada7aa4c0d3a58d15ba15a8f7fc6e6",
+          "url": "https://github.com/endavis/infrafoundry/commit/b2edd8332eb55cca3a3be5dd0a7147598b4a5e29"
+        },
+        "date": 1795285561244,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 70.1637432419973,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00047807337396109546",
+            "extra": "mean: 14.252375283783872 msec\nrounds: 74"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13148.30070056654,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006665137274943427",
+            "extra": "mean: 76.05545558879038 usec\nrounds: 15334"
           }
         ]
       }
