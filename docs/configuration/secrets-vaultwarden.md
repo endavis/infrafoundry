@@ -78,7 +78,7 @@ Built-in names win over a custom field of the same name. A missing field, a cust
 - **Server check.** `server` must be `https://`. After `bw config server`, the backend reads `bw status` and fails if the server did not take.
 
 !!! note "Verified against bw"
-    Only part of the `bw` behaviour this backend uses was checked against an installed `bw` (the state directory, `bw status`, `bw config server`, the flag names). The rest, such as the item JSON shape and exact-name filtering, follows the Bitwarden documentation and is confirmed by a live test before release.
+    A live test with `bw` 2026.10.1 against a self-hosted Vaultwarden, scoped to one organization collection, resolved `username`, `password` and a custom field by exact item name, and reported a missing field and a missing item as errors. The `uri`, `notes` and `totp` fields and lookup by item ID follow the Bitwarden documentation and are covered by the unit tests only.
 
 ## Using vault values in `terraform_secrets` and host Tailscale auth
 
