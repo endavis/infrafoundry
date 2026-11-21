@@ -507,7 +507,15 @@ def _run_verify(
     return result, log, warnings
 
 
-_CONTROL_ENV = {"K3S_CONTROL_NAME": "example-k3s-control", "K3S_TAILNET": "example.ts.net"}
+_PINNED = (
+    "example-k3s-control,example-k3s-control.example.ts.net "
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest"
+)
+_CONTROL_ENV = {
+    "K3S_CONTROL_NAME": "example-k3s-control",
+    "K3S_TAILNET": "example.ts.net",
+    "K3S_KNOWN_HOSTS": _PINNED,
+}
 
 
 def test_verify_cluster_prefers_local_kubectl(tmp_path: Path) -> None:
@@ -671,6 +679,10 @@ def _run_script(
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest test@example.com"
         ),
         "INFRAFOUNDRY_VAR_kubeconfig_local_path": str(tmp_path / "kube.yaml"),
+        "INFRAFOUNDRY_VAR_ssh_known_hosts": (
+            "ctl,ctl.example.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest;"
+            "w1,w1.example.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest"
+        ),
         "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"workers": [{"name": "w1"}]}),
     }
     if blueprint_dir is not None:
@@ -822,6 +834,10 @@ def _run_script_with_failing_ssh(
         ),
         "INFRAFOUNDRY_VAR_tailnet": "example.net",
         "INFRAFOUNDRY_VAR_kubeconfig_local_path": str(tmp_path / "kube.yaml"),
+        "INFRAFOUNDRY_VAR_ssh_known_hosts": (
+            "ctl,ctl.example.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest;"
+            "w1,w1.example.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest"
+        ),
         "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"workers": [{"name": "w1"}]}),
     }
     result = subprocess.run(

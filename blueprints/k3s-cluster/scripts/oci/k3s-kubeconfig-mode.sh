@@ -8,7 +8,8 @@
 #
 # Workflow after_apply handlers get no package variables, so the blueprint
 # passes everything through its env: block:
-#   K3S_CONTROL_NAME, K3S_WORKER_NAMES (comma-separated), K3S_TAILNET
+#   K3S_CONTROL_NAME, K3S_WORKER_NAMES (comma-separated), K3S_TAILNET,
+#   K3S_KNOWN_HOSTS (the pinned SSH host keys, ";"-separated)
 #
 # The handler has continue_on_error, so a failure is appended to
 # INFRAFOUNDRY_WARNINGS_FILE and the step is retried on the next apply.
@@ -42,7 +43,7 @@ PLAYBOOK="${BLUEPRINT_DIR}/playbooks/k3s-kubeconfig-mode.yml"
 ROLES_PATH="${BLUEPRINT_DIR}/roles"
 
 INVENTORY_FILE="$(mktemp -t k3s-kubeconfig-mode-inventory-XXXXXX.yml)"
-trap 'rm -f "${INVENTORY_FILE}"' EXIT
+trap 'rm -f "${INVENTORY_FILE}"; k3s_ssh_cleanup' EXIT
 
 warn() {
     if [ -n "${INFRAFOUNDRY_WARNINGS_FILE:-}" ]; then
@@ -50,13 +51,14 @@ warn() {
     fi
 }
 
+k3s_pin_host_keys || { warn "no pinned SSH host keys; run 'foundry secrets host-keys --env <env>'"; exit 1; }
+
 write_k3s_inventory "${INVENTORY_FILE}"
 
 echo "=== k3s node kubeconfig mode ==="
 echo "Control: ${CONTROL_NAME} (${CONTROL_HOST})"
 
 export ANSIBLE_ROLES_PATH="${ROLES_PATH}"
-export ANSIBLE_HOST_KEY_CHECKING=False
 
 rc=0
 ansible-playbook -i "${INVENTORY_FILE}" "${PLAYBOOK}" || rc=$?

@@ -15,6 +15,8 @@
 #   K3S_CONTROL_NAME, K3S_TAILNET - Control node name and tailnet. Used only
 #                when kubectl is not on PATH: the checks then run on the control
 #                node over ssh (ansible@<host>) as `sudo k3s kubectl ...`.
+#   K3S_KNOWN_HOSTS - The pinned SSH host keys (";"-separated); the ssh fallback
+#                needs them and is skipped with a warning without.
 #   INFRAFOUNDRY_WARNINGS_FILE - Receives a warning when verification is skipped
 
 set -euo pipefail
@@ -58,9 +60,15 @@ else
         warn "cluster verification skipped: kubectl not found and ssh fallback unavailable"
         exit 0
     fi
+    trap 'k3s_ssh_cleanup' EXIT
+    if ! k3s_pin_host_keys; then
+        echo "Verification skipped: no pinned SSH host keys for the ssh fallback"
+        warn "cluster verification skipped: no pinned SSH host keys"
+        exit 0
+    fi
     REMOTE_HOST="${K3S_LOGIN_USER}@$(host_fqdn "${CONTROL_NAME}")"
     echo "kubectl not found locally; running checks on ${REMOTE_HOST} over ssh"
-    if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "${REMOTE_HOST}" true; then
+    if ! ssh ${K3S_SSH_OPTS} -o BatchMode=yes -o ConnectTimeout=10 "${REMOTE_HOST}" true; then
         echo "Verification skipped: cannot ssh to ${REMOTE_HOST}"
         warn "cluster verification skipped: ssh to the control node failed"
         exit 0
@@ -71,7 +79,7 @@ fi
 # The remote command is one argument built only from this script's fixed args.
 kc() {
     if [ -n "${REMOTE_HOST}" ]; then
-        ssh -o BatchMode=yes -o ConnectTimeout=10 "${REMOTE_HOST}" "sudo k3s kubectl $*"
+        ssh ${K3S_SSH_OPTS} -o BatchMode=yes -o ConnectTimeout=10 "${REMOTE_HOST}" "sudo k3s kubectl $*"
     else
         kubectl "$@"
     fi

@@ -342,13 +342,16 @@ def secrets_rotate(
 def _host_key_candidates(
     resources: list[ResourceConfig], packages: tuple[str, ...]
 ) -> list[ResourceConfig]:
-    """Return the VMs that set ``ssh_host_key``, limited to the named packages."""
+    """Return the VMs and OCI instances that set ``ssh_host_key``, limited to the named packages."""
     from infrafoundry.core.ssh_host_keys import HOST_KEY_FIELD
 
     wanted = set(packages)
     found: list[ResourceConfig] = []
     for resource in resources:
-        if resource.type != "vm" or (resource.config or {}).get(HOST_KEY_FIELD) is None:
+        if (
+            resource.type not in ("vm", "instance")
+            or (resource.config or {}).get(HOST_KEY_FIELD) is None
+        ):
             continue
         if wanted and not ({resource.package_path, resource.package_name} & wanted):
             continue
@@ -380,9 +383,9 @@ def secrets_host_keys(
     regenerate: tuple[str, ...],
     dry_run: bool,
 ) -> None:
-    """Pin SSH host keys for the VMs that blueprints build.
+    """Pin SSH host keys for the VMs and OCI instances that blueprints build.
 
-    For each VM that sets ``ssh_host_key``, records a host key in its package's SOPS
+    For each VM or instance that sets ``ssh_host_key``, records a host key in its package's SOPS
     ``secrets.yaml`` under ``variables.ssh_host_keys.<name>``. A VM that is not deployed
     gets a generated key pair, which cloud-init installs at first boot. A VM that is
     already deployed is pinned: the key it presents now is recorded and the VM is not
@@ -408,10 +411,10 @@ def secrets_host_keys(
     unknown = sorted(set(regenerate) - {r.name for r in candidates})
     if unknown:
         raise click.ClickException(
-            f"--regenerate names no VM that sets ssh_host_key: {', '.join(unknown)}"
+            f"--regenerate names no VM or instance that sets ssh_host_key: {', '.join(unknown)}"
         )
     if not candidates:
-        console.info("No VM sets ssh_host_key; nothing to do.")
+        console.info("No VM or instance sets ssh_host_key; nothing to do.")
         return
 
     plan = host_key_store.plan_actions(

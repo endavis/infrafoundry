@@ -237,6 +237,7 @@ providers:
             K3S_CONTROL_NAME: "{{ control_name }}"
             K3S_WORKER_NAMES: "{{ workers | map(attribute='name') | join(',') }}"
             K3S_TAILNET: "{{ tailnet }}"
+            K3S_KNOWN_HOSTS: "{{ ssh_known_hosts }}"
             K3S_SSH_PUBLIC_KEY: "{{ ssh_public_key }}"
         - type: script
           name: k3s-kubeconfig-mode
@@ -248,6 +249,7 @@ providers:
             K3S_CONTROL_NAME: "{{ control_name }}"
             K3S_WORKER_NAMES: "{{ workers | map(attribute='name') | join(',') }}"
             K3S_TAILNET: "{{ tailnet }}"
+            K3S_KNOWN_HOSTS: "{{ ssh_known_hosts }}"
         - type: script
           name: k3s-dns
           script: scripts/oci/k3s-dns.sh
@@ -258,6 +260,7 @@ providers:
             K3S_CONTROL_NAME: "{{ control_name }}"
             K3S_WORKER_NAMES: "{{ workers | map(attribute='name') | join(',') }}"
             K3S_TAILNET: "{{ tailnet }}"
+            K3S_KNOWN_HOSTS: "{{ ssh_known_hosts }}"
             K3S_DNS_NAMESERVERS: "{{ k3s_dns_nameservers | join(',') }}"
             K3S_DNS_SEARCH: "{{ k3s_dns_search | join(',') }}"
             K3S_VCN_DNS_LABEL: "{{ vcn_dns_label }}"
@@ -271,3 +274,4 @@ providers:
             KUBECONFIG: "{{ kubeconfig_local_path }}"
             K3S_CONTROL_NAME: "{{ control_name }}"
             K3S_TAILNET: "{{ tailnet }}"
+            K3S_KNOWN_HOSTS: "{{ ssh_known_hosts }}"
