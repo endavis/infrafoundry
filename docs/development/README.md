@@ -13,6 +13,7 @@ This section provides comprehensive guides for developing and extending InfraFou
 
 ## Getting Started with Development
 
+- **[Contributor Setup](contributor-setup.md)** - Prerequisites, direnv and the environment for working on InfraFoundry itself
 - **[Coding Standards](coding-standards.md)** - Style guides, conventions, and best practices for contributing code
 - **[CI/CD Testing](ci-cd-testing.md)** - Continuous integration setup, testing strategies, and workflows
 - **[Release & Automation](release-and-automation.md)** - Automated versioning, release management, and governance validation

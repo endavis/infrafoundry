@@ -79,6 +79,7 @@ This index provides a structured overview of the available documentation.
 - **[Manager Patterns](development/manager-patterns.md)**: implementation patterns for Manager classes.
 - **[Event System](development/event-system.md)**: Documentation of the internal event system.
 - **[Credential Loader](development/credential-loader-system.md)**: How the credential loading system works.
+- **[Contributor Setup](development/contributor-setup.md)**: Prerequisites, direnv and the environment for working on InfraFoundry itself.
 - **[Coding Standards](development/coding-standards.md)**: Style guides and standards for contributing code.
 - **[CI/CD Testing](development/ci-cd-testing.md)**: Strategies and setups for CI/CD pipelines.
 - **[Release Automation & Security](development/release-and-automation.md)**: Automated versioning, release management, governance validation, and security tooling.

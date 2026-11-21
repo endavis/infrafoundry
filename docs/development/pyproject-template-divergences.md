@@ -165,7 +165,7 @@ customization a reviewer must verify survived the merge.
 | `.envrc` | Preserves `INFRAFOUNDRY_*` environment variables and direnv layout specific to the framework. Like upstream since #1208, it no longer sets `UV_CACHE_DIR`: uv uses its shared default cache. |
 | `.pre-commit-config.yaml` | Preserves InfraFoundry-specific hooks (blueprint linter, commit-msg format) alongside upstream quality hooks, and the `check-yaml` `exclude` that skips Jinja2 blueprint resource templates (every `blueprints/**/*.yaml` except `blueprint.yaml`) (#1096). |
 | `CHANGELOG.md` | InfraFoundry owns this — never replaced, only appended. |
-| `README.md` | Preserves InfraFoundry description, quickstart, and feature list. |
+| `README.md` | The user entry point: what InfraFoundry is, providers and features, quick start, core concepts, the everyday command flow and a map of `docs/`. The template's contributor sections (development setup, releases, tasks, tests, code quality, AI agents) live in `docs/development/` instead (#1582), so a sync must not restore them. |
 | `dodo.py` | Preserves InfraFoundry-specific task imports. |
 | `mkdocs.yml` | Preserves the InfraFoundry nav tree (Providers, Runners, Configuration, etc.). |
 | `pyproject.toml` | Preserves project name, dependencies, CLI entry points, and mypy/ruff overrides specific to InfraFoundry: `disallow_any_generics = true` globally with an override that turns it off for template-owned tooling (as upstream has it), the `agent_roster` import override, the InfraFoundry vulture `ignore_names` entries, and the `[tool.mutmut]` `also_copy` (`blueprints/`, `example-config/`) and `do_not_mutate` (`src/infrafoundry/core/protocols.py`) keys, checked by `tests/test_mutmut_project_paths.py` (#1108). |

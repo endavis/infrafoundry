@@ -239,6 +239,22 @@ agy
 
 **Antigravity parity status:** Antigravity does not use repo-defined slash commands; its workflow skills (`antigravity-review`, `antigravity-adversarial-review`, and the shared `implement-issue` skill) live in `.agents/skills/` and activate by description match. The shared dangerous-command hook at `tools/hooks/ai/block-dangerous-commands.py` applies to Antigravity via `.agents/hooks.json` (a `PreToolUse` matcher on `run_command`, `write_file`, `edit_file` and `write_to_file`); unlike the other agents it blocks by printing `{"decision":"deny"}` on stdout, which holds even under `--dangerously-skip-permissions`. `agy` only loads workspace customizations for an active/trusted workspace, so headless `agy -p` runs need `--add-dir <repo-root>`. Cross-agent delegation (both directions, reusing Codex's host-agnostic `delegate-*` skills) and the `/multi-*` orchestrators fully support `agy`. For the broader workflow picture, see [Slash Commands and Workflows](ai/slash-commands.md).
 
+### GitHub CLI (`gh`) requirement
+
+[GitHub CLI (`gh`)](https://cli.github.com/) is **required** for AI-assisted workflows. Many `doit`
+tasks use it for issue creation, PR management and repository operations. Install and authenticate
+it before using an AI agent:
+
+```bash
+# Install (macOS)
+brew install gh
+
+# Install (Linux): see https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+
+# Authenticate
+gh auth login
+```
+
 ### 5. Other AI Tools
 
 The `AGENTS.md` file serves as general-purpose documentation for any AI coding assistant:
