@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795281373917,
+  "lastUpdate": 1795284018596,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5400,6 +5400,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004180101442200874",
             "extra": "mean: 69.25244057510392 usec\nrounds: 16138"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "11968ae9c60a7f79b0a813ea7ec879923d009b93",
+          "message": "feat: check ssh host keys for package connections to jumphosts, esxi and proxmox hosts (merges PR #1589, addresses #1588)\n\n* feat: check ssh host keys for package connections to jumphosts, esxi and proxmox hosts\n\nEvery SSH and Ansible connection the package makes now verifies the host\nkey.\n\n- Long-lived hosts (jumphosts, ESXi hosts, Proxmox nodes) are checked with\n  StrictHostKeyChecking=yes against the operator's normal known_hosts.\n  The option is defined once in core/ssh_options.py and reaches templates\n  through a Jinja global. UserKnownHostsFile=/dev/null is gone.\n- An unknown or changed key fails with a hint that names the host and how\n  to record its key: connect once with ssh, or ssh-keyscan after checking\n  the fingerprint. The hint is added to the script handler's mkdir and\n  rsync errors, the preflight's jumphost failure, the ESXi exporter and\n  the Terraform error summary.\n- The infra doctor preflight probes a deployed blueprint VM only against\n  the package's pinned keys, staged in a mode-0600 temporary file with\n  HostKeyAlias. Without pinned keys, the probe is skipped with a hint to\n  run `foundry secrets host-keys`.\n- The generated ansible.cfg for the host and oci providers sets\n  host_key_checking = True.\n- ADR-0033 records the trust model, and a new guide covers migration.\n\nBREAKING CHANGE: a jumphost, ESXi host, Proxmox node or Ansible target\nwhose host key is not in the operator's known_hosts now fails until its\nkey is recorded. See docs/guides/ssh-host-key-checking.md.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* test: check hosts in host-key hint tests with a word-bounded regex\n\nCodeQL read the hostname substring asserts as incomplete URL sanitization. The tests only check that the message names the host, so use a word-bounded regex with the same meaning.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T17:59:04Z",
+          "tree_id": "236833c99e33018b3529443d7b90247dbf8d4556",
+          "url": "https://github.com/endavis/infrafoundry/commit/11968ae9c60a7f79b0a813ea7ec879923d009b93"
+        },
+        "date": 1795284017635,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 103.06500695450146,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00008358220908215124",
+            "extra": "mean: 9.70261420000151 msec\nrounds: 105"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16486.51066754692,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000471928753775915",
+            "extra": "mean: 60.65564874006133 usec\nrounds: 17739"
           }
         ]
       }
