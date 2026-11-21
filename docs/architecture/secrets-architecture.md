@@ -165,7 +165,7 @@ rendering them into generated files, through `package.<key>` references; see
 
 ### SSH Host Keys
 
-A Proxmox VM that sets `ssh_host_key` gets a pre-generated ed25519 host key (see
+A Proxmox VM, or an OCI instance with `tailscale:`, that sets `ssh_host_key` gets a pre-generated ed25519 host key (see
 [SSH Host Keys](../configuration/infrastructure-packages.md#ssh-host-keys)). The private key
 travels through these places:
 
@@ -175,6 +175,8 @@ travels through these places:
 | `TF_VAR_*` at apply | A sensitive Terraform variable, set through the secrets bridge ([ADR-0031](../decisions/0031-secret-references-resolve-from-the-owning-packages-secretsyaml-through-a-package-prefix.md)). |
 | Terraform state | Stored in `proxmox_virtual_environment_file.source_raw.data`, with the cloud-init user data. With the local backend that is under `generated/{env}/terraform/proxmox/`. Use an encrypted remote backend and restrict access to the state. |
 | Proxmox snippet storage | The cloud-init user-data file on the node's snippet datastore, readable by those who can read that datastore. |
+| OCI Terraform state | The Tailscale module's data source and `oci_core_instance.metadata.user_data` hold the cloud-init content, key included. Use an encrypted remote backend and restrict access to the state. |
+| OCI instance metadata | `user_data` is readable by anyone with instance read rights on the OCI API, and from the node by any process that can reach the metadata service (including k3s pods). The Tailscale OAuth secret travels the same way. |
 | The VM | `/etc/ssh` (mode 0600) and cloud-init's root-only copy of the user data. |
 
 It never reaches generated `.tf` files (they hold only a variable reference), tfvars, script

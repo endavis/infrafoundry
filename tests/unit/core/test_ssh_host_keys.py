@@ -200,6 +200,10 @@ class TestProblems:
         problems = host_key_problems(_vm(secrets=_secrets(**FULL), tailscale={"auth": {}}))
         assert any("tailscale" in p and "#1583" in p for p in problems)
 
+    def test_tailscale_is_allowed_for_oci(self) -> None:
+        resource = _vm(secrets=_secrets(**FULL), tailscale={"auth": {}})
+        assert host_key_problems(resource, allow_tailscale=True) == []
+
     def test_not_from_a_package(self) -> None:
         (problem,) = host_key_problems(_vm(secrets=_secrets(**FULL), package=False))
         assert "package" in problem
@@ -219,3 +223,15 @@ class TestProblems:
             text = "\n".join(host_key_problems(resource, {"ssh_keys": {}}))
             assert "SENTINEL" not in text
             assert "AAAA" not in text
+
+
+class TestCloudConfigPart:
+    def test_part_holds_the_expression_and_no_private_key(self) -> None:
+        from infrafoundry.core.ssh_host_keys import cloud_config_part
+
+        part = cloud_config_part("tf_var_x", "ssh-ed25519 AAAA")
+        assert part["filename"] == "infrafoundry-ssh-host-key.cfg"
+        assert part["content_type"] == "text/cloud-config"
+        assert part["content"].startswith("#cloud-config\nssh_keys:\n")
+        assert "${jsonencode(var.tf_var_x)}" in part["content"]
+        assert "PRIVATE KEY" not in part["content"]

@@ -325,9 +325,12 @@ to it has nothing to check the VM against. InfraFoundry instead generates an ed2
 pair per VM ahead of time, installs it through cloud-init, and the blueprint scripts verify the
 VM against the pinned public key (`StrictHostKeyChecking=yes`).
 
-- **Opt-in:** a Proxmox `vm` resource sets `ssh_host_key: {address: "<address the scripts use>"}`.
-  The `aiqum`, `console-connector` and `k3s-cluster` (Proxmox) blueprints do. A VM with a
-  `tailscale:` block, or cloud-init snippets that already set `ssh_keys`, cannot use it.
+- **Opt-in:** a Proxmox `vm` resource or an OCI `instance` resource with a `tailscale:` block
+  sets `ssh_host_key: {address: "<address the scripts use>"}`. The `aiqum`,
+  `console-connector` and `k3s-cluster` (Proxmox and OCI) blueprints do. A Proxmox VM with a
+  `tailscale:` block, an OCI instance without one, or cloud-init snippets or parts that
+  already set `ssh_keys`, cannot use it. On OCI the address is `<node>.<tailnet>` and the key
+  travels in an extra `text/cloud-config` part of the Tailscale module.
 - **Reserved secret:** `variables.ssh_host_keys.<resource-name>.{ed25519_private, ed25519_public}`
   in the package's `secrets.yaml`. The loader keeps `ssh_host_keys` out of the merged
   variables, so the private key never reaches script env, `INFRAFOUNDRY_PACKAGE_VARS` or

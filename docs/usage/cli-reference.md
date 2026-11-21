@@ -874,14 +874,15 @@ foundry secrets rotate --env dev --generate-new-key --dry-run
 
 ### `secrets host-keys`
 
-Record the SSH host keys that blueprint scripts pin for the VMs they build (see
-[SSH Host Keys](../configuration/infrastructure-packages.md#ssh-host-keys)). For each VM that
-sets `ssh_host_key`, it writes `variables.ssh_host_keys.<name>` into the package's SOPS
+Record the SSH host keys that blueprint scripts pin for the VMs and OCI instances they build
+(see [SSH Host Keys](../configuration/infrastructure-packages.md#ssh-host-keys)). For each VM or
+instance that sets `ssh_host_key`, it writes `variables.ssh_host_keys.<name>` into the package's SOPS
 `secrets.yaml`:
 
 - a VM that is not deployed gets a generated key pair, which cloud-init installs at first boot;
 - a deployed VM is pinned: the key it presents now is recorded (scanned from the package's
-  jumphost when one is set) and the VM is not changed;
+  jumphost when one is set, otherwise from the local host; for OCI the tailnet name
+  `<node>.<tailnet>`) and the VM is not changed;
 - a VM with a recorded key is skipped, and a VM that is being created, deleted or in error is
   refused.
 
@@ -893,6 +894,7 @@ error. Run it before the first apply and once after upgrading a package that now
 foundry secrets host-keys --env dev
 foundry secrets host-keys --env dev --dry-run
 foundry secrets host-keys --env dev --package proxmox/aiqum
+foundry secrets host-keys --env dev --package oci/k3s-cluster
 foundry secrets host-keys --env dev --regenerate aiqum-01
 ```
 

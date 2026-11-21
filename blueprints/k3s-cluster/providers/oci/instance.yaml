@@ -37,6 +37,9 @@ instance:
 {% for key, value in extra_freeform_tags.items() %}
       {{ key }}: "{{ value }}"
 {% endfor %}
+    # Pinned SSH host key (#1583); run `foundry secrets host-keys --env <env>` first.
+    ssh_host_key:
+      address: "{{ control_name }}{% if tailnet %}.{{ tailnet }}{% endif %}"
     tailscale:
       hostname: "{{ control_name }}"
       enable_ssh: true
@@ -69,6 +72,8 @@ instance:
 {% for key, value in extra_freeform_tags.items() %}
       {{ key }}: "{{ value }}"
 {% endfor %}
+    ssh_host_key:
+      address: "{{ worker.name }}{% if tailnet %}.{{ tailnet }}{% endif %}"
     tailscale:
       hostname: "{{ worker.name }}"
       enable_ssh: true

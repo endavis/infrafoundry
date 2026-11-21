@@ -171,14 +171,16 @@ def _hk_vm(name: str, secrets: dict[str, Any] | None = None) -> Any:
     )
 
 
-def _hk_orchestrator(tmp_path: Path, resources: list[Any], deployed: set[str]) -> Mock:
+def _hk_orchestrator(
+    tmp_path: Path, resources: list[Any], deployed: set[str], provider: str = "proxmox"
+) -> Mock:
     from types import SimpleNamespace
 
     from infrafoundry.core.state.models import ResourceState
 
     records = [
         SimpleNamespace(
-            provider="proxmox",
+            provider=provider,
             name=name,
             state=ResourceState.ACTIVE,
             created_at=1,
@@ -239,6 +241,48 @@ def test_host_keys_pins_a_deployed_vm_from_the_jumphost(
     mocks["scan"].assert_called_once_with("192.0.2.10", "ansible@jump.example")
     assert mocks["write"].call_args.args[2] == {"ed25519_public": _HK_PUBLIC}
     mocks["gen"].assert_not_called()
+
+
+def _hk_instance(name: str) -> Any:
+    from infrafoundry.core.provider import ResourceConfig
+
+    return ResourceConfig(
+        name=name,
+        type="instance",
+        provider="oci",
+        config={"ssh_host_key": {"address": f"{name}.example.net"}},
+        package_name="demo",
+        package_path="oci/demo",
+        package_secrets={},
+    )
+
+
+def test_host_keys_generates_for_an_undeployed_oci_instance(
+    cli_runner: CliRunner, tmp_path: Path
+) -> None:
+    orchestrator = _hk_orchestrator(tmp_path, [_hk_instance("node-01")], deployed=set())
+
+    result, mocks = _invoke_host_keys(cli_runner, orchestrator)
+
+    assert result.exit_code == 0, result.output
+    assert "generated SHA256:abc" in result.output
+    assert mocks["write"].call_args.args[1] == "node-01"
+    mocks["scan"].assert_not_called()
+
+
+def test_host_keys_pins_a_deployed_oci_instance_locally(
+    cli_runner: CliRunner, tmp_path: Path
+) -> None:
+    orchestrator = _hk_orchestrator(
+        tmp_path, [_hk_instance("node-01")], deployed={"node-01"}, provider="oci"
+    )
+
+    result, mocks = _invoke_host_keys(cli_runner, orchestrator)
+
+    assert result.exit_code == 0, result.output
+    assert "pinned    SHA256:abc" in result.output
+    mocks["scan"].assert_called_once_with("node-01.example.net", None)
+    assert mocks["write"].call_args.args[2] == {"ed25519_public": _HK_PUBLIC}
 
 
 def test_host_keys_skips_recorded_vms(cli_runner: CliRunner, tmp_path: Path) -> None:

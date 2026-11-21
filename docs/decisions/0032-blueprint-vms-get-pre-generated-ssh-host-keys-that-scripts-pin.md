@@ -26,6 +26,7 @@ InfraFoundry generates one ed25519 host key pair per blueprint VM ahead of time 
 - **Verification:** the scripts write `ssh_known_hosts` to a private temporary file and connect with `StrictHostKeyChecking=yes`, `UserKnownHostsFile=<file>` and `GlobalKnownHostsFile=/dev/null`. The hop to a jumphost is strict against the operator's own `known_hosts`; the file is staged on the jumphost for the inner hop and removed on exit. A key mismatch stops the script at once and names the VM.
 - **Generation:** `foundry secrets host-keys --env <env>` (not plan time, which stays read-only and offline, ADR-0023) generates keys with `ssh-keygen` in a private temporary directory and writes them with `sops set --value-stdin`, so no key is on a command line or in a plaintext file.
 - **Existing VMs:** the command reads the state database. A deployed VM is pinned: the key it presents now is recorded (`ssh-keyscan`, from the package's jumphost when one is set) and only `ed25519_public` is stored, so no cloud-init data, snippet file or VM changes. An undeployed VM gets a generated pair. A VM that is being created, deleted or in error is refused. `--regenerate <name>` replaces a key only for a VM that is not deployed. Pinning a deployed VM is a one-time recording; it trusts the key the VM presents at that moment.
+- **OCI instances (#1583):** the opt-in also covers OCI `instance` resources with a `tailscale:` block (the k3s-cluster OCI variant); `ssh_host_key` on an instance without `tailscale:` is a validation error. Delivery is an extra `text/cloud-config` part in the Tailscale module's `additional_parts`, added only when a private key exists, so a pinned instance keeps its `user_data` and is not replaced. Existing nodes are pinned by scanning `<node>.<tailnet>` from where the scripts run (the jumphost when the package sets one, otherwise locally). Ansible runs with `ANSIBLE_HOST_KEY_CHECKING=True` and `ANSIBLE_SSH_COMMON_ARGS` pointing at the pinned file; the OCI scripts connect directly over the tailnet, so no file is staged anywhere.
 - **Breaking change:** a package that uses these blueprints fails `infra plan` until `foundry secrets host-keys` has been run. The error names the command.
 
 ## Rationale
@@ -33,11 +34,19 @@ Pre-generated keys give the scripts a value to check from the first connection, 
 
 Exposure: the private key reaches Terraform state (`proxmox_virtual_environment_file` `source_raw.data`, under `generated/<env>/terraform/proxmox/` with the local backend) and the Proxmox snippet storage, as any cloud-init content does. It never reaches generated `.tf` files, tfvars, inventories, logs or outputs, and the plan shows `(sensitive value)`. Use an encrypted remote backend.
 
-Out of scope: k3s-cluster on OCI over Tailscale SSH (#1583), and the other SSH call sites in the framework (handler and preflight jumphost connections, ESXi, the Proxmox node snippet upload).
+Live-check findings for OCI (#1583):
+
+- Port 22 on a tailnet address is answered by Tailscale SSH, while OpenSSH still listens on all addresses.
+- The ed25519 key Tailscale SSH presents is the node's `/etc/ssh/ssh_host_ed25519_key.pub`. tailscaled keeps no host keys of its own, so cloud-init `ssh_keys` is enough and no `write_files` is needed.
+- `ssh-keyscan -t ed25519 <node>.<tailnet>` returns that key.
+
+OCI exposure: the private key reaches Terraform state (the Tailscale module's data source and `oci_core_instance.metadata.user_data`) and OCI instance metadata, which anyone with instance read rights on the OCI API can read and which any process on the node that can reach the metadata service (including k3s pods) can read. The Tailscale OAuth secret already travels the same way, so this adds no new channel.
+
+Out of scope: OCI instances without `tailscale:`, and the other SSH call sites in the framework (handler and preflight jumphost connections, ESXi, the Proxmox node snippet upload).
 
 ## Related Issues
 - Issue #1581: pin pre-generated ssh host keys for VMs built by blueprints
-- Issue #1583: the same for k3s-cluster on OCI over Tailscale SSH
+- Issue #1583: the same for k3s-cluster on OCI over Tailscale SSH (OCI instances with `tailscale:`)
 
 ## Related Documentation
 - [Infrastructure Packages: SSH Host Keys](../configuration/infrastructure-packages.md#ssh-host-keys)

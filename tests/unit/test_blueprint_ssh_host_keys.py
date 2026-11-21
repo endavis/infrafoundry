@@ -68,6 +68,19 @@ class TestRenderedResources:
         assert len(expected) > 1
         assert addresses == expected
 
+    def test_oci_k3s_control_and_every_worker_opt_in(self, loader: PackageLoader) -> None:
+        resources, _e, variables = loader.load_package(
+            EXAMPLE_ENVS / "oci-k3s" / "k3s-cluster", provider="oci", env_name="oci-k3s"
+        )
+        addresses = {
+            r.name: r.config["ssh_host_key"]["address"] for r in resources if r.type == "instance"
+        }
+        tailnet = variables["tailnet"]
+        names = [variables["control_name"], *(w["name"] for w in variables["workers"])]
+        assert len(names) > 1
+        assert addresses == {n: f"{n}.{tailnet}" for n in names}
+        assert variables["ssh_known_hosts"] == ""
+
     def test_known_hosts_is_empty_until_keys_are_recorded(self, loader: PackageLoader) -> None:
         _r, _e, variables = loader.load_package(
             EXAMPLE_ENVS / "dev" / "proxmox" / "aiqum", provider="proxmox", env_name="dev"
@@ -75,7 +88,13 @@ class TestRenderedResources:
         assert variables["ssh_known_hosts"] == ""
 
 
-ALL_SCRIPTS = [AIQUM_SCRIPT, CC_SCRIPT, *sorted(K3S_DIR.glob("*.sh"))]
+OCI_DIR = BLUEPRINTS / "k3s-cluster" / "scripts" / "oci"
+ALL_SCRIPTS = [
+    AIQUM_SCRIPT,
+    CC_SCRIPT,
+    *sorted(K3S_DIR.glob("*.sh")),
+    *sorted(OCI_DIR.glob("*.sh")),
+]
 
 
 @pytest.mark.parametrize("script", ALL_SCRIPTS, ids=lambda p: p.name)
@@ -83,6 +102,7 @@ def test_scripts_do_not_disable_host_key_checking(script: Path) -> None:
     text = script.read_text(encoding="utf-8")
     assert "StrictHostKeyChecking=no" not in text
     assert "UserKnownHostsFile=/dev/null" not in text
+    assert "ANSIBLE_HOST_KEY_CHECKING=False" not in text
 
 
 _SSH_STUB = """#!/bin/sh
@@ -307,3 +327,155 @@ class TestK3sScripts:
         assert result.returncode == 1
         assert "foundry secrets host-keys" in result.stderr
         assert _calls(record) == []
+
+
+_OCI_ANSIBLE = """#!/bin/sh
+n=$(cat "$RECORD/ansible_count" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" > "$RECORD/ansible_count"
+echo "$ANSIBLE_HOST_KEY_CHECKING" > "$RECORD/hkc$n"
+echo "$ANSIBLE_SSH_COMMON_ARGS" > "$RECORD/args$n"
+"""
+_OCI_KNOWN = f"ctl,ctl.example.net {PUBLIC_A};w1,w1.example.net {PUBLIC_B}"
+
+
+def _run_oci(
+    script: Path, tmp_path: Path, env_extra: dict[str, str], *, ssh_ok: bool = True
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True)
+    record = tmp_path / "record"
+    record.mkdir(parents=True)
+    for name, body in {
+        "ssh": _SSH_STUB,
+        "ssh-add": "#!/bin/sh\necho key\n",
+        "sleep": "#!/bin/sh\nexit 0\n",
+        "ansible-playbook": _OCI_ANSIBLE,
+    }.items():
+        stub = bin_dir / name
+        stub.write_text(body)
+        stub.chmod(0o755)
+    env = {
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "HOME": str(tmp_path),
+        "RECORD": str(record),
+        "TMPDIR": str(tmp_path),
+        "INFRAFOUNDRY_BLUEPRINT_DIR": str(BLUEPRINTS / "k3s-cluster"),
+        "INFRAFOUNDRY_WARNINGS_FILE": str(tmp_path / "warnings.jsonl"),
+        **({"FAKE_SSH_OK": "1"} if ssh_ok else {}),
+        **env_extra,
+    }
+    result = subprocess.run(
+        ["bash", str(script)], env=env, capture_output=True, text=True, check=False, timeout=60
+    )
+    return result, record
+
+
+def _oci_post_env(known_hosts: str) -> dict[str, str]:
+    return {
+        "INFRAFOUNDRY_VAR_control_name": "ctl",
+        "INFRAFOUNDRY_VAR_cluster_name": "c",
+        "INFRAFOUNDRY_VAR_tailnet": "example.net",
+        "INFRAFOUNDRY_VAR_ssh_public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest a@b.example",
+        "INFRAFOUNDRY_VAR_kubeconfig_local_path": "/tmp/kube.yaml",
+        "INFRAFOUNDRY_VAR_ssh_known_hosts": known_hosts,
+        "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"workers": [{"name": "w1"}]}),
+    }
+
+
+_OCI_HANDLERS = [
+    ("k3s-bootstrap.sh", {"K3S_SSH_PUBLIC_KEY": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest a@b"}),
+    ("k3s-kubeconfig-mode.sh", {}),
+    ("k3s-dns.sh", {"K3S_DNS_NAMESERVERS": "192.0.2.53"}),
+]
+
+
+class TestOciK3sScripts:
+    def test_post_terraform_is_strict_everywhere(self, tmp_path: Path) -> None:
+        result, record = _run_oci(
+            OCI_DIR / "k3s-post-terraform.sh", tmp_path, _oci_post_env(_OCI_KNOWN)
+        )
+
+        assert result.returncode == 0, result.stderr
+        calls = _calls(record)
+        assert calls
+        for call in calls:
+            assert "StrictHostKeyChecking=yes" in call
+            assert "GlobalKnownHostsFile=/dev/null" in call
+        used = {p.read_text().strip() for p in record.glob("used_known_hosts.*")}
+        assert used == {"\n".join(_OCI_KNOWN.split(";"))}
+        assert int((record / "ansible_count").read_text()) == 2
+        for n in (1, 2):
+            assert (record / f"hkc{n}").read_text().strip() == "True"
+            args = (record / f"args{n}").read_text()
+            assert "StrictHostKeyChecking=yes" in args
+            assert "UserKnownHostsFile=" in args
+            assert "/dev/null" not in args.replace("GlobalKnownHostsFile=/dev/null", "")
+
+    def test_the_temporary_file_is_removed_on_exit(self, tmp_path: Path) -> None:
+        _run_oci(OCI_DIR / "k3s-post-terraform.sh", tmp_path, _oci_post_env(_OCI_KNOWN))
+        assert not [p for p in tmp_path.glob("tmp.*") if p.is_file()]
+
+    @pytest.mark.parametrize("value", ["", "ctl,ctl.example.net ssh-rsa AAAA"])
+    def test_missing_or_malformed_keys_exit_before_any_call(
+        self, tmp_path: Path, value: str
+    ) -> None:
+        result, record = _run_oci(OCI_DIR / "k3s-post-terraform.sh", tmp_path, _oci_post_env(value))
+
+        assert result.returncode == 1
+        assert "foundry secrets host-keys" in result.stderr
+        assert _calls(record) == []
+        assert not (record / "ansible_count").exists()
+
+    def test_a_key_mismatch_stops_at_once_and_names_the_node(self, tmp_path: Path) -> None:
+        result, record = _run_oci(
+            OCI_DIR / "k3s-post-terraform.sh",
+            tmp_path,
+            _oci_post_env(_OCI_KNOWN),
+            ssh_ok=False,
+        )
+
+        assert result.returncode == 1
+        assert "ssh_host_keys.ctl" in result.stderr
+        assert "--regenerate ctl" in result.stderr
+        assert len(_calls(record)) == 1
+
+    @pytest.mark.parametrize(("name", "extra"), _OCI_HANDLERS, ids=lambda v: str(v)[:20])
+    def test_handlers_refuse_without_keys_and_run_strict_with_them(
+        self, tmp_path: Path, name: str, extra: dict[str, str]
+    ) -> None:
+        base = {
+            "K3S_CONTROL_NAME": "ctl",
+            "K3S_WORKER_NAMES": "w1",
+            "K3S_TAILNET": "example.net",
+            **extra,
+        }
+        denied, record = _run_oci(OCI_DIR / name, tmp_path / "a", base | {"K3S_KNOWN_HOSTS": ""})
+        assert denied.returncode != 0
+        assert not (record / "ansible_count").exists()
+        warnings = (tmp_path / "a" / "warnings.jsonl").read_text()
+        assert "foundry secrets host-keys" in warnings
+
+        ok, record = _run_oci(
+            OCI_DIR / name, tmp_path / "b", base | {"K3S_KNOWN_HOSTS": _OCI_KNOWN}
+        )
+        assert ok.returncode == 0, ok.stderr
+        assert (record / "hkc1").read_text().strip() == "True"
+        assert "StrictHostKeyChecking=yes" in (record / "args1").read_text()
+
+    def test_verify_cluster_without_kubectl_or_keys_skips_with_a_warning(
+        self, tmp_path: Path
+    ) -> None:
+        path_dirs = [p for p in os.environ["PATH"].split(":") if not (Path(p) / "kubectl").exists()]
+        env = {
+            "PATH": os.pathsep.join(path_dirs),
+            "KUBECONFIG": str(tmp_path / "kube.yaml"),
+            "K3S_CONTROL_NAME": "ctl",
+            "K3S_TAILNET": "example.net",
+            "K3S_KNOWN_HOSTS": "",
+        }
+        (tmp_path / "kube.yaml").write_text("x")
+        result, record = _run_oci(OCI_DIR / "verify-cluster.sh", tmp_path / "w", env)
+        assert result.returncode == 0, result.stderr
+        assert _calls(record) == []
+        assert "no pinned SSH host keys" in (tmp_path / "w" / "warnings.jsonl").read_text()

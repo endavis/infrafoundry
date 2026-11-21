@@ -10,7 +10,7 @@
 # Workflow after_apply handlers get no package variables, so the blueprint
 # passes everything through its env: block:
 #   K3S_CONTROL_NAME, K3S_WORKER_NAMES (comma-separated), K3S_TAILNET,
-#   K3S_SSH_PUBLIC_KEY
+#   K3S_SSH_PUBLIC_KEY, K3S_KNOWN_HOSTS (the pinned SSH host keys, ";"-separated)
 #
 # The handler has continue_on_error, so a failure is appended to
 # INFRAFOUNDRY_WARNINGS_FILE and the step is retried on the next apply.
@@ -44,6 +44,9 @@ warn() {
         printf '{"source": "k3s-bootstrap", "message": "%s"}\n' "$1" >> "${INFRAFOUNDRY_WARNINGS_FILE}"
     fi
 }
+
+trap 'k3s_ssh_cleanup' EXIT
+k3s_pin_host_keys || { warn "no pinned SSH host keys; run 'foundry secrets host-keys --env <env>'"; exit 1; }
 
 echo "=== k3s login user bootstrap ==="
 echo "Control: ${CONTROL_NAME} (${CONTROL_HOST}), workers: ${#WORKER_NAMES[@]}"

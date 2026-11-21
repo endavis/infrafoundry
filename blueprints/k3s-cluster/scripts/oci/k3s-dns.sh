@@ -10,7 +10,7 @@
 # passes everything through its env: block:
 #   K3S_CONTROL_NAME, K3S_WORKER_NAMES (comma-separated), K3S_TAILNET,
 #   K3S_DNS_NAMESERVERS (comma-separated), K3S_DNS_SEARCH (comma-separated),
-#   K3S_VCN_DNS_LABEL
+#   K3S_VCN_DNS_LABEL, K3S_KNOWN_HOSTS (the pinned SSH host keys, ";"-separated)
 #
 # The handler runs on the operator host (never a jumphost) and has
 # continue_on_error, so a failure is appended to INFRAFOUNDRY_WARNINGS_FILE and
@@ -52,13 +52,15 @@ ROLES_PATH="${BLUEPRINT_DIR}/roles"
 
 INVENTORY_FILE="$(mktemp -t k3s-dns-inventory-XXXXXX.yml)"
 EXTRA_VARS_FILE="$(mktemp -t k3s-dns-vars-XXXXXX.json)"
-trap 'rm -f "${INVENTORY_FILE}" "${EXTRA_VARS_FILE}"' EXIT
+trap 'rm -f "${INVENTORY_FILE}" "${EXTRA_VARS_FILE}"; k3s_ssh_cleanup' EXIT
 
 warn() {
     if [ -n "${INFRAFOUNDRY_WARNINGS_FILE:-}" ]; then
         printf '{"source": "k3s-dns", "message": "%s"}\n' "$1" >> "${INFRAFOUNDRY_WARNINGS_FILE}"
     fi
 }
+
+k3s_pin_host_keys || { warn "no pinned SSH host keys; run 'foundry secrets host-keys --env <env>'"; exit 1; }
 
 write_k3s_inventory "${INVENTORY_FILE}"
 write_k3s_dns_extra_vars "${EXTRA_VARS_FILE}"
@@ -67,7 +69,6 @@ echo "=== k3s cluster DNS ==="
 echo "Control: ${CONTROL_NAME} (${CONTROL_HOST}), workers: ${#WORKER_NAMES[@]}"
 
 export ANSIBLE_ROLES_PATH="${ROLES_PATH}"
-export ANSIBLE_HOST_KEY_CHECKING=False
 
 rc=0
 ansible-playbook -i "${INVENTORY_FILE}" -e "@${EXTRA_VARS_FILE}" "${PLAYBOOK}" || rc=$?

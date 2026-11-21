@@ -114,6 +114,7 @@ def test_after_apply_env_for_the_example_package(loader: PackageLoader) -> None:
         "K3S_CONTROL_NAME": "k3s-control",
         "K3S_WORKER_NAMES": "k3s-worker-0,k3s-worker-1",
         "K3S_TAILNET": "your-tailnet.ts.net",
+        "K3S_KNOWN_HOSTS": "",
         "K3S_DNS_NAMESERVERS": "169.254.169.254",
         "K3S_DNS_SEARCH": "",
         "K3S_VCN_DNS_LABEL": "k3svcn",
@@ -135,6 +136,7 @@ def test_after_apply_env_for_an_override_package(tmp_path: Path) -> None:
         "K3S_CONTROL_NAME": "ctl",
         "K3S_WORKER_NAMES": "w0,w1",
         "K3S_TAILNET": "example.net",
+        "K3S_KNOWN_HOSTS": "",
         "K3S_DNS_NAMESERVERS": "192.0.2.53,192.0.2.54",
         "K3S_DNS_SEARCH": "a.example.net,b.example.net",
         "K3S_VCN_DNS_LABEL": "lbl",
@@ -267,10 +269,16 @@ def _run_dns(
     return result, record
 
 
+_PINNED = (
+    "ctl,ctl.example.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest;"
+    "w0,w0.example.net ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest"
+)
+
 _BASE_ENV = {
     "K3S_CONTROL_NAME": "ctl",
     "K3S_WORKER_NAMES": "w0,w1",
     "K3S_TAILNET": "example.net",
+    "K3S_KNOWN_HOSTS": _PINNED,
     "K3S_DNS_NAMESERVERS": "169.254.169.254",
     "K3S_DNS_SEARCH": "",
     "K3S_VCN_DNS_LABEL": "lbl",
@@ -418,6 +426,7 @@ def _run_post(tmp_path: Path, package_vars: dict[str, object]) -> Path:
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest test@example.com"
         ),
         "INFRAFOUNDRY_VAR_tailnet": "example.net",
+        "INFRAFOUNDRY_VAR_ssh_known_hosts": _PINNED,
         "INFRAFOUNDRY_VAR_kubeconfig_local_path": str(tmp_path / "kube.yaml"),
         "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"workers": [{"name": "w1"}], **package_vars}),
     }
