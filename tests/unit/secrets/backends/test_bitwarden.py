@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from collections.abc import Iterator
@@ -203,6 +204,40 @@ def test_scope_flags_and_name_resolution_once(stub: StubBw) -> None:
     for argv in items:
         assert argv[argv.index("--organizationid") + 1] == ORG_ID
         assert argv[argv.index("--collectionid") + 1] == COL_ID
+
+
+def test_collection_scope_filters_name_lookup(stub: StubBw) -> None:
+    """Two same-named items in sibling collections: the collection scope picks one.
+
+    bw ignores ``--collectionid`` next to ``--organizationid`` (the stub does too), so the
+    backend has to apply the collection filter itself.
+    """
+    other_col = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+    fx = json.loads(stub.fixture.read_text(encoding="utf-8"))
+    fx["collections"].append({"id": other_col, "name": "Other"})
+    for item_id, col, pw in (
+        ("88888888-8888-4888-8888-888888888888", COL_ID, "in-automation"),
+        ("99999999-9999-4999-8999-999999999999", other_col, "in-other"),
+    ):
+        fx["items"].append(
+            {
+                "id": item_id,
+                "name": "Shared Name",
+                "organizationId": ORG_ID,
+                "collectionIds": [col],
+                "login": {"password": pw},
+            }
+        )
+    stub.fixture.write_text(json.dumps(fx), encoding="utf-8")
+
+    scoped = make(organization="Example Org", collection="Other")
+    assert scoped.get_secret("Shared Name/password") == "in-other"
+    assert "Router Admin" not in scoped.list_secrets()
+    assert make(organization="Example Org", collection="Automation").get_secret(
+        "Shared Name/password"
+    ) == ("in-automation")
+    with pytest.raises(SecretBackendError, match="2 items"):
+        make(organization="Example Org").get_secret("Shared Name/password")
 
 
 def test_scope_uuid_passed_without_lookup(stub: StubBw) -> None:

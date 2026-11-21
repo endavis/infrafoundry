@@ -28,6 +28,12 @@ Design (ADR-0034):
 * ``bw list items --nointeraction`` while unauthenticated exits 1 (``You are not logged in.``).
 * Flags that exist: ``unlock --passwordenv``, ``unlock --passwordfile``, ``unlock --raw``,
   ``login --apikey``, ``list --search``, ``--organizationid``, ``--collectionid``.
+* ``bw list items`` with both ``--organizationid`` and ``--collectionid`` (with or without
+  ``--search``) filters by organization only; ``--collectionid`` alone filters by collection.
+  The backend therefore re-applies both scope filters to every listed item.
+* A live test against a self-hosted Vaultwarden confirmed ``login --apikey`` with
+  ``BW_CLIENTID``/``BW_CLIENTSECRET``, ``unlock --passwordenv --raw``, ``sync``, the item JSON
+  shape for logins and custom fields, ``list collections``, and exact-name filtering.
 
 Everything else relied on below is from bw documentation, unverified against an installed ``bw``
 (the live test confirms or corrects it): ``login --apikey`` reading ``BW_CLIENTID`` and
@@ -412,7 +418,15 @@ class BitwardenSecretBackend:
             raise SecretBackendError(f"bw list failed (exit {exc.code})") from None
         if not isinstance(rows, list):
             raise SecretBackendError("bw list returned an unexpected shape")
-        return [r for r in rows if isinstance(r, dict)]
+        # bw ignores --collectionid when --organizationid is also given, so the scope is
+        # re-applied here rather than trusted to the flags.
+        return [
+            r
+            for r in rows
+            if isinstance(r, dict)
+            and (not org_id or r.get("organizationId") == org_id)
+            and (not col_id or col_id in (r.get("collectionIds") or []))
+        ]
 
     def get_secret(self, key: str) -> str:
         """Return one field of one vault item.

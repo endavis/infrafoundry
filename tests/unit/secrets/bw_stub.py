@@ -84,9 +84,10 @@ elif cmd == "list":
     items = fx["items"]
     if opt("--search"):
         items = [i for i in items if opt("--search").lower() in i["name"].lower()]
+    # Like bw 2026.10.1: --collectionid is ignored when --organizationid is also given.
     if opt("--organizationid"):
         items = [i for i in items if i.get("organizationId") == opt("--organizationid")]
-    if opt("--collectionid"):
+    elif opt("--collectionid"):
         items = [i for i in items if opt("--collectionid") in (i.get("collectionIds") or [])]
     print(json.dumps(items))
 elif cmd == "get" and argv[1] == "item":
