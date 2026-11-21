@@ -1229,6 +1229,89 @@ class TestBlueprintIntegration:
 
 
 @pytest.mark.unit
+class TestVariableReferenceResolution:
+    """Variables referencing other variables are resolved after merging."""
+
+    def _load(
+        self,
+        temp_dir: Path,
+        defaults: dict[str, Any],
+        variables: dict[str, Any],
+        secrets: str | None = None,
+    ) -> dict[str, Any]:
+        resolver = BlueprintResolver(temp_dir)
+        resolver.blueprints_dir = temp_dir / "blueprints"
+        _create_blueprint(
+            temp_dir,
+            "ref-bp",
+            {"name": "ref-bp", "defaults": defaults, "resources": ["vm.yaml"]},
+            {"vm.yaml": "vm:\n  - name: {{ cluster_name }}\n"},
+        )
+        loader = PackageLoader(temp_dir, blueprint_resolver=resolver)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "ref-pkg",
+            {"name": "ref-pkg", "blueprint": "ref-bp", "variables": variables},
+            {"secrets.yaml": secrets} if secrets else None,
+        )
+        _, _, result = loader.load_package(pkg_dir, "proxmox", "dev")
+        return result
+
+    def test_chained_default(self, temp_dir: Path) -> None:
+        result = self._load(
+            temp_dir,
+            {"kubeconfig": "~/.kube/{{ cluster_name }}.yaml", "cluster_name": "{{ base }}"},
+            {"base": "example-k3s"},
+        )
+        assert result["kubeconfig"] == "~/.kube/example-k3s.yaml"
+        assert result["cluster_name"] == "example-k3s"
+
+    def test_package_override_wins(self, temp_dir: Path) -> None:
+        result = self._load(
+            temp_dir,
+            {"kubeconfig": "~/.kube/{{ cluster_name }}.yaml", "cluster_name": "default"},
+            {"cluster_name": "example-k3s", "kubeconfig": "/etc/{{ cluster_name }}.yaml"},
+        )
+        assert result["kubeconfig"] == "/etc/example-k3s.yaml"
+
+    def test_value_referencing_secret(self, temp_dir: Path) -> None:
+        result = self._load(
+            temp_dir,
+            {"cluster_name": "example-k3s", "url": "https://x/{{ token }}"},
+            {},
+            secrets="variables:\n  token: s3cret\n",
+        )
+        assert result["url"] == "https://x/s3cret"
+
+    def test_cycle_raises_without_values(self, temp_dir: Path) -> None:
+        with pytest.raises(InvalidConfigurationError, match="Circular") as exc:
+            self._load(
+                temp_dir,
+                {"cluster_name": "example-k3s", "a": "{{ b }}", "b": "{{ a }}"},
+                {},
+            )
+        assert "example-k3s" not in str(exc.value)
+
+    def test_non_string_and_plain_values_unchanged(self, temp_dir: Path) -> None:
+        result = self._load(
+            temp_dir,
+            {"cluster_name": "example-k3s", "count": 3, "flag": True, "plain": "no refs"},
+            {"items": ["{{ cluster_name }}-1", 2], "nested": {"k": "{{ count }}"}},
+        )
+        assert result["count"] == 3
+        assert result["flag"] is True
+        assert result["plain"] == "no refs"
+        assert result["items"] == ["example-k3s-1", 2]
+        assert result["nested"] == {"k": "3"}
+
+    def test_unknown_reference_left_in_place(self, temp_dir: Path) -> None:
+        result = self._load(temp_dir, {"cluster_name": "example-k3s", "x": "{{ nope }}"}, {})
+        assert "nope" in result["x"]
+
+
+@pytest.mark.unit
 class TestHandlerConfigTagging:
     """Tests for _package_dir/_package/_blueprint_dir injection on handler configs."""
 

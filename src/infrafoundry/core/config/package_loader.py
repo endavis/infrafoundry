@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import jinja2
+import jinja2.meta
 import yaml
 
 from infrafoundry.core.config.filters import create_jinja2_env
@@ -157,6 +158,97 @@ FIREWALL_FILE_KEY: str = "firewall"
 # Top-level key beside ``resources:`` or the provider-centric list that selects the
 # kubernetes cluster for the whole file (#1539).
 CLUSTER_FILE_KEY: str = "cluster"
+
+
+_MAX_REFERENCE_PASSES = 10
+
+
+def _collect_references(value: Any, known: set[str], env: jinja2.Environment) -> set[str]:
+    """Return names of ``known`` variables referenced by templates inside ``value``."""
+    if isinstance(value, str):
+        if "{{" not in value:
+            return set()
+        try:
+            return jinja2.meta.find_undeclared_variables(env.parse(value)) & known
+        except jinja2.TemplateError:
+            return set()
+    if isinstance(value, list):
+        return set().union(*(_collect_references(v, known, env) for v in value)) if value else set()
+    if isinstance(value, dict):
+        refs: set[str] = set()
+        for v in value.values():
+            refs |= _collect_references(v, known, env)
+        return refs
+    return set()
+
+
+def _render_references(value: Any, context: dict[str, Any], env: jinja2.Environment) -> Any:
+    """Render strings containing ``{{`` against ``context``, recursing into lists and dicts."""
+    if isinstance(value, str):
+        if "{{" not in value:
+            return value
+        try:
+            return env.from_string(value).render(**context)
+        except jinja2.TemplateError:
+            return value
+    if isinstance(value, list):
+        return [_render_references(v, context, env) for v in value]
+    if isinstance(value, dict):
+        return {k: _render_references(v, context, env) for k, v in value.items()}
+    return value
+
+
+def _resolve_variable_references(variables: dict[str, Any]) -> dict[str, Any]:
+    """Resolve ``{{ name }}`` references between merged package variables.
+
+    Strings (also inside lists and dicts) that reference other variables are
+    rendered against the merged variables until nothing changes. Unknown names
+    are left in place. Values without ``{{`` and non-strings are untouched.
+
+    Args:
+        variables: Fully merged variables (defaults, package, secrets).
+
+    Returns:
+        New dict with references resolved.
+
+    Raises:
+        InvalidConfigurationError: On circular references or when resolution does
+            not settle within the pass limit. Messages name variables, never values.
+    """
+    env = create_jinja2_env(undefined=jinja2.DebugUndefined)
+    known = set(variables)
+    graph = {name: _collect_references(value, known, env) for name, value in variables.items()}
+    if not any(graph.values()):
+        return variables
+
+    visiting: set[str] = set()
+    done: set[str] = set()
+
+    def _visit(name: str) -> None:
+        if name in done:
+            return
+        if name in visiting:
+            raise InvalidConfigurationError(
+                f"Circular variable reference involving variable '{name}'"
+            )
+        visiting.add(name)
+        for dep in graph[name]:
+            _visit(dep)
+        visiting.discard(name)
+        done.add(name)
+
+    for name in graph:
+        _visit(name)
+
+    current = dict(variables)
+    for _ in range(_MAX_REFERENCE_PASSES):
+        resolved = {k: _render_references(v, current, env) for k, v in current.items()}
+        if resolved == current:
+            return resolved
+        current = resolved
+    raise InvalidConfigurationError(
+        f"Variable references did not resolve within {_MAX_REFERENCE_PASSES} passes"
+    )
 
 
 class PackageLoader:
@@ -374,6 +466,10 @@ class PackageLoader:
                     len(secret_vars),
                     secrets_path.name,
                 )
+
+        # Resolve variable-to-variable references once every layer (blueprint
+        # defaults < provider defaults < package < secrets) is merged.
+        manifest.variables = _resolve_variable_references(manifest.variables)
 
         if blueprint is not None:
             self._check_required_inputs(manifest, blueprint, provider)

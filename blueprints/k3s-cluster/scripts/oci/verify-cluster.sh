@@ -9,11 +9,15 @@
 #   INFRAFOUNDRY_CONFIG_DIR - Config directory path (set automatically)
 #
 # Optional:
-#   KUBECONFIG - Path to kubeconfig (defaults to ~/.kube/oci-k3s.yaml)
+#   KUBECONFIG - Path to kubeconfig; a leading ~ is expanded. The blueprint
+#                handler sets it to the package's kubeconfig_local_path
+#                (falls back to ~/.kube/oci-k3s.yaml when unset)
 
 set -euo pipefail
 
 KUBECONFIG="${KUBECONFIG:-$HOME/.kube/oci-k3s.yaml}"
+# The handler env is not shell-expanded, so expand a leading ~ here.
+KUBECONFIG="${KUBECONFIG/#\~/$HOME}"
 
 echo "Verifying K3s cluster health for environment: ${INFRAFOUNDRY_ENV:-unknown}"
 echo "Using kubeconfig: $KUBECONFIG"

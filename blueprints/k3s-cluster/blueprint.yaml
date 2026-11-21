@@ -231,3 +231,5 @@ providers:
           description: "Verify k3s cluster health after apply"
           timeout: 120
           continue_on_error: true
+          env:
+            KUBECONFIG: "{{ kubeconfig_local_path }}"
