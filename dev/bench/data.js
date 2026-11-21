@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795264562445,
+  "lastUpdate": 1795265814571,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5210,6 +5210,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000504167639677087",
             "extra": "mean: 60.465005145694796 usec\nrounds: 17879"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "599f2abb30f4bc260b2dd8af103d5c7a0f323455",
+          "message": "fix: restrict k3s kubeconfig permissions to the owner (merges PR #1579, addresses #1577)\n\nWrite the k3s kubeconfig on the server node with mode 0600 in both\nvariants of the k3s-cluster blueprint, and keep the copy saved on the\ncontroller at 0600 too.\n\n- OCI role: set write-kubeconfig-mode to \"0600\". A localhost file task\n  after the fetch enforces 0600 on kubeconfig_local_path.\n- OCI existing clusters: a new idempotent after_apply step,\n  k3s-kubeconfig-mode, runs after k3s-bootstrap on the control node. It\n  sets write-kubeconfig-mode in config.yaml and chmods k3s.yaml to\n  0600. It restarts nothing.\n- Proxmox script: install with --write-kubeconfig-mode 600 and save\n  the local copy under umask 077, keeping chmod 600. Read the node file\n  through sudo, in remote_kubectl and the Phase 6 read, since it now\n  needs root.\n\nExisting Proxmox clusters are left to a follow-up issue.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T12:55:57Z",
+          "tree_id": "70848170189a3fa8a6abdf9c2fd191136ea2c2ee",
+          "url": "https://github.com/endavis/infrafoundry/commit/599f2abb30f4bc260b2dd8af103d5c7a0f323455"
+        },
+        "date": 1795265814087,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 48.49212615435424,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00013134911588165597",
+            "extra": "mean: 20.62190461224409 msec\nrounds: 49"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8011.596434573171,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008152502589677544",
+            "extra": "mean: 124.81906798058486 usec\nrounds: 8473"
           }
         ]
       }
