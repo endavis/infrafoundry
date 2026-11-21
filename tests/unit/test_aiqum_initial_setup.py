@@ -11,13 +11,20 @@ from __future__ import annotations
 
 import ast
 import base64
+import hashlib
 import importlib.util
 import io
 import json
+import shutil
 import smtplib
 import socket
+import ssl
 import struct
+import subprocess
 import sys
+import threading
+from collections.abc import Iterator
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -572,6 +579,7 @@ def _ontap_dns_body(servers: list[str], domains: list[str]) -> bytes:
 def _dns_config() -> dict[str, Any]:
     config = _make_config("")
     config["vm_name"] = "aiqum"
+    config["ontap_cert_fingerprint"] = "aa" * 32
     return config
 
 
@@ -639,8 +647,8 @@ class TestCheckOntapResolvesAiqum:
 
     def _rest(self, servers: list[str], domains: list[str]) -> Any:
         return patch(
-            "aiqum_initial_setup.urlopen",
-            return_value=_mock_urlopen_response(200, _ontap_dns_body(servers, domains)),
+            "aiqum_initial_setup._ontap_get_json",
+            return_value=json.loads(_ontap_dns_body(servers, domains)),
         )
 
     def test_match_returns_true(self) -> None:
@@ -648,15 +656,18 @@ class TestCheckOntapResolvesAiqum:
             return [AIQUM_IP] if name == "aiqum.lab.example" else []
 
         with (
-            self._rest(["198.51.100.1"], ["lab.example"]) as urlopen_mock,
+            self._rest(["198.51.100.1"], ["lab.example"]) as get_mock,
             patch("aiqum_initial_setup.query_dns_a", side_effect=fake),
         ):
             verdict, detail = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
         assert verdict is True
         assert "aiqum.lab.example" in detail
-        req = urlopen_mock.call_args.args[0]
-        assert req.full_url == ("https://192.0.2.220/api/name-services/dns?fields=servers,domains")
-        assert urlopen_mock.call_args.kwargs["timeout"] == aiqum_setup.ONTAP_REST_TIMEOUT
+        host, path, _token, fingerprint = get_mock.call_args.args
+        assert (host, path, fingerprint) == (
+            "192.0.2.220",
+            "/api/name-services/dns?fields=servers,domains",
+            "aa" * 32,
+        )
 
     def test_wrong_ip_returns_false(self) -> None:
         with (
@@ -692,18 +703,24 @@ class TestCheckOntapResolvesAiqum:
         assert verdict is True
 
     @pytest.mark.parametrize(
-        "exc", [URLError("refused"), TimeoutError("timed out"), _http_error(401)]
+        "exc",
+        [
+            OSError("refused"),
+            TimeoutError("timed out"),
+            OSError("ONTAP REST returned HTTP 401"),
+            aiqum_setup.OntapCertificateMismatchError("different certificate"),
+        ],
     )
     def test_rest_failure_is_inconclusive(self, exc: Exception) -> None:
-        with patch("aiqum_initial_setup.urlopen", side_effect=exc):
+        with patch("aiqum_initial_setup._ontap_get_json", side_effect=exc):
             verdict, reason = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
         assert verdict is None
         assert reason
 
     def test_bad_json_is_inconclusive(self) -> None:
         with patch(
-            "aiqum_initial_setup.urlopen",
-            return_value=_mock_urlopen_response(200, b"not json"),
+            "aiqum_initial_setup._ontap_get_json",
+            side_effect=json.JSONDecodeError("bad", "not json", 0),
         ):
             verdict, _ = aiqum_setup.check_ontap_resolves_aiqum(_dns_config())
         assert verdict is None
@@ -724,9 +741,195 @@ class TestCheckOntapResolvesAiqum:
         assert "198.51.100.1" in reason
 
     def test_missing_vm_name_is_skipped(self) -> None:
-        with patch("aiqum_initial_setup.urlopen") as urlopen_mock:
+        with patch("aiqum_initial_setup._ontap_get_json") as get_mock:
             assert aiqum_setup.check_ontap_resolves_aiqum(_make_config("")) == (None, "")
-        urlopen_mock.assert_not_called()
+        get_mock.assert_not_called()
+
+    @pytest.mark.parametrize("value", [None, ""])
+    def test_unset_fingerprint_is_inconclusive_without_contact(self, value: str | None) -> None:
+        config = _dns_config()
+        config["ontap_cert_fingerprint"] = value
+        with (
+            patch("aiqum_initial_setup._ontap_get_json") as get_mock,
+            patch("aiqum_initial_setup.http.client.HTTPSConnection") as conn_mock,
+        ):
+            verdict, message = aiqum_setup.check_ontap_resolves_aiqum(config)
+        assert verdict is None
+        assert "ontap_cert_fingerprint" in message
+        get_mock.assert_not_called()
+        conn_mock.assert_not_called()
+
+    def test_invalid_fingerprint_is_inconclusive_without_contact(self) -> None:
+        config = _dns_config()
+        config["ontap_cert_fingerprint"] = "not-a-fingerprint"
+        with patch("aiqum_initial_setup.http.client.HTTPSConnection") as conn_mock:
+            verdict, message = aiqum_setup.check_ontap_resolves_aiqum(config)
+        assert verdict is None
+        assert "SHA-256" in message
+        conn_mock.assert_not_called()
+
+
+class TestOntapFingerprint:
+    """normalize_fingerprint accepts the forms openssl prints."""
+
+    HEX = "0123456789abcdef" * 4
+
+    def _colons(self, upper: bool) -> str:
+        pairs = [self.HEX[i : i + 2] for i in range(0, 64, 2)]
+        text = ":".join(pairs)
+        return text.upper() if upper else text
+
+    def test_forms_normalize_equal(self) -> None:
+        forms = [
+            self.HEX,
+            self.HEX.upper(),
+            self._colons(True),
+            f"sha256 Fingerprint={self._colons(True)}",
+            f"SHA256 Fingerprint={self._colons(True)}\n",
+        ]
+        assert {aiqum_setup.normalize_fingerprint(f) for f in forms} == {self.HEX}
+
+    @pytest.mark.parametrize("value", ["", "abcd", "zz" * 32, "aa" * 33])
+    def test_invalid_raises(self, value: str) -> None:
+        with pytest.raises(ValueError, match="SHA-256"):
+            aiqum_setup.normalize_fingerprint(value)
+
+
+def _gen_cert(tmp_path: Path) -> tuple[Path, Path]:
+    cert, key = tmp_path / "ontap.pem", tmp_path / "ontap.key"
+    subprocess.run(
+        [
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:2048",
+            "-nodes",
+            "-days",
+            "1",
+            "-subj",
+            "/CN=ontap.example",
+            "-keyout",
+            str(key),
+            "-out",
+            str(cert),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return cert, key
+
+
+@pytest.fixture
+def ontap_tls(tmp_path: Path) -> Iterator[dict[str, Any]]:
+    """A local TLS server posing as ONTAP, recording the requests it receives."""
+    if shutil.which("openssl") is None:
+        pytest.skip("openssl CLI not available to generate test certificates")
+    cert, key = _gen_cert(tmp_path)
+    state: dict[str, Any] = {
+        "hits": [],
+        "status": 200,
+        "body": _ontap_dns_body(["198.51.100.1"], ["lab.example"]),
+        "fingerprint": hashlib.sha256(ssl.PEM_cert_to_DER_cert(cert.read_text())).hexdigest(),
+    }
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            state["hits"].append((self.path, self.headers.get("Authorization", "")))
+            self.send_response(state["status"])
+            self.send_header("Content-Length", str(len(state["body"])))
+            self.end_headers()
+            self.wfile.write(state["body"])
+
+        def log_message(self, format: str, *args: Any) -> None:
+            return
+
+    class QuietServer(HTTPServer):
+        def handle_error(self, request: Any, client_address: Any) -> None:
+            return
+
+    server = QuietServer(("127.0.0.1", 0), Handler)
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.load_cert_chain(str(cert), str(key))
+    server.socket = ctx.wrap_socket(server.socket, server_side=True)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    state["host"] = f"127.0.0.1:{server.server_address[1]}"
+    yield state
+    server.shutdown()
+    server.server_close()
+
+
+class TestFetchOntapDnsPinned:
+    """fetch_ontap_dns against a local TLS server."""
+
+    def _config(self, state: dict[str, Any], fingerprint: str) -> dict[str, Any]:
+        config = _dns_config()
+        config["ontap_cluster_ip"] = state["host"]
+        config["ontap_cert_fingerprint"] = fingerprint
+        return config
+
+    @pytest.mark.parametrize("form", ["plain", "upper", "colons", "prefixed"])
+    def test_matching_fingerprint_reads_dns(self, ontap_tls: dict[str, Any], form: str) -> None:
+        fp = ontap_tls["fingerprint"]
+        colons = ":".join(fp[i : i + 2] for i in range(0, 64, 2)).upper()
+        value = {
+            "plain": fp,
+            "upper": fp.upper(),
+            "colons": colons,
+            "prefixed": f"sha256 Fingerprint={colons}",
+        }[form]
+        result = aiqum_setup.fetch_ontap_dns(self._config(ontap_tls, value))
+        assert result == (["198.51.100.1"], ["lab.example"])
+        config = self._config(ontap_tls, value)
+        expected_token = base64.b64encode(
+            f"{config['ontap_admin_user']}:{config['ontap_admin_password']}".encode()
+        ).decode()
+        assert ontap_tls["hits"] == [
+            ("/api/name-services/dns?fields=servers,domains", f"Basic {expected_token}")
+        ]
+
+    def test_mismatch_sends_no_request(self, ontap_tls: dict[str, Any]) -> None:
+        config = self._config(ontap_tls, "00" * 32)
+        with pytest.raises(aiqum_setup.OntapCertificateMismatchError) as excinfo:
+            aiqum_setup.fetch_ontap_dns(config)
+        message = str(excinfo.value)
+        assert ":".join(["00"] * 32) in message
+        presented = ontap_tls["fingerprint"].upper()
+        assert ":".join(presented[i : i + 2] for i in range(0, 64, 2)) in message
+        assert ontap_tls["hits"] == []
+        verdict, reason = aiqum_setup.check_ontap_resolves_aiqum(config)
+        assert verdict is None
+        assert "different certificate" in reason
+        assert ontap_tls["hits"] == []
+
+    def test_http_error_is_oserror(self, ontap_tls: dict[str, Any]) -> None:
+        ontap_tls["status"] = 401
+        config = self._config(ontap_tls, ontap_tls["fingerprint"])
+        with pytest.raises(OSError, match="HTTP 401"):
+            aiqum_setup.fetch_ontap_dns(config)
+        assert aiqum_setup.check_ontap_resolves_aiqum(config)[0] is None
+
+    def test_non_json_body_is_inconclusive(self, ontap_tls: dict[str, Any]) -> None:
+        ontap_tls["body"] = b"not json"
+        config = self._config(ontap_tls, ontap_tls["fingerprint"])
+        assert aiqum_setup.check_ontap_resolves_aiqum(config)[0] is None
+
+    def test_timeout_is_passed_to_connection(self, ontap_tls: dict[str, Any]) -> None:
+        real = aiqum_setup.http.client.HTTPSConnection
+        conn_mock = MagicMock(side_effect=lambda *a, **k: real(*a, **k))
+        fake_http = MagicMock()
+        fake_http.client.HTTPSConnection = conn_mock
+        fake_http.client.HTTPException = aiqum_setup.http.client.HTTPException
+        with patch("aiqum_initial_setup.http", fake_http):
+            aiqum_setup.fetch_ontap_dns(self._config(ontap_tls, ontap_tls["fingerprint"]))
+        assert conn_mock.call_args.kwargs["timeout"] == aiqum_setup.ONTAP_REST_TIMEOUT
+
+    def test_unset_fingerprint_raises_value_error(self) -> None:
+        config = _dns_config()
+        config["ontap_cert_fingerprint"] = ""
+        with pytest.raises(ValueError, match="not set"):
+            aiqum_setup.fetch_ontap_dns(config)
 
 
 class TestMainDnsPreCheck:

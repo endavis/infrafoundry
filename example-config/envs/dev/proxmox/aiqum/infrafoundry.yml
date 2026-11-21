@@ -39,3 +39,4 @@ variables:
   # --- ONTAP cluster ---
   ontap_cluster_ip: "192.0.2.220"
   ontap_admin_password: "CHANGE_ME"
+  # ontap_cert_fingerprint: "AB:CD:...:EF"  # openssl x509 -fingerprint -sha256; enables the DNS pre-check

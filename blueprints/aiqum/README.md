@@ -76,6 +76,7 @@ infra apply --env <env> --package aiqum
 | `aiqum_admin_user` | `umadmin` | AIQUM admin username |
 | `smtp_port` | `587` | SMTP port |
 | `ontap_admin_user` | `admin` | ONTAP admin username |
+| `ontap_cert_fingerprint` | `""` | SHA-256 fingerprint of the ONTAP management certificate. Enables the Step 5 DNS pre-check (see [ONTAP must resolve the AIQUM hostname](#ontap-must-resolve-the-aiqum-hostname)) |
 | `publish_dns` | `false` | Create an OPNsense Unbound host override for the VM (see Publishing DNS) |
 | `dns_domain` | `""` | Domain for the override; required when `publish_dns` is true |
 | `cloud_init_snippets_storage` | `""` | Proxmox storage for the cloud-init snippet file; empty: provider default |
@@ -111,7 +112,19 @@ search domains (`GET /api/name-services/dns`) and asks each server for `<vm_name
 |---------|---------|------------------|
 | OK | A server returned `ip_address` for one of the names | Adds the cluster |
 | ERROR | The servers answered but never with `ip_address` | Prints the fix and skips the cluster add; setup continues with Step 6 and still exits 0 |
-| WARNING (inconclusive) | No `vm_name` input, ONTAP REST unreadable, no DNS servers configured, or no DNS server answered | Prints the reason and adds the cluster anyway |
+| WARNING (inconclusive) | No `vm_name` input, `ontap_cert_fingerprint` unset, ONTAP presented a different certificate (both fingerprints are printed), ONTAP REST unreadable, no DNS servers configured, or no DNS server answered | Prints the reason and adds the cluster anyway |
+
+The pre-check sends the ONTAP admin credentials only to a certificate whose SHA-256
+fingerprint matches `ontap_cert_fingerprint`. With the variable unset, ONTAP is not
+contacted and the check is reported as inconclusive. Read the fingerprint with:
+
+```bash
+openssl s_client -connect <ontap_cluster_ip>:443 </dev/null 2>/dev/null \
+  | openssl x509 -noout -fingerprint -sha256
+```
+
+The value may be given with or without colons, in either case, and with or without the
+`sha256 Fingerprint=` prefix. Update it when the ONTAP certificate is renewed.
 
 To fix an ERROR, publish a DNS record for the hostname on a DNS server ONTAP uses: set
 `publish_dns: true` and `dns_domain` on the aiqum package (see
@@ -149,6 +162,7 @@ and [ADR-0032](../../docs/decisions/0032-blueprint-vms-get-pre-generated-ssh-hos
   - `install7zip.sh`
 - SSH jumphost reachable from the InfraFoundry host
 - ONTAP cluster running and reachable (for the cluster-add step)
+- Optional: `ontap_cert_fingerprint`, to enable the DNS pre-check
 - ONTAP's DNS servers resolve the AIQUM hostname to `ip_address` (see
   [ONTAP must resolve the AIQUM hostname](#ontap-must-resolve-the-aiqum-hostname))
 

@@ -60,6 +60,7 @@ def test_aiqum_example_package_loads_blueprint(loader: PackageLoader) -> None:
     assert variables["aiqum_admin_user"] == "umadmin"
     assert variables["smtp_port"] == 587
     assert variables["ontap_admin_user"] == "admin"
+    assert variables["ontap_cert_fingerprint"] == ""
 
 
 def test_aiqum_example_renders_vm_and_dhcp_resources(loader: PackageLoader) -> None:
