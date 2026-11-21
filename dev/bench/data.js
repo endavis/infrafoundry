@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795255145989,
+  "lastUpdate": 1795258003150,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4944,6 +4944,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008987157795095198",
             "extra": "mean: 125.55794269852933 usec\nrounds: 8464"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "91dc3832ce248ae263144b977116d67cd851168f",
+          "message": "fix: run the oci k3s verify-cluster checks on the control node when kubectl is missing (merges PR #1564, addresses #1563)\n\nverify-cluster.sh exited 0 without checking anything when kubectl was not on\nthe workstation's PATH, and the handler still reported completed. It now runs\nthe same checks on the control node over ssh as `sudo k3s kubectl`, finding\nthe node the way k3s-dns.sh does (k3s-lib.sh host_fqdn, with the control name\nand tailnet passed through the handler env). Local kubectl stays the first\nchoice. When neither works, the script says verification was skipped and\nrecords a warning in INFRAFOUNDRY_WARNINGS_FILE.\n\nAlso fixes the readiness count: under `set -euo pipefail`, `grep -v \" Ready \"`\nexits 1 when every node is Ready, which made the script fail on a healthy\ncluster. NotReady nodes still produce a warning and exit 0, as before.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T10:45:49Z",
+          "tree_id": "c82cd3a9d0109cbb893df14ea274abe0ee1803a2",
+          "url": "https://github.com/endavis/infrafoundry/commit/91dc3832ce248ae263144b977116d67cd851168f"
+        },
+        "date": 1795258002393,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 77.36499316482863,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003765293109298906",
+            "extra": "mean: 12.925742756410093 msec\nrounds: 78"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14276.231009797824,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000433380506856554",
+            "extra": "mean: 70.0464989193364 usec\nrounds: 16193"
           }
         ]
       }
