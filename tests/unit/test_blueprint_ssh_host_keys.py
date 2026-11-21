@@ -466,7 +466,21 @@ class TestOciK3sScripts:
     def test_verify_cluster_without_kubectl_or_keys_skips_with_a_warning(
         self, tmp_path: Path
     ) -> None:
-        path_dirs = [p for p in os.environ["PATH"].split(":") if not (Path(p) / "kubectl").exists()]
+        # Hide kubectl without hiding its neighbours: on CI it sits in /usr/bin beside bash,
+        # so dropping that directory would drop bash too. Link everything else instead.
+        shadow = tmp_path / "no-kubectl"
+        shadow.mkdir()
+        path_dirs: list[str] = []
+        for entry in os.environ["PATH"].split(os.pathsep):
+            directory = Path(entry)
+            if not (directory / "kubectl").exists():
+                path_dirs.append(entry)
+                continue
+            for tool in directory.iterdir():
+                if tool.name != "kubectl" and not (shadow / tool.name).exists():
+                    (shadow / tool.name).symlink_to(tool)
+            if str(shadow) not in path_dirs:
+                path_dirs.append(str(shadow))
         env = {
             "PATH": os.pathsep.join(path_dirs),
             "KUBECONFIG": str(tmp_path / "kube.yaml"),
