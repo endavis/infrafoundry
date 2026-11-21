@@ -1,6 +1,7 @@
 """Unit tests for EventManager and event handlers."""
 
 import json
+import re
 import shutil
 import signal
 import stat
@@ -954,7 +955,9 @@ class TestScriptHandlerJumphostReexec:
             result = handler.execute(context)
 
         assert result.success is False
-        assert "jump.example.com" in (result.reason or "")
+        # Word-bounded regex rather than `in`, so CodeQL does not read it as URL
+        # sanitization; it only checks the reason names the jumphost.
+        assert re.search(r"\bjump\.example\.com\b", result.reason or "")
         assert "ssh-keyscan" in (result.reason or "")
         assert "StrictHostKeyChecking=yes" in calls[0]
         assert "UserKnownHostsFile=/dev/null" not in calls[0]
@@ -980,7 +983,7 @@ class TestScriptHandlerJumphostReexec:
 
         assert result.success is False
         assert rsync_calls[0][rsync_calls[0].index("-e") + 1] == "ssh -o StrictHostKeyChecking=yes"
-        assert "jh.example.com" in (result.reason or "")
+        assert re.search(r"\bjh\.example\.com\b", result.reason or "")
         assert "ssh-keyscan" in (result.reason or "")
 
     def test_cleanup_runs_on_success(self, tmp_path: Path) -> None:

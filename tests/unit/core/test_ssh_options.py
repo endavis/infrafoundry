@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -50,15 +51,17 @@ class TestHostKeyHint:
         hint = host_key_hint(output)
 
         assert hint is not None
-        assert "fw-test.example.com" in hint
-        assert "ssh-keygen -R fw-test.example.com" in hint
+        # A word-bounded regex, not `in`: CodeQL reads a hostname substring check
+        # as URL sanitization; this only checks the hint names the host.
+        assert re.search(r"\bfw-test\.example\.com\b", hint)
+        assert re.search(r"ssh-keygen -R fw-test\.example\.com\b", hint)
         assert "ssh-keyscan" in hint
 
     def test_bare_failure_uses_the_host_fallback(self) -> None:
         hint = host_key_hint("Host key verification failed.", "jump.example.com")
 
         assert hint is not None
-        assert "jump.example.com" in hint
+        assert re.search(r"\bjump\.example\.com\b", hint)
 
     def test_bare_failure_without_host(self) -> None:
         hint = host_key_hint("Host key verification failed.")
