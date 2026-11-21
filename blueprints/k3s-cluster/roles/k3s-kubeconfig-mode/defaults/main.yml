@@ -1,0 +1,6 @@
+---
+# k3s config directory on the control node.
+k3s_kubeconfig_mode_config_dir: /etc/rancher/k3s
+
+# Mode of the node-side kubeconfig (owner only).
+k3s_kubeconfig_mode: "0600"

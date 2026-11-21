@@ -55,6 +55,15 @@ k3s. It runs in two places:
   runs first, so existing clusters get the user before `k3s-dns` and `verify-cluster` log in
   as `ansible`. A failure is a warning (`continue_on_error`) and is retried on the next apply.
 
+#### Node kubeconfig mode
+
+The node kubeconfig (the k3s `k3s.yaml` file) is owner-only (`0600`). New clusters get this
+from the install step. On every apply, the `k3s-kubeconfig-mode` after_apply handler
+(`scripts/oci/k3s-kubeconfig-mode.sh`, `playbooks/k3s-kubeconfig-mode.yml`) brings existing OCI
+clusters in line: it sets `write-kubeconfig-mode: "0600"` in the k3s `config.yaml` and
+the file's mode on the control node. It restarts nothing and runs after `k3s-bootstrap`. A
+failure is a warning (`continue_on_error`) and is retried on the next apply.
+
 | Variant | Login user |
 | :--- | :--- |
 | Proxmox | `ansible` (cloud-init) |
@@ -168,11 +177,13 @@ k3s-cluster/
     k3s.yml                # Ansible playbook (OCI variant)
     k3s-dns.yml            # Cluster DNS only (OCI variant, also run after apply)
     k3s-bootstrap.yml      # Creates the ansible login user (OCI variant, also run after apply)
+    k3s-kubeconfig-mode.yml  # Owner-only node kubeconfig (OCI variant, also run after apply)
   roles/
     k3s-server/            # Control plane install (OCI variant)
     k3s-agent/             # Worker install (OCI variant)
     k3s-dns/               # Cluster DNS isolation (OCI variant)
     k3s-bootstrap/         # ansible login user (OCI variant)
+    k3s-kubeconfig-mode/   # owner-only node kubeconfig (OCI variant)
   providers/
     proxmox/
       vm.yaml              # Proxmox VM resource template
@@ -186,6 +197,7 @@ k3s-cluster/
     oci/
       k3s-post-terraform.sh
       k3s-bootstrap.sh     # after_apply: create the ansible login user
+      k3s-kubeconfig-mode.sh  # after_apply: owner-only node kubeconfig
       k3s-dns.sh           # after_apply: cluster DNS only
       k3s-lib.sh           # shared helpers, sourced
       verify-cluster.sh

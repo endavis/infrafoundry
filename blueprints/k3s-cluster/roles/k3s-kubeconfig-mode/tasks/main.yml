@@ -1,0 +1,21 @@
+---
+# Owner-only node kubeconfig on an existing control node. Edits one line of
+# config.yaml and the kubeconfig's mode; it restarts nothing, so a running
+# cluster is untouched. A later k3s restart reads the setting from config.yaml.
+
+- name: Set write-kubeconfig-mode in the k3s config
+  ansible.builtin.lineinfile:
+    path: "{{ k3s_kubeconfig_mode_config_dir }}/config.yaml"
+    regexp: '^write-kubeconfig-mode:'
+    line: 'write-kubeconfig-mode: "{{ k3s_kubeconfig_mode }}"'
+
+- name: Check for the node kubeconfig
+  ansible.builtin.stat:
+    path: "{{ k3s_kubeconfig_mode_config_dir }}/k3s.yaml"
+  register: k3s_kubeconfig_mode_stat
+
+- name: Restrict the node kubeconfig to its owner
+  ansible.builtin.file:
+    path: "{{ k3s_kubeconfig_mode_config_dir }}/k3s.yaml"
+    mode: "{{ k3s_kubeconfig_mode }}"
+  when: k3s_kubeconfig_mode_stat.stat.exists

@@ -81,11 +81,11 @@ if [ -n "${JUMPHOST}" ]; then
         ${SSH_KEEPALIVE} "${JUMPHOST}" "${SSH} ansible@${ip} 'sudo PATH=/usr/local/bin:\$PATH bash -c \"$*\"'"
     }
 
-    # Helper: run kubectl on k3s server as ansible user (no sudo needed)
+    # Helper: run kubectl on k3s server as root via sudo (the node kubeconfig is owner-only)
     remote_kubectl() {
         local ip="$1"
         shift
-        ${SSH_KEEPALIVE} "${JUMPHOST}" "${SSH} ansible@${ip} 'KUBECONFIG=/etc/rancher/k3s/k3s.yaml PATH=/usr/local/bin:\$PATH $*'"
+        ${SSH_KEEPALIVE} "${JUMPHOST}" "${SSH} ansible@${ip} 'sudo env KUBECONFIG=/etc/rancher/k3s/k3s.yaml PATH=/usr/local/bin:\$PATH $*'"
     }
 else
     # Helper: run command on a remote node directly (as ansible user)
@@ -102,11 +102,11 @@ else
         ${SSH_KEEPALIVE} "ansible@${ip}" "sudo PATH=/usr/local/bin:\$PATH bash -c \"$*\""
     }
 
-    # Helper: run kubectl on k3s server as ansible user directly (no sudo needed)
+    # Helper: run kubectl on k3s server as root via sudo directly (the node kubeconfig is owner-only)
     remote_kubectl() {
         local ip="$1"
         shift
-        ${SSH_KEEPALIVE} "ansible@${ip}" "KUBECONFIG=/etc/rancher/k3s/k3s.yaml PATH=/usr/local/bin:\$PATH $*"
+        ${SSH_KEEPALIVE} "ansible@${ip}" "sudo env KUBECONFIG=/etc/rancher/k3s/k3s.yaml PATH=/usr/local/bin:\$PATH $*"
     }
 fi
 
@@ -250,7 +250,7 @@ echo "--- Phase 3: Installing k3s server on ${SERVER_NAME} ---"
 
 remote_root_cmd "${SERVER_IP}" "
     curl -sfL https://get.k3s.io | ${K3S_VERSION_ENV}INSTALL_K3S_EXEC='server' sh -s - \
-        --write-kubeconfig-mode 644 \
+        --write-kubeconfig-mode 600 \
         ${K3S_SERVER_ARGS} \
         --node-name ${SERVER_NAME}
 "
@@ -355,7 +355,8 @@ echo "--- Phase 6: Saving kubeconfig locally ---"
 mkdir -p "$(dirname "${KUBECONFIG_LOCAL}")"
 
 # Fetch kubeconfig and rewrite localhost to the server IP
-remote_cmd "${SERVER_IP}" "cat /etc/rancher/k3s/k3s.yaml" | sed "s|127.0.0.1|${SERVER_IP}|g" > "${KUBECONFIG_LOCAL}"
+# Owner-only kubeconfig: umask covers a new file, chmod covers an existing one.
+(umask 077; remote_root_cmd "${SERVER_IP}" "cat /etc/rancher/k3s/k3s.yaml" | sed "s|127.0.0.1|${SERVER_IP}|g" > "${KUBECONFIG_LOCAL}")
 chmod 600 "${KUBECONFIG_LOCAL}"
 echo "  Kubeconfig saved to ${KUBECONFIG_LOCAL}"
 

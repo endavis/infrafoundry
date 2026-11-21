@@ -226,6 +226,16 @@ providers:
             K3S_TAILNET: "{{ tailnet }}"
             K3S_SSH_PUBLIC_KEY: "{{ ssh_public_key }}"
         - type: script
+          name: k3s-kubeconfig-mode
+          script: scripts/oci/k3s-kubeconfig-mode.sh
+          description: "Make the control node's kubeconfig owner-only (idempotent, restarts nothing)"
+          timeout: 300
+          continue_on_error: true
+          env:
+            K3S_CONTROL_NAME: "{{ control_name }}"
+            K3S_WORKER_NAMES: "{{ workers | map(attribute='name') | join(',') }}"
+            K3S_TAILNET: "{{ tailnet }}"
+        - type: script
           name: k3s-dns
           script: scripts/oci/k3s-dns.sh
           description: "Give k3s its own cluster DNS resolver (idempotent, never reinstalls k3s)"
