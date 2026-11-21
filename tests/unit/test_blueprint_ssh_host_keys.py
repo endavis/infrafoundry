@@ -477,7 +477,9 @@ class TestOciK3sScripts:
                 path_dirs.append(entry)
                 continue
             for tool in directory.iterdir():
-                if tool.name != "kubectl" and not (shadow / tool.name).exists():
+                # lexists: a dangling link reads as missing to exists(), and /bin and
+                # /usr/bin can be the same directory, so it would be linked twice.
+                if tool.name != "kubectl" and not os.path.lexists(shadow / tool.name):
                     (shadow / tool.name).symlink_to(tool)
             if str(shadow) not in path_dirs:
                 path_dirs.append(str(shadow))
