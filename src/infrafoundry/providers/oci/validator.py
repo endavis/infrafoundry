@@ -117,19 +117,40 @@ class OCIValidator:
                 message=f"OCI API connectivity failed: {exc.message}",
             )
 
-    def validate_references(self, resources: list[ResourceConfig]) -> None:
+    def validate_references(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
         """Validate that referenced OCI resources exist within config and live API.
 
         Performs local cross-reference checks (always) and API-based validation
         (when client creation succeeds and compartment_ocid is configured).
 
         Args:
-            resources: List of resources to validate
+            resources: List of resources to validate and report on
+            reference_resources: Every OCI resource in the environment, used to resolve
+                names when ``resources`` is a filtered subset (#1568)
         """
-        self._validate_local_references(resources)
-        self._validate_compartments(resources, None)
-        self.storage_iam_validator.validate(OCIStorageIamContext(resources=resources))
+        self._validate_local_references(resources, reference_resources)
+        self._validate_compartments(resources, reference_resources)
+        self.storage_iam_validator.validate(
+            OCIStorageIamContext(
+                resources=resources, reference_resources=list(reference_resources or [])
+            )
+        )
         self._validate_api_references(resources)
+
+    @staticmethod
+    def _lookup_pool(
+        resources: list[ResourceConfig], reference_resources: list[ResourceConfig] | None
+    ) -> list[ResourceConfig]:
+        """Return the resources names resolve against: the references plus the selected ones."""
+        if not reference_resources:
+            return list(resources)
+        selected = {(r.type, r.name) for r in resources}
+        others = [r for r in reference_resources if (r.type, r.name) not in selected]
+        return [*others, *resources]
 
     def validate_offline(
         self,
@@ -143,7 +164,7 @@ class OCIValidator:
             reference_resources: Every OCI resource in the environment, used to resolve
                 compartment names when ``resources`` is a filtered subset
         """
-        self._validate_local_references(resources)
+        self._validate_local_references(resources, reference_resources)
         self._validate_compartments(resources, reference_resources)
         self.storage_iam_validator.validate(
             OCIStorageIamContext(
@@ -212,7 +233,11 @@ class OCIValidator:
                     f"and the provider settings have no compartment_ocid",
                 )
 
-    def _validate_local_references(self, resources: list[ResourceConfig]) -> None:
+    def _validate_local_references(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
         """Validate cross-references between resources in the configuration.
 
         Checks:
@@ -224,7 +249,9 @@ class OCIValidator:
         - ``terraform_secrets`` references resolve in env secrets
 
         Args:
-            resources: List of resources to validate
+            resources: List of resources to validate and report on
+            reference_resources: Every OCI resource in the environment, used to resolve
+                VCN and subnet names when ``resources`` is a filtered subset
         """
         # Tailscale schema must run before terraform_secrets validation
         # because process_tailscale_config auto-populates terraform_secrets
@@ -251,7 +278,7 @@ class OCIValidator:
         vcn_names: set[str] = set()
         subnet_names: set[str] = set()
 
-        for resource in resources:
+        for resource in self._lookup_pool(resources, reference_resources):
             if resource.type == "vcn":
                 vcn_names.add(resource.name)
             elif resource.type == "subnet":
@@ -278,7 +305,7 @@ class OCIValidator:
                         message=f"Subnet '{resource.name}' VCN reference valid",
                     )
 
-        self._validate_subnet_cidrs(resources)
+        self._validate_subnet_cidrs(resources, reference_resources)
 
         # Validate instance -> subnet references
         for resource in resources:
@@ -311,7 +338,11 @@ class OCIValidator:
         except ValueError:
             return None
 
-    def _validate_subnet_cidrs(self, resources: list[ResourceConfig]) -> None:
+    def _validate_subnet_cidrs(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
         """Check subnet CIDRs against their VCN and each other, offline (#1521).
 
         Reports an ERROR when a subnet's ``cidr_block`` is not inside the
@@ -321,17 +352,22 @@ class OCIValidator:
         former. Only failures are reported.
 
         Args:
-            resources: List of resources to validate
+            resources: List of resources to validate and report on
+            reference_resources: Every OCI resource in the environment; VCNs and
+                subnets in it are considered, but a failure is reported only when
+                at least one subnet involved is in ``resources``
         """
+        pool = self._lookup_pool(resources, reference_resources)
+        selected = {r.name for r in resources if r.type == "subnet"}
         vcn_nets: dict[str, ipaddress.IPv4Network | ipaddress.IPv6Network] = {}
-        for resource in resources:
+        for resource in pool:
             if resource.type == "vcn":
                 net = self._parse_network(resource.config.get("cidr_block"))
                 if net is not None:
                     vcn_nets[resource.name] = net
 
         by_vcn: dict[str, list[tuple[str, ipaddress.IPv4Network | ipaddress.IPv6Network]]] = {}
-        for resource in resources:
+        for resource in pool:
             if resource.type != "subnet":
                 continue
             vcn_ref = resource.config.get("vcn")
@@ -340,6 +376,8 @@ class OCIValidator:
                 continue
             vcn_net = vcn_nets[vcn_ref]
             if subnet_net.version != vcn_net.version or not subnet_net.subnet_of(vcn_net):  # type: ignore[arg-type]
+                if resource.name not in selected:
+                    continue
                 self.report.add_check(
                     check_name=f"oci_subnet_{resource.name}_cidr_outside_vcn",
                     passed=False,
@@ -355,6 +393,8 @@ class OCIValidator:
         for vcn_ref, subnets in by_vcn.items():
             for i, (name_a, net_a) in enumerate(subnets):
                 for name_b, net_b in subnets[i + 1 :]:
+                    if name_a not in selected and name_b not in selected:
+                        continue
                     if net_a.version == net_b.version and net_a.overlaps(net_b):
                         self.report.add_check(
                             check_name=f"oci_subnet_{name_a}_{name_b}_cidr_overlap",

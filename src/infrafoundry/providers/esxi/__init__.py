@@ -83,6 +83,16 @@ class EsxiProvider(
         validator = EsxiValidator(env_config, report)
         validator.validate_references(resources)
 
+    def validate_references_in_context(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Validate *resources*, resolving names against *reference_resources* (#1568)."""
+        EsxiValidator(env_config, report).validate_references(resources, reference_resources)
+
     def validate_offline(
         self,
         resources: list[ResourceConfig],

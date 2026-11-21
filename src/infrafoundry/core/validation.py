@@ -136,10 +136,14 @@ class ValidationContext:
     required fields, so validators need no ``None`` checks for them.
 
     Attributes:
-        resources: Resources the validator checks.
+        resources: Resources the validator checks and reports on.
+        reference_resources: Every resource of the provider in the environment, which
+            name lookups resolve against when ``resources`` is a filtered subset (#1568).
+            Empty when the run is unfiltered.
     """
 
     resources: list[ResourceConfig] = field(default_factory=list)
+    reference_resources: list[ResourceConfig] = field(default_factory=list)
 
 
 def run_validators(

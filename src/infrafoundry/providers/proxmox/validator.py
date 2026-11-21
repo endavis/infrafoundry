@@ -150,7 +150,11 @@ class ProxmoxValidator:
 
         validate_terraform_secrets_references("proxmox", resources, self.env_config, self.report)
 
-    def validate_references(self, resources: list[ResourceConfig]) -> None:
+    def validate_references(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
         """Validate that referenced Proxmox resources exist.
 
         Checks:
@@ -163,7 +167,9 @@ class ProxmoxValidator:
         - ``terraform_secrets`` references resolve in env secrets
 
         Args:
-            resources: List of resources to validate
+            resources: List of resources to validate and report on
+            reference_resources: Every Proxmox resource in the environment, used to resolve
+                SDN vnet names when ``resources`` is a filtered subset (#1568)
         """
         # Local checks first, so misconfigurations surface even when the cluster is
         # unreachable.
@@ -184,7 +190,8 @@ class ProxmoxValidator:
             cluster_vms = self._get_cluster_vms(client)
 
             # Validate each type of reference using specialized validators
-            declared_vnets = frozenset(sdn_id(r) for r in resources if r.type == "sdn_vnet")
+            vnet_pool = [*(reference_resources or []), *resources]
+            declared_vnets = frozenset(sdn_id(r) for r in vnet_pool if r.type == "sdn_vnet")
             run_validators(
                 (self.node_validator, self.storage_validator, self.network_validator),
                 ProxmoxLiveContext(

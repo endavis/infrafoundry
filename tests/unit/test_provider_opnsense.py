@@ -11,8 +11,8 @@ import pytest
 
 from infrafoundry.core.protocols import ValidatesReferencesInContext
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.providers.openwrt import OpenWrtProvider
 from infrafoundry.providers.opnsense import OPNsenseProvider
-from infrafoundry.providers.proxmox import ProxmoxProvider
 
 _RETIRED_SYSTEM_TYPES = [
     "system.hostname",
@@ -149,11 +149,15 @@ class TestOPNsenseProviderBasic:
 
 
 def test_opnsense_resolves_references_in_context(tmp_path: Path) -> None:
-    """OPNsense opts into context-aware validation; Proxmox keeps the plain hook (#1133)."""
+    """OPNsense opts into context-aware validation (#1133).
+
+    OpenWrt, which has no cross-resource name lookups, keeps the plain hook. Proxmox
+    used to stand here but now implements the hook for its SDN vnet lookups (#1568).
+    """
     opnsense: ValidatesReferencesInContext = OPNsenseProvider(tmp_path, tmp_path)
 
     assert isinstance(opnsense, ValidatesReferencesInContext)
-    assert not isinstance(ProxmoxProvider(tmp_path, tmp_path), ValidatesReferencesInContext)
+    assert not isinstance(OpenWrtProvider(tmp_path, tmp_path), ValidatesReferencesInContext)
 
 
 def test_opnsense_in_context_passes_reference_resources(tmp_path: Path) -> None:

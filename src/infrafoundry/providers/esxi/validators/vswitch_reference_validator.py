@@ -31,7 +31,7 @@ class VswitchReferenceValidator(SpecializedValidator[ValidationContext]):
         resources = context.resources
         # Build a set of (host, vswitch_name) from vswitch resources
         vswitch_set: set[tuple[str, str]] = set()
-        for resource in resources:
+        for resource in [*context.reference_resources, *resources]:
             if resource.type == "vswitch":
                 host = resource.config.get("host", "")
                 vswitch_set.add((host, resource.name))

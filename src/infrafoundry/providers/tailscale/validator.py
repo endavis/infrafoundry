@@ -85,16 +85,23 @@ class TailscaleValidator:
             )
         )
 
-    def validate_references(self, resources: list[ResourceConfig]) -> None:
+    def validate_references(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
         """Run every resource-config validator.
 
         Args:
-            resources: Resources to validate
+            resources: Resources to validate and report on
+            reference_resources: Every Tailscale resource in the environment; the
+                ``acl`` policy is looked up in it plus ``resources`` (#1568)
         """
         context = TailscaleConfigContext(
             resources=resources,
+            reference_resources=list(reference_resources or []),
             auth_mode=detect_auth_mode(cast(dict[str, Any], self.provider_settings)),
-            acl_policy=acl_policy_of(resources),
+            acl_policy=acl_policy_of([*(reference_resources or []), *resources]),
         )
         report = self.report
         run_validators(
