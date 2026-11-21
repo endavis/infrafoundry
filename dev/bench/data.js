@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795297034746,
+  "lastUpdate": 1795298376999,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5590,6 +5590,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000921628814760046",
             "extra": "mean: 127.9659823926451 usec\nrounds: 8292"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "43ece7e94a1f75fa1f66a4b6a79d3e1a34cbbd35",
+          "message": "fix: report each unresolvable settings secret once, against its own instance (merges PR #1597, addresses #1596)\n\nA provider-settings secret:// URI that failed to resolve was reported once\nper live validator hook, without the instance label, and from whichever\nfirewall's entry failed first, because the whole settings block was\nresolved for every instance.\n\n- resolved_provider_settings resolves only the shared keys and the\n  addressed instance's entry (OPNsense firewalls:, Kubernetes clusters:);\n  sibling entries stay unresolved copies, so they make no vault calls.\n- resolved_env_or_report labels the error with the instance name and adds\n  it once per report, which fixes the duplication for OPNsense, Proxmox,\n  OCI and Kubernetes.\n- The OPNsense HA pair check resolves the ha_backup firewall's own\n  settings; a failure there is the existing CARP-read warning.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T21:58:16Z",
+          "tree_id": "ff91d3383bdf13814294227815c73f2afd7f6496",
+          "url": "https://github.com/endavis/infrafoundry/commit/43ece7e94a1f75fa1f66a4b6a79d3e1a34cbbd35"
+        },
+        "date": 1795298376065,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 101.98708974570692,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00033456068770289834",
+            "extra": "mean: 9.805162619047028 msec\nrounds: 105"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16284.062184368706,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000003310507283024108",
+            "extra": "mean: 61.40973847176251 usec\nrounds: 18021"
           }
         ]
       }
