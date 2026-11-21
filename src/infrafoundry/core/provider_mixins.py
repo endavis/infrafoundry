@@ -27,6 +27,7 @@ from infrafoundry.core.package_secret_refs import (
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_instances import split_provider_id
 from infrafoundry.core.security.file_utils import secure_write
+from infrafoundry.core.ssh_options import STRICT_HOST_KEY_OPTS
 
 #: Reserved prefix of a ``terraform_secrets`` entry that names another provider's Terraform
 #: output instead of a SOPS key (#1536).
@@ -255,6 +256,9 @@ class TemplateRendererMixin:
 
     def _register_common_filters(self) -> None:
         """Register common Jinja2 filters used across providers."""
+        # Strict host-key option for generated ssh/rsync commands (#1588)
+        self.jinja_env.globals["ssh_host_key_opts"] = STRICT_HOST_KEY_OPTS
+
         # Convert hyphens to underscores (for Terraform resource names)
         self.jinja_env.filters["to_terraform_name"] = lambda s: str(s).replace("-", "_")
 

@@ -45,7 +45,7 @@ variable "proxmox_ssh_port" {
 locals {
   # SSH command prefix based on configuration
   ssh_opts = var.proxmox_ssh_key_path != "" ? "-i ${var.proxmox_ssh_key_path} -p ${var.proxmox_ssh_port}" : "-p ${var.proxmox_ssh_port}"
-  ssh_cmd  = "ssh ${local.ssh_opts} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  ssh_cmd  = "ssh ${local.ssh_opts} {{ ssh_host_key_opts }}"
 }
 
 {# Dynamic sensitive variables from resource ``terraform_secrets`` references.

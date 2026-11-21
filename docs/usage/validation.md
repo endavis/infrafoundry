@@ -98,16 +98,16 @@ Jumphost preflight: 9 OK, 1 SKIP
 
 | Check | Fails when |
 |-------|-----------|
-| SSH to jumphost | The jumphost can't be reached non-interactively (BatchMode). The remaining checks are skipped. |
+| SSH to jumphost | The jumphost can't be reached non-interactively (BatchMode), or its host key is not in your `known_hosts`. The remaining checks are skipped. |
 | ssh-agent | `ssh-add -l` finds no keys (exit 1) or no agent (exit 2). |
 | key match | A public key the package declares (`ssh_public_key`, or a VM's `ssh_keys`) is not in the agent. Comments are ignored. `SKIP` when the package declares none, for example when the key comes from a cloud-init snippet. |
 | tools | `rsync`, `bash`, `python3`, `ssh` or `scp` is missing on the jumphost. |
 | writable /tmp | The script handler can't create its work directory in `/tmp`. |
-| target (deployed) | SSH from the jumphost to the VM fails. The detail carries ssh's last error line, such as `Permission denied (publickey)`. |
+| target (deployed) | SSH from the jumphost to the VM fails, including a host key that differs from the pinned one. `SKIP` when the package pinned no key. The detail carries ssh's last error line, such as `Permission denied (publickey)`. |
 | target (not deployed) | The jumphost has no route to the IP, or something already answers a ping there, which means another host holds the address. `WARN` when `ip` is missing on the jumphost. |
 | output | Only `WARN`: an `outputs:` destination doesn't render, isn't absolute, or can't be written on the workstation. An apply only warns about these too. |
 
-**Targets** are the package's VMs that have a DHCP reservation whose `hostname` is the VM name; the reservation gives the IP. A VM counts as deployed when its newest state-DB row, ignoring the `planned` rows `infra plan` adds for resources not yet deployed, is `active` or `updating`; `deleted` or no row means not deployed, and anything in between is `SKIP`. Target SSH runs as the package's `ssh_user`, else the user in `jumphost`, with the blueprint scripts' options (`StrictHostKeyChecking=no`, `UserKnownHostsFile=/dev/null`). Leftover `known_hosts` entries on the jumphost therefore can't break an apply and aren't checked.
+**Targets** are the package's VMs that have a DHCP reservation whose `hostname` is the VM name; the reservation gives the IP. A VM counts as deployed when its newest state-DB row, ignoring the `planned` rows `infra plan` adds for resources not yet deployed, is `active` or `updating`; `deleted` or no row means not deployed, and anything in between is `SKIP`. Target SSH runs as the package's `ssh_user`, else the user in `jumphost`, strictly, against the host key the package pinned in `ssh_known_hosts` (staged in a temporary file on the jumphost, looked up by VM name). A deployed VM with no pinned key is `SKIP` with a `foundry secrets host-keys --env <env>` hint. The SSH hop to the jumphost itself is strict against your own `known_hosts`; see [SSH Host Key Checking](../guides/ssh-host-key-checking.md).
 
 A scoped doctor run (`-p`, `-r`, `-P`) reports only on the selected resources and resolves names such as compartments, VCNs, vswitches and interfaces against all of the provider's resources in the environment, so a reference to something another package defines is not flagged.
 
@@ -202,6 +202,7 @@ Beyond the doctor commands, InfraFoundry offers additional validation tools:
 - **Symptom:** Missing templates/networks in doctor output. **Fix:** Create the resource in the provider or update the configuration reference; rerun `foundry infra doctor --env <env>`.
 - **Symptom:** Doctor reports API failures. **Fix:** Verify endpoints, tokens, kubeconfig, and network reachability; test with provider CLIs.
 - **Symptom:** `[FAIL] ssh-agent: agent is running but has no keys loaded`. **Fix:** On the jumphost, load the key the VMs accept into the agent the jumphost user's non-interactive SSH sessions use (for example with `ssh-add` or keychain), then rerun doctor.
+- **Symptom:** `Host key verification failed` or a `No ED25519 host key is known for ...` line for the jumphost or a target. **Fix:** Record the key in your `known_hosts` after checking its fingerprint, or pin the VM key with `foundry secrets host-keys --env <env>`. See [SSH Host Key Checking](../guides/ssh-host-key-checking.md).
 - **Symptom:** Unknown resource/provider. **Fix:** Confirm resource type spelling and provider availability in the current framework version.
 
 ---

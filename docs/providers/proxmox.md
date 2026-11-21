@@ -94,6 +94,7 @@ envs/prod/proxmox/
 A VM with `ova_source` or `disk_image_source` is built over SSH on its
 `target_node` with `qm` commands rather than by cloning. Use it for appliances
 that ship as a disk, not as a cloud image. Such VMs skip cloud-init.
+The `target_node` host key must be in your `~/.ssh/known_hosts`; the ssh calls check it strictly (see [SSH Host Key Checking](../guides/ssh-host-key-checking.md)).
 
 - **`ova_source`** is a path on the Proxmox host to an `.ova`. Its VMDKs are
   extracted and imported in order.

@@ -29,6 +29,7 @@ from infrafoundry.core.state.models import ResourceState
 JUMP = "ansible@jump.example"
 KEY_A = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKeyA ansible@ops"
 KEY_B = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKeyB other@ops"
+PINNED = "vm1,198.51.100.10 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHostKey"
 
 
 def _resource(
@@ -293,17 +294,32 @@ def _target_report(targets: list[Target], extra: list[str]) -> Any:
 
 class TestTargetChecks:
     def test_deployed_target_ssh_ok(self) -> None:
-        target = Target("vm1", "198.51.100.10", "ansible", True)
+        target = Target("vm1", "198.51.100.10", "ansible", True, (PINNED,))
 
         report, run = _target_report([target], ["target 0 ssh 0"])
 
         check = report.checks[-1]
         assert (check.name, check.status) == ("target vm1 (198.51.100.10)", Status.OK)
-        assert "ansible@198.51.100.10 true" in run.calls[0][-1]
-        assert "UserKnownHostsFile=/dev/null" in run.calls[0][-1]
+        script = run.calls[0][-1]
+        assert "ansible@198.51.100.10 true" in script
+        assert "StrictHostKeyChecking=yes" in script
+        assert 'UserKnownHostsFile="$kh"' in script
+        assert "GlobalKnownHostsFile=/dev/null" in script
+        assert "HostKeyAlias=vm1" in script
+        assert "UserKnownHostsFile=/dev/null" not in script
+
+    def test_deployed_target_without_pinned_key_is_skipped(self) -> None:
+        target = Target("vm1", "198.51.100.10", "ansible", True)
+
+        report, run = _target_report([target], [])
+
+        check = report.checks[-1]
+        assert check.status is Status.SKIP
+        assert "foundry secrets host-keys" in check.detail
+        assert "ansible@198.51.100.10" not in run.calls[0][-1]
 
     def test_deployed_target_ssh_failure_carries_the_reason(self) -> None:
-        target = Target("vm1", "198.51.100.10", "ansible", True)
+        target = Target("vm1", "198.51.100.10", "ansible", True, (PINNED,))
 
         report, _ = _target_report(
             [target],
@@ -440,3 +456,69 @@ class TestOutputChecks:
         checks = output_checks([_handler(dest), _handler(dest)], [_with_vars()])
 
         assert len(checks[JUMP]) == 1
+
+
+class TestStrictHostKeys:
+    def test_jumphost_ssh_is_strict(self) -> None:
+        run = _Run(_stdout())
+
+        check_jumphost(JUMP, [], run=run)
+
+        argv = run.calls[0]
+        assert "StrictHostKeyChecking=yes" in argv
+        assert "BatchMode=yes" in argv
+        assert "StrictHostKeyChecking=no" not in argv
+
+    def test_unknown_jumphost_key_fails_with_the_hint(self) -> None:
+        stderr = (
+            "No ED25519 host key is known for jump.example and you have requested strict "
+            "checking.\nHost key verification failed.\n"
+        )
+        run = _Run("", returncode=255, stderr=stderr)
+
+        report = check_jumphost(JUMP, [], run=run)
+
+        assert report.failed
+        assert "ssh-keyscan" in report.checks[0].detail
+        assert "jump.example" in report.checks[0].detail
+
+    def test_targets_pick_only_their_own_pinned_lines(self) -> None:
+        other = "vm2 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOther"
+        vm = _resource("vm1")
+        assert vm.package_variables is not None
+        vm.package_variables["ssh_known_hosts"] = f"{PINNED};{other}"
+        reservation = _reservation("vm1", "198.51.100.10")
+
+        targets = targets_by_jumphost([vm], [vm, reservation], lambda r: True)
+
+        assert targets[JUMP][0].host_keys == (PINNED,)
+
+    def test_staging_and_probe_run_in_a_real_shell(self, tmp_path: Path) -> None:
+        """The key file is mode 0600 while ssh runs, holds the pin, and is gone after."""
+        record = tmp_path / "record.txt"
+        stub = tmp_path / "bin"
+        stub.mkdir()
+        ssh = stub / "ssh"
+        ssh.write_text(
+            "#!/bin/bash\n"
+            'for a in "$@"; do case "$a" in UserKnownHostsFile=*) f="${a#UserKnownHostsFile=}";; '
+            "esac; done\n"
+            f'echo "$f $(stat -c %a "$f") $(cat "$f")" > {record}\n'
+        )
+        ssh.chmod(0o755)
+        target = Target("vm1", "198.51.100.10", "ansible", True, (PINNED,))
+        lines = jumphost_preflight._target_lines([target])
+
+        result = subprocess.run(
+            ["bash", "-c", "; ".join(lines)],
+            capture_output=True,
+            text=True,
+            check=False,
+            env={**os.environ, "PATH": f"{stub}:{os.environ['PATH']}"},
+        )
+
+        assert result.stdout.strip() == "target 0 ssh 0"
+        path, mode, content = record.read_text().strip().split(" ", 2)
+        assert mode == "600"
+        assert content == PINNED
+        assert not Path(path).exists()

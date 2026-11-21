@@ -27,6 +27,7 @@ from infrafoundry.core.result_types import (
 )
 from infrafoundry.core.runners import terraform_orphans
 from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY, BaseRunner
+from infrafoundry.core.ssh_options import host_key_hint
 from infrafoundry.core.terraform_outputs import resolve_output_refs
 from infrafoundry.core.types import ResourceOutcome
 
@@ -540,14 +541,17 @@ class TerraformRunner(BaseRunner):
                 summaries.append(message)
 
         if summaries:
-            return "; ".join(summaries)
+            joined = "; ".join(summaries)
+            hint = host_key_hint(joined)
+            return f"{joined} ({hint})" if hint else joined
 
         # Fallback: truncated stderr
         if stderr_text:
             truncated = stderr_text.strip()
+            hint = host_key_hint(truncated)
             if len(truncated) > 500:
                 truncated = truncated[:500] + "..."
-            return truncated
+            return f"{truncated} ({hint})" if hint else truncated
         return ""
 
     @staticmethod

@@ -800,7 +800,7 @@ class TestScriptHandlerJumphostReexec:
         assert mock_popen.call_count == 1
         cmd = mock_popen.call_args[0][0]
         assert cmd[0] == "ssh"
-        assert "StrictHostKeyChecking=no" in cmd
+        assert "StrictHostKeyChecking=yes" in cmd
         assert "ansible@jump" in cmd
         # The last arg is the remote bash command string
         assert "INFRAFOUNDRY_ON_JUMPHOST=1" in cmd[-1]
@@ -932,6 +932,56 @@ class TestScriptHandlerJumphostReexec:
         assert result.success is False
         assert "mkdir" in (result.reason or "")
         assert mock_popen.call_count == 0
+
+    def test_mkdir_host_key_failure_carries_the_hint(self, tmp_path: Path) -> None:
+        """A strict host-key failure on the jumphost says how to record the key."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="ansible@jump.example.com")
+        stderr = (
+            "No ED25519 host key is known for jump.example.com and you have requested "
+            "strict checking.\nHost key verification failed.\n"
+        )
+        calls: list[list[str]] = []
+
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> Any:
+            calls.append(list(cmd))
+            return MagicMock(returncode=255, stdout="", stderr=stderr)
+
+        with patch(
+            "infrafoundry.core.events.handlers.script.subprocess.run",
+            side_effect=run_side_effect,
+        ):
+            result = handler.execute(context)
+
+        assert result.success is False
+        assert "jump.example.com" in (result.reason or "")
+        assert "ssh-keyscan" in (result.reason or "")
+        assert "StrictHostKeyChecking=yes" in calls[0]
+        assert "UserKnownHostsFile=/dev/null" not in calls[0]
+
+    def test_rsync_uses_strict_checking_and_carries_the_hint(self, tmp_path: Path) -> None:
+        """rsync's ssh is strict, and a host-key failure there carries the hint."""
+        handler, _ = self._handler(tmp_path)
+        context = self._context(jumphost="jh.example.com")
+        stderr = "Host key verification failed.\n"
+        rsync_calls: list[list[str]] = []
+
+        def run_side_effect(cmd: Any, *_args: Any, **_kwargs: Any) -> Any:
+            if cmd[0] == "rsync":
+                rsync_calls.append(list(cmd))
+                return MagicMock(returncode=255, stdout="", stderr=stderr)
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        with patch(
+            "infrafoundry.core.events.handlers.script.subprocess.run",
+            side_effect=run_side_effect,
+        ):
+            result = handler.execute(context)
+
+        assert result.success is False
+        assert rsync_calls[0][rsync_calls[0].index("-e") + 1] == "ssh -o StrictHostKeyChecking=yes"
+        assert "jh.example.com" in (result.reason or "")
+        assert "ssh-keyscan" in (result.reason or "")
 
     def test_cleanup_runs_on_success(self, tmp_path: Path) -> None:
         """Cleanup ssh rm -rf fires after a successful remote run."""
@@ -1650,7 +1700,7 @@ class TestScriptHandlerOutputs:
         assert order == ["scp", "cleanup"]
 
     def test_remote_ssh_opts_forwarded_to_scp(self, tmp_path: Path) -> None:
-        """scp inherits the same StrictHostKeyChecking=no used by the handler."""
+        """scp inherits the same StrictHostKeyChecking=yes used by the handler."""
         handler, _ = self._handler(
             tmp_path,
             outputs=[{"source": "/tmp/remote/out.txt", "dest": str(tmp_path / "out.txt")}],
@@ -1670,7 +1720,7 @@ class TestScriptHandlerOutputs:
             handler.execute(context)
         assert len(scp_calls) == 1
         assert "-o" in scp_calls[0]
-        assert "StrictHostKeyChecking=no" in scp_calls[0]
+        assert "StrictHostKeyChecking=yes" in scp_calls[0]
 
     # -- Extra error-handling paths -------------------------------------
 
