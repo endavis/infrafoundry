@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795261625513,
+  "lastUpdate": 1795262709949,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5134,6 +5134,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004889755530171934",
             "extra": "mean: 77.94458585557739 usec\nrounds: 13645"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4fcb96e31d7328f7437637de2dfca3e88afbae9c",
+          "message": "docs: explain when to use infra doctor, config doctor and infra plan (merges PR #1574, addresses #1573)\n\nAdd a \"Which command when\" section to validation.md comparing foundry\ndoctor, config doctor, infra doctor, infra plan and config show by the\nquestion each answers, its scope and whether it calls the network, with\nthe recommended order. Reword the cli-reference one-liners for infra\nplan, infra doctor and config doctor and link them to the new section.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T12:03:58Z",
+          "tree_id": "95a19bebba2f2e4361a172d1ada62a91f87e4d50",
+          "url": "https://github.com/endavis/infrafoundry/commit/4fcb96e31d7328f7437637de2dfca3e88afbae9c"
+        },
+        "date": 1795262709254,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 43.658046914840995,
+            "unit": "iter/sec",
+            "range": "stddev: 0.002488531649132881",
+            "extra": "mean: 22.905284836735625 msec\nrounds: 49"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7857.669331165521,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000012080293010751189",
+            "extra": "mean: 127.26419983515277 usec\nrounds: 8487"
           }
         ]
       }
