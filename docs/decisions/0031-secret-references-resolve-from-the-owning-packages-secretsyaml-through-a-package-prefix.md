@@ -32,9 +32,11 @@ Alternative rejected: falling back from the env file to the package file for unp
 
 ## Related Issues
 - Issue #1565: resolve secret refs from the owning package's secrets.yaml
+- Issue #1567: show secret sources in `infra doctor`
 
 ## Related Documentation
 - [Infrastructure Packages: Per-Package Secrets](../configuration/infrastructure-packages.md#package-secret-references)
+- [Validation: Secret Sources](../usage/validation.md#secret-sources)
 - [Secrets Architecture](../architecture/secrets-architecture.md)
 - [Kubernetes provider](../providers/kubernetes.md)
 - [ADR-0029: Providers consume other providers' Terraform outputs through outputs references](0029-providers-consume-other-providers-terraform-outputs-through-outputs-references.md)

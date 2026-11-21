@@ -302,6 +302,9 @@ prefix:
   `secrets.yaml` values count, not manifest variables or defaults. `package` is a reserved
   prefix, so a top-level env secrets key named `package` cannot be referenced.
   Unprefixed and `outputs.` references behave as before.
+- **Checking:** `foundry infra doctor --env <env> -p <package>` lists where each reference
+  resolves from and fails on one that does not. See
+  [Secret Sources](../usage/validation.md#secret-sources).
 - **Transport:** the value reaches Terraform as a sensitive variable set through
   `TF_VAR_*` at apply. It is never written to a generated file or logged.
 - **Variable name:** `package_<slug>_<key>`, where the slug is the package directory

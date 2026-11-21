@@ -143,20 +143,28 @@ def validate_terraform_secrets_references(
         )
 
 
+def output_ref_problem(provider_name: str, ref: str, allowed: bool) -> str | None:
+    """Return why an ``outputs.*`` reference is unusable, or None when it is usable.
+
+    Args:
+        provider_name: Provider that carries the reference.
+        ref: A reference starting with ``outputs.``.
+        allowed: Whether the provider accepts ``outputs.*`` references at all.
+
+    Returns:
+        A message naming the ref (never a value), or None.
+    """
+    if not allowed:
+        return f"'{ref}': outputs.* references are supported by the kubernetes provider only"
+    try:
+        parsed = parse_output_ref(ref)
+    except InvalidConfigurationError as exc:
+        return str(exc)
+    if parsed.provider == provider_name:
+        return f"'{ref}' names the provider's own outputs; use another provider"
+    return None
+
+
 def _output_ref_problems(provider_name: str, refs: list[str], allowed: bool) -> list[str]:
     """Return one message per unusable ``outputs.*`` reference."""
-    problems: list[str] = []
-    for ref in refs:
-        if not allowed:
-            problems.append(
-                f"'{ref}': outputs.* references are supported by the kubernetes provider only"
-            )
-            continue
-        try:
-            parsed = parse_output_ref(ref)
-        except InvalidConfigurationError as exc:
-            problems.append(str(exc))
-            continue
-        if parsed.provider == provider_name:
-            problems.append(f"'{ref}' names the provider's own outputs; use another provider")
-    return problems
+    return [p for ref in refs if (p := output_ref_problem(provider_name, ref, allowed)) is not None]

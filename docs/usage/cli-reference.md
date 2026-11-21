@@ -32,7 +32,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 
 - `foundry doctor` -- checks system-level binary dependencies
 - `foundry config doctor` -- checks config repo structure and health
-- `foundry infra doctor --env <env>` -- validates against live provider APIs. Options: `-r/--resource`, `-p/--package`, `-P/--provider` (repeatable; limits validation, connectivity checks and the jumphost preflight to the named providers), `-v/--verbose`. `--package`, `--resource` and `--provider` are mutually exclusive; an unknown provider name fails with the list of available providers. Example: `foundry infra doctor --env <env> -P opnsense`
+- `foundry infra doctor --env <env>` -- validates against live provider APIs. Options: `-r/--resource`, `-p/--package`, `-P/--provider` (repeatable; limits validation, connectivity checks and the jumphost preflight to the named providers), `-v/--verbose`, `--format text|json`. `--package`, `--resource` and `--provider` are mutually exclusive; an unknown provider name fails with the list of available providers. Example: `foundry infra doctor --env <env> -P opnsense`
 
 ## Audience and Prerequisites
 
@@ -393,9 +393,12 @@ foundry infra doctor --env dev
 foundry infra doctor --env dev --resource vm-01 --resource vm-02
 foundry infra doctor --env prod --package k3s-cluster
 foundry infra doctor --env dev --verbose
+foundry infra doctor --env prod --package k3s-cluster --format json
 ```
 
-**Options:** `-e/--env TEXT` (required), `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `-v/--verbose`
+**Options:** `-e/--env TEXT` (required), `-r/--resource TEXT` (repeatable), `-p/--package TEXT`, `-v/--verbose`, `--format [text|json]` (default `text`)
+
+**Secret sources:** with `--package` or `--resource`, doctor also lists where each secret reference of the in-scope resources resolves from and exits 1 when one does not resolve. Values are never shown. With `--format json` the result is one JSON document on stdout and the text report goes to stderr. See [Secret Sources](validation.md#secret-sources).
 
 Note: `--resource` and `--package` are mutually exclusive. They limit which resources are checked; for providers that support it (OPNsense), references still resolve against the whole environment, so a reservation may name a subnet from another package.
 

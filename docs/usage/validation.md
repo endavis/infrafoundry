@@ -85,6 +85,29 @@ Jumphost preflight: 9 OK, 1 SKIP
 
 Any `FAIL` makes doctor exit 1, so `foundry infra doctor --env prod -p k3s-cluster && foundry infra apply --env prod -p k3s-cluster` stops before the apply.
 
+## Secret Sources
+
+With `-p/--package` or `-r/--resource`, `infra doctor` also lists where each secret reference of the in-scope resources resolves from. An unscoped run, or one limited with `-P`, does not print it.
+
+```text
+Secret sources (package example-app):
+  ✓ example-app terraform_secrets[0] package.admin_token -> envs/prod/apps/example-app/secrets.yaml
+  ✓ example-app terraform_secrets[1] db.password -> envs/prod/secrets.yaml
+  - example-app terraform_secrets[2] outputs.opnsense.api_key -> outputs of opnsense (apply time)
+  ✗ example-app terraform_secrets[3] db.missing -> envs/prod/secrets.yaml: Resource 'example-app' references unknown secret key 'db.missing'. Ensure each dotted path exists in the env's secrets file.
+Secret sources: 2 resolved, 1 at apply time, 1 unresolved
+```
+
+| Reference | Source | Status |
+| --- | --- | --- |
+| `package.<key>` | `secrets.yaml` of the package that defines the resource | `✓` when the key exists, else `✗` with the reason |
+| `outputs.<provider>.<output>` | Terraform outputs of that provider | `-` at apply time when well formed, else `✗` |
+| anything else | the environment's `secrets.yaml` | `✓` when the dotted path exists, else `✗` |
+
+**Field paths** name where the reference sits: `terraform_secrets[<i>]`, and for Kubernetes `string_data_secrets.<KEY>`, `data_secrets.<KEY>` and `set_sensitive[<i>].value_secret` (`<i>` counts every `set_sensitive` entry, literal ones included). A malformed field shows as one `✗` row with the reason.
+
+Any `✗` makes doctor exit 1. Only references and paths are shown, never secret values. With `--format json` stdout holds one document (`environment`, `passed`, `providers`, `secret_sources`) and the text report goes to stderr.
+
 ## Validation during plan and apply
 
 `foundry infra plan`, and so `foundry infra apply`, runs each provider's offline validation (`validate_offline`) first, as one pass over every provider in scope. It runs after the provider and resource filters and the policy check, and before any `before_plan` hook, state write or runner call.

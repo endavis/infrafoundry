@@ -1,6 +1,8 @@
 """Infra doctor command - Validate infrastructure against provider APIs."""
 
+import contextlib
 import sys
+from typing import Any
 
 import click
 
@@ -14,10 +16,19 @@ from infrafoundry.core.jumphost_preflight import (
     targets_by_jumphost,
 )
 from infrafoundry.core.orchestrator import Orchestrator
+from infrafoundry.core.provider import ResourceConfig
 
 from ...decorators import with_orchestrator
+from ...output import output_data
 from ...utils import console
 from ._firewall import CLUSTER_HELP, FIREWALL_HELP, expand_provider_filter
+from ._secret_sources import (
+    SecretSourceRow,
+    SourceStatus,
+    collect_secret_sources,
+    print_secret_sources,
+    secret_sources_json,
+)
 
 _STATUS_STYLE = {
     Status.OK: "green",
@@ -70,6 +81,13 @@ _STATUS_STYLE = {
     default=False,
     help="Show detailed validation output including passing checks",
 )
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    help="Output format (default: text). json sends the text report to stderr.",
+)
 @with_orchestrator("Validation failed")
 def doctor(
     _ctx: click.Context,
@@ -81,6 +99,7 @@ def doctor(
     firewall: tuple[str, ...],
     cluster: tuple[str, ...],
     verbose: bool,
+    output_format: str,
 ) -> None:
     """Validate infrastructure configuration against provider APIs.
 
@@ -102,6 +121,12 @@ def doctor(
     if deployed; a route and a free IP if not), and that each ``outputs:``
     destination can be written locally.
 
+    With ``--package`` or ``--resource`` it also lists where each secret reference
+    of the in-scope resources resolves from (package secrets.yaml, another provider's
+    outputs, or the environment's secrets.yaml) and fails on any that does not. Values
+    are never shown. ``--format json`` prints one JSON document on stdout and sends
+    the text report to stderr.
+
     This helps catch configuration errors before attempting deployment.
 
     Examples:
@@ -120,6 +145,9 @@ def doctor(
 
         # Show detailed output with all passing checks
         infra doctor --env test --verbose
+
+        # Machine-readable result
+        infra doctor --env test --package k3s-cluster --format json
     """
     if (provider or firewall or cluster) and (package_name or resource):
         raise click.UsageError("--package, --resource, and --provider are mutually exclusive")
@@ -138,19 +166,63 @@ def doctor(
     # Only pass the filter when set, so unfiltered calls keep their original signature.
     extra: dict[str, list[str]] = {"provider_filter": provider_filter} if provider_filter else {}
 
-    results = orchestrator.validate(
-        env_name=env,
-        resource_filter=resource_filter,
-        verbose=verbose,
-        **extra,
-    )
+    as_json = output_format == "json"
+    # JSON mode keeps stdout for the one document; the text report goes to stderr.
+    text_out = contextlib.redirect_stdout(sys.stderr) if as_json else contextlib.nullcontext()
+    with text_out:
+        results = orchestrator.validate(
+            env_name=env,
+            resource_filter=resource_filter,
+            verbose=verbose,
+            **extra,
+        )
 
-    has_errors = any(r["errors"] > 0 for r in results.values())
-    if _jumphost_preflight(orchestrator, env, resource_filter, provider_filter):
-        has_errors = True
+        has_errors = any(r["errors"] > 0 for r in results.values())
+        if _jumphost_preflight(orchestrator, env, resource_filter, provider_filter):
+            has_errors = True
+        secret_rows: list[SecretSourceRow] | None = None
+        if resource_filter is not None:
+            scope = (
+                f"package {package_name}" if package_name else f"resource(s) {', '.join(resource)}"
+            )
+            secret_rows = _secret_sources(orchestrator, env, resource_filter, scope)
+            if any(r.status is SourceStatus.UNRESOLVED for r in secret_rows):
+                has_errors = True
+    if as_json:
+        data: dict[str, Any] = {
+            "environment": env,
+            "passed": not has_errors,
+            "providers": {
+                name: {"errors": r["errors"], "warnings": r["warnings"]}
+                for name, r in results.items()
+            },
+            "secret_sources": (
+                secret_sources_json(secret_rows, scope) if secret_rows is not None else None
+            ),
+        }
+        output_data(data, "json")
     if has_errors:
         sys.exit(1)
     sys.exit(0)
+
+
+def _secret_sources(
+    orchestrator: Orchestrator,
+    env: str,
+    resource_filter: list[str],
+    scope: str,
+) -> list[SecretSourceRow]:
+    """Collect and print the secret sources of the in-scope resources."""
+    config_manager = orchestrator.config_manager
+    wanted = set(resource_filter)
+    resources: list[ResourceConfig] = [
+        r for r in config_manager.get_all_resources_all_providers(env) if r.name in wanted
+    ]
+    rows = collect_secret_sources(
+        resources, env, lambda: config_manager.load_environment(env).secrets
+    )
+    print_secret_sources(rows, scope)
+    return rows
 
 
 def _jumphost_preflight(
