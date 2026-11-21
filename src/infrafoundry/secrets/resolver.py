@@ -181,7 +181,6 @@ class SecretResolver:
 
             # Cache it
             self._backends[backend_name] = backend
-            logger.debug(f"Loaded backend: {backend_name}")
 
             return backend
 
