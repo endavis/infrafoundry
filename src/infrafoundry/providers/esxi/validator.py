@@ -60,7 +60,11 @@ class EsxiValidator:
             hostname = host_settings.get("hostname", host_name)
             self.host_connectivity_validator.validate(EsxiHostContext(hostname=hostname))
 
-    def validate_references(self, resources: list[ResourceConfig]) -> None:
+    def validate_references(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
         """Validate cross-references between ESXi resources.
 
         Checks:
@@ -68,7 +72,9 @@ class EsxiValidator:
         - VMs reference portgroups that exist on the same host
 
         Args:
-            resources: List of resources to validate
+            resources: List of resources to validate and report on
+            reference_resources: Every ESXi resource in the environment, used to resolve
+                vswitch and portgroup names when ``resources`` is a filtered subset
         """
         run_validators(
             (
@@ -76,5 +82,7 @@ class EsxiValidator:
                 self.portgroup_reference_validator,
                 self.ovf_deployment_validator,
             ),
-            ValidationContext(resources=resources),
+            ValidationContext(
+                resources=resources, reference_resources=list(reference_resources or [])
+            ),
         )

@@ -103,3 +103,18 @@ def test_reference_to_unknown_interface_is_flagged(factory: FakeRouterOS) -> Non
     with patch("infrafoundry.providers.mikrotik.validator.load_settings", return_value=SETTINGS):
         validator.validate_references(resources)
     assert _failed(report) == ["mikrotik_reference_b"]
+
+
+def test_reference_to_interface_declared_in_another_package(factory: FakeRouterOS) -> None:
+    """A scoped run counts an interface declared in the reference set as existing (#1568)."""
+    vlan = resource("interface.vlan", "vlan10", interface="bridge", **{"vlan-id": 10})
+    addr = resource("ip.address", "a", address="192.0.2.2/24", interface="vlan10")
+    validator, report = _validator(factory)
+    with patch("infrafoundry.providers.mikrotik.validator.load_settings", return_value=SETTINGS):
+        validator.validate_references([addr], [vlan, addr])
+    assert _failed(report) == []
+
+    validator, report = _validator(factory)
+    with patch("infrafoundry.providers.mikrotik.validator.load_settings", return_value=SETTINGS):
+        validator.validate_references([addr])
+    assert _failed(report) == ["mikrotik_reference_a"]

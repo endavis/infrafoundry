@@ -78,11 +78,17 @@ class AWSValidator:
             )
         )
 
-    def validate_references(self, resources: list[ResourceConfig]) -> None:
+    def validate_references(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
         """Run the tailscale, secret-reference and resource-config validators.
 
         Args:
-            resources: Resources to validate
+            resources: Resources to validate and report on
+            reference_resources: Every AWS resource in the environment, used to resolve
+                security group and instance names when ``resources`` is a filtered subset
         """
         check_tailscale_blocks(resources, self.report)
         validate_terraform_secrets_references("aws", resources, self.env_config, self.report)
@@ -92,5 +98,5 @@ class AWSValidator:
                 InstanceValidator(self.report),
                 EbsVolumeValidator(self.report),
             ),
-            AWSConfigContext.from_resources(resources),
+            AWSConfigContext.from_resources(resources, reference_resources),
         )

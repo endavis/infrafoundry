@@ -83,6 +83,8 @@ Jumphost preflight: 9 OK, 1 SKIP
 
 **Targets** are the package's VMs that have a DHCP reservation whose `hostname` is the VM name; the reservation gives the IP. A VM counts as deployed when its newest state-DB row, ignoring the `planned` rows `infra plan` adds for resources not yet deployed, is `active` or `updating`; `deleted` or no row means not deployed, and anything in between is `SKIP`. Target SSH runs as the package's `ssh_user`, else the user in `jumphost`, with the blueprint scripts' options (`StrictHostKeyChecking=no`, `UserKnownHostsFile=/dev/null`). Leftover `known_hosts` entries on the jumphost therefore can't break an apply and aren't checked.
 
+A scoped doctor run (`-p`, `-r`, `-P`) reports only on the selected resources and resolves names such as compartments, VCNs, vswitches and interfaces against all of the provider's resources in the environment, so a reference to something another package defines is not flagged.
+
 Any `FAIL` makes doctor exit 1, so `foundry infra doctor --env prod -p k3s-cluster && foundry infra apply --env prod -p k3s-cluster` stops before the apply.
 
 ## Secret Sources

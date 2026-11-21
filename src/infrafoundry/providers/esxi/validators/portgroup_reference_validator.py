@@ -31,7 +31,7 @@ class PortgroupReferenceValidator(SpecializedValidator[ValidationContext]):
         resources = context.resources
         # Build a set of (host, portgroup_name) from portgroup resources
         portgroup_set: set[tuple[str, str]] = set()
-        for resource in resources:
+        for resource in [*context.reference_resources, *resources]:
             if resource.type == "portgroup":
                 host = resource.config.get("host", "")
                 portgroup_set.add((host, resource.name))

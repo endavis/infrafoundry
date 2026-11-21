@@ -85,6 +85,18 @@ class MikroTikProvider(
         """Run schema, settings and interface-reference checks."""
         MikroTikValidator(env_config, report, self.config_dir).validate_references(resources)
 
+    def validate_references_in_context(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig],
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+    ) -> None:
+        """Validate *resources*, resolving names against *reference_resources* (#1568)."""
+        MikroTikValidator(env_config, report, self.config_dir).validate_references(
+            resources, reference_resources
+        )
+
     def validate_offline(
         self,
         resources: list[ResourceConfig],

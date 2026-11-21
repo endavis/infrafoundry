@@ -115,18 +115,26 @@ class MikroTikValidator:
                 level=ValidationLevel.WARNING,
             )
 
-    def validate_references(self, resources: list[ResourceConfig]) -> None:
+    def validate_references(
+        self,
+        resources: list[ResourceConfig],
+        reference_resources: list[ResourceConfig] | None = None,
+    ) -> None:
         """Check schema and settings, then that every referenced interface exists.
 
         An interface or bridge exists when the device holds it or a resource declares it.
 
         Args:
             resources: Resources to validate; only MikroTik types are checked.
+            reference_resources: Every MikroTik resource in the environment; the
+                interfaces and bridges they declare count as existing (#1568).
         """
         self.validate_offline(resources)
+        selected = {(r.type, r.name) for r in resources}
+        others = [r for r in reference_resources or [] if (r.type, r.name) not in selected]
         declared = {
             str(obj.fields.get("name"))
-            for obj in _safe_desired(resources)
+            for obj in _safe_desired([*others, *resources])
             if obj.type_name in ("interface.bridge", "interface.vlan")
         }
         try:
