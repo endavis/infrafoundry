@@ -27,6 +27,8 @@ foundry infra destroy --env dev --package aiqum
 - Running the post-deploy event handler against an example jumphost and
   ONTAP cluster (replace the placeholder hosts and `CHANGE_ME` secrets
   before applying)
+- Optionally setting `ontap_cert_fingerprint` to enable the pre-check of ONTAP's DNS
+  (see the blueprint README)
 
 ## Per-Instance Overrides
 

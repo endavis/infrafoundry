@@ -14,7 +14,8 @@ Steps:
   3. Change admin password
   4. Enable API Gateway
   5. Add ONTAP cluster (after a pre-check that ONTAP's DNS resolves the AIQUM
-     hostname; see #1168)
+     hostname; see #1168. The pre-check reads ONTAP only when its certificate
+     matches the pinned ``ontap_cert_fingerprint``)
   6. Mark setup complete
   7. Create default alert policy (if aiqum_alert_email set)
   8. Send test alert email (if alert created)
@@ -23,6 +24,9 @@ Steps:
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
+import http.client
 import json
 import os
 import random
@@ -480,36 +484,120 @@ def query_dns_a(server: str, name: str, timeout: float = DNS_QUERY_TIMEOUT) -> l
         raise OSError(str(exc)) from exc
 
 
+def normalize_fingerprint(value: str) -> str:
+    """Normalize a SHA-256 certificate fingerprint to 64 lowercase hex digits.
+
+    Accepts the forms ``openssl x509 -fingerprint -sha256`` prints: with or
+    without colons, in either case, with or without the ``... Fingerprint=``
+    prefix.
+
+    Args:
+        value: The fingerprint as configured.
+
+    Returns:
+        The fingerprint as 64 lowercase hex characters.
+
+    Raises:
+        ValueError: If the value is not a SHA-256 fingerprint.
+    """
+    text = value.strip()
+    if "=" in text:
+        text = text.split("=", 1)[1]
+    text = "".join(text.replace(":", "").split()).lower()
+    if len(text) != 64 or any(c not in "0123456789abcdef" for c in text):
+        raise ValueError("ontap_cert_fingerprint must be a SHA-256 fingerprint (64 hex digits)")
+    return text
+
+
+def _format_fingerprint(hex_digest: str) -> str:
+    """Format a hex digest like openssl prints it (uppercase, colon separated)."""
+    upper = hex_digest.upper()
+    return ":".join(upper[i : i + 2] for i in range(0, len(upper), 2))
+
+
+class OntapCertificateMismatchError(OSError):
+    """ONTAP presented a certificate other than the pinned one."""
+
+
+def _ontap_get_json(host: str, path: str, auth_token: str, fingerprint: str) -> Any:
+    """GET a JSON document from ONTAP, sending credentials only to the pinned certificate.
+
+    The TLS connection is opened first and the peer certificate's SHA-256 digest
+    compared with ``fingerprint``; the request, with its ``Authorization``
+    header, is written only on a match.
+
+    Args:
+        host: ``host`` or ``host:port`` of the ONTAP management interface.
+        path: Request path with query string.
+        auth_token: Base64 ``user:password`` for Basic auth.
+        fingerprint: Normalized SHA-256 fingerprint (64 lowercase hex digits).
+
+    Returns:
+        The decoded JSON body.
+
+    Raises:
+        OntapCertificateMismatchError: If the presented certificate does not match.
+        OSError: On connection failures or an HTTP error status.
+        ValueError: If the body is not JSON.
+    """
+    conn = http.client.HTTPSConnection(  # nosec B309  # pinned below, before any request
+        host, timeout=ONTAP_REST_TIMEOUT, context=make_ssl_context()
+    )
+    try:
+        conn.connect()
+        der = conn.sock.getpeercert(binary_form=True) if conn.sock is not None else None  # type: ignore[attr-defined]
+        presented = hashlib.sha256(der).hexdigest() if der else ""
+        if not presented or not hmac.compare_digest(presented, fingerprint):
+            shown = _format_fingerprint(presented) if presented else "none"
+            raise OntapCertificateMismatchError(
+                "ONTAP presented a different certificate than ontap_cert_fingerprint: "
+                f"expected {_format_fingerprint(fingerprint)}, presented {shown}"
+            )
+        conn.request(
+            "GET",
+            path,
+            headers={"Authorization": f"Basic {auth_token}", "Accept": "application/json"},
+        )
+        resp = conn.getresponse()
+        if resp.status >= 400:
+            raise OSError(f"ONTAP REST returned HTTP {resp.status}")
+        return json.loads(resp.read())
+    except http.client.HTTPException as exc:
+        raise OSError(f"ONTAP REST request failed ({exc})") from exc
+    finally:
+        conn.close()
+
+
 def fetch_ontap_dns(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     """Read the DNS servers and search domains configured on the ONTAP cluster.
 
     Args:
-        config: Package variables with ``ontap_cluster_ip``, ``ontap_admin_user``
-            and ``ontap_admin_password``.
+        config: Package variables with ``ontap_cluster_ip``, ``ontap_admin_user``,
+            ``ontap_admin_password`` and ``ontap_cert_fingerprint``.
 
     Returns:
         ``(servers, domains)`` collected from every DNS record.
 
     Raises:
+        OntapCertificateMismatchError: If ONTAP presents a certificate other than the
+            pinned one (no credentials are sent).
         OSError: If ONTAP cannot be reached or answers with an HTTP error.
-        ValueError: If the response is not the expected JSON.
+        ValueError: If the fingerprint is missing or invalid, or the response is
+            not the expected JSON.
     """
+    raw_fingerprint = config.get("ontap_cert_fingerprint")
+    if not raw_fingerprint:
+        raise ValueError("ontap_cert_fingerprint is not set")
+    fingerprint = normalize_fingerprint(str(raw_fingerprint))
     token = base64.b64encode(
         f"{config['ontap_admin_user']}:{config['ontap_admin_password']}".encode()
     ).decode("ascii")
-    req = Request(
-        f"https://{config['ontap_cluster_ip']}/api/name-services/dns?fields=servers,domains",
-        method="GET",
+    payload = _ontap_get_json(
+        config["ontap_cluster_ip"],
+        "/api/name-services/dns?fields=servers,domains",
+        token,
+        fingerprint,
     )
-    req.add_header("Authorization", f"Basic {token}")
-    req.add_header("Accept", "application/json")
-    try:
-        with urlopen(  # nosec B310  # URL built from package variables
-            req, context=make_ssl_context(), timeout=ONTAP_REST_TIMEOUT
-        ) as resp:
-            payload = json.loads(resp.read())
-    except HTTPError as exc:
-        raise OSError(f"ONTAP REST returned HTTP {exc.code}") from exc
     records = payload.get("records") if isinstance(payload, dict) else None
     if not isinstance(records, list):
         raise ValueError("unexpected ONTAP DNS response")
@@ -539,11 +627,19 @@ def check_ontap_resolves_aiqum(config: dict[str, Any]) -> tuple[bool | None, str
         ``(True, detail)`` if a DNS server returned ``ip_address`` for the
         hostname, ``(False, message)`` if the servers answered but never with
         that address, ``(None, reason)`` if the check was inconclusive (no
-        ``vm_name``, ONTAP REST or every DNS server unreachable).
+        ``vm_name``, no pinned ``ontap_cert_fingerprint`` so ONTAP is never
+        contacted, a certificate mismatch, ONTAP REST or every DNS server
+        unreachable).
     """
     vm_name = config.get("vm_name")
     if not vm_name:
         return None, ""
+    if not config.get("ontap_cert_fingerprint"):
+        return None, (
+            "ONTAP's certificate is not pinned, so its DNS configuration was not read; "
+            "set ontap_cert_fingerprint (SHA-256 of the ONTAP management certificate) "
+            "to enable this check"
+        )
     expected = config["ip_address"]
 
     try:

@@ -73,6 +73,9 @@ inputs:
   # --- ONTAP integration ---
   - name: ontap_admin_user
     default: admin
+  - name: ontap_cert_fingerprint
+    description: "SHA-256 fingerprint of the ONTAP cluster management certificate; empty: skip the DNS pre-check's ONTAP lookup"
+    default: ""
 
   # --- DNS ---
   # Publish a DNS name (OPNsense Unbound host override) for each reserved IP so
