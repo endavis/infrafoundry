@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795216779871,
+  "lastUpdate": 1795247814495,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4868,6 +4868,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000049423052215229195",
             "extra": "mean: 93.75888110526857 usec\nrounds: 11220"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d20a9db3cbaae8443260693f4070b6c25f0822d7",
+          "message": "fix: keep bracketed text in cli error output (merges PR #1561, addresses #1541)\n\nfix: escape rich markup in cli error and message helpers\n\nRich parsed square brackets in exception messages as markup and dropped\nthem, so an error such as \"actor cannot set scopes: [a b] (403)\" lost the\nbracketed part. Escape message text with rich.markup.escape in\nraise_cli_error and in the semantic console helpers that wrap text in\ntheir own style tags. info() and print() stay raw because callers may\npass markup.\n\nAddresses #1541\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T07:55:49Z",
+          "tree_id": "9bf0adc09f46db71fe99af3c1596e553a3017ffe",
+          "url": "https://github.com/endavis/infrafoundry/commit/d20a9db3cbaae8443260693f4070b6c25f0822d7"
+        },
+        "date": 1795247813871,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 77.46100642842597,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003445380846147865",
+            "extra": "mean: 12.909721240505709 msec\nrounds: 79"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13888.357859807875,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008690116960718837",
+            "extra": "mean: 72.00275296001291 usec\nrounds: 15625"
           }
         ]
       }
