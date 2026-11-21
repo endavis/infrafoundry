@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795284018596,
+  "lastUpdate": 1795284937186,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5438,6 +5438,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000471928753775915",
             "extra": "mean: 60.65564874006133 usec\nrounds: 17739"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "74c81406ddd6d156df9f2e2ff9ba5d3f461347d6",
+          "message": "feat: pass the vaultwarden master password to bw by environment variable (merges PR #1591, addresses #1590)\n\nVaultwardenProvider now unlocks with `bw unlock --passwordenv BW_PASSWORD\n--raw`. bw reads the password from the environment it inherits, so the\nvalue never appears on the command line. The not-found error in _run_bw\nnames only the bw subcommand instead of the full argument list.\n\nTests run the provider against a stub bw that records its arguments and\nenvironment. The docs say how the password reaches bw.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T18:14:19Z",
+          "tree_id": "d10a46ed4c1442e01365b05c323a40e6ded5f824",
+          "url": "https://github.com/endavis/infrafoundry/commit/74c81406ddd6d156df9f2e2ff9ba5d3f461347d6"
+        },
+        "date": 1795284936663,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 59.743978416223506,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005413596745868596",
+            "extra": "mean: 16.738088532256995 msec\nrounds: 62"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 11179.176218160545,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006023656786034548",
+            "extra": "mean: 89.4520294237336 usec\nrounds: 12201"
           }
         ]
       }
