@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795276938018,
+  "lastUpdate": 1795281373917,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5362,6 +5362,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004821726786467389",
             "extra": "mean: 64.03386009625703 usec\nrounds: 16833"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e408ae502653e25ca9129e473f432c860a6d244c",
+          "message": "feat: verify the ontap certificate in the aiqum dns pre-check (merges PR #1587, addresses #1586)\n\nThe aiqum initial setup reads ONTAP's DNS configuration with the cluster\nadmin credentials before it adds the cluster. It now does so only to a\ncertificate that matches the new optional ontap_cert_fingerprint package\nvariable (SHA-256).\n\n- Unset: ONTAP is not contacted, and the check reports inconclusive with a\n  hint on how to enable it. Setup carries on as before.\n- Set: the script opens the TLS connection, compares the peer\n  certificate's SHA-256, and sends the request with credentials only on a\n  match. A mismatch raises before any request is written and names both\n  fingerprints.\n- Fingerprints are accepted with or without colons, in either case, and\n  with openssl's \"sha256 Fingerprint=\" prefix.\n\nThe AIQUM connections keep their existing first-boot TLS handling.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T17:15:09Z",
+          "tree_id": "c053e2ad584cad17779e0e8bfd572dcd46c42817",
+          "url": "https://github.com/endavis/infrafoundry/commit/e408ae502653e25ca9129e473f432c860a6d244c"
+        },
+        "date": 1795281373393,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 72.04415330588544,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005747497574311949",
+            "extra": "mean: 13.880376881579755 msec\nrounds: 76"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14439.924307295787,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004180101442200874",
+            "extra": "mean: 69.25244057510392 usec\nrounds: 16138"
           }
         ]
       }
