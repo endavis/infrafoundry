@@ -24,6 +24,32 @@ InfraFoundry provides a three-tier validation system to catch configuration, ref
 - After editing settings, resources, or secrets to ensure structural integrity.
 - In CI to block merges when validation fails.
 
+## Which Command When
+
+The doctors and `infra plan` answer different questions. The doctors check that the tools, the config repo and an environment are sound. `infra plan` shows what an apply would change. None of them changes infrastructure.
+
+| Command | Question it answers | Scope | Calls the network |
+| :--- | :--- | :--- | :--- |
+| `foundry doctor` | Are the tools installed? | The workstation | No |
+| `foundry config doctor` | Is the config repo healthy? | The whole config repo, every environment | No provider APIs; it reads local files and the state backend |
+| `foundry infra doctor --env <env>` | Is this environment's config valid against the real systems, and where do its secrets come from? | One environment, narrowed with `--provider`, `--package` or `--resource` | Yes: provider APIs, SSH to jumphosts |
+| `foundry infra plan --env <env>` | What would an apply change? | One environment, narrowed with `--provider`, `--package` or `--resource` | Validation is offline; the runner's plan (for example `terraform plan`) reads live state |
+| `foundry config show --env <env>` | What does the resolved config look like? | One environment | No |
+
+`infra plan` is the only one of these that produces output for an apply: it records a deployment in the state database and, unless `--dry-run` is given, generates the files under `generated/<env>/` and runs each runner's plan.
+
+Neither doctor prints your configuration. To see it after variable substitution, use `config show`. A scoped `infra doctor` (`--package` or `--resource`) lists where each secret reference resolves, without showing values ([Secret Sources](#secret-sources)).
+
+Run them from the widest scope to the narrowest:
+
+1. `foundry doctor`: after installing or upgrading tools.
+2. `foundry config doctor`: after cloning or restructuring the config repo, adding an environment or changing SOPS keys.
+3. `foundry infra doctor --env <env>`: after editing an environment's resources, packages or secrets.
+4. `foundry infra plan --env <env>`: to review the change set.
+5. `foundry infra apply --env <env>`: to make the change.
+
+`infra plan` repeats the offline part of the provider validation that `infra doctor` runs, so a plan fails on a config error even when no doctor was run. The checks that need the network run only in `infra doctor` ([Validation during plan and apply](#validation-during-plan-and-apply)).
+
 ## Three-Tier Doctor System
 
 InfraFoundry validation is organized into three levels, each checking a different scope:

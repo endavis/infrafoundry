@@ -213,7 +213,7 @@ Configuration repo management: environments, schemas, diffs, health, blueprints,
 
 ### `config doctor`
 
-Check configuration repository health: repo structure, environments, state backend, SOPS keys, state/filesystem consistency, blueprint validation.
+Check configuration repository health across every environment: repo structure, environments, state backend, SOPS keys, state/filesystem consistency, blueprint validation. It calls no provider API and changes nothing. For live checks of one environment use `infra doctor`; see [Which command when](validation.md#which-command-when).
 
 ```bash
 foundry config doctor                 # basic health check
@@ -386,7 +386,7 @@ Day-2 infrastructure operations: plan, apply, destroy, drift, rollback, security
 
 ### `infra doctor`
 
-Validate infrastructure against provider APIs (connectivity, nodes, storage, networks, templates, resource IDs, MAC conflicts).
+Validate one environment's configuration against the real systems: provider API connectivity, nodes, storage, networks, templates, resource IDs and MAC conflicts, plus secret sources and the jumphost preflight for a `--package` or `--resource` run. It changes nothing. To see what an apply would change use `infra plan`; see [Which command when](validation.md#which-command-when).
 
 ```bash
 foundry infra doctor --env dev
@@ -406,7 +406,7 @@ Note: `--resource` and `--package` are mutually exclusive. They limit which reso
 
 ### `infra plan`
 
-Generate Terraform/Ansible files for an environment.
+Show what an apply would change: run the offline validation, generate the Terraform/Ansible files for the environment and print each provider's change summary. It changes no infrastructure. Live config checks stay in `infra doctor`; see [Which command when](validation.md#which-command-when).
 
 ```bash
 foundry infra plan --env dev
