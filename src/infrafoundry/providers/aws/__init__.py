@@ -19,7 +19,7 @@ from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
     TerraformGeneratorMixin,
-    sanitize_secret_ref_to_tf_var,
+    collect_terraform_secret_vars,
 )
 from infrafoundry.core.tailscale import process_tailscale_config
 from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
@@ -167,10 +167,7 @@ class AWSProvider(
         self._last_terraform_resources = processed
 
         self.render_backend()
-        secret_vars = [
-            {"name": sanitize_secret_ref_to_tf_var(ref), "source": ref}
-            for ref in self.collect_terraform_secret_refs(processed)
-        ]
+        secret_vars = collect_terraform_secret_vars(processed)
         self.render_provider_and_variables(variables_context={"terraform_secret_vars": secret_vars})
 
         groups = resources_by_type.get("security_group", [])

@@ -259,3 +259,141 @@ class TestValidation:
             _validate([_secret(string_data_secrets={"pw": "app.x"})], {"app": {"x": "y"}})
         run.assert_not_called()
         v.assert_not_called()
+
+
+# --- package.<key> references (#1565) -------------------------------------------
+
+
+def _pkg(res: ResourceConfig, path: str, secrets: dict[str, Any] | None) -> ResourceConfig:
+    res.package_name = "example-app"
+    res.package_path = path
+    res.package_secrets = secrets
+    return res
+
+
+_PKG_VAR = "package_kubernetes_example_app_admin_token"
+
+
+class TestPackageRefs:
+    def test_all_fields_render_package_var(self, provider: KubernetesProvider) -> None:
+        secret = _pkg(
+            _secret(
+                string_data_secrets={"pw": "package.admin_token"},
+                data_secrets={"tls": "package.admin_token"},
+                terraform_secrets=["package.admin_token"],
+            ),
+            "kubernetes/example-app",
+            {"admin_token": _B64},
+        )
+        helm = _pkg(
+            _helm(
+                chart="c",
+                repository="https://charts.example.com",
+                set_sensitive=[{"name": "x", "value_secret": "package.admin_token"}],
+            ),
+            "kubernetes/example-app",
+            {"admin_token": _B64},
+        )
+        provider.generate_terraform([secret, helm])
+        files = {p.name: p.read_text() for p in _tf_dir(provider).glob("*.tf")}
+        assert f'"pw" = var.{_PKG_VAR}' in files["secrets.tf"]
+        assert f'"tls" = var.{_PKG_VAR}' in files["secrets.tf"]
+        assert f"value = var.{_PKG_VAR}" in files["helm_releases.tf"]
+        assert f'variable "{_PKG_VAR}"' in files["variables.tf"]
+        assert files["variables.tf"].count(f'variable "{_PKG_VAR}"') == 1
+        assert "sensitive   = true" in files["variables.tf"]
+        for content in files.values():
+            assert _B64 not in content
+
+    def test_two_packages_distinct_vars_and_values(
+        self, provider: KubernetesProvider, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        a = _pkg(
+            _res("secrets", "a", string_data_secrets={"pw": "package.admin_token"}),
+            "kubernetes/app-a",
+            {"admin_token": "value-a"},
+        )
+        b = _pkg(
+            _res("secrets", "b", string_data_secrets={"pw": "package.admin_token"}),
+            "kubernetes/app-b",
+            {"admin_token": "value-b"},
+        )
+        env = make_env_config(name="test", secrets={})
+        monkeypatch.setattr(provider, "_load_environment_config", lambda: env)
+        provider.generate_terraform([a, b])
+        content = (_tf_dir(provider) / "secrets.tf").read_text()
+        assert "var.package_kubernetes_app_a_admin_token" in content
+        assert "var.package_kubernetes_app_b_admin_token" in content
+        result = provider.get_terraform_env_vars()
+        assert result["TF_VAR_package_kubernetes_app_a_admin_token"] == "value-a"
+        assert result["TF_VAR_package_kubernetes_app_b_admin_token"] == "value-b"
+        for tf in _tf_dir(provider).glob("*.tf"):
+            assert "value-a" not in tf.read_text()
+            assert "value-b" not in tf.read_text()
+
+    def test_env_vars_carry_value_and_logs_do_not(
+        self,
+        provider: KubernetesProvider,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        caplog.set_level("DEBUG")
+        env = make_env_config(name="test", secrets={})
+        monkeypatch.setattr(provider, "_load_environment_config", lambda: env)
+        res = _pkg(
+            _secret(string_data_secrets={"pw": "package.admin_token"}),
+            "kubernetes/example-app",
+            {"admin_token": _PLACEHOLDER},
+        )
+        provider.generate_terraform([res])
+        assert provider.get_terraform_env_vars()[f"TF_VAR_{_PKG_VAR}"] == _PLACEHOLDER
+        assert _PLACEHOLDER not in caplog.text
+
+    def test_terraform_secrets_list_form(self, provider: KubernetesProvider) -> None:
+        res = _pkg(
+            _secret(string_data={"a": "b"}, terraform_secrets=["package.admin_token"]),
+            "kubernetes/example-app",
+            {"admin_token": _PLACEHOLDER},
+        )
+        provider.generate_terraform([res])
+        assert f'variable "{_PKG_VAR}"' in (_tf_dir(provider) / "variables.tf").read_text()
+
+    def test_validation_errors_name_package_and_ref_only(self) -> None:
+        resources = [
+            _secret(string_data_secrets={"pw": "package.admin_token"}),
+            _pkg(
+                _res("secrets", "b", string_data_secrets={"pw": "package.admin_token"}),
+                "kubernetes/example-app",
+                {"other": _PLACEHOLDER},
+            ),
+        ]
+        errors = _errors(_validate(resources, {}))
+        assert len(errors) == 2
+        assert all("package.admin_token" in e for e in errors)
+        assert all(_PLACEHOLDER not in e for e in errors)
+
+    def test_valid_package_ref_passes(self) -> None:
+        res = _pkg(
+            _secret(string_data_secrets={"pw": "package.admin_token"}),
+            "kubernetes/example-app",
+            {"admin_token": _PLACEHOLDER},
+        )
+        assert _errors(_validate([res], {})) == []
+
+    def test_data_secrets_base64_validation_value_free(self) -> None:
+        bad = "!!not base64!!"
+        res = _pkg(
+            _secret(data_secrets={"tls": "package.key"}),
+            "kubernetes/example-app",
+            {"key": bad},
+        )
+        errors = _errors(_validate([res], {}))
+        assert len(errors) == 1
+        assert "package.key" in errors[0]
+        assert bad not in errors[0]
+        ok = _pkg(
+            _secret(data_secrets={"tls": "package.key"}),
+            "kubernetes/example-app",
+            {"key": _B64},
+        )
+        assert _errors(_validate([ok], {})) == []

@@ -156,6 +156,8 @@ config:
 
 The values reach Terraform as sensitive variables set through `TF_VAR_*` at apply, so they never appear in the generated `.tf` files. A resolved value still lands in the Terraform state, as with any Terraform-managed secret. `data_secrets` values must be base64, like `data`. A key in `string_data` or `string_data_secrets` is left out of `binary_data`. The same key in `string_data` and `string_data_secrets`, or in `data` and `data_secrets`, fails validation.
 
+A reference of the form `package.<key>` takes the value from the `secrets.yaml` of the package that defines the resource, not from the environment's file. `package` is a reserved prefix. It works in `string_data_secrets`, `data_secrets`, `value_secret` and `terraform_secrets`, and resolves from that package only. See [Package Secret References](../configuration/infrastructure-packages.md#package-secret-references).
+
 A reference of the form `outputs.<provider>.<output>` takes the value from another provider's Terraform output instead of SOPS, for example `outputs.tailscale.oauth_client_k8s_operator_secret`:
 
 - It works in `string_data_secrets`, in `terraform_secrets` and in `set_sensitive[*].value_secret` of a Helm release. It is an error in `data_secrets` (an output is not base64), in another provider's `terraform_secrets`, and for the Kubernetes provider's own outputs. A non-primary cluster (`kubernetes@<name>`) may read the primary's `outputs.kubernetes.*`. A non-primary cluster cannot be a producer, because the reference grammar excludes `@` and `-`.

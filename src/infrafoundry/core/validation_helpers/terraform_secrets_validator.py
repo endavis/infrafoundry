@@ -3,7 +3,8 @@
 Verifies that each resource's optional ``terraform_secrets`` list:
 
 1. Has the right shape (list of strings).
-2. References dotted paths that resolve in the env's decrypted secrets dict.
+2. References dotted paths that resolve in the env's decrypted secrets dict, or, for
+   ``package.<key>`` refs, in the owning package's ``secrets.yaml`` variables (#1565).
 
 The framework's secrets→TF_VAR bridge requires both invariants to hold,
 otherwise apply-time terraform invocation will either crash or silently
@@ -14,6 +15,7 @@ from __future__ import annotations
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import InvalidConfigurationError
+from infrafoundry.core.package_secret_refs import is_package_ref, package_ref_problem
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_mixins import is_output_ref
 from infrafoundry.core.secrets.secret_manager import SecretManager
@@ -98,7 +100,26 @@ def validate_terraform_secrets_references(
             )
             continue
 
-        missing = [ref for ref in refs if not is_output_ref(ref) and ref not in flat_secrets]
+        package_problems = [
+            problem
+            for ref in refs
+            if is_package_ref(ref) and (problem := package_ref_problem(resource, ref)) is not None
+        ]
+        if package_problems:
+            for problem in package_problems:
+                report.add_check(
+                    check_name=check_name,
+                    passed=False,
+                    message=problem,
+                    level=ValidationLevel.ERROR,
+                )
+            continue
+
+        missing = [
+            ref
+            for ref in refs
+            if not is_output_ref(ref) and not is_package_ref(ref) and ref not in flat_secrets
+        ]
         if missing:
             report.add_check(
                 check_name=check_name,

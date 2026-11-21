@@ -456,9 +456,13 @@ class PackageLoader:
 
         # ----- Secrets -----
         secrets_path = package_dir / "secrets.yaml"
+        # Raw secrets.yaml variables, kept apart from the merged variables so only
+        # ``package.<key>`` secret refs can read them (#1565). None: no secrets.yaml.
+        package_secrets: dict[str, Any] | None = None
         if secrets_path.exists():
             secrets_data = self._secret_provider.load_secret(secrets_path)
             secret_vars = secrets_data.get("variables", {})
+            package_secrets = copy.deepcopy(secret_vars) if secret_vars else {}
             if secret_vars:
                 manifest.variables.update(secret_vars)
                 logger.info(
@@ -495,6 +499,12 @@ class PackageLoader:
             )
             parsed = self._parse_resources_from_data(data, resource_file, effective_provider)
             resources.extend(parsed)
+
+        package_path = self._package_path(package_dir, env_name)
+        for resource in resources:
+            resource.package_name = manifest.name
+            resource.package_path = package_path
+            resource.package_secrets = copy.deepcopy(package_secrets)
 
         if manifest.firewall is not None or manifest.cluster is not None:
             stamp_selected(
@@ -559,6 +569,13 @@ class PackageLoader:
             logger.info("Generated inventory for package '%s': %s", manifest.name, inventory_path)
 
         return resources, events, dict(manifest.variables)
+
+    def _package_path(self, package_dir: Path, env_name: str) -> str:
+        """Return the package directory relative to ``envs/<env>`` in POSIX form."""
+        try:
+            return package_dir.relative_to(self.base_dir / env_name).as_posix()
+        except ValueError:
+            return package_dir.name
 
     def _parse_manifest(self, manifest_path: Path) -> PackageManifest:
         """Parse an infrafoundry.yml manifest file.

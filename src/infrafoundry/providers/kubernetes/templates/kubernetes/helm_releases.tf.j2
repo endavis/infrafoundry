@@ -94,7 +94,7 @@ EOT
   set_sensitive {
     name  = "{{ s.name }}"
     {% if s.value_secret is defined %}
-    value = var.{{ s.value_secret | secret_tf_var }}
+    value = var.{{ s.value_secret | secret_tf_var(release) }}
     {% else %}
     value = "{{ s.value }}"
     {% endif %}

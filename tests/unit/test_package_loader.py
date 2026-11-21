@@ -1,7 +1,7 @@
 """Unit tests for PackageLoader."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 import yaml
@@ -1462,3 +1462,58 @@ class TestHandlerConfigTagging:
         assert handler["_package"] == "bp-consumer"
         assert handler["_package_dir"] == str(pkg_dir)
         assert handler["_blueprint_dir"] == str(bp_dir)
+
+
+@pytest.mark.unit
+class TestPackageSecretsAttachment:
+    """The loader attaches the raw secrets.yaml variables to each resource (#1565)."""
+
+    _RESOURCES: ClassVar[dict[str, str]] = {"vm.yaml": "vm:\n  - name: node-1\n"}
+
+    def _load(self, temp_dir: Path, manifest: dict[str, Any], files: dict[str, str]) -> Any:
+        loader = PackageLoader(temp_dir)
+        pkg_dir = _create_package(
+            temp_dir, "dev", "proxmox", "example-app", manifest, {**self._RESOURCES, **files}
+        )
+        return loader.load_package(pkg_dir, "proxmox", "dev")[0]
+
+    def test_holds_only_secrets_yaml_variables(self, temp_dir: Path) -> None:
+        manifest = {
+            "name": "example-app",
+            "variables": {"admin_token": "manifest-value", "plain": "p"},
+            "resources": ["vm.yaml"],
+        }
+        resources = self._load(
+            temp_dir, manifest, {"secrets.yaml": "variables:\n  other: not-a-real-secret\n"}
+        )
+        assert resources[0].package_secrets == {"other": "not-a-real-secret"}
+        assert resources[0].package_name == "example-app"
+        assert resources[0].package_path == "proxmox/example-app"
+
+    def test_none_without_secrets_file(self, temp_dir: Path) -> None:
+        manifest = {"name": "example-app", "resources": ["vm.yaml"]}
+        assert self._load(temp_dir, manifest, {})[0].package_secrets is None
+
+    def test_empty_without_variables_key(self, temp_dir: Path) -> None:
+        manifest = {"name": "example-app", "resources": ["vm.yaml"]}
+        resources = self._load(temp_dir, manifest, {"secrets.yaml": "other: 1\n"})
+        assert resources[0].package_secrets == {}
+
+    def test_not_in_dump_or_repr(self, temp_dir: Path) -> None:
+        manifest = {"name": "example-app", "resources": ["vm.yaml"]}
+        resources = self._load(
+            temp_dir, manifest, {"secrets.yaml": "variables:\n  admin_token: not-a-real-secret\n"}
+        )
+        assert "package_secrets" not in resources[0].model_dump()
+        assert "not-a-real-secret" not in repr(resources[0])
+
+    def test_env_root_package_path(self, temp_dir: Path) -> None:
+        loader = PackageLoader(temp_dir)
+        pkg_dir = temp_dir / "dev" / "example-app"
+        pkg_dir.mkdir(parents=True)
+        (pkg_dir / "infrafoundry.yml").write_text(
+            "name: example-app\nprovider: proxmox\nresources: [vm.yaml]\n"
+        )
+        (pkg_dir / "vm.yaml").write_text("vm:\n  - name: node-1\n")
+        resources = loader.load_package(pkg_dir, "proxmox", "dev")[0]
+        assert resources[0].package_path == "example-app"

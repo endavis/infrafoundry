@@ -276,6 +276,45 @@ variables:
 
 After merging, templates see `ontap_password` as `"real-secret-from-vault"`.
 
+### Package Secret References
+
+Package secret variables are Jinja variables, so rendering one into a plain field writes
+it in clear text into the generated `.tf` files. To keep a secret out of those files,
+point a secret-backed field at the package's `secrets.yaml` with the reserved `package.`
+prefix:
+
+```yaml
+# <pkg>/infrafoundry.yml resources
+- provider: kubernetes
+  type: secrets
+  name: app-admin
+  config:
+    string_data_secrets:
+      ADMIN_TOKEN: package.admin_token   # from <pkg>/secrets.yaml `variables:`
+      OTHER: shared.some_key             # unprefixed: env secrets.yaml, unchanged
+```
+
+- **Fields:** `terraform_secrets` (any provider), and for Kubernetes `string_data_secrets`,
+  `data_secrets` and Helm `set_sensitive[*].value_secret`.
+- **Scope:** a `package.<key>` reference resolves against the `variables:` of the
+  `secrets.yaml` in the package that defines the resource, and nothing else. It never
+  falls back to the env secrets file and never reaches another package. Only the raw
+  `secrets.yaml` values count, not manifest variables or defaults. `package` is a reserved
+  prefix, so a top-level env secrets key named `package` cannot be referenced.
+  Unprefixed and `outputs.` references behave as before.
+- **Transport:** the value reaches Terraform as a sensitive variable set through
+  `TF_VAR_*` at apply. It is never written to a generated file or logged.
+- **Variable name:** `package_<slug>_<key>`, where the slug is the package directory
+  relative to `envs/<env>`, lowercased with non-alphanumerics replaced by `_`. For example
+  `package.admin_token` in `kubernetes/example-app` becomes
+  `package_kubernetes_example_app_admin_token`, so two packages using the same key get
+  distinct variables. If two different sources produce the same name, generation fails.
+- **Errors:** `infra plan` reports an error naming the resource, the reference and the
+  package (never a value) when the key is missing, the package has no `secrets.yaml`, the
+  key is empty, or the resource does not come from a package.
+
+See [ADR-0031](../decisions/0031-secret-references-resolve-from-the-owning-packages-secretsyaml-through-a-package-prefix.md).
+
 ### Best Practices
 
 - Keep only sensitive values in `secrets.yaml`; put everything else in `infrafoundry.yml`
