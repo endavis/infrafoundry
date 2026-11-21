@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795262709949,
+  "lastUpdate": 1795264562445,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5172,6 +5172,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000012080293010751189",
             "extra": "mean: 127.26419983515277 usec\nrounds: 8487"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ca150111681301c9702a80829b43058018c085f4",
+          "message": "feat: log in to oci k3s nodes as the ansible user, like the proxmox variant (merges PR #1576, addresses #1575)\n\nA new idempotent k3s-bootstrap role connects as the image's ubuntu user\nand creates ansible with the package's ssh_public_key and passwordless\nsudo. It never touches k3s.\n\nThe bootstrap runs in two places:\n- k3s-post-terraform.sh runs it on create, before the main playbook.\n- A new after_apply handler, k3s-bootstrap, runs it first on every\n  apply, so existing clusters get the user before k3s-dns and\n  verify-cluster log in as ansible.\n\nThe OCI scripts and the generated inventory now use ansible. The post-\nterraform script validates ssh_public_key before any connection. No\ninstance or cloud-init change is made, so deployed nodes are not\nreplaced.\n\nThe blueprint README documents the login user of each variant and the\ntailnet ssh rule users. The oci-k3s example doc uses ansible@ for\ntailnet SSH.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T12:35:12Z",
+          "tree_id": "8c1ebff1f9b2020774e6f4883f99ad483dd05448",
+          "url": "https://github.com/endavis/infrafoundry/commit/ca150111681301c9702a80829b43058018c085f4"
+        },
+        "date": 1795264561958,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 103.27850018586697,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00020947493070509691",
+            "extra": "mean: 9.682557339623758 msec\nrounds: 106"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16538.49193579704,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000504167639677087",
+            "extra": "mean: 60.465005145694796 usec\nrounds: 17879"
           }
         ]
       }
