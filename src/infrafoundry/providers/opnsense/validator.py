@@ -503,6 +503,11 @@ class OPNsenseValidator:
                     api_url, api_key, api_secret
                 )
 
+            # #1598: the rule editor's network keywords, only when rules are in scope
+            net_keywords: set[str] = set()
+            if resource_refs["firewall_rules"] or resource_refs["nat_rules"]:
+                net_keywords = self._get_existing_net_keywords(api_url, api_key, api_secret)
+
             context = self._build_context(
                 resources,
                 resource_refs,
@@ -514,6 +519,7 @@ class OPNsenseValidator:
                 existing_host_override_names=existing_unbound_host_overrides,
                 existing_hasync_interfaces=hasync_interfaces,
                 existing_hasync_sync_items=hasync_items,
+                existing_net_keywords=net_keywords,
             )
             self._run_live_validators(context, resource_refs)
             self._run_offline_validators(context, resource_refs)
@@ -540,6 +546,7 @@ class OPNsenseValidator:
         existing_host_override_names: set[str] | None = None,
         existing_hasync_interfaces: set[str] | None = None,
         existing_hasync_sync_items: set[str] | None = None,
+        existing_net_keywords: set[str] | None = None,
     ) -> OPNsenseValidationContext:
         """Build the validation context; the ``existing_*`` fields stay empty offline."""
         return OPNsenseValidationContext(
@@ -567,6 +574,7 @@ class OPNsenseValidator:
             existing_host_override_names=existing_host_override_names or set(),
             existing_hasync_interfaces=existing_hasync_interfaces or set(),
             existing_hasync_sync_items=existing_hasync_sync_items or set(),
+            existing_net_keywords=existing_net_keywords or set(),
             managed_gateways=reference_refs["gateways"],
             index=xref_index,
         )
@@ -1032,6 +1040,38 @@ class OPNsenseValidator:
         if not isinstance(hasync, dict):
             return set(), set()
         return live_options(hasync, "pfsyncinterface"), live_options(hasync, "syncitems")
+
+    def _get_existing_net_keywords(self, api_url: str, api_key: str, api_secret: str) -> set[str]:
+        """Get the network keywords the rule editor offers (#1598).
+
+        Reads the ``networks`` group of ``listNetworkSelectOptions``: ``any``,
+        ``(self)``, ``<id>``, ``<id>ip`` per interface, ``lo0``. The ``aliases``
+        group is ignored. The rule validators accept these keywords.
+
+        Args:
+            api_url: OPNsense API base URL
+            api_key: API key
+            api_secret: API secret
+
+        Returns:
+            Set of keyword keys; empty if the API call fails or the reply has an
+            unexpected shape.
+        """
+        data = self.api_validator.fetch_json(
+            url=f"{api_url}/api/{endpoints.FILTER_NETWORK_SELECT_OPTIONS.path()}",
+            auth=(api_key, api_secret),
+            verify_ssl=False,
+            timeout=10,
+            method="GET",
+            check_name="opnsense_get_network_options",
+            error_message="Could not retrieve rule network options (status {status})",
+            error_level=ValidationLevel.WARNING,
+        )
+        networks = data.get("networks") if isinstance(data, dict) else None
+        items = networks.get("items") if isinstance(networks, dict) else None
+        if not isinstance(items, dict):
+            return set()
+        return {str(key) for key in items if str(key)}
 
     def _get_existing_unbound_host_overrides(
         self, api_url: str, api_key: str, api_secret: str

@@ -17,7 +17,8 @@ Cross-reference targets:
   validator's gateway-acceptance pattern. The protocol family of the
   gateway is checked against ``ipprotocol`` for compatibility.
 - ``source_net`` / ``destination_net``: ``"any"``, alias name (managed
-  or live), literal IP/CIDR, or ``<iface>net`` sentinel.
+  or live), literal IP/CIDR, ``<iface>net`` sentinel, or a keyword for a managed
+  or live interface (``<id>``, ``<id>ip``).
 
 Identity-tag collision:
 
@@ -42,6 +43,7 @@ from typing import Any, override
 from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.validators._net_keywords import accepted_net_keywords
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
@@ -60,22 +62,6 @@ from ..services.firewall_rule import (
 _MANAGED_ALIAS_TYPE = "firewall.aliases"
 _MANAGED_GATEWAY_TYPE = "routing.gateways"
 _MANAGED_INTERFACE_TYPE = "interfaces.assignments"
-
-# OPNsense built-in net keywords commonly accepted in firewall rules.
-# Conservative — unknown values surface as warnings (not errors) so a
-# new keyword in a future minor version doesn't block a plan.
-_NET_KEYWORDS: frozenset[str] = frozenset(
-    {
-        "any",
-        "lan",
-        "wan",
-        "wanip",
-        "lanip",
-        "(self)",
-        "lan_subnets",
-        "wan_subnets",
-    }
-)
 
 # Soft cap on the encoded description length (operator description +
 # identity suffix tag). Some OPNsense versions silently truncate around
@@ -110,6 +96,7 @@ class FirewallRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
         existing_gateways = context.existing_gateways
         managed_gateways = context.managed_gateways
         index = context.index
+        net_keywords = accepted_net_keywords(context)
         gateway_protocols = _index_managed_gateway_protocols(managed_gateways or [])
         for rule in firewall_rules:
             self._validate_one(
@@ -122,6 +109,7 @@ class FirewallRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 existing_gateways=existing_gateways,
                 gateway_protocols=gateway_protocols,
                 index=index,
+                net_keywords=net_keywords,
             )
 
     def _validate_one(
@@ -136,6 +124,7 @@ class FirewallRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
         existing_gateways: set[str],
         gateway_protocols: dict[str, str],
         index: XRefIndex | None,
+        net_keywords: frozenset[str],
     ) -> None:
         """Run all checks for a single firewall-rule entry."""
         self._validate_description(rule)
@@ -177,6 +166,7 @@ class FirewallRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
             alias_names=alias_names,
             existing_aliases=existing_aliases,
             index=index,
+            net_keywords=net_keywords,
         )
         self._validate_net_field(
             rule,
@@ -184,6 +174,7 @@ class FirewallRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
             alias_names=alias_names,
             existing_aliases=existing_aliases,
             index=index,
+            net_keywords=net_keywords,
         )
         self._validate_tcpflags_mutex(rule)
         self._validate_int_field(rule, "max")
@@ -569,6 +560,7 @@ class FirewallRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
         alias_names: set[str],
         existing_aliases: dict[str, Any],
         index: XRefIndex | None,
+        net_keywords: frozenset[str],
     ) -> None:
         if field_name not in rule.config:
             return
@@ -606,7 +598,7 @@ class FirewallRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 bare_value = resolved.name
 
         if (
-            bare_value in _NET_KEYWORDS
+            bare_value in net_keywords
             or bare_value in alias_names
             or bare_value in existing_aliases
         ):
@@ -621,7 +613,7 @@ class FirewallRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
             message=(
                 f"firewall_rule '{rule.name}' {field_name} '{value}' did not resolve "
                 f"to a managed alias, live alias, IP/CIDR, interface sentinel, or "
-                f"known keyword ({sorted(_NET_KEYWORDS)})"
+                f"known keyword ({sorted(net_keywords)})"
             ),
             level=ValidationLevel.WARNING,
         )

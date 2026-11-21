@@ -1181,3 +1181,55 @@ class TestDottedPathXRefs:
             )
         )
         assert not _failures(report, "firewall_rule_ok_gateway")
+
+
+# ---------------------------------------------------------------------------
+# interface net keywords (#1598)
+# ---------------------------------------------------------------------------
+
+
+class TestInterfaceNetKeywords:
+    def test_managed_interface_keyword_accepted(
+        self, validator: FirewallRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", source_net="opt1")],
+                interface_assignment_names={"opt1"},
+            )
+        )
+        assert not _failures(report, "firewall_rule_ok_source_net")
+
+    def test_live_interface_identifier_accepted(
+        self, validator: FirewallRuleValidator, report: ValidationReport
+    ) -> None:
+        row = {"identifier": "opt3", "device": "em2"}
+        validator.validate(
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", destination_net="opt3")],
+                existing_interfaces={"opt3": row, "em2": row},
+            )
+        )
+        assert not _failures(report, "firewall_rule_ok_destination_net")
+
+    def test_live_option_keyword_accepted(
+        self, validator: FirewallRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("ok", source_net="lo0")],
+                existing_net_keywords={"lo0"},
+            )
+        )
+        assert not _failures(report, "firewall_rule_ok_source_net")
+
+    def test_unknown_interface_keyword_warns(
+        self, validator: FirewallRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            OPNsenseValidationContext(
+                firewall_rules=[_rule("bad", source_net="opt99")],
+                interface_assignment_names={"opt1"},
+            )
+        )
+        assert _warnings(report, "firewall_rule_bad_source_net")

@@ -405,3 +405,10 @@ def test_spec_lists_post_exemption_stands(version: str) -> None:
         assert e.method == "GET"
         assert endpoint_exists(e.sample_path(), "POST", version=version)
         assert not endpoint_exists(e.sample_path(), "GET", version=version)
+
+
+def test_filter_network_select_options_is_a_doctor_read() -> None:
+    ep = endpoints.FILTER_NETWORK_SELECT_OPTIONS
+    assert ep.method == "GET"
+    assert ep in endpoints.DOCTOR_ENDPOINTS
+    assert ep in endpoints.registered_endpoints()
