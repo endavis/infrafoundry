@@ -29,27 +29,57 @@ if [ -z "${INFRAFOUNDRY_PACKAGE_VARS:-}" ]; then
     echo "ERROR: INFRAFOUNDRY_PACKAGE_VARS is not set — run via 'foundry infra apply', not directly" >&2
     exit 1
 fi
+# Scalar package variables become shell variables (values shell-quoted).
 eval "$(python3 -c "
-import json, os
+import json, os, shlex
 v = json.loads(os.environ['INFRAFOUNDRY_PACKAGE_VARS'])
 for k, val in v.items():
-    print(f'{k}={val}')
+    if isinstance(val, (str, int, float, bool)) and k.isidentifier():
+        print(f'{k}={shlex.quote(str(val))}')
 ")"
 
 JUMPHOST="${jumphost:-}"
-SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
 SSH_USER="${ssh_user:-ansible}"
+# The hop to the jumphost is verified against the operator's own known_hosts.
+JUMP_SSH="ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10"
 
-# Build remote command helpers based on whether a jumphost is configured
-if [ -n "${JUMPHOST}" ]; then
-    remote_cmd() { ${SSH} ${JUMPHOST} "${SSH} ${SSH_USER}@${1} '${2}'"; }
-    remote_cmd_long() { ${SSH} -o ServerAliveInterval=30 ${JUMPHOST} "${SSH} -o ServerAliveInterval=30 ${SSH_USER}@${1} '${2}'"; }
-    remote_upload() { scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$1" "${JUMPHOST}:/tmp/_aiqum_upload" && ${SSH} ${JUMPHOST} "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null /tmp/_aiqum_upload ${SSH_USER}@${2}:${3}"; }
-else
-    remote_cmd() { ${SSH} ${SSH_USER}@${1} "${2}"; }
-    remote_cmd_long() { ${SSH} -o ServerAliveInterval=30 ${SSH_USER}@${1} "${2}"; }
-    remote_upload() { scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$1" "${SSH_USER}@${2}:${3}"; }
+# The VM's host key is pinned (#1581): InfraFoundry generated it, cloud-init installed it,
+# and ssh_known_hosts (";"-separated "<name>,<address> ssh-ed25519 <key>" lines) holds the
+# public half. Nothing but this file is trusted for the VM.
+PREFLIGHT_ERR=""
+WAIT_ERR=""
+CURL_ERR=""
+KNOWN_HOSTS=$(mktemp)
+REMOTE_KNOWN_HOSTS=""
+cleanup() {
+    rm -f "$KNOWN_HOSTS" "$PREFLIGHT_ERR" "$WAIT_ERR" "$CURL_ERR"
+    if [ -n "${REMOTE_KNOWN_HOSTS}" ]; then
+        ${JUMP_SSH} ${JUMPHOST} "rm -f '${REMOTE_KNOWN_HOSTS}'" >/dev/null 2>&1 || true
+    fi
+}
+trap cleanup EXIT
+if [ -z "${ssh_known_hosts:-}" ]; then
+    echo "ERROR: ssh_known_hosts is empty: no pinned SSH host key for ${vm_name:-the VM}." >&2
+    echo "       Run 'foundry secrets host-keys --env <env>' and re-apply." >&2
+    exit 1
 fi
+printf '%s\n' "${ssh_known_hosts//;/$'\n'}" >"$KNOWN_HOSTS"
+if grep -Evq '^[A-Za-z0-9._:,-]+ ssh-ed25519 [A-Za-z0-9+/]+={0,3}$' "$KNOWN_HOSTS"; then
+    echo "ERROR: ssh_known_hosts holds a malformed line; run 'foundry secrets host-keys --env <env>'" >&2
+    exit 1
+fi
+
+# True when an ssh error file shows the pinned key did not match: retrying cannot help.
+host_key_error() {
+    grep -Eq 'Host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED|No ED25519 host key is known' "$1"
+}
+fail_host_key() {
+    echo "ERROR: ${vm_name} (${ip_address}) does not present the pinned host key" >&2
+    echo "       (ssh_host_keys.${vm_name} in the package secrets.yaml). If the VM was rebuilt," >&2
+    echo "       run 'foundry secrets host-keys --env <env> --regenerate ${vm_name}' first." >&2
+    sed 's/^/    /' "$1" >&2
+    exit 1
+}
 
 log "=== AIQUM Post-Terraform Setup ==="
 echo "VM: ${vm_name} (${ip_address})"
@@ -77,9 +107,33 @@ if ! ssh-add -l >/dev/null 2>&1; then
 fi
 echo "  ssh-agent: $(ssh-add -l | wc -l) key(s) loaded"
 
+# Pinned-key ssh options. With a jumphost the inner hop runs there, so the known_hosts
+# file is staged on the jumphost (mode 0600) and removed on exit.
+VM_KNOWN_HOSTS="$KNOWN_HOSTS"
+if [ -n "${JUMPHOST}" ]; then
+    REMOTE_KNOWN_HOSTS=$(${JUMP_SSH} ${JUMPHOST} 'umask 077; f=$(mktemp) && cat >"$f" && echo "$f"' <"$KNOWN_HOSTS") || {
+        echo "ERROR: cannot stage the pinned host keys on ${JUMPHOST}" >&2
+        exit 1
+    }
+    VM_KNOWN_HOSTS="$REMOTE_KNOWN_HOSTS"
+fi
+VM_SSH_OPTS="-o StrictHostKeyChecking=yes -o UserKnownHostsFile=${VM_KNOWN_HOSTS} -o GlobalKnownHostsFile=/dev/null"
+SSH="ssh ${VM_SSH_OPTS} -o ConnectTimeout=10"
+
+# Build remote command helpers based on whether a jumphost is configured
+if [ -n "${JUMPHOST}" ]; then
+    remote_cmd() { ${JUMP_SSH} ${JUMPHOST} "${SSH} ${SSH_USER}@${1} '${2}'"; }
+    remote_cmd_long() { ${JUMP_SSH} -o ServerAliveInterval=30 ${JUMPHOST} "${SSH} -o ServerAliveInterval=30 ${SSH_USER}@${1} '${2}'"; }
+    remote_upload() { scp "$1" "${JUMPHOST}:/tmp/_aiqum_upload" && ${JUMP_SSH} ${JUMPHOST} "scp ${VM_SSH_OPTS} /tmp/_aiqum_upload ${SSH_USER}@${2}:${3}"; }
+else
+    remote_cmd() { ${SSH} ${SSH_USER}@${1} "${2}"; }
+    remote_cmd_long() { ${SSH} -o ServerAliveInterval=30 ${SSH_USER}@${1} "${2}"; }
+    remote_upload() { scp ${VM_SSH_OPTS} "$1" "${SSH_USER}@${2}:${3}"; }
+fi
+
 PREFLIGHT_ERR=$(mktemp)
-trap 'rm -f "$PREFLIGHT_ERR"' EXIT
 if ! remote_cmd "${ip_address}" "echo ok" >"$PREFLIGHT_ERR" 2>&1; then
+    if host_key_error "$PREFLIGHT_ERR"; then fail_host_key "$PREFLIGHT_ERR"; fi
     echo "ERROR: preflight ssh to ${vm_name} (${ip_address}) failed:" >&2
     sed 's/^/    /' "$PREFLIGHT_ERR" >&2
     exit 1
@@ -92,8 +146,8 @@ log "--- Phase 1: Waiting for VM to be reachable ---"
 MAX_WAIT=300
 ELAPSED=0
 WAIT_ERR=$(mktemp)
-trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR"' EXIT
 while ! remote_cmd "${ip_address}" "echo ready" >"$WAIT_ERR" 2>&1; do
+    if host_key_error "$WAIT_ERR"; then fail_host_key "$WAIT_ERR"; fi
     if [ $ELAPSED -ge $MAX_WAIT ]; then
         echo "ERROR: VM not reachable after ${MAX_WAIT}s"
         echo "  Last ssh attempt:" >&2
@@ -131,7 +185,6 @@ echo "  AIQUM RPM installed successfully"
 # error (connection refused, TLS handshake fail, etc.) instead of just
 # "not available after Ns".
 CURL_ERR=$(mktemp)
-trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR" "$CURL_ERR"' EXIT
 echo ""
 log "--- Phase 3: Waiting for AIQUM web UI ---"
 MAX_WAIT=600

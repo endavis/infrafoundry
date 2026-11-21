@@ -199,6 +199,7 @@ Key commands (`foundry` via `uv run foundry ...`):
 - `secrets encrypt <file>` – encrypt a file with SOPS
 - `secrets decrypt <file>` – decrypt and display a SOPS-encrypted file
 - `secrets rotate --env <name>` – rotate encryption keys
+- `secrets host-keys --env <name>` – record the SSH host keys blueprint scripts pin for their VMs
 
 **Policy group (`policy`):**
 - `policy list` – list available infrastructure policies

@@ -163,6 +163,24 @@ for format and usage details. Secret-backed fields can also read these values wi
 rendering them into generated files, through `package.<key>` references; see
 [Package Secret References](../configuration/infrastructure-packages.md#package-secret-references).
 
+### SSH Host Keys
+
+A Proxmox VM that sets `ssh_host_key` gets a pre-generated ed25519 host key (see
+[SSH Host Keys](../configuration/infrastructure-packages.md#ssh-host-keys)). The private key
+travels through these places:
+
+| Place | Protection |
+|:------|:-----------|
+| Package `secrets.yaml` | SOPS + age. Written by `foundry secrets host-keys` through `sops set --value-stdin`, so it is never on a command line or in a plaintext file. |
+| `TF_VAR_*` at apply | A sensitive Terraform variable, set through the secrets bridge ([ADR-0031](../decisions/0031-secret-references-resolve-from-the-owning-packages-secretsyaml-through-a-package-prefix.md)). |
+| Terraform state | Stored in `proxmox_virtual_environment_file.source_raw.data`, with the cloud-init user data. With the local backend that is under `generated/{env}/terraform/proxmox/`. Use an encrypted remote backend and restrict access to the state. |
+| Proxmox snippet storage | The cloud-init user-data file on the node's snippet datastore, readable by those who can read that datastore. |
+| The VM | `/etc/ssh` (mode 0600) and cloud-init's root-only copy of the user data. |
+
+It never reaches generated `.tf` files (they hold only a variable reference), tfvars, script
+environment, inventories, logs or outputs, and the plan shows `(sensitive value)`. The public
+keys are not secret and are passed to scripts as `ssh_known_hosts`.
+
 ## Related Documentation
 
 - [Age Key Management Best Practices](../guides/age-key-management.md)

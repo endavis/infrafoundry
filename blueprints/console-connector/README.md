@@ -116,6 +116,26 @@ Verified against the NetApp page above:
   container). They live in one function, `console_agent_installed`, in
   `scripts/console-connector-install-remote.sh`.
 
+## SSH host keys
+
+The post-apply script checks the VM against a pinned SSH host key
+(`StrictHostKeyChecking=yes`), not the first key it presents. InfraFoundry generates a key
+pair for the VM, cloud-init installs it, and the public key reaches the script as
+`ssh_known_hosts`. The agent certificate that registration pins is fetched over this
+verified connection.
+
+- Run `foundry secrets host-keys --env <env>` before the first apply, and once after
+  upgrading to a version that pins host keys. `infra plan` fails until it has run.
+- A new VM gets a generated key. A VM that already exists is pinned: the key it presents now
+  is recorded and the VM is not changed.
+- Before rebuilding the VM, destroy it, then run
+  `foundry secrets host-keys --env <env> --regenerate <vm_name>`.
+- `Host key verification failed` from the script means the VM does not present the recorded
+  key, for example after a rebuild without `--regenerate`.
+
+See [Infrastructure Packages: SSH Host Keys](../../docs/configuration/infrastructure-packages.md#ssh-host-keys)
+and [ADR-0032](../../docs/decisions/0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md).
+
 ## Prerequisites
 
 - The `ubuntu-template` blueprint applied (template `ubuntu-2404-template`, VM ID `900`).

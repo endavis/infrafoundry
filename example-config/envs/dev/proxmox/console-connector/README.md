@@ -10,6 +10,9 @@ prerequisites and the manual registration steps.
 ## Quick Start
 
 ```bash
+# Record the VM's pinned SSH host key first (needed once, and after upgrading)
+foundry secrets host-keys --env dev --package console-connector
+
 # Deploy the VM, DHCP reservation and the agent install
 foundry infra apply --env dev --package console-connector
 

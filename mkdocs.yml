@@ -180,6 +180,7 @@ nav:
     - "ADR-0029 Providers consume other providers' Terraform outputs through outputs references": decisions/0029-providers-consume-other-providers-terraform-outputs-through-outputs-references.md
     - "ADR-0030 Kubernetes clusters are provider instances, several per environment": decisions/0030-kubernetes-clusters-are-provider-instances-several-per-environment.md
     - "ADR-0031 Secret references resolve from the owning package's secrets.yaml through a package prefix": decisions/0031-secret-references-resolve-from-the-owning-packages-secretsyaml-through-a-package-prefix.md
+    - ADR-0032 Blueprint VMs get pre-generated SSH host keys that scripts pin: decisions/0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md
     - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
     - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
     - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md

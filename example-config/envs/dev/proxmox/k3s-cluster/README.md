@@ -5,6 +5,9 @@ Example consumer of the `proxmox-k3s-cluster` blueprint. Deploys a 1-server +
 VM IDs, jumphost, and the DHCP subnet for your environment before applying.**
 
 ```bash
+# Record the nodes' pinned SSH host keys first (needed once, and after upgrading)
+foundry -c example-config secrets host-keys --env dev --package k3s-cluster
+
 foundry -c example-config infra apply --env dev --package k3s-cluster
 ```
 

@@ -416,8 +416,15 @@ printf '%s\\n' "$*" >> "$SSH_LOG"
 case "$*" in
 *"sysctl -n"*) printf '1\\n1\\n1\\n' ;;
 *"get nodes --no-headers"*) printf 'a Ready x\\nb Ready x\\nc Ready x\\n' ;;
+*mktemp*) echo /tmp/staged-known-hosts ;;
 esac
 """
+
+
+_KNOWN_HOSTS = (
+    "srv,198.51.100.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleSentinelPublicKey0;"
+    "ag1,198.51.100.2 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleSentinelPublicKey1"
+)
 
 
 def _run_post_terraform(tmp_path: Path, *, k3s_version: str | None, jumphost: str) -> list[str]:
@@ -442,6 +449,7 @@ def _run_post_terraform(tmp_path: Path, *, k3s_version: str | None, jumphost: st
         "INFRAFOUNDRY_VAR_server_ip": "198.51.100.1",
         "INFRAFOUNDRY_VAR_server_name": "srv",
         "INFRAFOUNDRY_VAR_jumphost": jumphost,
+        "INFRAFOUNDRY_VAR_ssh_known_hosts": _KNOWN_HOSTS,
         "INFRAFOUNDRY_VAR_k3s_server_args": "--disable traefik",
         "INFRAFOUNDRY_VAR_cluster_name": "c",
         "INFRAFOUNDRY_VAR_kubeconfig_dir": str(tmp_path / "kube"),
@@ -544,4 +552,5 @@ def test_k3s_kubeconfig_mode_handler_env_renders_for_the_example(loader: Package
         "K3S_SERVER_NAME": "k3s-dev-server",
         "K3S_SERVER_IP": "192.0.2.80",
         "K3S_JUMPHOST": "ansible@ansible.example.com",
+        "K3S_KNOWN_HOSTS": "",
     }

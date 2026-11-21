@@ -1517,3 +1517,102 @@ class TestPackageSecretsAttachment:
         (pkg_dir / "vm.yaml").write_text("vm:\n  - name: node-1\n")
         resources = loader.load_package(pkg_dir, "proxmox", "dev")[0]
         assert resources[0].package_path == "example-app"
+
+
+_HOST_KEY_PUBLIC = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleSentinelPublicKey0"
+_HOST_KEY_PRIVATE = "-----BEGIN OPENSSH " + "PRIVATE KEY-----\nSENTINEL-NOT-A-REAL-KEY\n"
+
+
+@pytest.mark.unit
+class TestSshHostKeys:
+    """``ssh_host_keys`` stays out of the variables; ``ssh_known_hosts`` is derived (#1581)."""
+
+    _VM = (
+        "vm:\n  - name: node-1\n    ssh_host_key:\n      address: 192.0.2.10\n"
+        "  - name: node-2\n    ssh_host_key:\n      address: 192.0.2.11\n"
+    )
+
+    @staticmethod
+    def _secrets() -> str:
+        return yaml.dump(
+            {
+                "variables": {
+                    "other": "kept",
+                    "ssh_host_keys": {
+                        "node-1": {
+                            "ed25519_private": _HOST_KEY_PRIVATE,
+                            "ed25519_public": _HOST_KEY_PUBLIC,
+                        },
+                        "node-2": {"ed25519_public": _HOST_KEY_PUBLIC.replace("0", "1")},
+                    },
+                }
+            }
+        )
+
+    def _load(
+        self, temp_dir: Path, manifest: dict[str, Any], files: dict[str, str]
+    ) -> tuple[Any, Any, Any]:
+        loader = PackageLoader(temp_dir)
+        pkg_dir = _create_package(temp_dir, "dev", "proxmox", "example-app", manifest, files)
+        return loader.load_package(pkg_dir, "proxmox", "dev")
+
+    def test_keys_stay_out_of_variables_and_events_but_in_package_secrets(
+        self, temp_dir: Path
+    ) -> None:
+        manifest = {
+            "name": "example-app",
+            "resources": ["vm.yaml"],
+            "events": {"on_create": [{"type": "script", "env": {"X": "{{ other }}"}}]},
+        }
+        resources, events, variables = self._load(
+            temp_dir, manifest, {"vm.yaml": self._VM, "secrets.yaml": self._secrets()}
+        )
+
+        assert "ssh_host_keys" not in variables
+        assert variables["other"] == "kept"
+        assert "SENTINEL" not in repr(variables)
+        assert "SENTINEL" not in repr(events)
+        assert "ssh_host_keys" in resources[0].package_secrets
+        assert "SENTINEL" not in repr(resources[0])
+
+    def test_known_hosts_is_a_scalar_of_public_keys(self, temp_dir: Path) -> None:
+        manifest = {"name": "example-app", "resources": ["vm.yaml"]}
+        _r, _e, variables = self._load(
+            temp_dir, manifest, {"vm.yaml": self._VM, "secrets.yaml": self._secrets()}
+        )
+
+        lines = variables["ssh_known_hosts"].split(";")
+        assert lines[0] == f"node-1,192.0.2.10 {_HOST_KEY_PUBLIC}"
+        assert lines[1].startswith("node-2,192.0.2.11 ssh-ed25519 ")
+        assert "SENTINEL" not in variables["ssh_known_hosts"]
+
+    def test_known_hosts_is_empty_without_entries(self, temp_dir: Path) -> None:
+        manifest = {"name": "example-app", "resources": ["vm.yaml"]}
+        _r, _e, variables = self._load(temp_dir, manifest, {"vm.yaml": self._VM})
+        assert variables["ssh_known_hosts"] == ""
+
+    def test_not_set_when_no_resource_opts_in(self, temp_dir: Path) -> None:
+        manifest = {"name": "example-app", "resources": ["vm.yaml"]}
+        _r, _e, variables = self._load(temp_dir, manifest, {"vm.yaml": "vm:\n  - name: node-1\n"})
+        assert "ssh_known_hosts" not in variables
+
+    def test_event_env_renders_to_valid_json_events(self, temp_dir: Path) -> None:
+        manifest = {
+            "name": "example-app",
+            "resources": ["vm.yaml"],
+            "events": {
+                "after_apply": [
+                    {
+                        "type": "script",
+                        "name": "h",
+                        "script": "s.sh",
+                        "env": {"K": "{{ ssh_known_hosts }}"},
+                    }
+                ]
+            },
+        }
+        _r, events, variables = self._load(
+            temp_dir, manifest, {"vm.yaml": self._VM, "secrets.yaml": self._secrets()}
+        )
+
+        assert events["after_apply"][0]["env"]["K"] == variables["ssh_known_hosts"]

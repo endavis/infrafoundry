@@ -7,7 +7,8 @@
 #
 # Workflow after_apply handlers get no package variables, so the blueprint
 # passes everything through its env: block:
-#   K3S_SERVER_IP, K3S_SERVER_NAME, K3S_JUMPHOST (empty = ssh directly)
+#   K3S_SERVER_IP, K3S_SERVER_NAME, K3S_JUMPHOST (empty = ssh directly),
+#   K3S_KNOWN_HOSTS (the pinned SSH host keys, ";"-separated known_hosts lines)
 #
 # The handler has continue_on_error, so a failure is appended to
 # INFRAFOUNDRY_WARNINGS_FILE and the step is retried on the next apply.
@@ -36,6 +37,7 @@ fi
 
 # shellcheck source=k3s-lib.sh
 source "${BLUEPRINT_DIR}/scripts/proxmox/k3s-lib.sh"
+trap 'k3s_ssh_cleanup' EXIT
 
 warn() {
     if [ -n "${INFRAFOUNDRY_WARNINGS_FILE:-}" ]; then

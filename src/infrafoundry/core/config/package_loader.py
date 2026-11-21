@@ -38,6 +38,12 @@ from infrafoundry.core.provider_instances import (
 )
 from infrafoundry.core.secrets.provider import SecretProvider
 from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
+from infrafoundry.core.ssh_host_keys import (
+    HOST_KEY_FIELD,
+    HOST_KEYS_VARIABLE,
+    KNOWN_HOSTS_VARIABLE,
+    known_hosts_value,
+)
 
 if TYPE_CHECKING:
     from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
@@ -464,10 +470,13 @@ class PackageLoader:
             secret_vars = secrets_data.get("variables", {})
             package_secrets = copy.deepcopy(secret_vars) if secret_vars else {}
             if secret_vars:
-                manifest.variables.update(secret_vars)
+                # ``ssh_host_keys`` holds private host keys (#1581): only ``package_secrets``
+                # keeps it, so it never reaches variables, script env or Jinja contexts.
+                mergeable = {k: v for k, v in secret_vars.items() if k != HOST_KEYS_VARIABLE}
+                manifest.variables.update(mergeable)
                 logger.info(
                     "Loaded %d secret variable(s) from %s",
-                    len(secret_vars),
+                    len(mergeable),
                     secrets_path.name,
                 )
 
@@ -505,6 +514,11 @@ class PackageLoader:
             resource.package_name = manifest.name
             resource.package_path = package_path
             resource.package_secrets = copy.deepcopy(package_secrets)
+
+        # Derived from the public host keys only; a scalar, so event ``env:`` blocks survive
+        # the JSON round trip below (#1581).
+        if any(HOST_KEY_FIELD in r.config for r in resources):
+            manifest.variables[KNOWN_HOSTS_VARIABLE] = known_hosts_value(resources)
 
         if manifest.firewall is not None or manifest.cluster is not None:
             stamp_selected(

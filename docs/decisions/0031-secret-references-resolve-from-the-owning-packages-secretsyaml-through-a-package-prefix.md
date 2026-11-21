@@ -23,6 +23,7 @@ A package keeps its secrets in a SOPS `secrets.yaml` next to its manifest. Those
 - **Source:** the loader attaches the raw `secrets.yaml` variables to each resource it parses (`package_secrets`, excluded from dumps and reprs), with the package name and the package directory relative to `envs/<env>` (`package_path`). Raw values are used, never the merged manifest variables, so a manifest variable or default cannot satisfy a reference.
 - **Naming:** the Terraform variable is `package_<slug(package_path)>_<key>`, the slug being the path lowercased with non-alphanumerics replaced by `_`. Two packages that use the same key get distinct variables. Naming is resource-aware (`secret_ref_tf_var`, `collect_terraform_secret_vars`), and a collision between two different sources raises.
 - **Transport:** the value travels as `TF_VAR_*` through the existing bridge and the variable is declared `sensitive`. It is never written to a generated file or logged.
+- **Reserved key:** `ssh_host_keys` in the package `secrets.yaml` is kept out of the merged package variables and stays in `package_secrets` only, so the private host keys it holds never reach script env or Jinja contexts (#1581, [ADR-0032](0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md)).
 - **Errors:** plan-time validation and an apply-time backstop name the resource, the reference and the package, never a value, for a missing key, a missing `secrets.yaml`, an empty key, and a reference on a resource that is not from a package.
 
 ## Rationale

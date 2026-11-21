@@ -94,6 +94,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | Encrypt a file | `foundry secrets encrypt <file>` |
 | Decrypt a file | `foundry secrets decrypt <file>` |
 | Rotate encryption keys | `foundry secrets rotate --env <env> --generate-new-key` |
+| Record pinned VM SSH host keys | `foundry secrets host-keys --env <env>` |
 | List policies | `foundry policy list` |
 | Check blueprint requirements | `foundry deps check --env <env>` |
 | Install blueprint requirements | `foundry deps sync --env <env>` |
@@ -870,6 +871,32 @@ foundry secrets rotate --env dev --generate-new-key --dry-run
 ```
 
 **Options:** `-e/--env TEXT` (required), `--new-key-file PATH`, `--generate-new-key`, `--files TEXT` (repeatable), `--no-verify`, `--no-backup`, `--dry-run`
+
+### `secrets host-keys`
+
+Record the SSH host keys that blueprint scripts pin for the VMs they build (see
+[SSH Host Keys](../configuration/infrastructure-packages.md#ssh-host-keys)). For each VM that
+sets `ssh_host_key`, it writes `variables.ssh_host_keys.<name>` into the package's SOPS
+`secrets.yaml`:
+
+- a VM that is not deployed gets a generated key pair, which cloud-init installs at first boot;
+- a deployed VM is pinned: the key it presents now is recorded (scanned from the package's
+  jumphost when one is set) and the VM is not changed;
+- a VM with a recorded key is skipped, and a VM that is being created, deleted or in error is
+  refused.
+
+It prints one line per VM with a fingerprint, never a key, and exits non-zero on a refusal or
+error. Run it before the first apply and once after upgrading a package that now sets
+`ssh_host_key`; until then `infra plan` fails.
+
+```bash
+foundry secrets host-keys --env dev
+foundry secrets host-keys --env dev --dry-run
+foundry secrets host-keys --env dev --package proxmox/aiqum
+foundry secrets host-keys --env dev --regenerate aiqum-01
+```
+
+**Options:** `-e/--env TEXT` (required), `--package TEXT` (repeatable; package path or name), `--regenerate TEXT` (repeatable; replaces the key of a VM that is not deployed, for example before a rebuild), `--dry-run`
 
 ---
 

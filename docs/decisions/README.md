@@ -166,3 +166,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0029](0029-providers-consume-other-providers-terraform-outputs-through-outputs-references.md) | Providers consume other providers' Terraform outputs through outputs references | Accepted |
 | [0030](0030-kubernetes-clusters-are-provider-instances-several-per-environment.md) | Kubernetes clusters are provider instances, several per environment | Accepted |
 | [0031](0031-secret-references-resolve-from-the-owning-packages-secretsyaml-through-a-package-prefix.md) | Secret references resolve from the owning package's secrets.yaml through a package prefix | Accepted |
+| [0032](0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md) | Blueprint VMs get pre-generated SSH host keys that scripts pin | Accepted |

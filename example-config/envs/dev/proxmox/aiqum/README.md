@@ -9,6 +9,9 @@ automation flow, and firewall port table.
 ## Quick Start
 
 ```bash
+# Record the VM's pinned SSH host key first (needed once, and after upgrading)
+foundry secrets host-keys --env dev --package aiqum
+
 # Deploy everything (VM, DHCP, AIQUM install, initial setup, cluster add)
 foundry infra apply --env dev --package aiqum
 

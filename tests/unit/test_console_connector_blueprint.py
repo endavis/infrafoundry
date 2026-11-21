@@ -269,7 +269,7 @@ def test_post_script_upload_and_jumphost_hardening() -> None:
     assert "/tmp/_console_connector_upload" not in text
     assert "/tmp/console-connector-install-remote.sh" not in text
     assert "mktemp" in text
-    assert 'JUMP_SSH="ssh -o ConnectTimeout=10"' in text
+    assert 'JUMP_SSH="ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10"' in text
     jump_lines = [ln for ln in text.splitlines() if "${JUMP_SSH}" in ln]
     assert jump_lines
     assert all("StrictHostKeyChecking" not in ln.split("${JUMPHOST}")[0] for ln in jump_lines)
