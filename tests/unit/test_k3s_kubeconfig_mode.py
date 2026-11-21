@@ -197,3 +197,265 @@ def test_playbook_syntax_check(tmp_path: Path) -> None:
         check=False,
     )
     assert result.returncode == 0, result.stderr + result.stdout
+
+
+# --- Proxmox variant: after_apply handler and node script (#1578) ---
+
+
+PVE_DIR = BLUEPRINT / "scripts" / "proxmox"
+PVE_HANDLER = PVE_DIR / "k3s-kubeconfig-mode.sh"
+PVE_NODE = PVE_DIR / "k3s-kubeconfig-mode-node.sh"
+
+_FAKE_SSH = """#!/bin/sh
+printf '%s\\n' "$*" >> "$RECORD_DIR/ssh_calls"
+cat > "$RECORD_DIR/stdin"
+exit "${FAKE_SSH_RC:-0}"
+"""
+
+_FAKE_SYSTEMCTL = """#!/bin/sh
+printf '%s\\n' "$*" >> "$RECORD_DIR/systemctl_calls"
+"""
+
+_PVE_ENV = {"K3S_SERVER_IP": "192.0.2.80", "K3S_SERVER_NAME": "k3s-server", "K3S_JUMPHOST": ""}
+
+
+def _stub_env(tmp_path: Path, extra: dict[str, str] | None = None) -> dict[str, str]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    record = tmp_path / "record"
+    record.mkdir(exist_ok=True)
+    for name, body in (("ssh", _FAKE_SSH), ("systemctl", _FAKE_SYSTEMCTL)):
+        stub = bin_dir / name
+        stub.write_text(body)
+        stub.chmod(0o755)
+    return {
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "HOME": str(tmp_path),
+        "RECORD_DIR": str(record),
+        "INFRAFOUNDRY_BLUEPRINT_DIR": str(BLUEPRINT),
+        "INFRAFOUNDRY_WARNINGS_FILE": str(tmp_path / "warnings.jsonl"),
+        **(extra or {}),
+    }
+
+
+def _run_pve_handler(
+    tmp_path: Path, extra: dict[str, str]
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    env = _stub_env(tmp_path, extra)
+    result = subprocess.run(
+        ["bash", str(PVE_HANDLER)], env=env, capture_output=True, text=True, check=False
+    )
+    return result, Path(env["RECORD_DIR"])
+
+
+def test_pve_scripts_have_the_expected_modes() -> None:
+    """The handler and node script are executable; the sourced library is not."""
+    assert os.access(PVE_HANDLER, os.X_OK)
+    assert os.access(PVE_NODE, os.X_OK)
+    assert not os.access(PVE_DIR / "k3s-lib.sh", os.X_OK)
+
+
+def test_pve_install_script_sources_the_library() -> None:
+    """The install script sources k3s-lib.sh instead of defining the ssh helpers."""
+    text = (PVE_DIR / "k3s-post-terraform.sh").read_text()
+    assert "scripts/proxmox/k3s-lib.sh" in text
+    assert "remote_root_cmd()" not in text
+    assert "remote_root_cmd()" in (PVE_DIR / "k3s-lib.sh").read_text()
+
+
+def test_pve_handler_requires_a_server_ip(tmp_path: Path) -> None:
+    """Without K3S_SERVER_IP the handler fails before ssh."""
+    result, record = _run_pve_handler(tmp_path, {**_PVE_ENV, "K3S_SERVER_IP": ""})
+
+    assert result.returncode != 0
+    assert not (record / "ssh_calls").exists()
+
+
+def test_pve_handler_direct_mode_pipes_the_node_script(tmp_path: Path) -> None:
+    """Direct mode makes one ssh call to ansible@ip with sudo and bash -s."""
+    result, record = _run_pve_handler(tmp_path, _PVE_ENV)
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    (call,) = (record / "ssh_calls").read_text().splitlines()
+    assert "ansible@192.0.2.80" in call
+    assert "sudo" in call
+    assert "bash -s" in call
+    assert (record / "stdin").read_text() == PVE_NODE.read_text()
+
+
+def test_pve_handler_jumphost_mode_pipes_the_node_script(tmp_path: Path) -> None:
+    """Jumphost mode makes one ssh call to the jumphost, the inner command reaches the node."""
+    result, record = _run_pve_handler(tmp_path, {**_PVE_ENV, "K3S_JUMPHOST": "jump.example"})
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    (call,) = (record / "ssh_calls").read_text().splitlines()
+    assert "jump.example" in call.split(" ssh ")[0]
+    assert "ansible@192.0.2.80" in call
+    assert "sudo" in call
+    assert "bash -s" in call
+    assert (record / "stdin").read_text() == PVE_NODE.read_text()
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [{"K3S_SERVER_IP": "192.0.2.80; id"}, {"K3S_JUMPHOST": "jump.example $(id)"}],
+)
+def test_pve_handler_rejects_invalid_values(tmp_path: Path, extra: dict[str, str]) -> None:
+    """Values spliced into ssh command strings are validated before any ssh."""
+    result, record = _run_pve_handler(tmp_path, {**_PVE_ENV, **extra})
+
+    assert result.returncode != 0
+    assert "invalid" in result.stderr
+    assert not (record / "ssh_calls").exists()
+
+
+def test_pve_handler_failure_keeps_rc_and_writes_a_warning(tmp_path: Path) -> None:
+    """A failing ssh keeps its exit code and appends one JSONL warning."""
+    result, _ = _run_pve_handler(tmp_path, {**_PVE_ENV, "FAKE_SSH_RC": "7"})
+
+    assert result.returncode == 7
+    (line,) = (tmp_path / "warnings.jsonl").read_text().splitlines()
+    assert json.loads(line)["source"] == "k3s-kubeconfig-mode"
+
+
+def _run_node(
+    tmp_path: Path,
+    unit: str | None = None,
+    config: str | None = None,
+    kubeconfig: int | None = None,
+) -> tuple[subprocess.CompletedProcess[str], Path, Path, Path]:
+    env = _stub_env(tmp_path)
+    cfg_dir = tmp_path / "k3s"
+    cfg_dir.mkdir(exist_ok=True)
+    unit_file = tmp_path / "k3s.service"
+    if unit is not None:
+        unit_file.write_text(unit)
+    if config is not None:
+        (cfg_dir / "config.yaml").write_text(config)
+    if kubeconfig is not None:
+        (cfg_dir / "k3s.yaml").write_text("kind: Config\n")
+        (cfg_dir / "k3s.yaml").chmod(kubeconfig)
+    result = subprocess.run(
+        ["bash", str(PVE_NODE), str(cfg_dir), str(unit_file)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result, cfg_dir, unit_file, Path(env["RECORD_DIR"])
+
+
+def _systemctl_calls(record: Path) -> list[str]:
+    log = record / "systemctl_calls"
+    return log.read_text().splitlines() if log.exists() else []
+
+
+_UNIT_644 = (
+    "[Service]\nExecStart=/usr/local/bin/k3s \\\n    server \\\n"
+    "    '--write-kubeconfig-mode' \\\n    '644' \\\n    '--disable' \\\n    'traefik' \\\n"
+)
+_UNIT_600 = _UNIT_644.replace("'644'", "'600'")
+_LINE = 'write-kubeconfig-mode: "0600"\n'
+
+
+def test_node_creates_an_absent_config(tmp_path: Path) -> None:
+    """An absent config.yaml is created with the owner-only line."""
+    result, cfg_dir, _, _ = _run_node(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert (cfg_dir / "config.yaml").read_text() == _LINE
+
+
+def test_node_replaces_a_readable_config_line_only(tmp_path: Path) -> None:
+    """A 0644 line is replaced; every other line is unchanged."""
+    before = 'a: 1\nwrite-kubeconfig-mode: "0644"\nb: 2\n'
+    result, cfg_dir, _, _ = _run_node(tmp_path, config=before)
+
+    assert result.returncode == 0, result.stderr
+    assert (cfg_dir / "config.yaml").read_text() == f"a: 1\n{_LINE}b: 2\n"
+
+
+def test_node_appends_cleanly_without_a_trailing_newline(tmp_path: Path) -> None:
+    """A missing key is appended on its own line when the file lacks a final newline."""
+    result, cfg_dir, _, _ = _run_node(tmp_path, config="a: 1")
+
+    assert result.returncode == 0, result.stderr
+    assert (cfg_dir / "config.yaml").read_text() == f"a: 1\n{_LINE}"
+
+
+def test_node_rewrites_the_installer_unit_format(tmp_path: Path) -> None:
+    """The installer's two-line flag form becomes 600, with one daemon-reload."""
+    result, _, unit, record = _run_node(tmp_path, unit=_UNIT_644)
+
+    assert result.returncode == 0, result.stderr
+    assert unit.read_text() == _UNIT_600
+    assert _systemctl_calls(record) == ["daemon-reload"]
+
+
+def test_node_rewrites_the_equals_unit_format(tmp_path: Path) -> None:
+    """The --flag=value form becomes 600."""
+    before = "ExecStart=/usr/local/bin/k3s server '--write-kubeconfig-mode=644'\n"
+    result, _, unit, record = _run_node(tmp_path, unit=before)
+
+    assert result.returncode == 0, result.stderr
+    assert "'--write-kubeconfig-mode=600'" in unit.read_text()
+    assert _systemctl_calls(record) == ["daemon-reload"]
+
+
+def test_node_leaves_a_600_unit_alone(tmp_path: Path) -> None:
+    """A unit already at 600 is unchanged and systemctl does not run."""
+    result, _, unit, record = _run_node(tmp_path, unit=_UNIT_600)
+
+    assert result.returncode == 0, result.stderr
+    assert unit.read_text() == _UNIT_600
+    assert _systemctl_calls(record) == []
+
+
+def test_node_without_a_unit_succeeds(tmp_path: Path) -> None:
+    """With no unit file the script exits 0 and runs no systemctl."""
+    result, _, _, record = _run_node(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert _systemctl_calls(record) == []
+
+
+def test_node_fails_on_an_unrecognised_unit_form(tmp_path: Path) -> None:
+    """A non-600 flag the script cannot rewrite fails loudly."""
+    before = "ExecStart=/usr/local/bin/k3s server --write-kubeconfig-mode 644\n"
+    result, _, _, _ = _run_node(tmp_path, unit=before)
+
+    assert result.returncode == 3
+    assert "write-kubeconfig-mode" in result.stderr
+
+
+def test_node_restricts_an_existing_kubeconfig(tmp_path: Path) -> None:
+    """A 0644 k3s.yaml becomes 0600."""
+    result, cfg_dir, _, _ = _run_node(tmp_path, kubeconfig=0o644)
+
+    assert result.returncode == 0, result.stderr
+    assert (cfg_dir / "k3s.yaml").stat().st_mode & 0o777 == 0o600
+
+
+def test_node_second_run_changes_nothing_and_never_restarts(tmp_path: Path) -> None:
+    """A second run is byte-identical with no extra systemctl; no restart/stop/start ever."""
+    _, cfg_dir, unit, record = _run_node(
+        tmp_path, unit=_UNIT_644, config="a: 1\n", kubeconfig=0o644
+    )
+    snapshot = ((cfg_dir / "config.yaml").read_text(), unit.read_text())
+    result, _, _, _ = _run_node(tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert ((cfg_dir / "config.yaml").read_text(), unit.read_text()) == snapshot
+    calls = _systemctl_calls(record)
+    assert calls == ["daemon-reload"]
+    assert not {"restart", "stop", "start"} & {word for c in calls for word in c.split()}
+
+
+def test_pve_handler_is_wired_after_apply_with_continue_on_error() -> None:
+    """The Proxmox handler is an after_apply script with continue_on_error and 3 env keys."""
+    blueprint = yaml.safe_load((BLUEPRINT / "blueprint.yaml").read_text())
+    (handler,) = blueprint["providers"]["proxmox"]["events"]["after_apply"]
+
+    assert handler["script"] == "scripts/proxmox/k3s-kubeconfig-mode.sh"
+    assert handler["continue_on_error"] is True
+    assert set(handler["env"]) == {"K3S_SERVER_NAME", "K3S_SERVER_IP", "K3S_JUMPHOST"}

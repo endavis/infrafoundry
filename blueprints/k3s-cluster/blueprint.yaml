@@ -99,6 +99,18 @@ providers:
           outputs:
             - source: "{{ kubeconfig_dir }}/{{ cluster_name }}.yaml"
               dest: "{{ kubeconfig_dir }}/{{ cluster_name }}.yaml"
+      after_apply:
+        # Workflow handlers get no package variables, so the values travel in env.
+        - type: script
+          name: k3s-kubeconfig-mode
+          script: scripts/proxmox/k3s-kubeconfig-mode.sh
+          description: "Make the server node's kubeconfig owner-only (idempotent, restarts nothing)"
+          timeout: 300
+          continue_on_error: true
+          env:
+            K3S_SERVER_NAME: "{{ server_name }}"
+            K3S_SERVER_IP: "{{ server_ip }}"
+            K3S_JUMPHOST: "{{ jumphost }}"
 
   # =====================================================================
   # OCI — ARM Always-Free-Tier (1 control + N workers) with Tailscale

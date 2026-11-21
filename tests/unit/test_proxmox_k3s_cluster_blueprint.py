@@ -528,3 +528,20 @@ def test_kubeconfig_reads_on_the_node_are_privileged(tmp_path: Path, jumphost: s
     reads = [c for c in calls if "cat /etc/rancher/k3s/k3s.yaml" in c]
     assert len(reads) == 1
     assert "sudo" in reads[0]
+
+
+def test_k3s_kubeconfig_mode_handler_env_renders_for_the_example(loader: PackageLoader) -> None:
+    """The after_apply env renders with StrictUndefined to the example's values (#1578)."""
+    _resources, events, variables = loader.load_package(
+        PACKAGE_DIR, provider="proxmox", env_name="dev"
+    )
+    (handler,) = events["after_apply"]
+    env = create_jinja2_env(undefined=jinja2.StrictUndefined)
+
+    rendered = {k: env.from_string(v).render(**variables) for k, v in handler["env"].items()}
+
+    assert rendered == {
+        "K3S_SERVER_NAME": "k3s-dev-server",
+        "K3S_SERVER_IP": "192.0.2.80",
+        "K3S_JUMPHOST": "ansible@ansible.example.com",
+    }

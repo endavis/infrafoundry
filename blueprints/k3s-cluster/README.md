@@ -64,6 +64,14 @@ clusters in line: it sets `write-kubeconfig-mode: "0600"` in the k3s `config.yam
 the file's mode on the control node. It restarts nothing and runs after `k3s-bootstrap`. A
 failure is a warning (`continue_on_error`) and is retried on the next apply.
 
+On Proxmox, the same-named handler (`scripts/proxmox/k3s-kubeconfig-mode.sh`) does this for
+clusters installed before the install step set the mode. It reaches the server node as `ansible`,
+directly or through the package's `jumphost`, and pipes `k3s-kubeconfig-mode-node.sh` to it as
+root. That script sets the `config.yaml` line, rewrites a `--write-kubeconfig-mode` flag in the
+k3s systemd unit to `600` and runs `systemctl daemon-reload` (command-line flags override
+`config.yaml`), and runs `chmod 600` on `k3s.yaml`. It restarts nothing, and a failure is a
+warning that is retried on the next apply.
+
 | Variant | Login user |
 | :--- | :--- |
 | Proxmox | `ansible` (cloud-init) |
@@ -194,6 +202,9 @@ k3s-cluster/
   scripts/
     proxmox/
       k3s-post-terraform.sh
+      k3s-kubeconfig-mode.sh  # after_apply: owner-only node kubeconfig
+      k3s-kubeconfig-mode-node.sh  # piped to the server node as root
+      k3s-lib.sh           # shared ssh helpers, sourced
     oci/
       k3s-post-terraform.sh
       k3s-bootstrap.sh     # after_apply: create the ansible login user
