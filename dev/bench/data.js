@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795270674225,
+  "lastUpdate": 1795276938018,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5324,6 +5324,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008098949586054499",
             "extra": "mean: 125.85364698911218 usec\nrounds: 8436"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "389986fa9d0dba1af9c4853364b6139272821b6a",
+          "message": "feat: pin pre-generated ssh host keys for the oci k3s nodes (merges PR #1585, addresses #1583)\n\n* feat: pin pre-generated ssh host keys for the oci k3s nodes\n\nExtend pinned SSH host keys to OCI instances with a tailscale block, which\ncovers every k3s-cluster OCI node. A live check showed that Tailscale SSH\npresents the node's /etc/ssh ed25519 key and that ssh-keyscan works\nagainst the tailnet name, so cloud-init ssh_keys is enough.\n\n- The OCI provider adds a text/cloud-config part to the Tailscale module's\n  additional_parts only when a private key exists. A pinned node keeps\n  byte-identical user_data and is not replaced.\n- The OCI validator reports missing or conflicting host keys at plan, and\n  ssh_host_key on an instance without tailscale is an error.\n- `foundry secrets host-keys` now covers OCI instances, pinning deployed\n  nodes by scanning their tailnet name.\n- The OCI k3s scripts connect with StrictHostKeyChecking=yes against the\n  pinned keys, Ansible runs with ANSIBLE_HOST_KEY_CHECKING=True, and the\n  scripts fail fast on a host key mismatch.\n- ADR-0032 records the live-check findings and the OCI exposure.\n\nBREAKING CHANGE: OCI k3s-cluster packages now require a recorded host key\nper node. Run `foundry secrets host-keys --env <env>` before the next plan\nor apply; plan fails with an error naming that command until it has run.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* test: hide only kubectl in the verify-cluster skip test\n\nOn CI kubectl sits in /usr/bin beside bash, so dropping its directory from PATH also dropped bash. Link every other tool in that directory instead.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* test: skip already-linked tools when hiding kubectl\n\nOn CI /bin and /usr/bin are the same directory and hold a dangling link, which exists() reports as missing, so it was linked twice. Use os.path.lexists.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T16:00:16Z",
+          "tree_id": "ad8026cab0515d5ded4fc24e48a3263bc88cf052",
+          "url": "https://github.com/endavis/infrafoundry/commit/389986fa9d0dba1af9c4853364b6139272821b6a"
+        },
+        "date": 1795276936908,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 78.54638742817026,
+            "unit": "iter/sec",
+            "range": "stddev: 0.001113161902391341",
+            "extra": "mean: 12.731330271738951 msec\nrounds: 92"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15616.737746198327,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004821726786467389",
+            "extra": "mean: 64.03386009625703 usec\nrounds: 16833"
           }
         ]
       }
