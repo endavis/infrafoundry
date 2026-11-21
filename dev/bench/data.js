@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795285562248,
+  "lastUpdate": 1795295030225,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5514,6 +5514,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006665137274943427",
             "extra": "mean: 76.05545558879038 usec\nrounds: 15334"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6d0456fdce90ef173d2f2a0175188a8fe2cdbc7d",
+          "message": "feat: add a bitwarden secret:// backend for vaultwarden items (merges PR #1593, addresses #1520)\n\n* feat: add a bitwarden secret:// backend for vaultwarden items\n\nAdd secret://bitwarden/<item>/<field>, resolved through the bw CLI against\na Vaultwarden or Bitwarden server configured per environment under\nsecret_backends.bitwarden (https server, optional organization and\ncollection scope). Each process gets a private 0700 bw app-data directory;\nthe session logs in with an API key, unlocks with --passwordenv, syncs, and\nis locked, logged out and removed at exit. Credentials come from env or\nenv_secrets URIs and travel only in the subprocess environment, never in\nargv, logs or error messages.\n\nEvery secret:// call site now goes through one resolver built from the\nenvironment's configured backends, and the Terraform and Ansible bridges\n(tf var naming, the terraform_secrets validator, tailscale auth keys)\naccept bitwarden URIs alongside env_secrets.\n\nADR-0034 records the design; ADR-0029 and ADR-0031 note the amendment.\n\nBREAKING CHANGE: VaultwardenProvider (infrafoundry.core.secrets.providers.vaultwarden)\nis removed. Configure secret_backends.bitwarden in the environment and\nreference values as secret://bitwarden/<item>/<field>; the migration steps\nare in docs/configuration/secrets-vaultwarden.md.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: drop the loaded-backend debug line from the secret resolver\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* docs: record the vaultwarden live test in the bitwarden backend page\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: apply the bitwarden collection scope to listed items\n\nbw list items ignores --collectionid when --organizationid is also given,\nso a name lookup scoped to one collection matched same-named items in\nsibling collections of the organization. Re-apply both scope filters to\nevery listed item, and make the test stub behave like the real bw.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T21:02:44Z",
+          "tree_id": "dc0e238a86f4b7ab03ed21f95c9464a20b2504ad",
+          "url": "https://github.com/endavis/infrafoundry/commit/6d0456fdce90ef173d2f2a0175188a8fe2cdbc7d"
+        },
+        "date": 1795295029295,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 45.83943956449028,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003188241595025819",
+            "extra": "mean: 21.81527543750021 msec\nrounds: 48"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7741.181505761922,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000011966239282580997",
+            "extra": "mean: 129.1792472835935 usec\nrounds: 8375"
           }
         ]
       }
