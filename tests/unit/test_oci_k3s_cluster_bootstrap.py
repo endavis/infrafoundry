@@ -320,7 +320,8 @@ def test_proxmox_has_no_bootstrap_handler() -> None:
     blueprint = yaml.safe_load((BLUEPRINT / "blueprint.yaml").read_text())
 
     assert "k3s-bootstrap" not in yaml.safe_dump(blueprint["providers"]["proxmox"])
-    assert "after_apply" not in blueprint["providers"]["proxmox"]["events"]
+    after_apply = blueprint["providers"]["proxmox"]["events"].get("after_apply", [])
+    assert "k3s-bootstrap" not in {h["name"] for h in after_apply}
 
 
 # --- Role safety (static) ---

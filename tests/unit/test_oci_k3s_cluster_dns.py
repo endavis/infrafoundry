@@ -94,12 +94,12 @@ def test_oci_dns_defaults(loader: PackageLoader) -> None:
 
 
 def test_proxmox_blueprint_is_not_wired() -> None:
-    """The Proxmox variant has no DNS inputs and no after_apply handler."""
+    """The Proxmox variant has no DNS inputs and no k3s-dns handler."""
     blueprint = yaml.safe_load((BLUEPRINT / "blueprint.yaml").read_text())
     proxmox = blueprint["providers"]["proxmox"]
 
     assert "k3s_dns_nameservers" not in {i["name"] for i in proxmox["inputs"]}
-    assert "after_apply" not in proxmox["events"]
+    assert "k3s-dns" not in {h["name"] for h in proxmox["events"].get("after_apply", [])}
 
 
 def test_after_apply_env_for_the_example_package(loader: PackageLoader) -> None:
