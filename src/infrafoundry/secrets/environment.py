@@ -12,7 +12,9 @@ Provider settings resolve at each consumer, never when the environment config lo
 starts only when a bitwarden URI is actually resolved. :func:`resolved_provider_settings` and
 :func:`with_resolved_provider_settings` hand a reader resolved copies; the original, possibly
 cached, ``EnvironmentConfig`` is never changed. :func:`provider_settings_secret_problems` is the
-offline counterpart for readers that only check presence or shape.
+offline counterpart for readers that only check presence or shape. For a provider with instances
+(``firewalls:``, ``clusters:``) only the shared keys and the addressed instance's entry are
+resolved; sibling entries stay raw, so one instance's unresolvable URI never fails another.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ import copy
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
-from infrafoundry.core.provider_instances import split_provider_id
+from infrafoundry.core.provider_instances import instance_name, instance_spec, split_provider_id
 from infrafoundry.secrets.resolver import (
     SecretResolutionError,
     SecretResolver,
@@ -112,8 +114,10 @@ def resolved_provider_settings(
 ) -> dict[str, Any] | None:
     """Return ``provider_settings[<base>]`` with its ``secret://`` URIs resolved.
 
-    ``opnsense@fw-b`` reads the ``opnsense`` block. Values nested under ``firewalls:`` and
-    ``clusters:`` are covered.
+    ``opnsense@fw-b`` reads the ``opnsense`` block. When the provider has instances and its
+    settings hold the instance map, only the shared top-level keys and the addressed instance's
+    entry are resolved (a plain id addresses the primary); sibling entries are returned as
+    unresolved deep copies. Flat settings resolve whole.
 
     Returns:
         The resolved settings, or ``None`` when the provider has no settings.
@@ -125,7 +129,21 @@ def resolved_provider_settings(
     raw = (env_config.provider_settings or {}).get(base)
     if raw is None:
         return None
-    return resolve_secret_settings(env_config, raw)
+    spec = instance_spec(base)
+    instances = raw.get(spec.map_key) if spec is not None and isinstance(raw, Mapping) else None
+    if spec is None or not isinstance(instances, dict):
+        return resolve_secret_settings(env_config, raw)
+    name = instance_name(base, raw, provider_name)
+    entry = instances.get(name) if name is not None else None
+    scoped_map: dict[str, Any] = (
+        {name: entry} if name is not None and isinstance(entry, dict) else {}
+    )
+    shared = {k: v for k, v in raw.items() if k != spec.map_key}
+    resolved = resolve_secret_settings(env_config, {**shared, spec.map_key: scoped_map})
+    if resolved is None:  # pragma: no cover - raw is not None
+        return None
+    resolved[spec.map_key] = {**copy.deepcopy(instances), **resolved[spec.map_key]}
+    return resolved
 
 
 def with_resolved_provider_settings(
@@ -139,7 +157,7 @@ def with_resolved_provider_settings(
         SecretResolutionError: If a URI cannot be resolved.
     """
     base, _ = split_provider_id(provider_name)
-    resolved = resolved_provider_settings(env_config, base)
+    resolved = resolved_provider_settings(env_config, provider_name)
     if resolved is None:
         return env_config.model_copy()
     settings = {**(env_config.provider_settings or {}), base: resolved}

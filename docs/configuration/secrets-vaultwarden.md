@@ -49,6 +49,7 @@ Provider settings resolve for every provider, wherever the provider reads them: 
 - `infra plan` and the offline validation, plus validators that only check a setting is present, check a settings URI offline: its shape and that its backend is configured. No vault is contacted.
 - `infra doctor` runs live checks against the provider APIs, so it resolves the settings first. A bitwarden URI queries the vault there.
 - The Terraform environment variable builder resolves only the settings keys it maps to a variable.
+- For a provider with instances (OPNsense `firewalls:`, Kubernetes `clusters:`), only the shared top-level keys and the checked instance's entry are resolved. A URI that cannot be resolved is reported once per instance, labelled with the instance name, and never fails a sibling instance.
 
 ### Credential sources
 

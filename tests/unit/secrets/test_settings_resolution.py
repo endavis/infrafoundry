@@ -437,3 +437,176 @@ class TestEsxi:
             self._provider(tmp_path, env).validate_connectivity(env, ValidationReport())
         seen = validator.call_args.args[0]
         assert seen.provider_settings["esxi"]["hosts"]["esx-a"]["hostname"] == FIXTURE_VALUE
+
+
+MISSING_URI = "secret://env_secrets/db/missing"
+
+
+def _firewalls_env(fw_a: dict[str, Any], fw_b: dict[str, Any], **shared: Any) -> EnvironmentConfig:
+    return make_env(
+        {"opnsense": {"primary": "fw-a", "firewalls": {"fw-a": fw_a, "fw-b": fw_b}, **shared}}
+    )
+
+
+class TestOpnsenseInstanceScoping:
+    """Only the addressed instance and the shared keys resolve (#1596)."""
+
+    def test_sibling_failure_does_not_raise(self, stub: StubBw) -> None:
+        env = _firewalls_env({"api_key": MISSING_URI}, {"api_key": KEY_URI})
+        resolved = resolved_provider_settings(env, "opnsense@fw-b")
+        assert resolved is not None
+        assert resolved["firewalls"]["fw-b"]["api_key"] == KEY_VALUE
+        assert resolved["firewalls"]["fw-a"]["api_key"] == MISSING_URI
+
+    def test_plain_id_resolves_only_the_primary(self, stub: StubBw) -> None:
+        env = _firewalls_env({"api_key": PW_URI}, {"api_key": KEY_URI})
+        resolved = resolved_provider_settings(env, "opnsense")
+        assert resolved is not None
+        assert resolved["firewalls"]["fw-a"]["api_key"] == FIXTURE_VALUE
+        assert resolved["firewalls"]["fw-b"]["api_key"] == KEY_URI
+
+    def test_shared_key_failure_raises_for_every_instance(self) -> None:
+        env = _firewalls_env({"api_key": "a"}, {"api_key": "b"}, api_secret=MISSING_URI)
+        for provider in ("opnsense", "opnsense@fw-a", "opnsense@fw-b"):
+            with pytest.raises(SecretResolutionError):
+                resolved_provider_settings(env, provider)
+
+    def test_undeclared_instance_resolves_shared_keys_only(self, stub: StubBw) -> None:
+        env = _firewalls_env({"api_key": MISSING_URI}, {"api_key": MISSING_URI}, api_secret=PW_URI)
+        resolved = resolved_provider_settings(env, "opnsense@fw-z")
+        assert resolved is not None
+        assert resolved["api_secret"] == FIXTURE_VALUE
+        assert resolved["firewalls"]["fw-a"]["api_key"] == MISSING_URI
+
+    def test_kubernetes_clusters_are_scoped(self, stub: StubBw) -> None:
+        env = make_env(
+            {
+                "kubernetes": {
+                    "primary": "c-a",
+                    "clusters": {
+                        "c-a": {"kubeconfig_path": MISSING_URI},
+                        "c-b": {"kubeconfig_path": PW_URI},
+                    },
+                }
+            }
+        )
+        resolved = resolved_provider_settings(env, "kubernetes@c-b")
+        assert resolved is not None
+        assert resolved["clusters"]["c-b"]["kubeconfig_path"] == FIXTURE_VALUE
+        assert resolved["clusters"]["c-a"]["kubeconfig_path"] == MISSING_URI
+
+    def test_original_untouched_and_siblings_are_copies(self, stub: StubBw) -> None:
+        env = _firewalls_env({"api_key": MISSING_URI}, {"api_key": KEY_URI})
+        resolved = resolved_provider_settings(env, "opnsense@fw-b")
+        assert resolved is not None
+        assert env.provider_settings["opnsense"]["firewalls"]["fw-b"]["api_key"] == KEY_URI
+        assert (
+            resolved["firewalls"]["fw-a"]
+            is not env.provider_settings["opnsense"]["firewalls"]["fw-a"]
+        )
+        assert list(resolved["firewalls"]) == ["fw-a", "fw-b"]
+
+
+class TestLabelAndDeduplicate:
+    def test_same_report_twice_adds_one_result(self) -> None:
+        env = _firewalls_env({"api_key": MISSING_URI}, {"api_key": "b"})
+        report = ValidationReport()
+        assert resolved_env_or_report(env, "opnsense", report) is None
+        assert resolved_env_or_report(env, "opnsense", report) is None
+        assert len(report.results) == 1
+
+    def test_separate_reports_each_get_one(self) -> None:
+        env = _firewalls_env({"api_key": MISSING_URI}, {"api_key": "b"})
+        reports = [ValidationReport(), ValidationReport()]
+        for report in reports:
+            assert resolved_env_or_report(env, "opnsense", report) is None
+        assert [len(r.results) for r in reports] == [1, 1]
+
+    def test_message_is_labelled_and_names_only_its_own_uri(self) -> None:
+        other = "secret://env_secrets/db/other-missing"
+        env = _firewalls_env({"api_key": other}, {"api_key": MISSING_URI})
+        report = ValidationReport()
+        assert resolved_env_or_report(env, "opnsense@fw-b", report) is None
+        message = report.results[0].message
+        assert message.startswith("[fw-b] provider_settings.opnsense:")
+        assert MISSING_URI in message
+        assert other not in message
+        assert "from-sops" not in message
+
+    def test_flat_message_has_no_label(self) -> None:
+        env = _opnsense_env({"api_key": MISSING_URI})
+        report = ValidationReport()
+        resolved_env_or_report(env, "opnsense", report)
+        assert report.results[0].message.startswith("provider_settings.opnsense:")
+
+
+class TestDuplicateHooks:
+    def test_opnsense_sibling_failure_does_not_block_connectivity(
+        self, stub: StubBw, tmp_path: Path
+    ) -> None:
+        from infrafoundry.providers.opnsense import OPNsenseProvider
+
+        env = _firewalls_env({"api_key": MISSING_URI}, {"api_key": KEY_URI})
+        report = ValidationReport()
+        provider = OPNsenseProvider(tmp_path, tmp_path)
+        provider.name = "opnsense@fw-b"
+        with patch("infrafoundry.providers.opnsense.OPNsenseValidator") as validator:
+            provider.validate_connectivity(env, report)
+        validator.assert_called_once()
+        assert [r.check_name for r in report.results] == []
+
+    def test_opnsense_two_hooks_one_labelled_error(self, tmp_path: Path) -> None:
+        from infrafoundry.providers.opnsense import OPNsenseProvider
+
+        env = _firewalls_env({"api_key": MISSING_URI}, {"api_key": "b"})
+        report = ValidationReport()
+        provider = OPNsenseProvider(tmp_path, tmp_path)
+        with patch("infrafoundry.providers.opnsense.OPNsenseValidator") as validator:
+            provider.validate_connectivity(env, report)
+            provider.validate_references([], env, report)
+        validator.assert_not_called()
+        errors = [r for r in report.results if r.check_name == "opnsense_settings_secrets"]
+        assert len(errors) == 1
+        assert errors[0].message.startswith("[fw-a] ")
+
+    @pytest.mark.parametrize(
+        ("module", "cls", "validator", "base", "settings"),
+        [
+            (
+                "proxmox",
+                "ProxmoxProvider",
+                "ProxmoxValidator",
+                "proxmox",
+                {"api_token": MISSING_URI},
+            ),
+            ("oci", "OCIProvider", "OCIValidator", "oci", {"tenancy_ocid": MISSING_URI}),
+            (
+                "kubernetes",
+                "KubernetesProvider",
+                "KubernetesValidator",
+                "kubernetes",
+                {"kubeconfig_path": MISSING_URI},
+            ),
+        ],
+    )
+    def test_three_hooks_one_error(
+        self,
+        tmp_path: Path,
+        module: str,
+        cls: str,
+        validator: str,
+        base: str,
+        settings: dict[str, Any],
+    ) -> None:
+        import importlib
+
+        mod = importlib.import_module(f"infrafoundry.providers.{module}")
+        provider = getattr(mod, cls)(tmp_path, tmp_path)
+        env = make_env({base: settings})
+        report = ValidationReport()
+        with patch(f"infrafoundry.providers.{module}.{validator}"):
+            provider.validate_connectivity(env, report)
+            provider.validate_references([], env, report)
+            provider.validate_references_in_context([], [], env, report)
+        errors = [r for r in report.results if r.check_name == f"{base}_settings_secrets"]
+        assert len(errors) == 1

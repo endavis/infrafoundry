@@ -89,6 +89,7 @@ from infrafoundry.providers.opnsense.validators.context import (
     HaPeerCheck,
     OPNsenseValidationContext,
 )
+from infrafoundry.secrets.resolver import SecretResolutionError
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -328,9 +329,13 @@ class OPNsenseValidator:
             return
         backup_id = qualified_provider_id("opnsense", backup)
         try:
+            from infrafoundry.secrets.environment import resolve_secret_settings
+
             from .services._credentials import resolve_credentials
 
-            settings = firewall_settings(self.env_config, backup_id)
+            settings = resolve_secret_settings(
+                self.env_config, firewall_settings(self.env_config, backup_id)
+            )
             if not settings:
                 raise ValueError(f"no settings for firewall '{backup}'")
             api_url, api_key, api_secret, verify_ssl, proxy = resolve_credentials(
@@ -345,7 +350,7 @@ class OPNsenseValidator:
                 timeout=timeout,
             )
             peer_status = CarpStatusService(backup_client).vip_status()
-        except (APIError, httpx.HTTPError, ValueError, KeyError) as exc:
+        except (APIError, httpx.HTTPError, ValueError, KeyError, SecretResolutionError) as exc:
             self.api_validator.add_error(
                 check_name="opnsense_carp_pair_read",
                 message=f"Could not read CARP state of ha_backup firewall '{backup}': {exc}",
