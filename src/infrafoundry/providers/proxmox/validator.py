@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -10,6 +11,7 @@ import urllib3
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import APIError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.ssh_host_keys import HOST_KEY_FIELD, apply_host_key, host_key_problems
 from infrafoundry.core.tailscale import TailscaleSchemaError, process_tailscale_config
 from infrafoundry.core.types import ProxmoxProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
@@ -148,7 +150,25 @@ class ProxmoxValidator:
                     level=ValidationLevel.ERROR,
                 )
 
-        validate_terraform_secrets_references("proxmox", resources, self.env_config, self.report)
+        # Host keys (#1581): report what stops delivery, and add the private key reference
+        # (on a copy) before the terraform_secrets check so it is resolved too.
+        checked: list[ResourceConfig] = []
+        for resource in resources:
+            if resource.type == "vm" and (resource.config or {}).get(HOST_KEY_FIELD) is not None:
+                copied = copy.deepcopy(resource)
+                for problem in host_key_problems(copied, None):
+                    self.report.add_check(
+                        check_name=f"proxmox_ssh_host_key_{resource.name}",
+                        passed=False,
+                        message=problem,
+                        level=ValidationLevel.ERROR,
+                    )
+                apply_host_key(copied)
+                checked.append(copied)
+            else:
+                checked.append(resource)
+
+        validate_terraform_secrets_references("proxmox", checked, self.env_config, self.report)
 
     def validate_references(
         self,

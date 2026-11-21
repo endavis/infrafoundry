@@ -29,6 +29,9 @@ vms:
       HOSTNAME: "{{ server_name }}"
     tags: {{ ["k3s", "k3s-server"] + extra_tags }}
     onboot: true
+    # Pinned SSH host key (#1581); run `foundry secrets host-keys --env <env>` first.
+    ssh_host_key:
+      address: "{{ server_ip }}"
 
   # --- Agent nodes (one entry per item in agents:) ---
 {% for agent in agents %}
@@ -57,4 +60,6 @@ vms:
       HOSTNAME: "{{ agent.name }}"
     tags: {{ ["k3s", "k3s-agent"] + extra_tags }}
     onboot: true
+    ssh_host_key:
+      address: "{{ agent.ip }}"
 {% endfor %}

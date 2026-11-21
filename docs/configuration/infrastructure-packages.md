@@ -318,6 +318,35 @@ prefix:
 
 See [ADR-0031](../decisions/0031-secret-references-resolve-from-the-owning-packages-secretsyaml-through-a-package-prefix.md).
 
+### SSH Host Keys
+
+A VM built by a blueprint generates its SSH host key on first boot, so a script that connects
+to it has nothing to check the VM against. InfraFoundry instead generates an ed25519 host key
+pair per VM ahead of time, installs it through cloud-init, and the blueprint scripts verify the
+VM against the pinned public key (`StrictHostKeyChecking=yes`).
+
+- **Opt-in:** a Proxmox `vm` resource sets `ssh_host_key: {address: "<address the scripts use>"}`.
+  The `aiqum`, `console-connector` and `k3s-cluster` (Proxmox) blueprints do. A VM with a
+  `tailscale:` block, or cloud-init snippets that already set `ssh_keys`, cannot use it.
+- **Reserved secret:** `variables.ssh_host_keys.<resource-name>.{ed25519_private, ed25519_public}`
+  in the package's `secrets.yaml`. The loader keeps `ssh_host_keys` out of the merged
+  variables, so the private key never reaches script env, `INFRAFOUNDRY_PACKAGE_VARS` or
+  templates.
+- **Derived variable:** `ssh_known_hosts`, a string of `;`-separated lines
+  `<name>,<address> ssh-ed25519 <key>`, built from the public keys. It is empty until the keys
+  are recorded. Scripts split it on `;` into a private `known_hosts` file.
+- **Recording the keys:** run `foundry secrets host-keys --env <env>` before the first apply,
+  and once after upgrading a package that now sets `ssh_host_key`. It generates a pair for a VM
+  that does not exist yet, and pins a deployed VM by recording the key it presents now (no VM
+  change). See [`secrets host-keys`](../usage/cli-reference.md#secrets-host-keys). Until it has
+  run, `infra plan` fails with an error that names the command.
+- **Delivery:** the private key reaches the VM through a sensitive Terraform variable
+  (`TF_VAR_*`) in the cloud-init user data. See
+  [Secrets Architecture: SSH host keys](../architecture/secrets-architecture.md#ssh-host-keys)
+  for where it travels and how each place is protected, including the Terraform state.
+
+See [ADR-0032](../decisions/0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md).
+
 ### Best Practices
 
 - Keep only sensitive values in `secrets.yaml`; put everything else in `infrafoundry.yml`
@@ -334,6 +363,7 @@ environment variables for the script to consume:
 |:---------|:-----------|
 | `INFRAFOUNDRY_VAR_<KEY>` | Individual package variable (key uppercased, e.g., `INFRAFOUNDRY_VAR_CLUSTER_NAME`) |
 | `INFRAFOUNDRY_PACKAGE_VARS` | JSON dict of all merged package variables (manifest + secrets.yaml) |
+| `INFRAFOUNDRY_VAR_ssh_known_hosts` | Pinned VM host keys, `;`-separated known_hosts lines, when a resource sets `ssh_host_key` (see [SSH Host Keys](#ssh-host-keys)) |
 | `INFRAFOUNDRY_ENV` | Environment name |
 | `INFRAFOUNDRY_PROVIDER` | Provider name |
 | `INFRAFOUNDRY_PACKAGE` | Package name |

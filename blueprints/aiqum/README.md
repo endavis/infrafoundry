@@ -121,6 +121,25 @@ To fix an ERROR, publish a DNS record for the hostname on a DNS server ONTAP use
 own names under, defaulting to `dns_domain`) are the ONTAP-side inputs to keep consistent
 with it. Then re-run the package or add the cluster to AIQUM by hand.
 
+## SSH host keys
+
+The post-apply script checks the VM against a pinned SSH host key
+(`StrictHostKeyChecking=yes`), not the first key it presents. InfraFoundry generates a key
+pair for the VM, cloud-init installs it, and the public key reaches the script as
+`ssh_known_hosts`.
+
+- Run `foundry secrets host-keys --env <env>` before the first apply, and once after
+  upgrading to a version that pins host keys. `infra plan` fails until it has run.
+- A new VM gets a generated key. A VM that already exists is pinned: the key it presents now
+  is recorded and the VM is not changed.
+- Before rebuilding the VM, destroy it, then run
+  `foundry secrets host-keys --env <env> --regenerate <vm_name>`.
+- `Host key verification failed` from the script means the VM does not present the recorded
+  key, for example after a rebuild without `--regenerate`.
+
+See [Infrastructure Packages: SSH Host Keys](../../docs/configuration/infrastructure-packages.md#ssh-host-keys)
+and [ADR-0032](../../docs/decisions/0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md).
+
 ## Prerequisites
 
 - The `rocky9-template` blueprint applied (provides VM ID `901` to clone from)

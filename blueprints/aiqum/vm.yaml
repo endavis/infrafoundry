@@ -36,3 +36,6 @@ vms:
 {% endif %}
     tags: {{ ["ontap", "aiqum"] + extra_tags }}
     onboot: true
+    # Pinned SSH host key (#1581); run `foundry secrets host-keys --env <env>` first.
+    ssh_host_key:
+      address: "{{ ip_address }}"

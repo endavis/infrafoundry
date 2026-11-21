@@ -111,6 +111,7 @@ providers:
             K3S_SERVER_NAME: "{{ server_name }}"
             K3S_SERVER_IP: "{{ server_ip }}"
             K3S_JUMPHOST: "{{ jumphost }}"
+            K3S_KNOWN_HOSTS: "{{ ssh_known_hosts }}"
 
   # =====================================================================
   # OCI — ARM Always-Free-Tier (1 control + N workers) with Tailscale

@@ -58,6 +58,17 @@ EXPECTED_NODES=$(( ${#AGENT_IPS[@]} + 1 ))
 BLUEPRINT_DIR="${INFRAFOUNDRY_BLUEPRINT_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 # shellcheck source=k3s-lib.sh
 source "${BLUEPRINT_DIR}/scripts/proxmox/k3s-lib.sh"
+# Later traps extend this one; it removes the pinned known_hosts files on any exit.
+trap 'k3s_ssh_cleanup' EXIT
+
+# Stop at once when a node does not present its pinned host key: retrying cannot help.
+fail_host_key() {
+    echo "ERROR: $1 ($2) does not present the pinned host key" >&2
+    echo "       (ssh_host_keys.$1 in the package secrets.yaml). If the VM was rebuilt," >&2
+    echo "       run 'foundry secrets host-keys --env <env> --regenerate $1' first." >&2
+    sed 's/^/    /' "$3" >&2
+    exit 1
+}
 
 # All node IPs and names for iteration
 ALL_IPS=("${SERVER_IP}" "${AGENT_IPS[@]}")
@@ -93,8 +104,9 @@ fi
 echo "  ssh-agent: $(ssh-add -l | wc -l) key(s) loaded"
 
 PREFLIGHT_ERR=$(mktemp)
-trap 'rm -f "$PREFLIGHT_ERR"' EXIT
+trap 'rm -f "$PREFLIGHT_ERR"; k3s_ssh_cleanup' EXIT
 if ! remote_cmd "${SERVER_IP}" "echo ok" >"$PREFLIGHT_ERR" 2>&1; then
+    if k3s_host_key_error "$PREFLIGHT_ERR"; then fail_host_key "${SERVER_NAME}" "${SERVER_IP}" "$PREFLIGHT_ERR"; fi
     echo "ERROR: preflight ssh to ${SERVER_NAME} (${SERVER_IP}) failed:" >&2
     sed 's/^/    /' "$PREFLIGHT_ERR" >&2
     exit 1
@@ -108,13 +120,14 @@ echo ""
 echo "--- Phase 1: Waiting for all VMs to be reachable ---"
 MAX_WAIT=300
 WAIT_ERR=$(mktemp)
-trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR"' EXIT
+trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR"; k3s_ssh_cleanup' EXIT
 
 for i in "${!ALL_IPS[@]}"; do
     ip="${ALL_IPS[$i]}"
     name="${ALL_NAMES[$i]}"
     ELAPSED=0
     while ! remote_cmd "${ip}" "echo ready" >"$WAIT_ERR" 2>&1; do
+        if k3s_host_key_error "$WAIT_ERR"; then fail_host_key "${name}" "${ip}" "$WAIT_ERR"; fi
         if [ $ELAPSED -ge $MAX_WAIT ]; then
             echo "ERROR: ${name} (${ip}) not reachable after ${MAX_WAIT}s"
             echo "  Last ssh attempt:" >&2
@@ -213,7 +226,7 @@ remote_root_cmd "${SERVER_IP}" "
 # Capture combined output each iteration so the timeout path can dump
 # kubectl's actual error instead of a black-box "not ready after 180s".
 KUBECTL_ERR=$(mktemp)
-trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR" "$KUBECTL_ERR"' EXIT
+trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR" "$KUBECTL_ERR"; k3s_ssh_cleanup' EXIT
 echo "  Waiting for k3s server to be ready..."
 ELAPSED=0
 while ! remote_kubectl "${SERVER_IP}" "kubectl get nodes" >"$KUBECTL_ERR" 2>&1; do
@@ -266,7 +279,7 @@ echo "--- Phase 5: Verifying cluster ---"
 # cross the ssh boundary, leaving the operator staring at "0/4 ready"
 # with no clue why.
 KUBECTL_OUT=$(mktemp)
-trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR" "$KUBECTL_ERR" "$KUBECTL_OUT"' EXIT
+trap 'rm -f "$PREFLIGHT_ERR" "$WAIT_ERR" "$KUBECTL_ERR" "$KUBECTL_OUT"; k3s_ssh_cleanup' EXIT
 echo "  Waiting for all ${EXPECTED_NODES} nodes to be Ready..."
 ELAPSED=0
 while true; do

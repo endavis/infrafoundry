@@ -37,17 +37,66 @@ for k, val in v.items():
 ")"
 
 JUMPHOST="${jumphost:-}"
-# Host keys are not checked for the VM: it gets new keys on every rebuild. The
-# jumphost is a long-lived host, so its connection keeps normal verification.
-VM_SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-SSH="ssh ${VM_SSH_OPTS} -o ConnectTimeout=10"
-JUMP_SSH="ssh -o ConnectTimeout=10"
+# The hop to the jumphost is verified against the operator's own known_hosts.
+JUMP_SSH="ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10"
 SSH_USER="${ssh_user:-ansible}"
+
+# The VM's host key is pinned (#1581): InfraFoundry generated it, cloud-init installed it,
+# and ssh_known_hosts (";"-separated "<name>,<address> ssh-ed25519 <key>" lines) holds the
+# public half. Nothing but this file is trusted for the VM.
+WAIT_ERR=""
+CURL_ERR=""
+AGENT_CERT=""
+KNOWN_HOSTS=$(mktemp)
+REMOTE_KNOWN_HOSTS=""
+cleanup() {
+    rm -f "$WAIT_ERR" "$CURL_ERR" "$AGENT_CERT" "$KNOWN_HOSTS"
+    if [ -n "${REMOTE_KNOWN_HOSTS}" ]; then
+        ${JUMP_SSH} ${JUMPHOST} "rm -f '${REMOTE_KNOWN_HOSTS}'" >/dev/null 2>&1 || true
+    fi
+}
+trap cleanup EXIT
+if [ -z "${ssh_known_hosts:-}" ]; then
+    echo "ERROR: ssh_known_hosts is empty: no pinned SSH host key for ${vm_name:-the VM}." >&2
+    echo "       Run 'foundry secrets host-keys --env <env>' and re-apply." >&2
+    exit 1
+fi
+printf '%s\n' "${ssh_known_hosts//;/$'\n'}" >"$KNOWN_HOSTS"
+if grep -Evq '^[A-Za-z0-9._:,-]+ ssh-ed25519 [A-Za-z0-9+/]+={0,3}$' "$KNOWN_HOSTS"; then
+    echo "ERROR: ssh_known_hosts holds a malformed line; run 'foundry secrets host-keys --env <env>'" >&2
+    exit 1
+fi
+
+# True when an ssh error file shows the pinned key did not match: retrying cannot help.
+host_key_error() {
+    grep -Eq 'Host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED|No ED25519 host key is known' "$1"
+}
+fail_host_key() {
+    echo "ERROR: ${vm_name} (${ip_address}) does not present the pinned host key" >&2
+    echo "       (ssh_host_keys.${vm_name} in the package secrets.yaml). If the VM was rebuilt," >&2
+    echo "       run 'foundry secrets host-keys --env <env> --regenerate ${vm_name}' first." >&2
+    sed 's/^/    /' "$1" >&2
+    exit 1
+}
+
 DOCKER_VERSION="${docker_version:-27.5.1}"
 INSTALL_ARGS="${console_agent_install_args:-}"
 : "${console_agent_url_base:?required: set console_agent_url_base in the package}"
 : "${console_agent_installer:?required: set console_agent_installer in the package}"
 : "${console_agent_sha256:?required: set console_agent_sha256 in the package}"
+
+# Pinned-key ssh options. With a jumphost the inner hop runs there, so the known_hosts
+# file is staged on the jumphost (mode 0600) and removed on exit.
+VM_KNOWN_HOSTS="$KNOWN_HOSTS"
+if [ -n "${JUMPHOST}" ]; then
+    REMOTE_KNOWN_HOSTS=$(${JUMP_SSH} ${JUMPHOST} 'umask 077; f=$(mktemp) && cat >"$f" && echo "$f"' <"$KNOWN_HOSTS") || {
+        echo "ERROR: cannot stage the pinned host keys on ${JUMPHOST}" >&2
+        exit 1
+    }
+    VM_KNOWN_HOSTS="$REMOTE_KNOWN_HOSTS"
+fi
+VM_SSH_OPTS="-o StrictHostKeyChecking=yes -o UserKnownHostsFile=${VM_KNOWN_HOSTS} -o GlobalKnownHostsFile=/dev/null"
+SSH="ssh ${VM_SSH_OPTS} -o ConnectTimeout=10"
 
 if [ -n "${JUMPHOST}" ]; then
     remote_cmd() { ${JUMP_SSH} ${JUMPHOST} "${SSH} ${SSH_USER}@${1} '${2}'"; }
@@ -92,7 +141,6 @@ echo "  ssh-agent: $(ssh-add -l | wc -l) key(s) loaded"
 # prints the last SSH error if it never becomes reachable.
 WAIT_ERR=$(mktemp)
 CURL_ERR=$(mktemp)
-trap 'rm -f "$WAIT_ERR" "$CURL_ERR"' EXIT
 
 # --- Phase 1: Wait for SSH, then cloud-init ---
 echo ""
@@ -100,6 +148,7 @@ log "--- Phase 1: Waiting for VM to be reachable ---"
 MAX_WAIT=300
 ELAPSED=0
 while ! remote_cmd "${ip_address}" "echo ready" >"$WAIT_ERR" 2>&1; do
+    if host_key_error "$WAIT_ERR"; then fail_host_key "$WAIT_ERR"; fi
     if [ $ELAPSED -ge $MAX_WAIT ]; then
         echo "ERROR: VM not reachable after ${MAX_WAIT}s" >&2
         sed 's/^/    /' "$WAIT_ERR" >&2
@@ -157,12 +206,12 @@ REGISTRATION_REQUESTED=0
 if [ -n "${console_client_id:-}${console_client_secret:-}${console_admin_email:-}" ]; then
     REGISTRATION_REQUESTED=1
 fi
-AGENT_CERT=""
 if [ "${REGISTRATION_REQUESTED}" -eq 1 ]; then
-    # Pin the agent's own certificate (fetched over the SSH channel to the VM) so the
-    # bearer token is only ever sent to this agent. A path, not a secret, goes on argv.
+    # Pin the agent's own certificate, fetched over the SSH channel to the VM, so the
+    # bearer token is only ever sent to this agent. That channel verifies the VM's pinned
+    # host key, so the certificate cannot come from another host. A path, not a secret,
+    # goes on argv.
     AGENT_CERT=$(mktemp)
-    trap 'rm -f "$WAIT_ERR" "$CURL_ERR" "$AGENT_CERT"' EXIT
     remote_cmd "${ip_address}" "openssl s_client -connect 127.0.0.1:443 -servername localhost </dev/null 2>/dev/null | openssl x509" >"$AGENT_CERT"
 fi
 python3 "${SCRIPT_DIR}/console-connector-register.py" ${AGENT_CERT:+--agent-cert "$AGENT_CERT"}

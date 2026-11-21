@@ -208,7 +208,10 @@ PVE_NODE = PVE_DIR / "k3s-kubeconfig-mode-node.sh"
 
 _FAKE_SSH = """#!/bin/sh
 printf '%s\\n' "$*" >> "$RECORD_DIR/ssh_calls"
-cat > "$RECORD_DIR/stdin"
+n=$(wc -l < "$RECORD_DIR/ssh_calls")
+cat > "$RECORD_DIR/stdin.$n"
+if [ -s "$RECORD_DIR/stdin.$n" ]; then cp "$RECORD_DIR/stdin.$n" "$RECORD_DIR/stdin"; fi
+case "$*" in *mktemp*) echo /tmp/staged-known-hosts ;; esac
 exit "${FAKE_SSH_RC:-0}"
 """
 
@@ -216,7 +219,13 @@ _FAKE_SYSTEMCTL = """#!/bin/sh
 printf '%s\\n' "$*" >> "$RECORD_DIR/systemctl_calls"
 """
 
-_PVE_ENV = {"K3S_SERVER_IP": "192.0.2.80", "K3S_SERVER_NAME": "k3s-server", "K3S_JUMPHOST": ""}
+_KNOWN_HOSTS = "k3s-server,192.0.2.80 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleSentinelKey0"
+_PVE_ENV = {
+    "K3S_SERVER_IP": "192.0.2.80",
+    "K3S_SERVER_NAME": "k3s-server",
+    "K3S_JUMPHOST": "",
+    "K3S_KNOWN_HOSTS": _KNOWN_HOSTS,
+}
 
 
 def _stub_env(tmp_path: Path, extra: dict[str, str] | None = None) -> dict[str, str]:
@@ -280,20 +289,41 @@ def test_pve_handler_direct_mode_pipes_the_node_script(tmp_path: Path) -> None:
     assert "ansible@192.0.2.80" in call
     assert "sudo" in call
     assert "bash -s" in call
+    assert "StrictHostKeyChecking=yes" in call
+    assert "GlobalKnownHostsFile=/dev/null" in call
+    assert "StrictHostKeyChecking=no" not in call
     assert (record / "stdin").read_text() == PVE_NODE.read_text()
 
 
 def test_pve_handler_jumphost_mode_pipes_the_node_script(tmp_path: Path) -> None:
-    """Jumphost mode makes one ssh call to the jumphost, the inner command reaches the node."""
+    """Jumphost mode stages the pinned keys, makes the call, then removes the staged file."""
     result, record = _run_pve_handler(tmp_path, {**_PVE_ENV, "K3S_JUMPHOST": "jump.example"})
 
     assert result.returncode == 0, result.stderr + result.stdout
-    (call,) = (record / "ssh_calls").read_text().splitlines()
+    stage, call, cleanup = (record / "ssh_calls").read_text().splitlines()
+    # Staging: strict hop to the jumphost with the operator's known_hosts; the pinned
+    # lines (one per ";" part) arrive on stdin.
+    assert "StrictHostKeyChecking=yes" in stage
+    assert "jump.example" in stage
+    assert (record / "stdin.1").read_text() == _KNOWN_HOSTS + "\n"
+    # The call: the jumphost hop is strict, the inner hop uses the staged file.
     assert "jump.example" in call.split(" ssh ")[0]
+    assert "StrictHostKeyChecking=yes" in call.split(" ssh ")[0]
+    assert "UserKnownHostsFile=/tmp/staged-known-hosts" in call
     assert "ansible@192.0.2.80" in call
     assert "sudo" in call
     assert "bash -s" in call
-    assert (record / "stdin").read_text() == PVE_NODE.read_text()
+    assert (record / "stdin.2").read_text() == PVE_NODE.read_text()
+    assert "rm -f '/tmp/staged-known-hosts'" in cleanup
+
+
+def test_pve_handler_requires_pinned_host_keys(tmp_path: Path) -> None:
+    """Without pinned host keys the handler fails before any ssh."""
+    result, record = _run_pve_handler(tmp_path, {**_PVE_ENV, "K3S_KNOWN_HOSTS": ""})
+
+    assert result.returncode != 0
+    assert "foundry secrets host-keys" in result.stderr
+    assert not (record / "ssh_calls").exists()
 
 
 @pytest.mark.parametrize(
@@ -452,10 +482,15 @@ def test_node_second_run_changes_nothing_and_never_restarts(tmp_path: Path) -> N
 
 
 def test_pve_handler_is_wired_after_apply_with_continue_on_error() -> None:
-    """The Proxmox handler is an after_apply script with continue_on_error and 3 env keys."""
+    """The Proxmox handler is an after_apply script with continue_on_error and 4 env keys."""
     blueprint = yaml.safe_load((BLUEPRINT / "blueprint.yaml").read_text())
     (handler,) = blueprint["providers"]["proxmox"]["events"]["after_apply"]
 
     assert handler["script"] == "scripts/proxmox/k3s-kubeconfig-mode.sh"
     assert handler["continue_on_error"] is True
-    assert set(handler["env"]) == {"K3S_SERVER_NAME", "K3S_SERVER_IP", "K3S_JUMPHOST"}
+    assert set(handler["env"]) == {
+        "K3S_SERVER_NAME",
+        "K3S_SERVER_IP",
+        "K3S_JUMPHOST",
+        "K3S_KNOWN_HOSTS",
+    }

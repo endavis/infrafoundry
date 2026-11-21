@@ -399,6 +399,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/test_blueprint_extra_tags.py",
     "tests/unit/test_blueprint_jumphost_env.py",
     "tests/unit/test_blueprint_snippets_storage.py",
+    "tests/unit/test_blueprint_ssh_host_keys.py",
     "tests/unit/test_blueprint_resolver.py",
     "tests/unit/test_blueprint_validator.py",
     "tests/unit/test_cli.py",

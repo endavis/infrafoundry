@@ -148,6 +148,27 @@ variables:
       ip: "192.0.2.71"
 ```
 
+#### SSH host keys (Proxmox)
+
+The post-apply scripts check each node against a pinned SSH host key
+(`StrictHostKeyChecking=yes`), not the first key the node presents. InfraFoundry generates
+one key pair per node, cloud-init installs it, and the public keys reach the scripts as
+`ssh_known_hosts`.
+
+- Run `foundry secrets host-keys --env <env>` before the first apply, and once after
+  upgrading to a version that pins host keys. `infra plan` fails until it has run.
+- New nodes get a generated key. Nodes that already exist are pinned: the key they present
+  now is recorded and the nodes are not changed.
+- Before rebuilding a node, destroy it, then run
+  `foundry secrets host-keys --env <env> --regenerate <node-name>` to give the new node a
+  fresh key.
+- `Host key verification failed` from a script means a node does not present the recorded
+  key, for example after a rebuild without `--regenerate`.
+
+See [Infrastructure Packages: SSH Host Keys](../../docs/configuration/infrastructure-packages.md#ssh-host-keys)
+and [ADR-0032](../../docs/decisions/0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md).
+The OCI variant is not covered (#1583).
+
 ### OCI
 
 ```yaml

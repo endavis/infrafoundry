@@ -14,6 +14,11 @@ from infrafoundry.core.provider_mixins import (
     TerraformGeneratorMixin,
     collect_terraform_secret_vars,
 )
+from infrafoundry.core.ssh_host_keys import (
+    apply_host_key,
+    cloud_config_fragment,
+    host_key_problems,
+)
 from infrafoundry.core.types import ProxmoxProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
 
@@ -37,6 +42,15 @@ if TYPE_CHECKING:
 def _imports_disk(vm: ResourceConfig) -> bool:
     """Whether a VM is built by importing a disk (an OVA or a raw image) over SSH."""
     return "ova_source" in vm.config or "disk_image_source" in vm.config
+
+
+def _raise_host_key_problems(vm: ResourceConfig, cloud_init: dict[Any, Any] | None) -> None:
+    """Raise ``SchemaValidationError`` when a VM's ``ssh_host_key`` cannot be delivered."""
+    problems = host_key_problems(vm, cloud_init, require_entry=False)
+    if problems:
+        raise SchemaValidationError(
+            "Proxmox VM SSH host key problems:\n" + "\n".join(f"  - {p}" for p in problems)
+        )
 
 
 class ProxmoxProvider(
@@ -424,6 +438,8 @@ class ProxmoxProvider(
         from infrafoundry.core.tailscale import process_tailscale_config
 
         vm_copy = copy.deepcopy(vm)
+        # A VM with ``tailscale:`` returns below, so refuse the combination first (#1581).
+        _raise_host_key_problems(vm_copy, None)
         # Proxmox stores cloud-init as a file via ``source_raw``; the
         # Tailscale module's ``rendered`` output is the raw multipart MIME
         # when base64_encode=False, which Proxmox can hand to cloud-init
@@ -434,9 +450,16 @@ class ProxmoxProvider(
             return vm_copy
 
         merged = self._merge_cloud_init_snippets(vm_copy.config)
-        if merged:
-            yaml_str = yaml.dump(merged, default_flow_style=False, sort_keys=False)
-            vm_copy.config["cloud_init_user_data"] = yaml_str.replace("${", "$${")
+        _raise_host_key_problems(vm_copy, merged or None)
+        yaml_str = yaml.dump(merged, default_flow_style=False, sort_keys=False) if merged else ""
+        # Escape the user's snippets first; the host key fragment below holds a real
+        # Terraform expression and must stay unescaped (#1581).
+        user_data = yaml_str.replace("${", "$${")
+        host_key = apply_host_key(vm_copy)
+        if host_key is not None:
+            user_data += cloud_config_fragment(*host_key)
+        if user_data:
+            vm_copy.config["cloud_init_user_data"] = user_data
         return vm_copy
 
     def _generate_templates_terraform(self, templates: list[ResourceConfig]) -> None:

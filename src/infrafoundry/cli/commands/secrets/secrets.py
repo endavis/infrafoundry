@@ -2,14 +2,20 @@
 
 import os
 import subprocess  # nosec B404  # runs age-keygen and sops with fixed argv
+import sys
 from pathlib import Path
 
 import click
 
+from infrafoundry.core import ssh_host_key_store as host_key_store
 from infrafoundry.core.exceptions import InfraFoundryError, SecretError
+from infrafoundry.core.jumphost_preflight import deployment_state
+from infrafoundry.core.orchestrator import Orchestrator
+from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.secrets import SecretManager
 from infrafoundry.core.secrets.age_key_manager import create_sops_config
 
+from ...decorators import with_orchestrator
 from ...utils import console, raise_cli_error
 
 
@@ -331,3 +337,128 @@ def secrets_rotate(
         raise_cli_error("Rotation failed", exc)
     except Exception as exc:
         raise_cli_error("Rotation failed", exc)
+
+
+def _host_key_candidates(
+    resources: list[ResourceConfig], packages: tuple[str, ...]
+) -> list[ResourceConfig]:
+    """Return the VMs that set ``ssh_host_key``, limited to the named packages."""
+    from infrafoundry.core.ssh_host_keys import HOST_KEY_FIELD
+
+    wanted = set(packages)
+    found: list[ResourceConfig] = []
+    for resource in resources:
+        if resource.type != "vm" or (resource.config or {}).get(HOST_KEY_FIELD) is None:
+            continue
+        if wanted and not ({resource.package_path, resource.package_name} & wanted):
+            continue
+        found.append(resource)
+    return found
+
+
+@secrets.command("host-keys")
+@click.option("--env", "-e", required=True, help="Environment name (e.g., dev, prod)")
+@click.option(
+    "--package",
+    "packages",
+    multiple=True,
+    help="Limit to a package (its path under the environment or its name). Repeatable.",
+)
+@click.option(
+    "--regenerate",
+    "regenerate",
+    multiple=True,
+    help="Replace the recorded key of a VM that is not deployed. Repeatable.",
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be done without changing anything")
+@with_orchestrator("Host key setup failed")
+def secrets_host_keys(
+    _ctx: click.Context,
+    orchestrator: Orchestrator,
+    env: str,
+    packages: tuple[str, ...],
+    regenerate: tuple[str, ...],
+    dry_run: bool,
+) -> None:
+    """Pin SSH host keys for the VMs that blueprints build.
+
+    For each VM that sets ``ssh_host_key``, records a host key in its package's SOPS
+    ``secrets.yaml`` under ``variables.ssh_host_keys.<name>``. A VM that is not deployed
+    gets a generated key pair, which cloud-init installs at first boot. A VM that is
+    already deployed is pinned: the key it presents now is recorded and the VM is not
+    changed. A VM with a recorded key is skipped. Only fingerprints are printed.
+
+    Run it once before the first apply, and once after upgrading a package that now sets
+    ``ssh_host_key``.
+
+    Examples:
+
+        # Record keys for every package in dev
+        foundry secrets host-keys --env dev
+
+        # Show what would be done
+        foundry secrets host-keys --env dev --dry-run
+
+        # Replace the key of a VM that is not deployed (before a rebuild)
+        foundry secrets host-keys --env dev --regenerate aiqum-01
+    """
+    config_manager = orchestrator.config_manager
+    all_resources = config_manager.get_all_resources_all_providers(env)
+    candidates = _host_key_candidates(all_resources, packages)
+    unknown = sorted(set(regenerate) - {r.name for r in candidates})
+    if unknown:
+        raise click.ClickException(
+            f"--regenerate names no VM that sets ssh_host_key: {', '.join(unknown)}"
+        )
+    if not candidates:
+        console.info("No VM sets ssh_host_key; nothing to do.")
+        return
+
+    plan = host_key_store.plan_actions(
+        candidates, deployment_state(orchestrator.state_manager, env), regenerate
+    )
+    failed = False
+    for item in plan:
+        resource = item.resource
+        label = f"{resource.name} ({resource.package_path})"
+        if item.action is host_key_store.HostKeyAction.SKIP:
+            console.print(f"skipped   {label}: {item.reason}", markup=False)
+            continue
+        if item.action is host_key_store.HostKeyAction.REFUSE:
+            console.print(f"refused   {label}: {item.reason}", markup=False)
+            failed = True
+            continue
+        if dry_run:
+            verb = "pin" if item.action is host_key_store.HostKeyAction.PIN else "generate"
+            console.print(f"would {verb}   {label}", markup=False)
+            continue
+        try:
+            path = config_manager.base_dir / env / str(resource.package_path) / "secrets.yaml"
+            host_key_store.ensure_secrets_file(path, config_manager.base_dir.parent)
+            outcome = _apply_host_key_action(item, path)
+        except (SecretError, ValueError) as exc:
+            console.print(f"failed    {label}: {exc}", markup=False)
+            failed = True
+            continue
+        console.print(f"{outcome}   {label}", markup=False)
+    if failed:
+        sys.exit(1)
+
+
+def _apply_host_key_action(item: host_key_store.PlannedAction, path: Path) -> str:
+    """Record one VM's host key and return the line to print (a fingerprint, never a key)."""
+    from infrafoundry.core.ssh_host_keys import host_key_config
+
+    resource = item.resource
+    if item.action is host_key_store.HostKeyAction.PIN:
+        spec = host_key_config(resource)
+        address = spec.address if spec else resource.name
+        jumphost = str((resource.package_variables or {}).get("jumphost", "")).strip() or None
+        public = host_key_store.scan_public_key(address, jumphost)
+        host_key_store.write_entry(path, resource.name, {"ed25519_public": public})
+        return f"pinned    {host_key_store.fingerprint(public)}"
+    private, public = host_key_store.generate_keypair(resource.name)
+    host_key_store.write_entry(
+        path, resource.name, {"ed25519_private": private, "ed25519_public": public}
+    )
+    return f"generated {host_key_store.fingerprint(public)}"
