@@ -56,6 +56,8 @@ Device names are kebab-case. Optional fields: `port`, `verify_ssl` (default `tru
 root, must stay inside it and must not be under `envs/`, where it would be discovered as a
 provider.
 
+With a `secret_backends.bitwarden` block in `settings.yaml`, `secret://bitwarden/<item>/<field>` works wherever `secret://env_secrets/...` does. See [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md).
+
 ## Output
 
 ```text

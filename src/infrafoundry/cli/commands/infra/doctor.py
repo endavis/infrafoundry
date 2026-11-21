@@ -219,7 +219,10 @@ def _secret_sources(
         r for r in config_manager.get_all_resources_all_providers(env) if r.name in wanted
     ]
     rows = collect_secret_sources(
-        resources, env, lambda: config_manager.load_environment(env).secrets
+        resources,
+        env,
+        lambda: config_manager.load_environment(env).secrets,
+        env_config=lambda: config_manager.load_environment(env),
     )
     print_secret_sources(rows, scope)
     return rows

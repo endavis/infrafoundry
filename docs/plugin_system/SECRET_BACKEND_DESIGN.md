@@ -428,7 +428,7 @@ class SecretBackendMetadata:
 
 ## Built-in Backends
 
-InfraFoundry ships with two built-in secret backends:
+InfraFoundry ships with two built-in secret backends (the shipped set has since grown: `env_secrets` and `bitwarden` also exist, see [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md)):
 
 ### 1. Environment Variable Backend
 

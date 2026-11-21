@@ -309,9 +309,9 @@ resources:
 
 | Field | Meaning |
 | :--- | :--- |
-| `auth.auth_key_secret` | Secret path of a static auth key. Exactly one of this or `auth.oauth` is required. |
-| `auth.oauth.client_secret_secret` | Secret path of an OAuth client secret, passed to the module as its auth key. Requires `advertise_tags`. |
-| `auth.oauth.client_id_secret` | Secret path of the OAuth client id. Optional for joining; required for removal on destroy. |
+| `auth.auth_key_secret` | Secret path, or a `secret://env_secrets/...` or `secret://bitwarden/...` URI, of a static auth key. Exactly one of this or `auth.oauth` is required. |
+| `auth.oauth.client_secret_secret` | Secret path or `secret://` URI of an OAuth client secret, passed to the module as its auth key. Requires `advertise_tags`. |
+| `auth.oauth.client_id_secret` | Secret path or `secret://` URI of the OAuth client id. Optional for joining; required for removal on destroy. |
 | `hostname` | Tailnet hostname. Defaults to the resource name. |
 | `advertise_tags`, `advertise_routes` | Tags and subnet routes the node advertises. |
 | `accept_dns`, `accept_routes`, `enable_ssh` | Client settings passed to the module. |

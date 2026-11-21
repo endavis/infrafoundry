@@ -1903,7 +1903,17 @@ class DestroyOrchestrator(HookExecutionMixin):
                     "loaded[/yellow]"
                 )
                 return
-            report = remove_tailnet_devices(targets, env_config.secrets)
+            from infrafoundry.secrets.environment import SecretRefLookup
+
+            with SecretRefLookup(env_config) as refs:
+
+                def _lookup(ref: str) -> str | None:
+                    try:
+                        return refs.lookup(ref)
+                    except KeyError:
+                        return None
+
+                report = remove_tailnet_devices(targets, env_config.secrets, lookup=_lookup)
             for line in report.removed:
                 self.console.print(line)
             for line in report.skipped:

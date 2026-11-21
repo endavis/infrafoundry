@@ -22,12 +22,14 @@ from infrafoundry.core.package_secret_refs import (
     is_package_ref,
     package_ref_key,
     package_secret_var_name,
+    package_var_slug,
     resolve_package_secret,
 )
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.provider_instances import split_provider_id
 from infrafoundry.core.security.file_utils import secure_write
 from infrafoundry.core.ssh_options import STRICT_HOST_KEY_OPTS
+from infrafoundry.secrets.resolver import is_secret_uri, parse_secret_uri
 
 #: Reserved prefix of a ``terraform_secrets`` entry that names another provider's Terraform
 #: output instead of a SOPS key (#1536).
@@ -79,10 +81,41 @@ def sanitize_secret_ref_to_tf_var(dotted_path: str) -> str:
     return sanitized
 
 
+def secret_uri_tf_var(uri: str) -> str:
+    """Return the Terraform variable name for a ``secret://<backend>/<key>`` reference.
+
+    The name is ``secret_<backend>_<slug(key)>``; the slug lowercases the key and turns every
+    run of non-alphanumeric characters into ``_``.
+
+    Args:
+        uri: The ``secret://`` URI.
+
+    Returns:
+        A Terraform-safe variable name (without the ``TF_VAR_`` prefix).
+
+    Raises:
+        ValueError: If the URI is malformed or the name is not a legal Terraform identifier.
+    """
+    try:
+        backend, key = parse_secret_uri(uri)
+    except Exception as exc:
+        raise ValueError(
+            f"Secret reference '{uri}' is not a valid secret://<backend>/<key> URI"
+        ) from exc
+    name = f"secret_{package_var_slug(backend)}_{package_var_slug(key)}"
+    if not _TF_VAR_NAME_RE.match(name) or name.endswith("_"):
+        raise ValueError(
+            f"Secret reference '{uri}' sanitizes to '{name}', "
+            f"which is not a valid Terraform variable name"
+        )
+    return name
+
+
 def secret_ref_tf_var(ref: str, resource: ResourceConfig | None = None) -> str:
     """Return the Terraform variable name for a secret reference on a resource.
 
     Unprefixed and ``outputs.`` refs keep the name ``sanitize_secret_ref_to_tf_var`` gives.
+    A ``secret://<backend>/<key>`` URI is named ``secret_<backend>_<slug(key)>``.
     A ``package.<key>`` ref is named after the owning package so two packages that use the
     same key get distinct variables: ``package_<slug(package_path)>_<key>``.
 
@@ -97,6 +130,8 @@ def secret_ref_tf_var(ref: str, resource: ResourceConfig | None = None) -> str:
         ValueError: If a ``package.`` ref has no resource from a package, or the name is
             not a legal Terraform variable identifier.
     """
+    if is_secret_uri(ref):
+        return secret_uri_tf_var(ref)
     if not is_package_ref(ref):
         return sanitize_secret_ref_to_tf_var(ref)
     if resource is None or resource.package_path is None:
@@ -752,12 +787,9 @@ class TerraformGeneratorMixin:
             SecretResolutionError: If a URI cannot be resolved.
         """
         # Local import to avoid a circular import at module load time.
-        from infrafoundry.secrets.resolver import SecretResolver
+        from infrafoundry.secrets.environment import build_secret_resolver
 
-        resolver = SecretResolver()
-        resolver.configure_backend(
-            "env_secrets", {"secrets": env_config.secrets if env_config.secrets is not None else {}}
-        )
+        resolver = build_secret_resolver(env_config)
         try:
             return resolver.resolve_config(provider_settings)
         finally:
@@ -804,7 +836,11 @@ class TerraformGeneratorMixin:
         env_config: EnvironmentConfig,
         resources: list[ResourceConfig],
     ) -> dict[str, str]:
-        """Resolve resource ``terraform_secrets`` refs against env secrets.
+        """Resolve resource ``terraform_secrets`` refs against env secrets or a vault.
+
+        A ``secret://<backend>/<key>`` ref is resolved through the environment's configured
+        backends (checked before ``outputs.`` and ``package.``); the vault is queried here, at
+        apply time, and only when such a ref is present.
 
         Args:
             env_config: Environment configuration with populated secrets.
@@ -815,34 +851,34 @@ class TerraformGeneratorMixin:
 
         Raises:
             KeyError: If a referenced secret path is not present in
-                ``env_config.secrets``. Error message names the missing
-                dotted path; the value itself is never included.
+                ``env_config.secrets``, or a ``secret://`` URI does not resolve. The message
+                names the ref (and the resource for a URI); the value is never included.
         """
-        # Local import to avoid a circular import at module load time.
-        from infrafoundry.core.secrets.secret_manager import SecretManager
+        from infrafoundry.secrets.environment import SecretRefLookup
 
-        flat_secrets: dict[str, str] | None = None
         result: dict[str, str] = {}
-        for resource in resources:
-            for ref in self.collect_terraform_secret_refs([resource]):
-                if is_output_ref(ref):
-                    # Resolved from the producer's Terraform outputs by the runner (#1536).
-                    continue
-                if is_package_ref(ref):
-                    value = resolve_package_secret(resource, ref)  # KeyError, no value
-                    result[f"TF_VAR_{secret_ref_tf_var(ref, resource)}"] = value
-                    continue
-                tf_name = secret_ref_tf_var(ref, resource)
-                if flat_secrets is None:
-                    flat_secrets = SecretManager.flatten_dict(env_config.secrets)
-                if ref not in flat_secrets:
-                    raise KeyError(
-                        f"terraform_secrets reference '{ref}' is not present in "
-                        f"env '{env_config.name}' secrets. "
-                        f"Available top-level keys: "
-                        f"{sorted({k.split('.')[0] for k in flat_secrets})}"
-                    )
-                result[f"TF_VAR_{tf_name}"] = flat_secrets[ref]
+        with SecretRefLookup(env_config) as lookup:
+            for resource in resources:
+                for ref in self.collect_terraform_secret_refs([resource]):
+                    if is_secret_uri(ref):
+                        tf_name = secret_ref_tf_var(ref, resource)
+                        try:
+                            result[f"TF_VAR_{tf_name}"] = lookup.lookup(ref)
+                        except KeyError as exc:
+                            raise KeyError(
+                                f"terraform_secrets reference '{ref}' on resource "
+                                f"'{resource.name}' did not resolve: {exc.args[0]}"
+                            ) from None
+                        continue
+                    if is_output_ref(ref):
+                        # Resolved from the producer's Terraform outputs by the runner (#1536).
+                        continue
+                    if is_package_ref(ref):
+                        value = resolve_package_secret(resource, ref)  # KeyError, no value
+                        result[f"TF_VAR_{secret_ref_tf_var(ref, resource)}"] = value
+                        continue
+                    tf_name = secret_ref_tf_var(ref, resource)
+                    result[f"TF_VAR_{tf_name}"] = lookup.lookup(ref)
         # Raises when two different sources map to the same TF variable name.
         collect_terraform_secret_vars(resources)
         return result

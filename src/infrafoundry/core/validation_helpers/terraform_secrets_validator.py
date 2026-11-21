@@ -3,8 +3,10 @@
 Verifies that each resource's optional ``terraform_secrets`` list:
 
 1. Has the right shape (list of strings).
-2. References dotted paths that resolve in the env's decrypted secrets dict, or, for
-   ``package.<key>`` refs, in the owning package's ``secrets.yaml`` variables (#1565).
+2. References ``secret://<backend>/<key>`` URIs for a backend configured on the environment
+   (checked offline: a vault is queried at apply time, never here), dotted paths that resolve
+   in the env's decrypted secrets dict, or, for ``package.<key>`` refs, in the owning
+   package's ``secrets.yaml`` variables (#1565).
 
 The framework's secrets→TF_VAR bridge requires both invariants to hold,
 otherwise apply-time terraform invocation will either crash or silently
@@ -21,6 +23,8 @@ from infrafoundry.core.provider_mixins import is_output_ref
 from infrafoundry.core.secrets.secret_manager import SecretManager
 from infrafoundry.core.terraform_outputs import parse_output_ref
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.secrets.environment import SecretRefLookup
+from infrafoundry.secrets.resolver import is_secret_uri
 
 
 def validate_terraform_secrets_references(
@@ -87,6 +91,21 @@ def validate_terraform_secrets_references(
             secrets_dict = getattr(env_config, "secrets", None)
             flat_secrets = SecretManager.flatten_dict(secrets_dict)
 
+        uri_problems = [
+            f"'{ref}': {problem}"
+            for ref in refs
+            if is_secret_uri(ref)
+            and (problem := SecretRefLookup(env_config).problem(ref)) is not None
+        ]
+        if uri_problems:
+            report.add_check(
+                check_name=check_name,
+                passed=False,
+                message=f"Resource '{resource.name}' terraform_secrets: " + "; ".join(uri_problems),
+                level=ValidationLevel.ERROR,
+            )
+            continue
+
         output_problems = _output_ref_problems(
             provider_name, [r for r in refs if is_output_ref(r)], allow_output_refs
         )
@@ -118,7 +137,10 @@ def validate_terraform_secrets_references(
         missing = [
             ref
             for ref in refs
-            if not is_output_ref(ref) and not is_package_ref(ref) and ref not in flat_secrets
+            if not is_secret_uri(ref)
+            and not is_output_ref(ref)
+            and not is_package_ref(ref)
+            and ref not in flat_secrets
         ]
         if missing:
             report.add_check(

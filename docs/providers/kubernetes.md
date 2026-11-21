@@ -156,6 +156,8 @@ config:
 
 The values reach Terraform as sensitive variables set through `TF_VAR_*` at apply, so they never appear in the generated `.tf` files. A resolved value still lands in the Terraform state, as with any Terraform-managed secret. `data_secrets` values must be base64, like `data`. A key in `string_data` or `string_data_secrets` is left out of `binary_data`. The same key in `string_data` and `string_data_secrets`, or in `data` and `data_secrets`, fails validation.
 
+A `secret://env_secrets/...` or `secret://bitwarden/...` URI is also accepted in `string_data_secrets`, `data_secrets`, `value_secret` and `terraform_secrets`, next to the dotted references. It is checked before the prefixes below, and a vault value is read at apply time ([Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md)). `data_secrets` values must still be base64; that is not checked at plan time for a URI.
+
 A reference of the form `package.<key>` takes the value from the `secrets.yaml` of the package that defines the resource, not from the environment's file. `package` is a reserved prefix. It works in `string_data_secrets`, `data_secrets`, `value_secret` and `terraform_secrets`, and resolves from that package only. See [Package Secret References](../configuration/infrastructure-packages.md#package-secret-references).
 
 A reference of the form `outputs.<provider>.<output>` takes the value from another provider's Terraform output instead of SOPS, for example `outputs.tailscale.oauth_client_k8s_operator_secret`:

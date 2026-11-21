@@ -85,6 +85,7 @@ proxmox = "infrafoundry.providers.proxmox:register"
 env = "infrafoundry.secrets.backends.env:register"
 env_secrets = "infrafoundry.secrets.backends.env_secrets:register"
 file = "infrafoundry.secrets.backends.file:register"
+bitwarden = "infrafoundry.secrets.backends.bitwarden:register"
 
 [build-system]
 requires = ["hatchling>=1.33.0", "hatch-vcs>=0.5.0"]
