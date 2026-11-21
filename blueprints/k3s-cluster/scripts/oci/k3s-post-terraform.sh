@@ -40,6 +40,8 @@ K3S_VERSION="${INFRAFOUNDRY_VAR_k3s_version:-}"
 K3S_SERVER_ARGS="${INFRAFOUNDRY_VAR_k3s_server_args:-}"
 K3S_OCI_FIREWALL_FIX="${INFRAFOUNDRY_VAR_k3s_oci_firewall_fix:-true}"
 K3S_VCN_CIDR="${INFRAFOUNDRY_VAR_vcn_cidr:-192.0.2.0/24}"
+K3S_SSH_PUBLIC_KEY="${INFRAFOUNDRY_VAR_ssh_public_key:-}"
+export K3S_SSH_PUBLIC_KEY
 KUBECONFIG_LOCAL=$(eval echo "${INFRAFOUNDRY_VAR_kubeconfig_local_path}")
 
 # --- Read worker list from the JSON-serialized package vars via python3 ---
@@ -91,6 +93,14 @@ print("export K3S_VCN_DNS_LABEL=" + shlex.quote(str(v.get("vcn_dns_label") or ""
 DNS_VARS_FILE="$(mktemp -t k3s-dns-vars-XXXXXX.json)"
 trap 'rm -f "${INVENTORY_FILE}" "${DNS_VARS_FILE}"' EXIT
 write_k3s_dns_extra_vars "${DNS_VARS_FILE}"
+
+# --- Validate the SSH public key before any connection (it feeds the bootstrap) ---
+BOOTSTRAP_VARS_CHECK="$(mktemp -t k3s-bootstrap-check-XXXXXX.json)"
+if ! write_k3s_bootstrap_extra_vars "${BOOTSTRAP_VARS_CHECK}"; then
+    rm -f "${BOOTSTRAP_VARS_CHECK}"
+    exit 1
+fi
+rm -f "${BOOTSTRAP_VARS_CHECK}"
 
 # --- Write inventory ---
 write_k3s_inventory "${INVENTORY_FILE}" \
@@ -146,18 +156,20 @@ WAIT_ERR=$(mktemp)
 trap 'rm -f "${INVENTORY_FILE}" "${DNS_VARS_FILE}" "${WAIT_ERR}"' EXIT
 
 wait_for_ssh() {
-    local host="$1"
+    local user="$1"
+    local host="$2"
     local elapsed=0
-    while ! ${SSH} "ubuntu@${host}" "echo ready" >"${WAIT_ERR}" 2>&1; do
+    while ! ${SSH} "${user}@${host}" "echo ready" >"${WAIT_ERR}" 2>&1; do
         if grep -qiE 'Permission denied|Host key verification failed|Too many authentication failures' "${WAIT_ERR}"; then
-            echo "ERROR: ssh to ${host} failed with a non-retryable error:" >&2
+            echo "ERROR: ssh to ${user}@${host} failed with a non-retryable error:" >&2
             sed 's/^/    /' "${WAIT_ERR}" >&2
             return 1
         fi
         if grep -qi 'tailnet policy does not permit' "${WAIT_ERR}"; then
             echo "ERROR: Tailscale SSH to ${host} was denied by the tailnet policy." >&2
             echo "  The policy's ssh rules need a rule allowing this controller's tag to SSH" >&2
-            echo "  to the nodes' tags (for example tag:controller -> tag:k3s-node)." >&2
+            echo "  to the nodes' tags (for example tag:controller -> tag:k3s-node), and" >&2
+            echo "  the rule must allow the user '${user}'." >&2
             sed 's/^/    /' "${WAIT_ERR}" >&2
             return 1
         fi
@@ -174,10 +186,25 @@ wait_for_ssh() {
     echo "  ${host} is reachable"
 }
 
-wait_for_ssh "${CONTROL_HOST}"
-for name in "${WORKER_NAMES[@]}"; do
-    wait_for_ssh "$(host_fqdn "${name}")"
-done
+wait_for_all() {
+    local user="$1"
+    wait_for_ssh "${user}" "${CONTROL_HOST}"
+    for name in "${WORKER_NAMES[@]}"; do
+        wait_for_ssh "${user}" "$(host_fqdn "${name}")"
+    done
+}
+
+wait_for_all "${K3S_BOOTSTRAP_USER}"
+
+# --- Phase 1b: create the login user (as the image's own user) ---
+echo ""
+echo "--- Phase 1b: creating the ${K3S_LOGIN_USER} login user ---"
+run_k3s_bootstrap
+
+# --- Phase 1c: wait for SSH as the login user ---
+echo ""
+echo "--- Phase 1c: waiting for SSH as ${K3S_LOGIN_USER} ---"
+wait_for_all "${K3S_LOGIN_USER}"
 
 # --- Phase 2: run the ansible playbook ---
 echo ""

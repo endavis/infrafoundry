@@ -1,0 +1,9 @@
+---
+# Login user the other roles connect as.
+k3s_bootstrap_user: ansible
+
+# Public keys allowed to log in as that user (one authorized_keys line each).
+k3s_bootstrap_ssh_public_keys: []
+
+# Shell of the login user.
+k3s_bootstrap_shell: /bin/bash

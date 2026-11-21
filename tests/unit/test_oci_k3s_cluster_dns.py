@@ -105,7 +105,7 @@ def test_proxmox_blueprint_is_not_wired() -> None:
 def test_after_apply_env_for_the_example_package(loader: PackageLoader) -> None:
     """The k3s-dns handler gets every value through its env block."""
     _r, events, _v = loader.load_package(PACKAGE_DIR, provider="oci", env_name="oci-k3s")
-    handler = events["after_apply"][0]
+    handler = next(h for h in events["after_apply"] if h["name"] == "k3s-dns")
 
     assert handler["name"] == "k3s-dns"
     assert handler["timeout"] == 900
@@ -130,7 +130,8 @@ def test_after_apply_env_for_an_override_package(tmp_path: Path) -> None:
     )
     _r, events, _v = loader.load_package(pkg, provider="oci", env_name="test")
 
-    assert events["after_apply"][0]["env"] == {
+    handler = next(h for h in events["after_apply"] if h["name"] == "k3s-dns")
+    assert handler["env"] == {
         "K3S_CONTROL_NAME": "ctl",
         "K3S_WORKER_NAMES": "w0,w1",
         "K3S_TAILNET": "example.net",
@@ -372,12 +373,12 @@ all:
       hosts:
         ctl:
           ansible_host: ctl.example.net
-          ansible_user: ubuntu
+          ansible_user: ansible
     k3s_workers:
       hosts:
         w1:
           ansible_host: w1.example.net
-          ansible_user: ubuntu
+          ansible_user: ansible
     k3s_cluster:
       children:
         k3s_control: {}
@@ -413,6 +414,9 @@ def _run_post(tmp_path: Path, package_vars: dict[str, object]) -> Path:
         "RECORD_DIR": str(record),
         "INFRAFOUNDRY_VAR_control_name": "ctl",
         "INFRAFOUNDRY_VAR_cluster_name": "c",
+        "INFRAFOUNDRY_VAR_ssh_public_key": (
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest test@example.com"
+        ),
         "INFRAFOUNDRY_VAR_tailnet": "example.net",
         "INFRAFOUNDRY_VAR_kubeconfig_local_path": str(tmp_path / "kube.yaml"),
         "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"workers": [{"name": "w1"}], **package_vars}),

@@ -292,7 +292,7 @@ fixes this on the next apply; see the blueprint README's "Cluster DNS" section. 
 **Diagnosis:**
 ```bash
 # Check if VXLAN rule exists
-ssh ubuntu@<node> 'sudo iptables -L INPUT -n | grep 8472'
+ssh ansible@<node> 'sudo iptables -L INPUT -n | grep 8472'
 # Should show: ACCEPT udp -- 192.0.2.0/24 0.0.0.0/0 udp dpt:8472
 ```
 
@@ -309,17 +309,18 @@ foundry infra apply --env oci-k3s --ansible-only
 
 **Diagnosis:**
 ```bash
-ssh ubuntu@<node> 'sudo iptables -L INPUT -n | grep 10250'
+ssh ansible@<node> 'sudo iptables -L INPUT -n | grep 10250'
 ```
 
 ### Tailscale Not Connecting
 
 ```bash
-# Check cloud-init logs
+# Check cloud-init logs (ubuntu: the ansible user may not exist yet, since
+# the first apply creates it only after the nodes are up)
 ssh ubuntu@<public-ip> 'sudo cat /var/log/cloud-init-output.log'
 
 # Check Tailscale status
-ssh ubuntu@<public-ip> 'sudo tailscale status'
+ssh ansible@<public-ip> 'sudo tailscale status'
 ```
 
 ### Workers Can't Pull Images

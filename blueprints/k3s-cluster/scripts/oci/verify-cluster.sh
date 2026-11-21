@@ -14,7 +14,7 @@
 #                (falls back to ~/.kube/oci-k3s.yaml when unset)
 #   K3S_CONTROL_NAME, K3S_TAILNET - Control node name and tailnet. Used only
 #                when kubectl is not on PATH: the checks then run on the control
-#                node over ssh (ubuntu@<host>) as `sudo k3s kubectl ...`.
+#                node over ssh (ansible@<host>) as `sudo k3s kubectl ...`.
 #   INFRAFOUNDRY_WARNINGS_FILE - Receives a warning when verification is skipped
 
 set -euo pipefail
@@ -58,7 +58,7 @@ else
         warn "cluster verification skipped: kubectl not found and ssh fallback unavailable"
         exit 0
     fi
-    REMOTE_HOST="ubuntu@$(host_fqdn "${CONTROL_NAME}")"
+    REMOTE_HOST="${K3S_LOGIN_USER}@$(host_fqdn "${CONTROL_NAME}")"
     echo "kubectl not found locally; running checks on ${REMOTE_HOST} over ssh"
     if ! ssh -o BatchMode=yes -o ConnectTimeout=10 "${REMOTE_HOST}" true; then
         echo "Verification skipped: cannot ssh to ${REMOTE_HOST}"

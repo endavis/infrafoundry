@@ -199,11 +199,15 @@ def test_oci_k3s_cluster_blueprint_inherits_events(loader: PackageLoader) -> Non
 
     assert "after_apply" in events
     after_apply = events["after_apply"]
-    assert [h["name"] for h in after_apply] == ["k3s-dns", "verify-cluster"]
-    assert after_apply[0]["script"].endswith("scripts/oci/k3s-dns.sh")
-    assert after_apply[0]["continue_on_error"] is True
-    assert after_apply[1]["script"].endswith("scripts/oci/verify-cluster.sh")
+    assert [h["name"] for h in after_apply] == [
+        "k3s-bootstrap",
+        "k3s-dns",
+        "verify-cluster",
+    ]
+    assert after_apply[1]["script"].endswith("scripts/oci/k3s-dns.sh")
     assert after_apply[1]["continue_on_error"] is True
+    assert after_apply[2]["script"].endswith("scripts/oci/verify-cluster.sh")
+    assert after_apply[2]["continue_on_error"] is True
 
 
 def test_oci_k3s_cluster_example_uses_tailscale_module(loader: PackageLoader) -> None:
@@ -521,7 +525,7 @@ def test_verify_cluster_falls_back_to_remote_kubectl_over_ssh(tmp_path: Path) ->
     result, log, warnings = _run_verify(tmp_path, bindir, _CONTROL_ENV)
     assert result.returncode == 0, result.stderr + result.stdout
     calls = log.read_text()
-    host = "ubuntu@example-k3s-control.example.ts.net"
+    host = "ansible@example-k3s-control.example.ts.net"
     assert f"-o BatchMode=yes -o ConnectTimeout=10 {host} sudo k3s kubectl get nodes -o wide" in (
         calls
     )
@@ -662,6 +666,9 @@ def _run_script(
         "RECORD_DIR": str(record),
         "INFRAFOUNDRY_VAR_control_name": "ctl",
         "INFRAFOUNDRY_VAR_cluster_name": "c",
+        "INFRAFOUNDRY_VAR_ssh_public_key": (
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest test@example.com"
+        ),
         "INFRAFOUNDRY_VAR_kubeconfig_local_path": str(tmp_path / "kube.yaml"),
         "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"workers": [{"name": "w1"}]}),
     }
@@ -756,10 +763,11 @@ def test_blueprint_ships_roles_and_playbook_layout() -> None:
     """Roles live in the blueprint; the playbook sits in playbooks/, away from roles/."""
     assert not list(BLUEPRINT.glob("playbook*.yml"))
     assert not (BLUEPRINT / "playbooks" / "roles").exists()
-    for role in ("k3s-server", "k3s-agent", "k3s-dns"):
+    for role in ("k3s-server", "k3s-agent", "k3s-dns", "k3s-bootstrap"):
         assert (BLUEPRINT / "roles" / role / "tasks" / "main.yml").is_file()
         assert not (REPO_ROOT / "example-config" / "roles" / role).exists()
     assert (BLUEPRINT / "playbooks" / "k3s-dns.yml").is_file()
+    assert (BLUEPRINT / "playbooks" / "k3s-bootstrap.yml").is_file()
 
 
 def test_playbook_and_role_files_are_valid_yaml() -> None:
@@ -808,6 +816,9 @@ def _run_script_with_failing_ssh(
         "SSH_FAIL_MSG": fail_msg,
         "INFRAFOUNDRY_VAR_control_name": "ctl",
         "INFRAFOUNDRY_VAR_cluster_name": "c",
+        "INFRAFOUNDRY_VAR_ssh_public_key": (
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItest test@example.com"
+        ),
         "INFRAFOUNDRY_VAR_tailnet": "example.net",
         "INFRAFOUNDRY_VAR_kubeconfig_local_path": str(tmp_path / "kube.yaml"),
         "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"workers": [{"name": "w1"}]}),

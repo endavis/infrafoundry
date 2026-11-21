@@ -32,7 +32,7 @@ variables:
   #     --query 'data[0].id' --raw-output
   image: "ocid1.image.oc1.iad.aaaaaaaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
-  # --- Required: SSH public key for the ubuntu user ---
+  # --- Required: SSH public key for the ubuntu and ansible users (ansible is created on first apply) ---
   ssh_public_key: "ssh-rsa AAAA... your-ssh-public-key"
 
   # --- Required: Tailscale tailnet DNS suffix ---

@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  role_name: k3s-bootstrap
+  author: InfraFoundry
+  description: Create the ansible login user with SSH keys and passwordless sudo
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+dependencies: []

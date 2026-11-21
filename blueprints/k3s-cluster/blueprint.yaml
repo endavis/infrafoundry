@@ -109,7 +109,7 @@ providers:
       - name: image
         description: "OCI compute image OCID for cluster instances"
       - name: ssh_public_key
-        description: "SSH public key material injected into instances"
+        description: "SSH public key material injected into instances; also authorized for the ansible login user the k3s-bootstrap role creates"
 
       - name: control_name
         default: k3s-control
@@ -212,6 +212,19 @@ providers:
 
       after_apply:
         # Workflow handlers get no package variables, so the values travel in env.
+        # k3s-bootstrap runs first: it creates the ansible login user the
+        # handlers after it connect as.
+        - type: script
+          name: k3s-bootstrap
+          script: scripts/oci/k3s-bootstrap.sh
+          description: "Create the ansible login user on every node (idempotent, never touches k3s)"
+          timeout: 600
+          continue_on_error: true
+          env:
+            K3S_CONTROL_NAME: "{{ control_name }}"
+            K3S_WORKER_NAMES: "{{ workers | map(attribute='name') | join(',') }}"
+            K3S_TAILNET: "{{ tailnet }}"
+            K3S_SSH_PUBLIC_KEY: "{{ ssh_public_key }}"
         - type: script
           name: k3s-dns
           script: scripts/oci/k3s-dns.sh
