@@ -262,3 +262,63 @@ class TestUrlHelpers:
     def test_iaas_url(self, client: OCIClient) -> None:
         """iaas_url returns correct URL."""
         assert client.iaas_url() == "https://iaas.us-phoenix-1.oraclecloud.com"
+
+
+class TestPassPhrase:
+    """Encrypted API signing key support (#1569)."""
+
+    PLACEHOLDER = "placeholder-pass-phrase"
+
+    @pytest.fixture
+    def encrypted_key_path(self, tmp_path: Path) -> str:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        path = tmp_path / "encrypted_key.pem"
+        path.write_bytes(
+            key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.BestAvailableEncryption(
+                    self.PLACEHOLDER.encode()
+                ),
+            )
+        )
+        return str(path)
+
+    def _settings(self, key_path: str, **extra: str) -> OCIProviderSettings:
+        settings: OCIProviderSettings = {
+            "tenancy_ocid": "ocid1.tenancy.oc1..example",
+            "user_ocid": "ocid1.user.oc1..example",
+            "fingerprint": "aa:bb:cc:dd:ee:ff:00:11",
+            "private_key_path": key_path,
+            "region": "us-phoenix-1",
+        }
+        settings.update(extra)  # type: ignore[typeddict-item]
+        return settings
+
+    def test_encrypted_key_loads_with_pass_phrase(self, encrypted_key_path: str) -> None:
+        settings = self._settings(encrypted_key_path, pass_phrase=self.PLACEHOLDER)
+        client = OCIClient.from_provider_settings(settings)
+        assert client._build_signed_headers(
+            "GET", "https://iaas.us-phoenix-1.oraclecloud.com/20160918/vcns"
+        )
+
+    def test_encrypted_key_without_pass_phrase_fails(self, encrypted_key_path: str) -> None:
+        with pytest.raises(ConfigurationError, match="Failed to load OCI private key"):
+            OCIClient.from_provider_settings(self._settings(encrypted_key_path))
+
+    def test_wrong_pass_phrase_error_does_not_leak_value(
+        self, encrypted_key_path: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        wrong = "wrong-placeholder-phrase"
+        with pytest.raises(ConfigurationError) as exc_info:
+            OCIClient.from_provider_settings(self._settings(encrypted_key_path, pass_phrase=wrong))
+        assert wrong not in str(exc_info.value)
+        assert self.PLACEHOLDER not in str(exc_info.value)
+        assert wrong not in caplog.text
+
+    def test_pass_phrase_ignored_for_unencrypted_key(self, rsa_key_path: Any) -> None:
+        settings = self._settings(rsa_key_path, pass_phrase="")
+        assert OCIClient.from_provider_settings(settings) is not None

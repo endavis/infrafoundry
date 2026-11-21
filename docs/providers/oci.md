@@ -66,7 +66,17 @@ provider_settings:
     private_key_path: "~/.oci/oci_api_key.pem"
     region: "us-phoenix-1"
     compartment_ocid: "ocid1.compartment.oc1..aaaaaa..."
+    # pass_phrase: "<passphrase>"   # only for an encrypted private key
 ```
+
+#### Encrypted API signing key
+
+If the key at `private_key_path` is encrypted, set `pass_phrase`. InfraFoundry uses it to
+load the key for the API checks in `infra doctor`, and passes it to Terraform as the
+`private_key_password` provider argument through the sensitive
+`TF_VAR_oci_private_key_password` environment variable. The value is never written to a
+generated file or logged. Without `pass_phrase` the provider block and `variables.tf` are
+unchanged, so an unencrypted key needs no extra setting. Keep `settings.yaml` SOPS-encrypted.
 
 !!! warning "Encrypt with SOPS"
     In production, encrypt your settings file:

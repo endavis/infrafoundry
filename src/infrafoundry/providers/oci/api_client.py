@@ -38,6 +38,7 @@ class OCIClient:
         fingerprint: str,
         region: str,
         timeout: int = 10,
+        pass_phrase: str | None = None,
     ) -> None:
         """Initialize OCI API client.
 
@@ -50,6 +51,7 @@ class OCIClient:
             fingerprint: RSA key fingerprint
             region: OCI region (e.g. us-phoenix-1)
             timeout: Request timeout in seconds
+            pass_phrase: Passphrase of an encrypted private key (never logged)
 
         Raises:
             ConfigurationError: If key file is missing, cryptography package
@@ -74,7 +76,9 @@ class OCIClient:
 
         try:
             with open(key_path, "rb") as f:
-                loaded_key = serialization.load_pem_private_key(f.read(), password=None)
+                loaded_key = serialization.load_pem_private_key(
+                    f.read(), password=pass_phrase.encode() if pass_phrase else None
+                )
             if not isinstance(loaded_key, RSAPrivateKey):
                 raise ConfigurationError("OCI API requires an RSA private key")
             self._private_key = loaded_key
@@ -102,6 +106,7 @@ class OCIClient:
             private_key_path=settings.get("private_key_path", ""),
             fingerprint=settings.get("fingerprint", ""),
             region=settings.get("region", ""),
+            pass_phrase=settings.get("pass_phrase") or None,
         )
 
     def identity_url(self) -> str:

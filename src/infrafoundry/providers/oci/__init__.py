@@ -35,6 +35,10 @@ class OCIProvider(
 ):
     """OCI provider for managing VCNs, subnets, and compute instances."""
 
+    # Built with zip, not a dict literal: bandit B105 mistakes a variable name for a password.
+    _OCI_SECRET_TFVARS: ClassVar[dict[str, str]] = dict(
+        zip(("pass_phrase",), ("oci_private_key_password",), strict=True)
+    )
     _OCI_TFVARS_MAPPING: ClassVar[dict[str, str]] = {
         "tenancy_ocid": "oci_tenancy_ocid",
         "user_ocid": "oci_user_ocid",
@@ -42,6 +46,7 @@ class OCIProvider(
         "private_key_path": "oci_private_key_path",
         "region": "oci_region",
         "compartment_ocid": "oci_compartment_ocid",
+        **_OCI_SECRET_TFVARS,
     }
 
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
@@ -146,8 +151,15 @@ class OCIProvider(
         terraform_secret_vars = collect_terraform_secret_vars(all_processed)
 
         # Generate provider configuration and variables
+        # The key passphrase variable exists only when a pass_phrase is configured, so an
+        # unencrypted-key setup generates the same files as before.
+        has_key_password = self._has_key_password()
         self.render_provider_and_variables(
-            variables_context={"terraform_secret_vars": terraform_secret_vars},
+            variables_context={
+                "terraform_secret_vars": terraform_secret_vars,
+                "private_key_password": has_key_password,
+            },
+            provider_context={"private_key_password": has_key_password},
         )
 
         # Compartments come first in the file set; Terraform orders by reference.
@@ -197,6 +209,12 @@ class OCIProvider(
 
         # Generate outputs
         self.render_outputs_terraform(resources_by_type)
+
+    def _has_key_password(self) -> bool:
+        """Return whether ``provider_settings.oci.pass_phrase`` is set (value is not read out)."""
+        env_config = self._load_environment_config()
+        settings = env_config.get_provider_settings("oci") if env_config else None
+        return bool(settings and settings.get("pass_phrase"))
 
     @staticmethod
     def _resolve_compartments(

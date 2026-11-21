@@ -502,3 +502,64 @@ def test_generate_ansible_filters_non_instances(provider: OCIProvider, tmp_dirs:
     content = (ansible_dir / "inventory.yml").read_text()
     assert "my-instance" in content
     assert "my-vcn" not in content
+
+
+def _generate_with_settings(provider: OCIProvider, tmp_dirs: Any, settings: str) -> Path:
+    config_dir, output_dir = tmp_dirs
+    env_dir = config_dir / "test"
+    env_dir.mkdir()
+    (env_dir / "settings.yaml").write_text(settings)
+    provider.set_environment("test")
+    provider.generate_terraform(
+        [
+            ResourceConfig(
+                name="test-vcn",
+                type="vcn",
+                provider="oci",
+                config={"cidr_block": "192.0.2.0/24"},
+            )
+        ]
+    )
+    return Path(output_dir / "test" / "terraform" / "oci")
+
+
+_BASE_SETTINGS = """name: test
+provider_settings:
+  oci:
+    tenancy_ocid: ocid1.tenancy.oc1..example
+    user_ocid: ocid1.user.oc1..example
+    fingerprint: "aa:bb:cc:dd:ee:ff:00:11"
+    private_key_path: /keys/key.pem
+    region: us-phoenix-1
+"""
+
+
+def test_pass_phrase_adds_sensitive_variable_and_env_var(
+    provider: OCIProvider, tmp_dirs: Any
+) -> None:
+    """A configured pass_phrase reaches Terraform only via a sensitive TF_VAR."""
+    placeholder = "placeholder-pass-phrase"
+    tf_dir = _generate_with_settings(
+        provider, tmp_dirs, _BASE_SETTINGS + f"    pass_phrase: {placeholder}\n"
+    )
+    provider_tf = (tf_dir / "provider.tf").read_text()
+    variables_tf = (tf_dir / "variables.tf").read_text()
+    assert "private_key_password = var.oci_private_key_password" in provider_tf
+    assert 'variable "oci_private_key_password"' in variables_tf
+    assert (
+        "sensitive   = true"
+        in variables_tf.split('variable "oci_private_key_password"')[1].split("}")[0]
+    )
+    for generated in tf_dir.iterdir():
+        assert placeholder not in generated.read_text()
+    assert provider.get_terraform_env_vars()["TF_VAR_oci_private_key_password"] == placeholder
+
+
+def test_no_pass_phrase_leaves_generated_files_unchanged(
+    provider: OCIProvider, tmp_dirs: Any
+) -> None:
+    """Without pass_phrase there is no password argument, variable or env var."""
+    tf_dir = _generate_with_settings(provider, tmp_dirs, _BASE_SETTINGS)
+    assert "private_key_password" not in (tf_dir / "provider.tf").read_text()
+    assert "oci_private_key_password" not in (tf_dir / "variables.tf").read_text()
+    assert "TF_VAR_oci_private_key_password" not in provider.get_terraform_env_vars()
