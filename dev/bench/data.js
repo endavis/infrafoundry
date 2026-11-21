@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795247814495,
+  "lastUpdate": 1795255145989,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -4906,6 +4906,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008690116960718837",
             "extra": "mean: 72.00275296001291 usec\nrounds: 15625"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "68cf90b82d441d3e30f86e03d8a94efd807f55e1",
+          "message": "fix: point the oci k3s verify-cluster handler at the blueprint's kubeconfig (merges PR #1562, addresses #1557)\n\nThe verify-cluster after_apply handler defaulted KUBECONFIG to a fixed\n~/.kube/oci-k3s.yaml, so for any other cluster_name it silently skipped\nverification. Pass kubeconfig_local_path through the handler env and expand\na leading ~ in the script, keeping the old default only as a fallback.\n\nThe blueprint default for kubeconfig_local_path references cluster_name, and\nthe package loader rendered it only once, so handler env received the raw\ntemplate. Resolve variable values that reference other variables after all\nsources are merged and before resources and events render; cycles raise\nInvalidConfigurationError.\n\nAddresses #1557\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T09:57:54Z",
+          "tree_id": "62c1c3f219af2c8e49b041d535dead6cf28f3195",
+          "url": "https://github.com/endavis/infrafoundry/commit/68cf90b82d441d3e30f86e03d8a94efd807f55e1"
+        },
+        "date": 1795255145276,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 49.38051399642605,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000852439502044039",
+            "extra": "mean: 20.250903019607605 msec\nrounds: 51"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7964.450344659183,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008987157795095198",
+            "extra": "mean: 125.55794269852933 usec\nrounds: 8464"
           }
         ]
       }
