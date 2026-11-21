@@ -1,0 +1,43 @@
+---
+- name: Check the login user name and keys
+  ansible.builtin.assert:
+    that:
+      - k3s_bootstrap_user is match('^[a-z_][a-z0-9_-]*$')
+      - k3s_bootstrap_ssh_public_keys | length > 0
+      - k3s_bootstrap_ssh_public_keys | select('match', '^[^\r\n]+$') | list | length == k3s_bootstrap_ssh_public_keys | length
+    fail_msg: k3s_bootstrap_user must be a valid user name and k3s_bootstrap_ssh_public_keys a non-empty list of single-line keys
+
+- name: Create the login user
+  ansible.builtin.user:
+    name: "{{ k3s_bootstrap_user }}"
+    shell: "{{ k3s_bootstrap_shell }}"
+    create_home: true
+    state: present
+  register: k3s_bootstrap_user_result
+
+- name: Create the .ssh directory
+  ansible.builtin.file:
+    path: "{{ k3s_bootstrap_user_result.home }}/.ssh"
+    state: directory
+    owner: "{{ k3s_bootstrap_user }}"
+    group: "{{ k3s_bootstrap_user_result.group }}"
+    mode: "0700"
+
+- name: Authorize the SSH public keys
+  ansible.builtin.lineinfile:
+    path: "{{ k3s_bootstrap_user_result.home }}/.ssh/authorized_keys"
+    line: "{{ item }}"
+    create: true
+    owner: "{{ k3s_bootstrap_user }}"
+    group: "{{ k3s_bootstrap_user_result.group }}"
+    mode: "0600"
+  loop: "{{ k3s_bootstrap_ssh_public_keys }}"
+
+- name: Allow passwordless sudo
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/90-{{ k3s_bootstrap_user }}"
+    content: "{{ k3s_bootstrap_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s

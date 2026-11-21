@@ -1,0 +1,14 @@
+---
+# k3s login user bootstrap playbook.
+#
+# Runs only the k3s-bootstrap role, connecting as the image's own user (ubuntu)
+# to create the ansible login user. It never touches k3s. It is run by
+# scripts/oci/k3s-post-terraform.sh on create and by scripts/oci/k3s-bootstrap.sh
+# on every apply.
+
+- name: Create the ansible login user on every node
+  hosts: k3s_cluster
+  gather_facts: false
+  become: true
+  roles:
+    - k3s-bootstrap

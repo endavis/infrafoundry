@@ -42,6 +42,24 @@ same names under `envs/<env>/roles/`; they take precedence over the blueprint's.
 override applies to local runs only: the env directory is not copied to a jumphost.
 The `k3s-dns` role (see [Cluster DNS](#cluster-dns)) is a third, standalone role.
 
+#### Login user
+
+The OCI nodes are reached as `ansible`, like the Proxmox variant. A fresh image only has
+`ubuntu`, so the `k3s-bootstrap` role (`playbooks/k3s-bootstrap.yml`) connects as `ubuntu` and
+creates `ansible` with the package's `ssh_public_key` and passwordless sudo. It never touches
+k3s. It runs in two places:
+
+- On create, `k3s-post-terraform.sh` waits for SSH as `ubuntu`, runs the bootstrap, waits for
+  SSH as `ansible`, then runs `k3s.yml` as `ansible`.
+- On every apply, the `k3s-bootstrap` after_apply handler (`scripts/oci/k3s-bootstrap.sh`)
+  runs first, so existing clusters get the user before `k3s-dns` and `verify-cluster` log in
+  as `ansible`. A failure is a warning (`continue_on_error`) and is retried on the next apply.
+
+| Variant | Login user |
+| :--- | :--- |
+| Proxmox | `ansible` (cloud-init) |
+| OCI | `ansible` (created by `k3s-bootstrap`; `ubuntu` only for the bootstrap) |
+
 #### Cluster DNS
 
 **Cause.** The kubelet builds each pod's `resolv.conf` from the node's own. On a Tailscale node
@@ -82,7 +100,8 @@ The search list is one cluster-wide list because the kubelet passes it into ever
 
 The post-terraform script reaches the nodes over Tailscale SSH. The tailnet policy's `ssh`
 rules must allow the controller's tag to SSH to the nodes' tags (for example `tag:controller`
-to `tag:k3s-node`). Without such a rule the script stops at once with
+to `tag:k3s-node`) and must allow both `ubuntu` (the bootstrap) and `ansible`. When upgrading an
+existing cluster, add `ansible` to the rule before re-applying. Without such a rule the script stops at once with
 "tailnet policy does not permit you to SSH to this node" instead of waiting.
 
 ## Usage
@@ -148,10 +167,12 @@ k3s-cluster/
   playbooks/
     k3s.yml                # Ansible playbook (OCI variant)
     k3s-dns.yml            # Cluster DNS only (OCI variant, also run after apply)
+    k3s-bootstrap.yml      # Creates the ansible login user (OCI variant, also run after apply)
   roles/
     k3s-server/            # Control plane install (OCI variant)
     k3s-agent/             # Worker install (OCI variant)
     k3s-dns/               # Cluster DNS isolation (OCI variant)
+    k3s-bootstrap/         # ansible login user (OCI variant)
   providers/
     proxmox/
       vm.yaml              # Proxmox VM resource template
@@ -164,6 +185,7 @@ k3s-cluster/
       k3s-post-terraform.sh
     oci/
       k3s-post-terraform.sh
+      k3s-bootstrap.sh     # after_apply: create the ansible login user
       k3s-dns.sh           # after_apply: cluster DNS only
       k3s-lib.sh           # shared helpers, sourced
       verify-cluster.sh
