@@ -69,6 +69,8 @@ provider_settings:
     # pass_phrase: "<passphrase>"   # only for an encrypted private key
 ```
 
+Settings values may be `secret://` URIs; see [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md).
+
 #### Encrypted API signing key
 
 If the key at `private_key_path` is encrypted, set `pass_phrase`. InfraFoundry uses it to

@@ -186,9 +186,7 @@ class TailscaleProvider(
     @override
     def get_terraform_env_vars(self) -> dict[str, str]:
         """Return TF_VAR_* variables, resolving ``secret://`` URIs in the settings."""
-        return self.build_terraform_env_vars(
-            "tailscale", _TAILSCALE_TFVARS_MAPPING, resolve_secret_uris=True
-        )
+        return self.build_terraform_env_vars("tailscale", _TAILSCALE_TFVARS_MAPPING)
 
     def _provider_settings(self) -> dict[str, Any]:
         """Return ``provider_settings.tailscale`` with URIs left unresolved."""

@@ -21,6 +21,7 @@ from infrafoundry.core.ssh_host_keys import (
 )
 from infrafoundry.core.types import ProxmoxProviderSettings
 from infrafoundry.core.validation import ValidationLevel, ValidationReport, run_validators
+from infrafoundry.core.validation_helpers import resolved_env_or_report
 
 from .validator import ProxmoxValidator
 from .validators import (
@@ -95,8 +96,10 @@ class ProxmoxProvider(
         self, env_config: EnvironmentConfig, report: ValidationReport
     ) -> None:
         """Validate connectivity to Proxmox API."""
-        validator = ProxmoxValidator(env_config, report)
-        validator.validate_connectivity()
+        resolved = resolved_env_or_report(env_config, "proxmox", report)
+        if resolved is None:
+            return
+        ProxmoxValidator(resolved, report).validate_connectivity()
 
     @override
     def validate_references(
@@ -106,8 +109,10 @@ class ProxmoxProvider(
         report: ValidationReport,
     ) -> None:
         """Validate that referenced Proxmox resources exist."""
-        validator = ProxmoxValidator(env_config, report)
-        validator.validate_references(resources)
+        resolved = resolved_env_or_report(env_config, "proxmox", report)
+        if resolved is None:
+            return
+        ProxmoxValidator(resolved, report).validate_references(resources)
 
     def validate_references_in_context(
         self,
@@ -117,7 +122,10 @@ class ProxmoxProvider(
         report: ValidationReport,
     ) -> None:
         """Validate *resources*, resolving names against *reference_resources* (#1568)."""
-        ProxmoxValidator(env_config, report).validate_references(resources, reference_resources)
+        resolved = resolved_env_or_report(env_config, "proxmox", report)
+        if resolved is None:
+            return
+        ProxmoxValidator(resolved, report).validate_references(resources, reference_resources)
 
     def validate_offline(
         self,
@@ -700,6 +708,7 @@ class ProxmoxProvider(
     def _sdn_dry_run_client(self) -> "ProxmoxClient | None":
         """Build an API client from the environment settings, as the validator does."""
         from infrafoundry.core.credential_override import resolve_settings
+        from infrafoundry.secrets.environment import resolve_secret_settings
 
         from .api_client import ProxmoxClient
 
@@ -710,6 +719,7 @@ class ProxmoxProvider(
         if not settings:
             return None
         settings = resolve_settings("proxmox", settings, self._PROXMOX_TFVARS_MAPPING)
+        settings = resolve_secret_settings(env_config, settings) or {}
         return ProxmoxClient.from_provider_settings(cast(ProxmoxProviderSettings, settings))
 
     @override

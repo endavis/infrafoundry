@@ -46,6 +46,8 @@ provider_settings:
     kubeconfig_path: "~/.kube/config"
 ```
 
+Settings values may be `secret://` URIs; see [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md).
+
 The `~` is automatically expanded using Terraform's `pathexpand()` function.
 
 The `KUBECONFIG` environment variable overrides `kubeconfig_path`: when it is set and not empty, the runner passes it to Terraform as `TF_VAR_kubeconfig_path`. Without either, the generated `variables.tf` defaults to `~/.kube/config`.

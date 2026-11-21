@@ -33,9 +33,14 @@ A read-only `bitwarden` backend resolves `secret://bitwarden/<item>/<field>` thr
 ## Rationale
 `secret://` is already the way config fields name a secret, so a new backend works everywhere `env_secrets` does with no new grammar for those sites. Private CLI state keeps a run from logging out or repointing the operator's own `bw`, and keeps the operator's `BW_SESSION` out of the run. Resolving credentials through `env` and `env_secrets` keeps the bootstrap in places the operator already controls. Offline plan-time checks keep `infra doctor` and validation from needing the vault or network.
 
+## Amendments
+
+- Provider settings resolve at every reader through `resolved_provider_settings` / `with_resolved_provider_settings`; offline paths check shape and backend only (#1594).
+
 ## Related Issues
 - Issue #1520: add a bitwarden/vaultwarden secret:// backend
 - Issue #1590: pass the vaultwarden master password to bw by environment variable
+- Issue #1594: resolve secret:// URIs in every provider's settings
 
 ## Related Documentation
 - [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md)

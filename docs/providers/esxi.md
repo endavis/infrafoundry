@@ -58,6 +58,8 @@ provider_settings:
 
 Each key under `hosts` is a logical host name used in resource configs. The `hostname` field is the actual SSH hostname or IP address.
 
+`hostname` and `username` may be `secret://` URIs (see [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md)). A URI value is passed to Terraform as `TF_VAR_esxi_hostname_<alias>` / `TF_VAR_esxi_username_<alias>` and is not written to `terraform.tfvars`.
+
 ### Providing Passwords
 
 Passwords are **never written to disk**. Provide them via Terraform environment variables:
@@ -293,7 +295,10 @@ The ESXi provider includes an exporter that discovers existing resources via SSH
 ```python
 from infrafoundry.providers.esxi.exporter import EsxiConfigExporter
 
-exporter = EsxiConfigExporter(env_config)
+from infrafoundry.secrets.environment import with_resolved_provider_settings
+
+resolved = with_resolved_provider_settings(env_config, "esxi")
+exporter = EsxiConfigExporter(resolved.model_dump())
 exports = exporter.export(host_filter="esxi-01", resource_filter="vm")
 ```
 

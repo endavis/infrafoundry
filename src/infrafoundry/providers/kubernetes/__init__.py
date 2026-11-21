@@ -17,6 +17,7 @@ from infrafoundry.core.provider_mixins import (
 )
 from infrafoundry.core.terraform_outputs import output_refs
 from infrafoundry.core.validation import ValidationReport
+from infrafoundry.core.validation_helpers import resolved_env_or_report
 from infrafoundry.providers.kubernetes.clusters import (
     allows_env_override,
     cluster_settings,
@@ -107,7 +108,10 @@ class KubernetesProvider(
         self, env_config: EnvironmentConfig, report: ValidationReport
     ) -> None:
         """Validate the kubeconfig and connectivity to the Kubernetes API."""
-        self._validator(env_config, report).validate_connectivity()
+        resolved = resolved_env_or_report(env_config, self.name, report)
+        if resolved is None:
+            return
+        self._validator(resolved, report).validate_connectivity()
 
     @override
     def validate_references(
@@ -117,7 +121,10 @@ class KubernetesProvider(
         report: ValidationReport,
     ) -> None:
         """Validate Kubernetes references, including cluster checks when connected."""
-        self._validator(env_config, report).validate_references(resources)
+        resolved = resolved_env_or_report(env_config, self.name, report)
+        if resolved is None:
+            return
+        self._validator(resolved, report).validate_references(resources)
 
     def validate_references_in_context(
         self,
@@ -127,7 +134,10 @@ class KubernetesProvider(
         report: ValidationReport,
     ) -> None:
         """Validate *resources*, resolving names against *reference_resources* (#1435)."""
-        self._validator(env_config, report).validate_references(resources, reference_resources)
+        resolved = resolved_env_or_report(env_config, self.name, report)
+        if resolved is None:
+            return
+        self._validator(resolved, report).validate_references(resources, reference_resources)
 
     def validate_offline(
         self,
