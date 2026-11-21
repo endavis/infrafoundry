@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795265814571,
+  "lastUpdate": 1795267676359,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5248,6 +5248,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008152502589677544",
             "extra": "mean: 124.81906798058486 usec\nrounds: 8473"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3245c0e4a03d73278eb1e0af40c9f662fe5154da",
+          "message": "fix: restrict the kubeconfig mode on existing proxmox k3s clusters (merges PR #1580, addresses #1578)\n\nExisting Proxmox k3s clusters now get an owner-only node kubeconfig on\nevery apply, as existing OCI clusters already do.\n\n- Move the Proxmox SSH helpers (SSH, SSH_KEEPALIVE, remote_cmd,\n  remote_root_cmd, remote_kubectl) out of k3s-post-terraform.sh into a\n  sourced scripts/proxmox/k3s-lib.sh, unchanged.\n- Add an after_apply handler, k3s-kubeconfig-mode. It runs a node-side\n  script on the server as root, directly or through the jumphost. The\n  script sets write-kubeconfig-mode \"0600\" in config.yaml and rewrites\n  the --write-kubeconfig-mode flag in k3s.service to 600, then runs\n  systemctl daemon-reload, because command-line flags take precedence\n  over config.yaml. It also chmods k3s.yaml to 600. It never restarts\n  k3s. It checks the unit afterwards and fails if a non-600 value is\n  left. Failures are a retried warning (continue_on_error).\n- Pass the handler its server address and jumphost through env.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T13:26:39Z",
+          "tree_id": "3a730366470609b5eb507cd7e52500fd30682302",
+          "url": "https://github.com/endavis/infrafoundry/commit/3245c0e4a03d73278eb1e0af40c9f662fe5154da"
+        },
+        "date": 1795267675612,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 54.496793934786574,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0001295732882326828",
+            "extra": "mean: 18.349703309090934 msec\nrounds: 55"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10064.700777602751,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000061589061401925275",
+            "extra": "mean: 99.35715150373142 usec\nrounds: 10607"
           }
         ]
       }
