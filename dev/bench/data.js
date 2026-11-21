@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795259464683,
+  "lastUpdate": 1795261026852,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5020,6 +5020,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005095389326267177",
             "extra": "mean: 89.17365331079881 usec\nrounds: 12429"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5ae8870d07c2402b1ff3576b07e3cf91023912e0",
+          "message": "feat: report where each secret reference resolves in infra doctor for a package or resource (merges PR #1570, addresses #1567)\n\nfeat: report where each secret reference resolves in infra doctor\n\nScoping `infra doctor` with -p/--package or -r/--resource now prints a\n\"Secret sources\" section. Each row names the resource, the field path\n(terraform_secrets[i], string_data_secrets.KEY, data_secrets.KEY,\nset_sensitive[i].value_secret), the reference, where it resolves from\n(the package secrets.yaml, the env secrets.yaml, or the outputs of\nanother provider at apply time) and whether it resolves now.\n\nAn unresolvable reference shows its existing value-free reason and makes\ndoctor exit non-zero. Secret values are never read into the report,\nprinted, logged or included in JSON. Unscoped output is unchanged.\n\nAdd a --format text|json option to infra doctor. In json mode the\nhuman-readable output goes to stderr and stdout carries one JSON\ndocument. Extract output_ref_problem from the terraform_secrets\nvalidator so the report reuses its messages.\n\nAddresses #1567\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T11:35:44Z",
+          "tree_id": "0a137a23def670359d61c3c614890c6115b00a99",
+          "url": "https://github.com/endavis/infrafoundry/commit/5ae8870d07c2402b1ff3576b07e3cf91023912e0"
+        },
+        "date": 1795261026176,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 65.83224317523747,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0011494127498740613",
+            "extra": "mean: 15.190124956522004 msec\nrounds: 69"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12893.86802000536,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004504643831236156",
+            "extra": "mean: 77.55624599603931 usec\nrounds: 13549"
           }
         ]
       }
