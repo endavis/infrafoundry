@@ -441,6 +441,126 @@ def test_verify_cluster_script_expands_leading_tilde(tmp_path: Path) -> None:
     assert f"Kubeconfig not found at {home}/x.yaml" in result.stdout
 
 
+def test_verify_cluster_handler_env_carries_control_name_and_tailnet(tmp_path: Path) -> None:
+    """The handler env carries what the ssh fallback needs to reach the control node."""
+    env = _verify_cluster_env(tmp_path)
+    assert env["K3S_CONTROL_NAME"] == "example-k3s-control"
+    assert env["K3S_TAILNET"] == "example.ts.net"
+
+
+def _stub_bin(
+    tmp_path: Path, *, kubectl: bool, ssh: bool, ssh_exit: int = 0, nodes: str = "n1 Ready"
+) -> Path:
+    """Build a PATH directory with the tools the script needs and optional stubs."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    for tool in ("bash", "dirname", "grep", "wc", "cat"):
+        found = shutil.which(tool)
+        assert found is not None
+        (bindir / tool).symlink_to(found)
+    body = (
+        "#!/bin/bash\n"
+        'echo "$0 $*" >> "$STUB_LOG"\n'
+        'if [[ "$*" == *"get nodes --no-headers" ]]; then\n'
+        f"  echo '{nodes}'\n"
+        "fi\n"
+    )
+    if kubectl:
+        (bindir / "kubectl").write_text(body)
+        (bindir / "kubectl").chmod(0o755)
+    if ssh:
+        probe = f'if [ "${{@: -1}}" = true ]; then exit {ssh_exit}; fi\n'
+        (bindir / "ssh").write_text(body + probe)
+        (bindir / "ssh").chmod(0o755)
+    return bindir
+
+
+def _run_verify(
+    tmp_path: Path, bindir: Path, extra_env: dict[str, str] | None = None
+) -> tuple[subprocess.CompletedProcess[str], Path, Path]:
+    """Run verify-cluster.sh with only the stub PATH; return result, call log, warnings."""
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "kube.yaml").write_text("apiVersion: v1\n")
+    log = tmp_path / "stub.log"
+    warnings = tmp_path / "warnings.jsonl"
+    env = {
+        "PATH": str(bindir),
+        "HOME": str(home),
+        "KUBECONFIG": "~/kube.yaml",
+        "STUB_LOG": str(log),
+        "INFRAFOUNDRY_WARNINGS_FILE": str(warnings),
+        **(extra_env or {}),
+    }
+    result = subprocess.run(
+        [str(bindir / "bash"), str(BLUEPRINT / "scripts" / "oci" / "verify-cluster.sh")],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result, log, warnings
+
+
+_CONTROL_ENV = {"K3S_CONTROL_NAME": "example-k3s-control", "K3S_TAILNET": "example.ts.net"}
+
+
+def test_verify_cluster_prefers_local_kubectl(tmp_path: Path) -> None:
+    """With kubectl on PATH the checks run locally and ssh is never called."""
+    bindir = _stub_bin(tmp_path, kubectl=True, ssh=True)
+    result, log, _ = _run_verify(tmp_path, bindir, _CONTROL_ENV)
+    assert result.returncode == 0, result.stderr + result.stdout
+    calls = log.read_text()
+    assert "kubectl get nodes -o wide" in calls
+    assert "ssh" not in calls
+
+
+def test_verify_cluster_falls_back_to_remote_kubectl_over_ssh(tmp_path: Path) -> None:
+    """Without local kubectl the checks run on the control node via sudo k3s kubectl."""
+    bindir = _stub_bin(tmp_path, kubectl=False, ssh=True)
+    result, log, warnings = _run_verify(tmp_path, bindir, _CONTROL_ENV)
+    assert result.returncode == 0, result.stderr + result.stdout
+    calls = log.read_text()
+    host = "ubuntu@example-k3s-control.example.ts.net"
+    assert f"-o BatchMode=yes -o ConnectTimeout=10 {host} sudo k3s kubectl get nodes -o wide" in (
+        calls
+    )
+    assert "sudo k3s kubectl get pods -n kube-system" in calls
+    assert "sudo k3s kubectl cluster-info" in calls
+    assert "Cluster verification complete" in result.stdout
+    assert not warnings.exists()
+
+
+def test_verify_cluster_remote_not_ready_nodes_are_reported(tmp_path: Path) -> None:
+    """Remote NotReady nodes are counted and warned about, as for a local kubectl."""
+    bindir = _stub_bin(tmp_path, kubectl=False, ssh=True, nodes="n1 NotReady")
+    result, _, _ = _run_verify(tmp_path, bindir, _CONTROL_ENV)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "1 node(s) not in Ready state" in result.stdout
+
+
+def test_verify_cluster_skips_when_ssh_unusable(tmp_path: Path) -> None:
+    """A failing ssh probe skips verification with a clear message and a warning."""
+    bindir = _stub_bin(tmp_path, kubectl=False, ssh=True, ssh_exit=255)
+    result, _, warnings = _run_verify(tmp_path, bindir, _CONTROL_ENV)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "Verification skipped" in result.stdout
+    assert "verify-cluster" in warnings.read_text()
+
+
+@pytest.mark.parametrize("with_ssh", [True, False])
+def test_verify_cluster_skips_without_kubectl_and_control_or_ssh(
+    tmp_path: Path, with_ssh: bool
+) -> None:
+    """No control name, or no ssh client, skips verification and records a warning."""
+    bindir = _stub_bin(tmp_path, kubectl=False, ssh=with_ssh)
+    env = {} if with_ssh else _CONTROL_ENV
+    result, _, warnings = _run_verify(tmp_path, bindir, env)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "Verification skipped" in result.stdout
+    assert json.loads(warnings.read_text().splitlines()[0])["source"] == "verify-cluster"
+
+
 def test_oci_k3s_cluster_blueprint_overrides_tailscale_secret_keys(tmp_path: Path) -> None:
     """ts_oauth_client_*_secret variables change the secret keys on every node."""
     envs = tmp_path / "envs"

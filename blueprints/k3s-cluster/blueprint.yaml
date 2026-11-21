@@ -233,3 +233,5 @@ providers:
           continue_on_error: true
           env:
             KUBECONFIG: "{{ kubeconfig_local_path }}"
+            K3S_CONTROL_NAME: "{{ control_name }}"
+            K3S_TAILNET: "{{ tailnet }}"
