@@ -12,7 +12,8 @@ Cross-reference targets:
 - ``interface``: managed ``interface_assignments`` names plus live
   ``interfacesInfo`` keys.
 - ``source_net`` / ``destination_net`` / ``target``: managed alias names plus
-  literal IP/CIDR plus a small set of OPNsense built-in keywords.
+  literal IP/CIDR plus OPNsense keywords: a static set, ``<id>`` / ``<id>ip`` for
+  managed and live interfaces, and the live rule editor's network options.
 
 Identity-tag collision:
 
@@ -40,6 +41,7 @@ from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.opnsense.services._identity import has_identity_marker
+from infrafoundry.providers.opnsense.validators._net_keywords import accepted_net_keywords
 from infrafoundry.providers.opnsense.validators._xref import XRefIndex, resolve_xref
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
@@ -48,23 +50,6 @@ from infrafoundry.providers.opnsense.validators.context import OPNsenseValidatio
 # agree on the target type.
 _MANAGED_ALIAS_TYPE = "firewall.aliases"
 _MANAGED_INTERFACE_TYPE = "interfaces.assignments"
-
-# OPNsense built-in net/target keywords commonly accepted in NAT rules. The
-# set is intentionally conservative — unknown values surface as warnings
-# (not errors) so a new keyword in a future minor version doesn't block a
-# plan.
-_NET_KEYWORDS: frozenset[str] = frozenset(
-    {
-        "any",
-        "lan",
-        "wan",
-        "wanip",
-        "lanip",
-        "(self)",
-        "lan_subnets",
-        "wan_subnets",
-    }
-)
 
 
 class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
@@ -91,6 +76,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
         existing_interfaces = context.existing_interfaces
         existing_aliases = context.existing_aliases
         index = context.index
+        net_keywords = accepted_net_keywords(context)
         for rule in nat_rules:
             self._validate_one(
                 rule,
@@ -99,6 +85,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 existing_interfaces=existing_interfaces,
                 existing_aliases=existing_aliases,
                 index=index,
+                net_keywords=net_keywords,
             )
 
     def _validate_one(
@@ -110,6 +97,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
         existing_interfaces: dict[str, Any],
         existing_aliases: dict[str, Any],
         index: XRefIndex | None,
+        net_keywords: frozenset[str],
     ) -> None:
         """Run all checks for a single NAT-rule entry."""
         kind = self._validate_kind(rule)
@@ -132,6 +120,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
                 index=index,
+                net_keywords=net_keywords,
             )
             self._validate_net_field(
                 rule,
@@ -139,6 +128,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
                 index=index,
+                net_keywords=net_keywords,
             )
             self._validate_net_field(
                 rule,
@@ -146,6 +136,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
                 index=index,
+                net_keywords=net_keywords,
             )
         elif kind == "one_to_one":
             self._validate_one_to_one_required(rule)
@@ -155,6 +146,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
                 index=index,
+                net_keywords=net_keywords,
             )
             self._validate_net_field(
                 rule,
@@ -162,6 +154,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
                 index=index,
+                net_keywords=net_keywords,
             )
             self._validate_one_to_one_type(rule)
             self._validate_natreflection(rule, kind="one_to_one")
@@ -173,6 +166,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
                 index=index,
+                net_keywords=net_keywords,
             )
             self._validate_net_field(
                 rule,
@@ -180,6 +174,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
                 index=index,
+                net_keywords=net_keywords,
             )
             self._validate_net_field(
                 rule,
@@ -187,6 +182,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 alias_names=alias_names,
                 existing_aliases=existing_aliases,
                 index=index,
+                net_keywords=net_keywords,
             )
             self._validate_pass_action(rule)
             self._validate_poolopts(rule)
@@ -372,6 +368,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
         alias_names: set[str],
         existing_aliases: dict[str, Any],
         index: XRefIndex | None,
+        net_keywords: frozenset[str],
     ) -> None:
         if field_name not in rule.config:
             return
@@ -410,7 +407,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
                 bare_value = resolved.name
 
         if (
-            bare_value in _NET_KEYWORDS
+            bare_value in net_keywords
             or bare_value in alias_names
             or bare_value in existing_aliases
         ):
@@ -425,7 +422,7 @@ class NATRuleValidator(SpecializedValidator[OPNsenseValidationContext]):
             message=(
                 f"nat_rule '{rule.name}' {field_name} '{value}' did not resolve to a "
                 f"managed alias, live alias, IP/CIDR, or known keyword "
-                f"({sorted(_NET_KEYWORDS)})"
+                f"({sorted(net_keywords)})"
             ),
             level=ValidationLevel.WARNING,
         )

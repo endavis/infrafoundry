@@ -65,6 +65,8 @@ class OPNsenseValidationContext(ValidationContext):
         existing_host_override_names: Host override names present on the live system.
         existing_hasync_interfaces: Interfaces the box offers for pfsync (live option keys).
         existing_hasync_sync_items: Sync items the box offers (live option keys).
+        existing_net_keywords: Network keywords the box offers for rule fields (live
+            ``listNetworkSelectOptions`` ``networks`` keys).
         managed_gateways: ``gateway`` resources managed in the configuration.
         index: Dotted-type cross-reference index, or None when not built.
         live_carp_status: ``diagnostics/interface/getVipStatus`` reply, or None when unread.
@@ -104,6 +106,7 @@ class OPNsenseValidationContext(ValidationContext):
     existing_host_override_names: set[str] = field(default_factory=set)
     existing_hasync_interfaces: set[str] = field(default_factory=set)
     existing_hasync_sync_items: set[str] = field(default_factory=set)
+    existing_net_keywords: set[str] = field(default_factory=set)
     managed_gateways: list[ResourceConfig] | None = None
     index: XRefIndex | None = None
     live_carp_status: dict[str, Any] | None = None

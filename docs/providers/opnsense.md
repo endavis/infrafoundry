@@ -336,6 +336,8 @@ foundry infra doctor --env <env> -P opnsense
 
 The check tests connectivity to the API (`validate_connectivity`), that referenced OPNsense resources exist, and the endpoint support described above (`validate_references`).
 
+`source_net`, `destination_net` and `target` in firewall and NAT rules accept `<iface>` and `<iface>ip` for every managed or live interface assignment, such as `opt1` and `opt1ip`. `infra doctor` also reads the box's rule network options (`firewall/filter/listNetworkSelectOptions`) to accept the keywords the installed version offers, such as `lo0`, and falls back to the built-in set when that read fails. A keyword for an interface that is not assigned still warns.
+
 `infra doctor` also warns when a `kea.dhcp4.subnets` entry sets `auto_collect: true` together with `routers`, `dns_servers` or `ntp_servers`. Saving the Kea DHCPv4 settings re-runs auto-collect and overwrites those values; set `auto_collect: false` to keep them. See [Kea DHCPv4 high availability](../development/opnsense-resource-coverage.md#kea-dhcpv4-high-availability-1392).
 
 `infra plan`, `infra apply` and `infra doctor` warn when a CARP `vhid` is reused on more than one interface, and fail when a CARP virtual IP lies outside the static subnet of its interface in config (or outside the subnet of an `ipalias` virtual IP on that interface). The subnet check is skipped when the interface address is not static in config, and for `ipalias` and `proxyarp` virtual IPs.

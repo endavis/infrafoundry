@@ -394,6 +394,8 @@ KEA_RECONFIGURE = Endpoint("POST", "kea/service/reconfigure")
 # --- firewall rules, NAT, categories --------------------------------------------------
 FILTER = _rules("firewall/filter")
 FILTER_SAVEPOINT = Endpoint("POST", "firewall/filter/savepoint")
+# #1598: read-only, the network choices of the rule editor (interface keywords, `lo0`).
+FILTER_NETWORK_SELECT_OPTIONS = Endpoint("GET", "firewall/filter/listNetworkSelectOptions")
 # #1497, #1509: the configuration backup (config.xml), read by ``config migrate
 # --include-legacy`` (firewall.rules and firewall.nat).
 # Read-only; the response body is XML, not JSON.
@@ -772,6 +774,7 @@ DOCTOR_ENDPOINTS: tuple[Endpoint, ...] = (
     GATEWAY.search,
     UNBOUND_HOST_OVERRIDE.search,
     HASYNC_GET,  # #1389: the live validator reads the pfsync interface and sync-item options
+    FILTER_NETWORK_SELECT_OPTIONS,  # #1598: the live validator reads the rule network keywords
     DIAGNOSTICS_VIP_STATUS,  # #1393: CARP VIP state
     HASYNC_STATUS_VERSION,  # #1393: HA peer reachability
 )

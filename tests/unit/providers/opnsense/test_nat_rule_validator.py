@@ -903,3 +903,67 @@ class TestDottedPathXRefs:
             )
         )
         assert not _failures(report, "nat_rule_ok_interface")
+
+
+# ---------------------------------------------------------------------------
+# interface net keywords (#1598)
+# ---------------------------------------------------------------------------
+
+
+class TestInterfaceNetKeywords:
+    def test_outbound_target_address_form_accepted(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", target="opt1ip")],
+                interface_assignment_names={"opt1"},
+            )
+        )
+        assert not _failures(report, "nat_rule_ok_target")
+
+    def test_live_identifier_accepted(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        row = {"identifier": "opt2", "device": "em3"}
+        validator.validate(
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", source_net="opt2")],
+                existing_interfaces={"opt2": row, "em3": row},
+            )
+        )
+        assert not _failures(report, "nat_rule_ok_source_net")
+
+    def test_port_forward_destination_accepted(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            OPNsenseValidationContext(
+                nat_rules=[_port_forward("ok", destination_net="opt1")],
+                interface_assignment_names={"opt1"},
+            )
+        )
+        assert not _failures(report, "nat_rule_ok_destination_net")
+
+    @pytest.mark.parametrize("value", ["opt99", "opt99ip"])
+    def test_unknown_interface_keyword_warns(
+        self, validator: NATRuleValidator, report: ValidationReport, value: str
+    ) -> None:
+        validator.validate(
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("bad", target=value)],
+                interface_assignment_names={"opt1"},
+            )
+        )
+        assert _failures(report, "nat_rule_bad_target")
+
+    def test_live_option_keyword_accepted(
+        self, validator: NATRuleValidator, report: ValidationReport
+    ) -> None:
+        validator.validate(
+            OPNsenseValidationContext(
+                nat_rules=[_outbound("ok", target="lo0")],
+                existing_net_keywords={"lo0"},
+            )
+        )
+        assert not _failures(report, "nat_rule_ok_target")

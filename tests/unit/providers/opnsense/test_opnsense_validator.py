@@ -1,7 +1,7 @@
 """Unit tests for OPNsense OPNsenseValidator orchestration."""
 
 from typing import Any, ClassVar
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -923,8 +923,6 @@ class TestValidateEndpointSupport:
         return [ResourceConfig(name="h", type="system.hostname", provider="opnsense", config={})]
 
     def test_errors_warnings_and_success(self, env_config: Any, report: MagicMock) -> None:
-        from unittest.mock import patch
-
         from infrafoundry.providers.opnsense.endpoint_support import EndpointSupport
 
         validator = OPNsenseValidator(env_config, report)
@@ -937,8 +935,6 @@ class TestValidateEndpointSupport:
         validator.api_validator.add_success.assert_not_called()
 
     def test_clean_result_adds_success(self, env_config: Any, report: MagicMock) -> None:
-        from unittest.mock import patch
-
         from infrafoundry.providers.opnsense.endpoint_support import EndpointSupport
 
         validator = OPNsenseValidator(env_config, report)
@@ -954,8 +950,6 @@ class TestValidateEndpointSupport:
         assert "26.1.6" in success["message"]
 
     def test_missing_credentials_adds_nothing(self, report: MagicMock) -> None:
-        from unittest.mock import patch
-
         validator = OPNsenseValidator(make_env_config(provider_settings={}), report)
         validator.api_validator = MagicMock()
         with patch(self._CHECK) as check:
@@ -1036,8 +1030,6 @@ class TestValidateHaHealth:
         return client
 
     def _run(self, env: Any, client: MagicMock) -> ValidationReport:
-        from unittest.mock import patch
-
         report = ValidationReport()
         with patch(f"{self._V}.OPNsenseClient", return_value=client) as cls:
             OPNsenseValidator(env, report).validate_ha_health()
@@ -1119,3 +1111,92 @@ class TestValidateHaHealth:
         client = self._client("192.0.2.2", {"response": {}})
         self._run(self._settings(), client)
         assert all("carpStatus" not in p for p in self._paths(client))
+
+
+class TestGetExistingNetKeywords:
+    """Tests for _get_existing_net_keywords (#1598)."""
+
+    def test_returns_networks_keys_only(self, validator: OPNsenseValidator) -> None:
+        payload = {
+            "networks": {
+                "label": "Networks",
+                "items": {
+                    key: {"value": key}
+                    for key in (
+                        "any",
+                        "(self)",
+                        "lan",
+                        "lanip",
+                        "lo0",
+                        "opt1",
+                        "opt1ip",
+                        "wan",
+                        "wanip",
+                    )
+                },
+            },
+            "aliases": {"label": "Aliases", "items": {"some_alias": {"value": "some_alias"}}},
+        }
+        fetch = MagicMock(return_value=payload)
+        validator.api_validator.fetch_json = fetch  # type: ignore[method-assign]
+
+        result = validator._get_existing_net_keywords("https://opn.example.com", "key", "secret")
+
+        assert result == {
+            "any",
+            "(self)",
+            "lan",
+            "lanip",
+            "lo0",
+            "opt1",
+            "opt1ip",
+            "wan",
+            "wanip",
+        }
+        assert fetch.call_args.kwargs["url"].endswith(
+            "/api/firewall/filter/listNetworkSelectOptions"
+        )
+
+    @pytest.mark.parametrize(
+        "reply",
+        [None, {"aliases": {}}, {"networks": {"items": []}}, {"networks": "x"}],
+    )
+    def test_bad_reply_gives_empty_set(self, validator: OPNsenseValidator, reply: Any) -> None:
+        validator.api_validator.fetch_json = MagicMock(return_value=reply)  # type: ignore[method-assign]
+
+        assert validator._get_existing_net_keywords("https://opn.example.com", "k", "s") == set()
+
+
+class TestValidateReferencesNetKeywords:
+    """validate_references fetches rule network keywords only when rules are in scope."""
+
+    def _run(self, validator: OPNsenseValidator, resources: list[ResourceConfig]) -> MagicMock:
+        creds = {"api_url": "https://fw.example.com", "api_key": "k", "api_secret": "s"}
+        with (
+            patch.object(validator.api_validator, "get_credentials", return_value=creds),
+            patch.object(validator, "_get_existing_aliases", return_value={}),
+            patch.object(validator, "_get_existing_interfaces", return_value={}),
+            patch.object(validator, "_get_existing_gateways", return_value=set()),
+            patch.object(validator, "_get_existing_unbound_host_overrides", return_value=set()),
+            patch.object(validator, "_get_existing_net_keywords", return_value={"lo0"}) as fetch,
+        ):
+            validator.validate_references(resources)
+        return fetch
+
+    def test_not_called_without_rules(self, validator: OPNsenseValidator) -> None:
+        assert not self._run(validator, []).called
+        other = ResourceConfig(name="a", type="vlan.vlans", provider="opnsense", config={})
+        assert not self._run(validator, [other]).called
+
+    def test_called_once_with_rule_and_keyword_accepted(self, env_config: Any) -> None:
+        real_report = ValidationReport()
+        validator = OPNsenseValidator(env_config, real_report)
+        rule = ResourceConfig(
+            name="r1",
+            type="firewall.rules",
+            provider="opnsense",
+            config={"interface": "lan", "source_net": "lo0"},
+        )
+        fetch = self._run(validator, [rule])
+        fetch.assert_called_once()
+        assert not [r for r in real_report.results if r.check_name == "firewall_rule_r1_source_net"]
