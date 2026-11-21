@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795295030225,
+  "lastUpdate": 1795297034746,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5552,6 +5552,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000011966239282580997",
             "extra": "mean: 129.1792472835935 usec\nrounds: 8375"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "abf2902d4cd845e04ab8826a69176a1c85ce717f",
+          "message": "feat: resolve secret:// uris in every provider's settings (merges PR #1595, addresses #1594)\n\nProvider settings resolved secret:// values only where a call site opted\nin (MikroTik and OpenWrt load_settings, the Tailscale terraform env vars).\nEverywhere else a URI reached Terraform or the API client as a literal.\n\nAdd shared helpers in infrafoundry.secrets.environment:\nresolve_secret_settings, resolved_provider_settings,\nwith_resolved_provider_settings, resolved_environment_data and the\noffline provider_settings_secret_problems. Route every reader that\nconnects through them: terraform env vars (now resolved by default, mapped\nkeys only), the OPNsense API client per firewall and interface-assignment\nSSH target, the live validator hooks behind infra doctor for OPNsense,\nProxmox, OCI, Kubernetes and ESXi, the Proxmox SDN dry run, and\nprovider proxmox export / dump. ESXi hostname and username given as URIs\nbecome TF_VAR_* env vars instead of terraform.tfvars entries. Offline\npaths (infra plan, presence-only validators such as Tailscale) check a\nURI's shape and backend without contacting a vault, so bw still starts\nonly when a bitwarden value is actually needed.\n\nADR-0020 and ADR-0034 carry amendment notes.\n\nBREAKING CHANGE: TerraformGeneratorMixin.build_terraform_env_vars no longer\naccepts resolve_secret_uris; settings secret:// URIs are always resolved.\nDrop the keyword from third-party provider calls.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-21T21:36:05Z",
+          "tree_id": "8f87deec0358fae1f54cfe027bb49b7738585b0d",
+          "url": "https://github.com/endavis/infrafoundry/commit/abf2902d4cd845e04ab8826a69176a1c85ce717f"
+        },
+        "date": 1795297034053,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 47.89517365344157,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00032837305572478294",
+            "extra": "mean: 20.878930458333222 msec\nrounds: 48"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7814.576821921662,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000921628814760046",
+            "extra": "mean: 127.9659823926451 usec\nrounds: 8292"
           }
         ]
       }
