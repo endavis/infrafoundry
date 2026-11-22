@@ -1,5 +1,6 @@
 """Configuration models for InfraFoundry."""
 
+import os
 from enum import StrEnum
 from typing import Any
 
@@ -95,7 +96,8 @@ class BitwardenBackendConfig(BaseModel):
 
     ``client_id``, ``client_secret`` and ``master_password`` are ``secret://`` URIs naming
     where the bootstrap credentials come from. Only the ``env`` and ``env_secrets`` backends
-    are accepted, so a credential can never point back into the vault.
+    are accepted, so a credential can never point back into the vault. ``device_id_file``
+    optionally overrides where the ``bw`` device id (app id) is persisted between runs.
     """
 
     server: str
@@ -104,6 +106,17 @@ class BitwardenBackendConfig(BaseModel):
     client_id: str = "secret://env/bw_clientid"
     client_secret: str = "secret://env/bw_clientsecret"
     master_password: str = "secret://env/bw_password"
+    device_id_file: str | None = None
+
+    @field_validator("device_id_file")
+    @classmethod
+    def _absolute_device_id_file(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        expanded = os.path.expanduser(value)
+        if not value or not os.path.isabs(expanded):
+            raise ValueError("device_id_file must be an absolute path (a leading ~ is expanded)")
+        return expanded
 
     @field_validator("server")
     @classmethod

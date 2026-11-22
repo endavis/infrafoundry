@@ -409,3 +409,213 @@ def test_resolver_finds_plugin_through_entry_point(stub: StubBw) -> None:
     resolver.close()
     # Closing the resolver does not log out: the session lives for the process.
     assert "logout" not in stub.subcommands()
+
+
+# -- persisted device identity (#1604) -------------------------------------------------------
+
+_APP_ID_KEY = "global_applicationId_appId"
+_STORED_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+
+
+def _app_ids(stub: StubBw, sub: str = "login") -> list[str]:
+    return [c["app_id"] for c in stub.calls() if c["argv"][0] == sub]
+
+
+def _state_home() -> Path:
+    return Path(os.environ["INFRAFOUNDRY_STATE_HOME"])
+
+
+def _default_file(server: str = SERVER) -> Path:
+    return Path(bitwarden._default_device_id_file(server))
+
+
+def _fresh_dir(tmp_path: Path, content: Any = None) -> Path:
+    app_dir = tmp_path / "appdir"
+    app_dir.mkdir(exist_ok=True)
+    if content is not None:
+        (app_dir / "data.json").write_text(
+            content if isinstance(content, str) else json.dumps(content), encoding="utf-8"
+        )
+    return app_dir
+
+
+def test_two_sessions_present_same_app_id(stub: StubBw) -> None:
+    make().get_secret("Router Admin/password")
+    close_bitwarden_sessions()
+    first_mtime = _default_file().stat().st_mtime_ns
+    make().get_secret("Router Admin/password")
+    ids = _app_ids(stub)
+    assert len(ids) == 2
+    assert ids[0] == ids[1]
+    assert _default_file().read_text(encoding="utf-8").strip() == ids[0]
+    assert _default_file().stat().st_mtime_ns == first_mtime
+
+
+def test_first_run_creates_private_file_holding_bw_id(stub: StubBw) -> None:
+    make().get_secret("Router Admin/password")
+    path = _default_file()
+    assert path.read_text(encoding="utf-8").strip() == _app_ids(stub)[0]
+    assert (path.stat().st_mode & 0o777) == 0o600
+    assert (path.parent.stat().st_mode & 0o777) == 0o700
+    assert (path.parent.parent.stat().st_mode & 0o777) == 0o700
+    assert path.is_relative_to(_state_home())
+
+
+def test_existing_valid_file_seeds_data_json_before_login(stub: StubBw) -> None:
+    path = _default_file()
+    path.parent.mkdir(parents=True, mode=0o700)
+    path.write_text(_STORED_ID + "\n", encoding="utf-8")
+    path.chmod(0o600)
+    make().get_secret("Router Admin/password")
+    assert _app_ids(stub, "config")[0] != _STORED_ID  # bw generated its own before seeding
+    assert _app_ids(stub) == [_STORED_ID]
+    assert path.read_text(encoding="utf-8").strip() == _STORED_ID
+
+
+def test_non_uuid_stored_id_is_ignored(stub: StubBw) -> None:
+    path = _default_file()
+    path.parent.mkdir(parents=True, mode=0o700)
+    path.write_text("not-a-uuid\n", encoding="utf-8")
+    path.chmod(0o600)
+    assert make().get_secret("Router Admin/password") == FIXTURE_VALUE
+    assert _app_ids(stub)[0] != "not-a-uuid"
+    assert path.read_text(encoding="utf-8") == "not-a-uuid\n"
+
+
+@pytest.mark.parametrize(
+    "content", [None, "not json", "[1, 2]", {"other": "x"}, {_APP_ID_KEY: "nope"}, {_APP_ID_KEY: 3}]
+)
+def test_bad_data_json_falls_back(tmp_path: Path, content: Any) -> None:
+    app_dir = _fresh_dir(tmp_path, content)
+    target = tmp_path / "ids" / "app-id"
+    bitwarden._seed_app_id(str(app_dir), str(target), SERVER)
+    assert not target.exists()
+    if content is not None:
+        assert (app_dir / "data.json").read_text(encoding="utf-8") == (
+            content if isinstance(content, str) else json.dumps(content)
+        )
+
+
+def test_different_servers_get_different_files(stub: StubBw) -> None:
+    make().get_secret("Router Admin/password")
+    close_bitwarden_sessions()
+    make(server="https://other.example.net").get_secret("Router Admin/password")
+    a, b = _default_file(SERVER), _default_file("https://other.example.net")
+    assert a != b
+    assert a.read_text(encoding="utf-8") != b.read_text(encoding="utf-8")
+
+
+def test_device_id_file_setting_overrides_path(stub: StubBw, tmp_path: Path) -> None:
+    target = tmp_path / "custom" / "device"
+    make(device_id_file=str(target)).get_secret("Router Admin/password")
+    assert target.read_text(encoding="utf-8").strip() == _app_ids(stub)[0]
+    assert not _default_file().exists()
+
+
+def test_relative_device_id_file_rejected() -> None:
+    with pytest.raises(SecretBackendError, match="absolute"):
+        BitwardenSecretBackend({"server": SERVER, "device_id_file": "rel/path"})
+
+
+def test_tilde_device_id_file_expands(stub: StubBw, monkeypatch: pytest.MonkeyPatch) -> None:
+    home = Path(os.environ["INFRAFOUNDRY_STATE_HOME"]) / "fakehome"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    make(device_id_file="~/dev-id").get_secret("Router Admin/password")
+    assert (home / "dev-id").is_file()
+
+
+def test_tempdir_removed_and_lock_logout_still_run(stub: StubBw) -> None:
+    make().get_secret("Router Admin/password")
+    appdir = Path(stub.calls()[0]["appdir"])
+    close_bitwarden_sessions()
+    assert stub.subcommands()[-2:] == ["lock", "logout"]
+    assert not appdir.exists()
+    assert _default_file().is_file()
+
+
+def test_no_debug_log_contains_app_id(
+    stub: StubBw, caplog: pytest.LogCaptureFixture, tmp_path: Path
+) -> None:
+    caplog.set_level(logging.DEBUG)
+    make().get_secret("Router Admin/password")
+    close_bitwarden_sessions()
+    make().get_secret("Router Admin/password")
+    bad = tmp_path / "bad"
+    bad.write_text(_STORED_ID, encoding="utf-8")
+    bad.chmod(0o666)
+    bitwarden._seed_app_id(str(_fresh_dir(tmp_path, {_APP_ID_KEY: _STORED_ID})), str(bad), SERVER)
+    for app_id in (*_app_ids(stub), _STORED_ID):
+        assert app_id not in caplog.text
+
+
+def test_race_stored_id_wins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    generated = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+    app_dir = _fresh_dir(tmp_path, {_APP_ID_KEY: generated})
+    target = tmp_path / "ids" / "app-id"
+    real_read = bitwarden._read_stored_app_id
+    calls = {"n": 0}
+
+    def racing_read(path: Path) -> tuple[str, str | None]:
+        calls["n"] += 1
+        result = real_read(path)
+        if calls["n"] == 1:  # another process creates the file after our "missing" check
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(_STORED_ID + "\n", encoding="utf-8")
+            path.chmod(0o600)
+        return result
+
+    monkeypatch.setattr(bitwarden, "_read_stored_app_id", racing_read)
+    bitwarden._seed_app_id(str(app_dir), str(target), SERVER)
+    assert json.loads((app_dir / "data.json").read_text(encoding="utf-8"))[_APP_ID_KEY] == (
+        _STORED_ID
+    )
+    assert target.read_text(encoding="utf-8").strip() == _STORED_ID
+
+
+@pytest.mark.parametrize("mode", [0o620, 0o602, 0o666])
+def test_writable_app_id_file_ignored(tmp_path: Path, mode: int) -> None:
+    app_dir = _fresh_dir(tmp_path, {_APP_ID_KEY: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"})
+    target = tmp_path / "app-id"
+    target.write_text(_STORED_ID, encoding="utf-8")
+    target.chmod(mode)
+    bitwarden._seed_app_id(str(app_dir), str(target), SERVER)
+    data = json.loads((app_dir / "data.json").read_text(encoding="utf-8"))
+    assert data[_APP_ID_KEY] == "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+
+
+def test_symlinked_app_id_file_ignored(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.write_text(_STORED_ID, encoding="utf-8")
+    real.chmod(0o600)
+    link = tmp_path / "app-id"
+    link.symlink_to(real)
+    app_dir = _fresh_dir(tmp_path, {_APP_ID_KEY: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"})
+    bitwarden._seed_app_id(str(app_dir), str(link), SERVER)
+    data = json.loads((app_dir / "data.json").read_text(encoding="utf-8"))
+    assert data[_APP_ID_KEY] == "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+
+
+@pytest.mark.skipif(os.getuid() == 0, reason="root ignores directory permissions")
+def test_unwritable_app_id_dir_falls_back(stub: StubBw, tmp_path: Path) -> None:
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o500)
+    try:
+        backend = make(device_id_file=str(locked / "sub" / "app-id"))
+        assert backend.get_secret("Router Admin/password") == FIXTURE_VALUE
+    finally:
+        locked.chmod(0o700)
+    assert not (locked / "sub").exists()
+
+
+def test_seeded_data_json_stays_private(tmp_path: Path) -> None:
+    app_dir = _fresh_dir(tmp_path, {_APP_ID_KEY: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "k": 1})
+    target = tmp_path / "app-id"
+    target.write_text(_STORED_ID, encoding="utf-8")
+    target.chmod(0o600)
+    bitwarden._seed_app_id(str(app_dir), str(target), SERVER)
+    data_path = app_dir / "data.json"
+    assert json.loads(data_path.read_text(encoding="utf-8")) == {_APP_ID_KEY: _STORED_ID, "k": 1}
+    assert (data_path.stat().st_mode & 0o777) == 0o600
+    assert [p.name for p in app_dir.iterdir()] == ["data.json"]
