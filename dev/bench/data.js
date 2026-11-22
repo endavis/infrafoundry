@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795384786317,
+  "lastUpdate": 1795389154517,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5894,6 +5894,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008006654763858283",
             "extra": "mean: 90.93828184893007 usec\nrounds: 12159"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3b3df6490f60f9f0a26403ddbc90bf2f1018196b",
+          "message": "feat: adopt existing proxmox vms and templates with an import_id field (merges PR #1614, addresses #1613)\n\nA Proxmox VM or template that exists on the cluster but is missing from\nthe Terraform state could not be adopted through InfraFoundry: the plan\nshowed it as new, and an apply would try to create a second VM with the\nsame VMID.\n\nThe framework-wide import_id field already rendered an import block for\nregular VMs, but:\n- templates got none, because the shared name match does not reach their\n  template_ prefix. templates.tf.j2 now renders the block itself, for\n  both the download-image and the clone forms;\n- the value was never checked. A new validator requires <node>/<vmid>\n  with a valid VMID, and that the parts match the configured target_node\n  and vmid, since a mismatched id would adopt a different VM into the\n  address;\n- on OVA and disk-image VMs, which render no importable VM resource, the\n  field was dropped silently. It is now an error.\n\nDocs gain an \"Adopting existing VMs and templates\" section, and the\nimport_id examples elsewhere now use the <node>/<vmid> form and the bpg\nresource type.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-22T23:11:47Z",
+          "tree_id": "323af198e3848165aeaecd47db3b6d10dfa241ab",
+          "url": "https://github.com/endavis/infrafoundry/commit/3b3df6490f60f9f0a26403ddbc90bf2f1018196b"
+        },
+        "date": 1795389153805,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 75.25894839019065,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005453057036631698",
+            "extra": "mean: 13.287456460530896 msec\nrounds: 76"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14350.15945818816,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004806831829378898",
+            "extra": "mean: 69.68563679823104 usec\nrounds: 15914"
           }
         ]
       }
