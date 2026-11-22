@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795373260216,
+  "lastUpdate": 1795382119215,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5818,6 +5818,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004870349679550763",
             "extra": "mean: 77.19417898655676 usec\nrounds: 13677"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a528043e5a1b945de9431b845d80861b2d58fb93",
+          "message": "fix: accept the loader-injected name key on trust.cas and trust.certs (merges PR #1610, addresses #1608)\n\nEvery config loader copies the entry name into its config, but the trust CA\nand certificate key sets did not allow it, so any trust.cas or trust.certs\nresource failed validation with \"unknown key 'name'\", and an OpenVPN\ninstance could not reference a CA declared in YAML.\n\nname is now accepted in the trust validator's and the trust service's key\nsets, as openvpn.static_keys and openvpn.instances already do. The parsers\nread only named keys, so name never reaches the wire body, and identity\nstays description.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-22T21:13:59Z",
+          "tree_id": "3f1d8ea6121073844e418916384ea6811f5d7858",
+          "url": "https://github.com/endavis/infrafoundry/commit/a528043e5a1b945de9431b845d80861b2d58fb93"
+        },
+        "date": 1795382118560,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 67.84548997020933,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00042548008250838933",
+            "extra": "mean: 14.73937324999931 msec\nrounds: 72"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12919.429678632567,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00000529911573260733",
+            "extra": "mean: 77.402797559547 usec\nrounds: 13604"
           }
         ]
       }
