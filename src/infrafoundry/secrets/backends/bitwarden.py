@@ -13,6 +13,10 @@ Design (ADR-0034):
 * One session per process (module-level registry). Backends built by different call sites share
   it; ``close_bitwarden_sessions()`` (also registered with ``atexit``) locks, logs out and removes
   the directory.
+* The one piece of state that persists is the device identity (``global_applicationId_appId`` in
+  ``data.json``), kept in a small ``0600`` file so the server sees one device across runs instead of
+  a new-device email per run. It is seeded into each fresh ``data.json`` before ``login``. No token,
+  key or API secret is persisted. See ``_seed_app_id``.
 * Credentials reach ``bw`` only through the subprocess environment, never argv. They are
   ``secret://env/...`` or ``secret://env_secrets/...`` URIs, so they cannot point into the vault.
 * Exceptions carry at most the ``bw`` subcommand name, the item or field reference and a reason.
@@ -31,6 +35,8 @@ Design (ADR-0034):
 * ``bw list items`` with both ``--organizationid`` and ``--collectionid`` (with or without
   ``--search``) filters by organization only; ``--collectionid`` alone filters by collection.
   The backend therefore re-applies both scope filters to every listed item.
+* The device identity is ``data.json`` key ``global_applicationId_appId``, written by the first
+  command, and it survives ``bw logout``; the server keys its new-device notice on it.
 * A live test against a self-hosted Vaultwarden confirmed ``login --apikey`` with
   ``BW_CLIENTID``/``BW_CLIENTSECRET``, ``unlock --passwordenv --raw``, ``sync``, the item JSON
   shape for logins and custom fields, ``list collections``, and exact-name filtering.
@@ -58,6 +64,7 @@ import stat
 import subprocess  # nosec B404  # required for running the bitwarden CLI
 import tempfile
 import threading
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from infrafoundry.secrets.protocol import SecretBackendError, SecretNotFoundError
@@ -71,6 +78,8 @@ _UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
 _BW_TIMEOUT_SECONDS = 120
+_APP_ID_KEY = "global_applicationId_appId"
+_APP_ID_MAX_BYTES = 128
 _ALLOWED_CREDENTIAL_BACKENDS = ("env", "env_secrets")
 _CREDENTIAL_SETTINGS = ("client_id", "client_secret", "master_password")
 # Each setting defaults to the env var the bw CLI itself reads (BW_CLIENTID, ...).
@@ -102,6 +111,117 @@ def _clean_env() -> dict[str, str]:
     }
 
 
+def _default_device_id_file(server: str) -> str:
+    """Return the per-server app-id file path under the InfraFoundry state home."""
+    home = os.environ.get("INFRAFOUNDRY_STATE_HOME")
+    base = Path(home) if home else Path.home() / ".infrafoundry"
+    digest = hashlib.sha256(server.encode()).hexdigest()[:16]
+    return str(base / "bw" / digest / "app-id")
+
+
+def _ensure_private_dir(path: Path) -> None:
+    """Create ``path`` as ``0700`` (umask-proof) and verify it."""
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    os.chmod(path, 0o700)
+    if stat.S_IMODE(os.stat(path).st_mode) != 0o700:
+        raise OSError("directory is not private (0700)")
+
+
+def _read_stored_app_id(path: Path) -> tuple[str, str | None]:
+    """Read the stored app id.
+
+    Returns:
+        ``("missing", None)`` when no file exists, ``("invalid", None)`` when it is a symlink,
+        group/world-writable, owned by another user or not a UUID, else ``("ok", app_id)``.
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    except FileNotFoundError:
+        return "missing", None
+    except OSError:
+        return "invalid", None
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o022:
+            return "invalid", None
+        raw = os.read(fd, _APP_ID_MAX_BYTES + 1)
+    finally:
+        os.close(fd)
+    if len(raw) > _APP_ID_MAX_BYTES:
+        return "invalid", None
+    value = raw.decode("utf-8").strip()  # UnicodeDecodeError is a ValueError, caught by callers
+    return ("ok", value) if _UUID_RE.match(value) else ("invalid", None)
+
+
+def _write_data_json(data_path: Path, data: dict[str, Any]) -> None:
+    """Replace ``data.json`` atomically, keeping mode ``0600``."""
+    fd, tmp_name = tempfile.mkstemp(prefix=".data-", dir=data_path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(data, handle)
+        os.chmod(tmp_name, 0o600)
+        os.replace(tmp_name, data_path)
+    except BaseException:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
+
+
+def _create_app_id_file(path: Path, app_id: str, *, private_parents: bool) -> bool:
+    """Create the app-id file exclusively (``0600``). Returns False if it already exists."""
+    if private_parents:
+        _ensure_private_dir(path.parent.parent)
+        _ensure_private_dir(path.parent)
+    else:
+        os.makedirs(path.parent, mode=0o700, exist_ok=True)
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    except FileExistsError:
+        return False
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(app_id + "\n")
+    return True
+
+
+def _seed_app_id(app_dir: str, device_file: str | None, server: str) -> None:
+    """Make ``bw`` present the same device identity on every run.
+
+    Called after ``bw config server`` has created ``data.json`` and before ``login``. When the
+    app-id file holds a valid id it is written into ``data.json``; when the file is missing, the id
+    ``bw`` just generated is saved there (created exclusively, so a concurrent run's id wins). Any
+    problem falls back to ``bw``'s own id with a fixed debug message. Never logs the id, the file
+    contents or a path derived from settings.
+    """
+    private_parents = device_file is None
+    path = Path(device_file if device_file is not None else _default_device_id_file(server))
+    data_path = Path(app_dir) / "data.json"
+    try:
+        loaded = json.loads(data_path.read_text(encoding="utf-8"))
+        if not isinstance(loaded, dict) or _APP_ID_KEY not in loaded:
+            logger.debug("bw data.json has no device id; using bw's own")
+            return
+        status, stored = _read_stored_app_id(path)
+        if status == "invalid":
+            logger.debug("stored bw device id is unusable; using bw's own")
+            return
+        if status == "missing":
+            generated = loaded[_APP_ID_KEY]
+            if not isinstance(generated, str) or not _UUID_RE.match(generated):
+                logger.debug("bw generated no usable device id; not persisting one")
+                return
+            if _create_app_id_file(path, generated, private_parents=private_parents):
+                return
+            status, stored = _read_stored_app_id(path)
+            if status != "ok":
+                logger.debug("stored bw device id is unusable; using bw's own")
+                return
+        if stored is not None and loaded[_APP_ID_KEY] != stored:
+            loaded[_APP_ID_KEY] = stored
+            _write_data_json(data_path, loaded)
+    # JSONDecodeError and UnicodeDecodeError are ValueError subclasses.
+    except (OSError, ValueError):
+        logger.debug("could not persist or seed the bw device id; using bw's own")
+
+
 class _BitwardenSession:
     """One logged-in, unlocked ``bw`` state in a private directory, shared per process."""
 
@@ -111,8 +231,10 @@ class _BitwardenSession:
         organization: str | None,
         collection: str | None,
         credentials: dict[str, str],
+        device_id_file: str | None = None,
     ) -> None:
         self.server = server.rstrip("/")
+        self._device_id_file = device_id_file
         self.organization = organization
         self.collection = collection
         self._credentials = credentials
@@ -196,6 +318,7 @@ class _BitwardenSession:
         self.app_dir = app_dir
 
         self.run(["config", "server", self.server])
+        _seed_app_id(app_dir, self._device_id_file, self.server)
         status = self.run_json(["status"])
         if not isinstance(status, dict):
             raise SecretBackendError("bw status returned an unexpected shape")
@@ -287,13 +410,15 @@ def close_bitwarden_sessions() -> None:
 
 
 def _get_session(
-    key: tuple[str, str | None, str | None, str], credentials: dict[str, str]
+    key: tuple[str, str | None, str | None, str],
+    credentials: dict[str, str],
+    device_id_file: str | None = None,
 ) -> _BitwardenSession:
     global _ATEXIT_REGISTERED
     with _REGISTRY_LOCK:
         session = _SESSIONS.get(key)
         if session is None:
-            session = _BitwardenSession(key[0], key[1], key[2], credentials)
+            session = _BitwardenSession(key[0], key[1], key[2], credentials, device_id_file)
             _SESSIONS[key] = session
         if not _ATEXIT_REGISTERED:
             atexit.register(close_bitwarden_sessions)
@@ -315,7 +440,8 @@ class BitwardenSecretBackend:
         config: Keys ``server`` (https URL), optional ``organization`` and ``collection``
             (UUID or exact name), ``client_id`` / ``client_secret`` / ``master_password``
             (``secret://env/...`` or ``secret://env_secrets/...`` URIs) and ``env_secrets``
-            (the decrypted secrets dict backing ``secret://env_secrets/...``).
+            (the decrypted secrets dict backing ``secret://env_secrets/...``), and optional
+            ``device_id_file`` (absolute path of the persisted ``bw`` device id; ``~`` expands).
 
     Raises:
         SecretBackendError: On a bad config or an unresolvable credential.
@@ -329,6 +455,7 @@ class BitwardenSecretBackend:
         self._server = server
         self._organization: str | None = config.get("organization") or None
         self._collection: str | None = config.get("collection") or None
+        self._device_id_file = self._resolve_device_id_file(config.get("device_id_file"))
         self._credentials = self._resolve_credentials(config)
         self._key = (
             server.rstrip("/"),
@@ -336,6 +463,17 @@ class BitwardenSecretBackend:
             self._collection,
             hashlib.sha256(self._credentials["client_id"].encode()).hexdigest(),
         )
+
+    @staticmethod
+    def _resolve_device_id_file(value: Any) -> str | None:
+        if value is None or value == "":
+            return None
+        if not isinstance(value, str):
+            raise SecretBackendError("bitwarden 'device_id_file' must be a path string")
+        expanded = os.path.expanduser(value)
+        if not os.path.isabs(expanded):
+            raise SecretBackendError("bitwarden 'device_id_file' must be an absolute path")
+        return expanded
 
     @staticmethod
     def _resolve_credentials(config: dict[str, Any]) -> dict[str, str]:
@@ -372,7 +510,7 @@ class BitwardenSecretBackend:
         return out
 
     def _session(self) -> _BitwardenSession:
-        return _get_session(self._key, self._credentials)
+        return _get_session(self._key, self._credentials, self._device_id_file)
 
     # -- lookup -----------------------------------------------------------------------------
 

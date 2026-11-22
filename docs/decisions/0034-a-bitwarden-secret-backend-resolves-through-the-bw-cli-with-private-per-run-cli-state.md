@@ -37,10 +37,13 @@ A read-only `bitwarden` backend resolves `secret://bitwarden/<item>/<field>` thr
 
 - Provider settings resolve at every reader through `resolved_provider_settings` / `with_resolved_provider_settings`; offline paths check shape and backend only (#1594).
 
+- The per-run `bw` state stays private and temporary; only the device identity (`global_applicationId_appId`) persists, in a `0600` file per server under `$INFRAFOUNDRY_STATE_HOME/bw/` (default `~/.infrafoundry/bw/`, overridable with `device_id_file`), seeded into `data.json` before `login`, so the server sees one device (#1604).
+
 ## Related Issues
 - Issue #1520: add a bitwarden/vaultwarden secret:// backend
 - Issue #1590: pass the vaultwarden master password to bw by environment variable
 - Issue #1594: resolve secret:// URIs in every provider's settings
+- Issue #1604: reuse one bw device identity across runs
 
 ## Related Documentation
 - [Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md)

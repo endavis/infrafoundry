@@ -30,6 +30,8 @@ secret_backends:
     client_id: secret://env/bw_clientid
     client_secret: secret://env/bw_clientsecret
     master_password: secret://env/bw_password
+    # Optional: absolute path of the persisted device id (a leading ~ is expanded):
+    # device_id_file: ~/.infrafoundry/bw/example/app-id
 ```
 
 Then use it like any other `secret://` value:
@@ -81,8 +83,9 @@ Built-in names win over a custom field of the same name. A missing field, a cust
 ## How the session works
 
 - **Private state.** Each InfraFoundry process creates a private `0700` directory and passes it to every `bw` call as `BITWARDENCLI_APPDATA_DIR`. Your own `bw` login, server setting and `BW_SESSION` are never read, changed or logged out, and inherited `BW_*` variables are removed from the `bw` environment. The cost is a fresh login per process.
+- **One persisted device id.** The one piece of state that outlives a run is the `bw` device id (`global_applicationId_appId` in `data.json`), so the server sees one device instead of sending a new-device email per run. It is kept in `$INFRAFOUNDRY_STATE_HOME/bw/<hash>/app-id` (default `~/.infrafoundry/bw/<hash>/app-id`), one file per server URL, in `0700` directories with a `0600` file, and written into each fresh `data.json` before `login`. Accounts on the same server share one id, like one real `bw` install. Set `device_id_file` to use another absolute path. No token, key or API secret is persisted. A missing, unreadable, symlinked, group/world-writable or non-UUID file is ignored and `bw` keeps its own id.
 - **One session per process.** The steps `bw config server`, `bw status`, `bw login --apikey`, `bw unlock`, `bw sync` run once. Later lookups in the same process reuse the session.
-- **Teardown.** At exit `bw lock` and `bw logout` run and the directory is removed. A process killed with `SIGKILL` leaves its `0700` directory (`infrafoundry-bw-*` in the temporary directory) behind; delete it by hand.
+- **Teardown.** At exit `bw lock` and `bw logout` run and the private directory is removed (the device id file stays). A process killed with `SIGKILL` leaves its `0700` directory (`infrafoundry-bw-*` in the temporary directory) behind; delete it by hand.
 - **Credentials stay out of argv.** They are passed through the environment of the one command that needs them (`login` gets the client ID and secret, `unlock` gets the master password through `--passwordenv`).
 - **Server check.** `server` must be `https://`. After `bw config server`, the backend reads `bw status` and fails if the server did not take.
 

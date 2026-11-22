@@ -17,7 +17,10 @@ from infrafoundry.core.config.models import (
     SecretBackendsConfig,
 )
 from infrafoundry.providers.mikrotik.settings import PROVIDER_NAME as MIKROTIK
-from infrafoundry.secrets.backends.bitwarden import close_bitwarden_sessions
+from infrafoundry.secrets.backends.bitwarden import (
+    BitwardenSecretBackend,
+    close_bitwarden_sessions,
+)
 from infrafoundry.secrets.environment import (
     SecretRefLookup,
     build_secret_resolver,
@@ -60,6 +63,41 @@ class TestModels:
         assert cfg.master_password == "secret://env/bw_password"
         assert cfg.organization is None
         assert cfg.collection is None
+
+    def test_device_id_file_default_none(self) -> None:
+        assert BitwardenBackendConfig(server=SERVER).device_id_file is None
+
+    def test_device_id_file_relative_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="absolute"):
+            BitwardenBackendConfig(server=SERVER, device_id_file="rel/app-id")
+
+    def test_device_id_file_expands_tilde_not_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("HOME", "/home/example")
+        monkeypatch.setenv("BW_DIR", "/elsewhere")
+        assert (
+            BitwardenBackendConfig(server=SERVER, device_id_file="~/id").device_id_file
+            == "/home/example/id"
+        )
+        with pytest.raises(ValidationError, match="absolute"):
+            BitwardenBackendConfig(server=SERVER, device_id_file="$BW_DIR/id")
+
+    def test_device_id_file_reaches_backend_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        for name in ("BW_CLIENTID", "BW_CLIENTSECRET", "BW_PASSWORD"):
+            monkeypatch.setenv(name, "fixture-value")
+        env = EnvironmentConfig(
+            name="test",
+            secret_backends=SecretBackendsConfig(
+                bitwarden=BitwardenBackendConfig(server=SERVER, device_id_file="/srv/bw/app-id")
+            ),
+        )
+        resolver = build_secret_resolver(env)
+        try:
+            config = resolver._backend_configs["bitwarden"]
+            assert config["device_id_file"] == "/srv/bw/app-id"
+            backend = BitwardenSecretBackend(config)
+            assert backend._device_id_file == "/srv/bw/app-id"
+        finally:
+            resolver.close()
 
     def test_http_rejected(self) -> None:
         with pytest.raises(ValidationError, match="https"):

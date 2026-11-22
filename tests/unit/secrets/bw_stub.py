@@ -1,10 +1,10 @@
 """A stub ``bw`` executable and fixtures shared by the bitwarden backend tests.
 
-The stub is a Python script placed on ``PATH``. It logs each call (argv plus the ``BW_*`` and
-app-data variables it received) to a JSONL file and keeps its own server/login state in the
-``BITWARDENCLI_APPDATA_DIR`` it is given, like the real ``bw``. Its behaviour is driven by
-variables that do not start with ``BW_`` (the backend strips those): ``STUB_BW_LOG``,
-``STUB_BW_FIXTURE`` and ``STUB_BW_FAIL``.
+The stub is a Python script placed on ``PATH``. It logs each call (argv, the ``BW_*`` and
+app-data variables it received, and the ``global_applicationId_appId`` read from ``data.json``) to
+a JSONL file and keeps its own server/login state in the ``BITWARDENCLI_APPDATA_DIR`` it is
+given, like the real ``bw``. Its behaviour is driven by variables that do not start with
+``BW_`` (the backend strips those): ``STUB_BW_LOG``, ``STUB_BW_FIXTURE`` and ``STUB_BW_FAIL``.
 """
 
 from __future__ import annotations
@@ -28,11 +28,23 @@ ITEM_ID = "11111111-1111-4111-8111-111111111111"
 OTHER_ORG_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 
 STUB = """#!/usr/bin/env python3
-import json, os, sys
+import json, os, sys, uuid
 argv = [a for a in sys.argv[1:] if a != "--nointeraction"]
 appdir = os.environ.get("BITWARDENCLI_APPDATA_DIR")
 env_keys = ("BW_CLIENTID", "BW_CLIENTSECRET", "BW_PASSWORD", "BW_SESSION", "BW_SERVER")
+data_path = os.path.join(appdir, "data.json") if appdir else None
+if data_path and not os.path.exists(data_path):
+    # Like real bw: the first command creates data.json with a fresh random app id.
+    with open(data_path, "w") as f:
+        json.dump({"global_applicationId_appId": str(uuid.uuid4())}, f)
+app_id = None
+if data_path:
+    try:
+        app_id = json.load(open(data_path)).get("global_applicationId_appId")
+    except (OSError, ValueError, AttributeError):
+        app_id = None
 rec = {
+    "app_id": app_id,
     "argv": sys.argv[1:],
     "appdir": appdir,
     "appdir_mode": (
