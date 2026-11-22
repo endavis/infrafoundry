@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -355,6 +356,140 @@ def test_unlock_failure_message_has_no_password(
         make().get_secret("Router Admin/password")
     assert MASTER not in str(exc.value)
     assert not Path(stub.calls()[0]["appdir"]).exists()
+
+
+# -- per-session item cache (#1606) ---------------------------------------------------------
+
+
+def _argv_count(stub: StubBw, prefix: list[str]) -> int:
+    return sum(1 for c in stub.calls() if c["argv"][: len(prefix)] == prefix)
+
+
+def test_repeated_lookup_runs_list_items_once(stub: StubBw) -> None:
+    for _ in range(3):
+        assert make().get_secret("Router Admin/password") == FIXTURE_VALUE
+    assert make().get_secret("Router Admin/api_key") == "fixture-api-456"
+    assert make().get_secret("Router Admin/username") == "admin"
+    assert _argv_count(stub, ["list", "items"]) == 1
+
+
+def test_distinct_items_each_fetched_once(stub: StubBw) -> None:
+    for _ in range(2):
+        assert make().get_secret("Router Admin/username") == "admin"
+        assert make().get_secret("Router Admin Backup/username") == "backup"
+        assert make().get_secret("team/shared/db/password") == "slashed"
+    assert _argv_count(stub, ["list", "items"]) == 3
+
+
+def test_uuid_lookup_cached(stub: StubBw) -> None:
+    for _ in range(2):
+        assert make().get_secret(f"{ITEM_ID}/password") == FIXTURE_VALUE
+    assert _argv_count(stub, ["get", "item"]) == 1
+
+
+def test_not_found_name_is_cached(stub: StubBw) -> None:
+    messages = []
+    for _ in range(2):
+        with pytest.raises(SecretNotFoundError) as exc:
+            make().get_secret("Nope/password")
+        messages.append(str(exc.value))
+    assert messages[0] == messages[1]
+    assert _argv_count(stub, ["list", "items"]) == 1
+
+
+def test_not_found_uuid_and_out_of_scope_cached(stub: StubBw) -> None:
+    missing = "99999999-9999-4999-8999-999999999999"
+    for _ in range(2):
+        with pytest.raises(SecretNotFoundError):
+            make().get_secret(f"{missing}/password")
+    assert _argv_count(stub, ["get", "item"]) == 1
+    close_bitwarden_sessions()
+    stub.log.write_text("", encoding="utf-8")
+    elsewhere = "66666666-6666-4666-8666-666666666666"
+    for _ in range(2):
+        with pytest.raises(SecretNotFoundError, match="not found in scope"):
+            make(organization=ORG_ID).get_secret(f"{elsewhere}/password")
+    assert _argv_count(stub, ["get", "item"]) == 1
+
+
+def test_transient_failure_not_cached(stub: StubBw, monkeypatch: pytest.MonkeyPatch) -> None:
+    assert make().get_secret("Router Admin/username") == "admin"
+    monkeypatch.setenv("STUB_BW_FAIL", "list")
+    with pytest.raises(SecretBackendError):
+        make().get_secret("Router Admin Backup/username")
+    monkeypatch.delenv("STUB_BW_FAIL")
+    assert make().get_secret("Router Admin Backup/username") == "backup"
+    assert _argv_count(stub, ["list", "items"]) == 3
+
+
+def test_ambiguous_not_cached(stub: StubBw) -> None:
+    for _ in range(2):
+        with pytest.raises(SecretBackendError, match="2 items"):
+            make().get_secret("Twin/password")
+    assert _argv_count(stub, ["list", "items"]) == 2
+
+
+def test_totp_fetched_each_time_item_once(stub: StubBw) -> None:
+    make().get_secret("Router Admin/totp")
+    make().get_secret("Router Admin/totp")
+    assert _argv_count(stub, ["get", "totp"]) == 2
+    assert _argv_count(stub, ["list", "items"]) <= 1
+
+
+def test_close_sessions_clears_cache(stub: StubBw) -> None:
+    make().get_secret("Router Admin/password")
+    close_bitwarden_sessions()
+    make().get_secret("Router Admin/password")
+    assert _argv_count(stub, ["list", "items"]) == 2
+
+
+def test_teardown_clears_item_cache(stub: StubBw) -> None:
+    make().get_secret("Router Admin/password")
+    (session,) = bitwarden._SESSIONS.values()
+    assert session.item_cache
+    session.teardown()
+    assert session.item_cache == {}
+
+
+def test_cache_does_not_leak_across_scopes(stub: StubBw) -> None:
+    other_col = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+    fx = json.loads(stub.fixture.read_text(encoding="utf-8"))
+    fx["collections"].append({"id": other_col, "name": "Other"})
+    for item_id, col, pw in (
+        ("88888888-8888-4888-8888-888888888888", COL_ID, "in-automation"),
+        ("99999999-9999-4999-8999-999999999999", other_col, "in-other"),
+    ):
+        fx["items"].append(
+            {
+                "id": item_id,
+                "name": "Shared Name",
+                "organizationId": ORG_ID,
+                "collectionIds": [col],
+                "login": {"password": pw},
+            }
+        )
+    stub.fixture.write_text(json.dumps(fx), encoding="utf-8")
+    other = make(organization="Example Org", collection="Other")
+    assert other.get_secret("Shared Name/password") == "in-other"
+    automation = make(organization="Example Org", collection="Automation")
+    assert automation.get_secret("Shared Name/password") == "in-automation"
+    assert _argv_count(stub, ["list", "items"]) == 2
+
+
+def test_concurrent_lookups_fetch_once(stub: StubBw) -> None:
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: make().get_secret("Router Admin/password"), range(8)))
+    assert results == [FIXTURE_VALUE] * 8
+    assert _argv_count(stub, ["list", "items"]) == 1
+
+
+def test_cached_values_not_logged(stub: StubBw, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.DEBUG)
+    for _ in range(3):
+        make().get_secret("Router Admin/password")
+        make().get_secret("Router Admin/api_key")
+    assert FIXTURE_VALUE not in caplog.text
+    assert "fixture-api-456" not in caplog.text
 
 
 class TestCredentialUris:

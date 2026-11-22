@@ -17,6 +17,9 @@ Design (ADR-0034):
   ``data.json``), kept in a small ``0600`` file so the server sees one device across runs instead of
   a new-device email per run. It is seeded into each fresh ``data.json`` before ``login``. No token,
   key or API secret is persisted. See ``_seed_app_id``.
+* Item lookups are cached per session, in memory only: each item is fetched once per process,
+  a not-found answer is cached too, ``bw`` failures and ambiguous names are not, ``totp`` is
+  fetched every time, and the cache is cleared at teardown. See ``_find_item``.
 * Credentials reach ``bw`` only through the subprocess environment, never argv. They are
   ``secret://env/...`` or ``secret://env_secrets/...`` URIs, so they cannot point into the vault.
 * Exceptions carry at most the ``bw`` subcommand name, the item or field reference and a reason.
@@ -243,6 +246,8 @@ class _BitwardenSession:
         self.ready = False
         self._organization_id: str | None = None
         self._collection_id: str | None = None
+        # Item reference -> scope-filtered item dict, or the message of a cached not-found.
+        self.item_cache: dict[str, dict[str, Any] | str] = {}
         self.lock = threading.RLock()
 
     # -- process plumbing -------------------------------------------------------------------
@@ -349,6 +354,7 @@ class _BitwardenSession:
     def teardown(self) -> None:
         """Lock, log out and remove the private directory. Never raises."""
         with self.lock:
+            self.item_cache.clear()
             if self.app_dir is None:
                 return
             for sub in ("lock", "logout"):
@@ -515,6 +521,26 @@ class BitwardenSecretBackend:
     # -- lookup -----------------------------------------------------------------------------
 
     def _find_item(self, session: _BitwardenSession, name: str) -> dict[str, Any]:
+        """Return the item for ``name``, fetching it once per session.
+
+        Found items and not-found answers are cached on the session; ambiguity and ``bw``
+        failures are not, so the next lookup retries them.
+        """
+        with session.lock:
+            cached = session.item_cache.get(name)
+            if isinstance(cached, dict):
+                return cached
+            if isinstance(cached, str):
+                raise SecretNotFoundError(cached)
+            try:
+                item = self._fetch_item(session, name)
+            except SecretNotFoundError as exc:
+                session.item_cache[name] = str(exc)
+                raise
+            session.item_cache[name] = item
+            return item
+
+    def _fetch_item(self, session: _BitwardenSession, name: str) -> dict[str, Any]:
         org_id, col_id = session.scope_ids()
         if _UUID_RE.match(name):
             try:

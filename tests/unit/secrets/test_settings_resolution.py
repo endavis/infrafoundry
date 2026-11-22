@@ -250,6 +250,18 @@ class TestOpnsenseClient:
         client = self._build(env, "opnsense@fw-b")
         assert client.call_args.kwargs["api_secret"] == FIXTURE_VALUE
 
+    def test_repeated_client_builds_fetch_item_once(self, stub: StubBw) -> None:
+        env = _opnsense_env(
+            {"api_url": "https://fw-a.example.com", "api_key": KEY_URI, "api_secret": PW_URI}
+        )
+        for _ in range(5):
+            kwargs = self._build(env).call_args.kwargs
+            assert kwargs["api_key"] == KEY_VALUE
+            assert kwargs["api_secret"] == FIXTURE_VALUE
+        argvs = [c["argv"] for c in stub.calls()]
+        assert sum(1 for a in argvs if a[:2] == ["list", "items"]) == 1
+        assert sum(1 for a in argvs if a[0] == "sync") == 1
+
 
 class TestOpnsenseValidatorHooks:
     def _provider(self, tmp_path: Path) -> Any:
