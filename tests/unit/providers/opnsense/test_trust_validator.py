@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
+from infrafoundry.core.config.package_loader import PackageLoader
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
+from infrafoundry.providers.opnsense.services.trust import (
+    TrustCaConfig,
+    TrustCertConfig,
+    trust_ca_configs_from_resources,
+    trust_cert_configs_from_resources,
+)
 from infrafoundry.providers.opnsense.validators import build_xref_index
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 from infrafoundry.providers.opnsense.validators.trust_validator import TrustValidator
@@ -105,3 +113,61 @@ def test_type_values() -> None:
     for good in ("server", "client", "combined"):
         assert not _failures(_run([_ca(), _cert(type=good)]), "trust_cert_web-cert_type")
     assert _failures(_run([_ca(), _cert(type="bogus")]), "trust_cert_web-cert_type")
+
+
+def _loaded_trust_resources(tmp_path: Path) -> list[ResourceConfig]:
+    """Build trust resources through the real nested and resource-centric loaders."""
+    loader = PackageLoader(tmp_path)
+    nested = loader._parse_resources_from_data(
+        {
+            "opnsense": {
+                "trust": {
+                    "cas": [{"name": "vpn-ca", "config": {"crt": SECRET_CRT, "prv": SECRET_PRV}}],
+                    "certs": [
+                        {
+                            "name": "web-cert",
+                            "config": {"crt": SECRET_CRT, "prv": SECRET_PRV, "ca_ref": "vpn-ca"},
+                        }
+                    ],
+                }
+            }
+        },
+        "pkg.yaml",
+        "opnsense",
+    )
+    centric = loader._parse_resource_centric(
+        [
+            {
+                "name": "rc-ca",
+                "type": "trust.cas",
+                "config": {"crt": SECRET_CRT, "prv": SECRET_PRV},
+            },
+            {
+                "name": "rc-cert",
+                "type": "trust.certs",
+                "config": {"crt": SECRET_CRT, "prv": SECRET_PRV, "ca_ref": "rc-ca"},
+            },
+        ],
+        "res.yaml",
+        "opnsense",
+    )
+    return [r for r in nested + centric if r.type.startswith("trust.")]
+
+
+def test_loader_injected_name_key_validates_and_parses(tmp_path: Path) -> None:
+    resources = _loaded_trust_resources(tmp_path)
+    assert {r.name for r in resources} == {"vpn-ca", "web-cert", "rc-ca", "rc-cert"}
+    assert all(r.config.get("name") == r.name for r in resources)
+
+    assert not [c for c in _run(resources).results if not c.passed]
+
+    cas = trust_ca_configs_from_resources(resources)
+    certs = trust_cert_configs_from_resources(resources)
+    assert {c.name for c in cas} == {"vpn-ca", "rc-ca"}
+    assert {c.name for c in certs} == {"web-cert", "rc-cert"}
+    items: list[TrustCaConfig | TrustCertConfig] = [*cas, *certs]
+    for item in items:
+        # Identity stays the description, which defaults to the resource name.
+        assert item.description == item.name
+        (body,) = item.to_payload("refid").values()
+        assert "name" not in body

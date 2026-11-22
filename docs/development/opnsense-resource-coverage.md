@@ -105,6 +105,7 @@ opnsense:
 | `ca_ref` | certs | Name of the `trust.cas` resource that signed it. Resolved to the live CA `refid`; see `ca_refids_by_name` in `services/trust.py`, which the OpenVPN work (#808) reuses; `cert_refids_by_name` is its counterpart for an instance's `cert_ref` (#1320). |
 | `type` | certs | `server`, `client` or `combined`. Sent as `cert_type` on add and update; not compared. On import the box keeps the type it derives from the certificate (see below). |
 | `lock` | both | Never add, update or delete. |
+| `name` | both | Copied into the config by the loaders. Accepted and ignored: not sent to the box and not the identity (`description` is). |
 
 `refid` and `serial` are assigned by the box and are not YAML fields. A literal `crt` or `csr` is a validation warning (public material, but keep it with its key). Messages and logs name the resource and field and never include a value derived from `crt`, `prv` or `csr`.
 

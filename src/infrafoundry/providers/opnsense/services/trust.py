@@ -415,8 +415,10 @@ def _needs_update(have: LiveTrustObject, want: TrustConfig, ca_refids: Mapping[s
 # Resource-to-domain conversion
 # ---------------------------------------------------------------------------
 
-_CA_KEYS = frozenset({"description", "crt", "prv", "lock"})
-_CERT_KEYS = frozenset({"description", "crt", "prv", "csr", "ca_ref", "type", "lock"})
+# The nested loader copies the entry name into config (package_loader); it is not sent
+# to the box and is not the identity (``description`` is).
+_CA_KEYS = frozenset({"name", "description", "crt", "prv", "lock"})
+_CERT_KEYS = frozenset({"name", "description", "crt", "prv", "csr", "ca_ref", "type", "lock"})
 
 
 def description_of(name: str, config: Mapping[str, Any]) -> str:
