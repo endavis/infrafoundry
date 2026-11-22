@@ -280,15 +280,47 @@ class Orchestrator:
         self.drift_detector.providers = self._providers
 
     def _find_managed_only_providers(
-        self, env_name: str, resources_by_provider: dict[str, list[ResourceConfig]]
+        self,
+        env_name: str,
+        resources_by_provider: dict[str, list[ResourceConfig]],
+        provider_filter: list[str] | None = None,
     ) -> list[str]:
-        """Find providers with managed objects but no YAML resources (#1260)."""
+        """Find providers with managed objects but no YAML resources (#1260).
+
+        A provider the environment does not configure is not dispatched; a warning
+        names it and its managed row count instead (#1601).
+        """
+        configured: set[str] | None = None
+        try:
+            env_config = self.config_manager.load_environment(env_name)
+        except FileNotFoundError:
+            pass
+        else:
+            listed: Any = env_config.providers
+            settings: Any = env_config.provider_settings
+            if isinstance(listed, list | tuple | set) or isinstance(settings, dict):
+                configured = set(listed) if isinstance(listed, list | tuple | set) else set()
+                if isinstance(settings, dict):
+                    configured.update(settings)
+
+        def warn_unconfigured(name: str, rows: int) -> None:
+            message = (
+                f"{name}: {rows} managed row(s) in state but the provider is not configured "
+                f"in environment '{env_name}'; not dispatching. Remove the rows with "
+                f"`foundry state prune --env {env_name} --provider {name}`"
+            )
+            self.console.print(f"[yellow]WARNING: {message}[/yellow]")
+            logger.warning(message)
+
         return find_managed_only_providers(
             env_name,
             resources_by_provider,
             providers=self.providers,
             runners=list(self.deployment_executor.runners.values()),
             get_managed_resources=self.state_manager.get_managed_resources,
+            configured=configured,
+            provider_filter=provider_filter,
+            on_unconfigured=warn_unconfigured,
         )
 
     def _load_resources(

@@ -2830,6 +2830,138 @@ def test_find_managed_only_never_queries_providers_in_yaml() -> None:
     get_managed.assert_not_called()
 
 
+def _find_with(
+    runners: list[Any], rows: Any, providers: list[str], **kwargs: Any
+) -> tuple[list[str], MagicMock]:
+    from infrafoundry.core.orchestrator_workflows import find_managed_only_providers
+
+    get_managed = MagicMock(return_value=rows)
+    found = find_managed_only_providers(
+        "dev",
+        {},
+        providers={name: MagicMock() for name in providers},
+        runners=runners,
+        get_managed_resources=get_managed,
+        **kwargs,
+    )
+    return found, get_managed
+
+
+def test_find_managed_only_skips_unconfigured_provider_and_reports_it() -> None:
+    dispatcher = _dispatcher(True)
+    on_unconfigured = MagicMock()
+
+    found, _ = _find_with(
+        [dispatcher],
+        _managed_rows(),
+        ["opnsense"],
+        configured={"proxmox"},
+        on_unconfigured=on_unconfigured,
+    )
+
+    assert found == []
+    on_unconfigured.assert_called_once_with("opnsense", 1)
+    dispatcher.needs_managed_dispatch.assert_not_called()
+
+
+def test_find_managed_only_unconfigured_without_callback_is_skipped() -> None:
+    found, _ = _find_with([_dispatcher(True)], _managed_rows(), ["opnsense"], configured=set())
+
+    assert found == []
+
+
+def test_find_managed_only_configured_by_instance_base_name() -> None:
+    on_unconfigured = MagicMock()
+
+    found, _ = _find_with(
+        [_dispatcher(True)],
+        _managed_rows(),
+        ["opnsense@fw"],
+        configured={"opnsense"},
+        on_unconfigured=on_unconfigured,
+    )
+
+    assert found == ["opnsense@fw"]
+    on_unconfigured.assert_not_called()
+
+
+def test_find_managed_only_configured_none_is_unchanged() -> None:
+    on_unconfigured = MagicMock()
+
+    found, _ = _find_with(
+        [_dispatcher(True)],
+        _managed_rows(),
+        ["opnsense"],
+        configured=None,
+        on_unconfigured=on_unconfigured,
+    )
+
+    assert found == ["opnsense"]
+    on_unconfigured.assert_not_called()
+
+
+def test_find_managed_only_provider_filter_skips_query_and_warning() -> None:
+    on_unconfigured = MagicMock()
+
+    found, get_managed = _find_with(
+        [_dispatcher(True)],
+        _managed_rows(),
+        ["opnsense"],
+        configured=set(),
+        provider_filter=["proxmox"],
+        on_unconfigured=on_unconfigured,
+    )
+
+    assert found == []
+    get_managed.assert_not_called()
+    on_unconfigured.assert_not_called()
+
+
+def test_find_managed_only_provider_filter_keeps_selected_provider() -> None:
+    found, get_managed = _find_with(
+        [_dispatcher(True)],
+        _managed_rows(),
+        ["opnsense", "proxmox"],
+        provider_filter=["opnsense"],
+    )
+
+    assert found == ["opnsense"]
+    get_managed.assert_called_once_with("dev", "opnsense")
+
+
+def test_managed_only_provider_filtered_out_is_not_announced(console: Console) -> None:
+    from infrafoundry.core.orchestrator_workflows import _add_managed_only_providers
+
+    finder = MagicMock(return_value=["opnsense", "proxmox"])
+    with console.capture() as capture:
+        result = _add_managed_only_providers({}, "dev", finder, console, ["proxmox"])
+
+    assert list(result) == ["proxmox"]
+    finder.assert_called_once_with("dev", {}, provider_filter=["proxmox"])
+    assert "opnsense" not in capture.get()
+
+
+def test_managed_only_provider_filtered_in_is_announced(console: Console) -> None:
+    from infrafoundry.core.orchestrator_workflows import _add_managed_only_providers
+
+    finder = MagicMock(return_value=["opnsense"])
+    with console.capture() as capture:
+        result = _add_managed_only_providers({}, "dev", finder, console, ["opnsense"])
+
+    assert result == {"opnsense": []}
+    assert "dispatching to remove" in capture.get()
+
+
+def test_managed_only_without_filter_is_announced(console: Console) -> None:
+    from infrafoundry.core.orchestrator_workflows import _add_managed_only_providers
+
+    finder = MagicMock(return_value=["opnsense"])
+
+    result = _add_managed_only_providers({}, "dev", finder, console)
+
+    assert result == {"opnsense": []}
+
+
 def _plan_managed_only(
     console: Console,
     *,

@@ -212,6 +212,61 @@ class TestOrchestratorProviderManagement:
         assert provider.fail_on_missing_snippets is True
 
 
+class TestFindManagedOnlyProviders:
+    """Tests for ``Orchestrator._find_managed_only_providers`` (#1601)."""
+
+    @staticmethod
+    def _orchestrator(tmp_path: Path, environment: Any) -> tuple[Orchestrator, MagicMock]:
+        config_manager = Mock(spec=ConfigManager)
+        config_manager.base_dir = tmp_path
+        if isinstance(environment, Exception):
+            config_manager.load_environment.side_effect = environment
+        else:
+            config_manager.load_environment.return_value = environment
+        orchestrator = Orchestrator(config_manager)
+        console = MagicMock()
+        orchestrator.console = console
+        return orchestrator, console
+
+    def test_warns_with_prune_suggestion_for_unconfigured_provider(self, tmp_path: Path) -> None:
+        env = Mock(providers=["proxmox"], provider_settings={})
+        orchestrator, console = self._orchestrator(tmp_path, env)
+
+        with patch("infrafoundry.core.orchestrator.find_managed_only_providers") as finder:
+            finder.return_value = []
+            orchestrator._find_managed_only_providers("dev", {}, provider_filter=["opnsense"])
+            kwargs = finder.call_args.kwargs
+            assert kwargs["configured"] == {"proxmox"}
+            assert kwargs["provider_filter"] == ["opnsense"]
+            kwargs["on_unconfigured"]("opnsense", 3)
+
+        printed = str(console.print.call_args.args[0])
+        assert "WARNING" in printed
+        assert "opnsense" in printed
+        assert "3 managed row(s)" in printed
+        assert "foundry state prune --env dev --provider opnsense" in printed
+
+    def test_provider_settings_keys_count_as_configured(self, tmp_path: Path) -> None:
+        env = Mock(providers=None, provider_settings={"opnsense": {}})
+        orchestrator, _ = self._orchestrator(tmp_path, env)
+
+        with patch("infrafoundry.core.orchestrator.find_managed_only_providers") as finder:
+            finder.return_value = []
+            orchestrator._find_managed_only_providers("dev", {})
+
+        assert finder.call_args.kwargs["configured"] == {"opnsense"}
+
+    def test_missing_environment_keeps_legacy_behavior(self, tmp_path: Path) -> None:
+        orchestrator, _ = self._orchestrator(tmp_path, FileNotFoundError("dev"))
+
+        with patch("infrafoundry.core.orchestrator.find_managed_only_providers") as finder:
+            finder.return_value = ["opnsense"]
+            result = orchestrator._find_managed_only_providers("dev", {})
+
+        assert result == ["opnsense"]
+        assert finder.call_args.kwargs["configured"] is None
+
+
 class TestOrchestratorValidateResources:
     """Tests for resource validation."""
 
