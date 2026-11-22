@@ -423,7 +423,7 @@ for the full rationale and trade-offs.
   ```bash
   cd generated/dev/terraform/proxmox
   terraform state list
-  terraform state show proxmox_vm_qemu.web_server_01
+  terraform state show proxmox_virtual_environment_vm.web_server_01
   ```
 - Inspect InfraFoundry state/history:
   ```bash
@@ -454,15 +454,15 @@ for the full rationale and trade-offs.
     - provider: proxmox
       type: vm
       name: web-server-01
-      import_id: "100"
+      import_id: "node1/100"
       config:
         target_node: node1
   ```
   For manual imports (e.g., one-off operations), you can still use the CLI:
   ```bash
   cd generated/dev/terraform/proxmox
-  terraform import proxmox_vm_qemu.web_server_01 100
-  terraform state show proxmox_vm_qemu.web_server_01
+  terraform import proxmox_virtual_environment_vm.web_server_01 node1/100
+  terraform state show proxmox_virtual_environment_vm.web_server_01
   ```
 - **Configure S3 backend with DynamoDB locking:**
   ```yaml

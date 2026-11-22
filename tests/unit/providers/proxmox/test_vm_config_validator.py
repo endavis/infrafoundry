@@ -407,3 +407,63 @@ class TestDiskSizeValidation:
         assert kwargs["check_name"] == "proxmox_vm_test-vm_disk_size"
         assert kwargs["passed"] is True
         assert kwargs["level"] == ValidationLevel.WARNING
+
+
+class TestImportIdValidation:
+    """Tests for import_id validation (#1613)."""
+
+    @staticmethod
+    def _with_import(import_id: str | None, **config: Any) -> ResourceConfig:
+        vm = _vm(**config)
+        vm.import_id = import_id
+        return vm
+
+    @staticmethod
+    def _errors(report: MagicMock) -> list[Any]:
+        return [
+            c for c in report.add_check.call_args_list if c.kwargs["level"] == ValidationLevel.ERROR
+        ]
+
+    def test_valid_no_error(self, validator: VMConfigValidator, report: MagicMock) -> None:
+        vm = self._with_import("pve01/100", vmid=100)
+        validator.validate(ProxmoxConfigContext(vms=[vm]))
+        report.add_check.assert_not_called()
+
+    def test_malformed_errors(self, validator: VMConfigValidator, report: MagicMock) -> None:
+        validator.validate(ProxmoxConfigContext(vms=[self._with_import("100")]))
+        (call,) = self._errors(report)
+        assert call.kwargs["check_name"] == "proxmox_vm_test-vm_import_id"
+        assert "<node>/<vmid>" in call.kwargs["message"]
+
+    @pytest.mark.parametrize(
+        ("import_id", "config"),
+        [("pve01/101", {"vmid": 100}), ("pve02/100", {})],
+    )
+    def test_mismatch_errors(
+        self,
+        validator: VMConfigValidator,
+        report: MagicMock,
+        import_id: str,
+        config: dict[str, Any],
+    ) -> None:
+        validator.validate(ProxmoxConfigContext(vms=[self._with_import(import_id, **config)]))
+        assert len(self._errors(report)) == 1
+
+    @pytest.mark.parametrize(
+        "config", [{"ova_source": "/x/a.ova"}, {"disk_image_source": "/x/a.img"}]
+    )
+    def test_ova_and_disk_image_rejected(
+        self, validator: VMConfigValidator, report: MagicMock, config: dict[str, Any]
+    ) -> None:
+        validator.validate(ProxmoxConfigContext(vms=[self._with_import("pve01/100", **config)]))
+        errors = [c for c in self._errors(report) if c.kwargs["check_name"].endswith("_import_id")]
+        assert len(errors) == 1
+        assert "not supported for OVA/disk-image" in errors[0].kwargs["message"]
+
+    def test_absent_adds_no_check(self, validator: VMConfigValidator, report: MagicMock) -> None:
+        validator.validate(ProxmoxConfigContext(vms=[_vm()]))
+        assert not [
+            c
+            for c in report.add_check.call_args_list
+            if c.kwargs["check_name"].endswith("_import_id")
+        ]

@@ -8,6 +8,7 @@ from typing import Any, override
 from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
+from infrafoundry.providers.proxmox.validators.import_id import import_id_problems
 
 # Known valid values for advisory warnings
 KNOWN_CPU_TYPES = frozenset(
@@ -44,6 +45,8 @@ class VMConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
     Performs field-level validation with appropriate severity levels:
     - ERROR for invalid values that would cause Terraform failures
     - WARNING for unusual but potentially valid values
+    - ERROR for an ``import_id`` that is malformed, disagrees with ``vmid``/``target_node``, or
+      is set on an OVA/disk-image VM, which renders no importable VM resource
     """
 
     def __init__(self, report: ValidationReport) -> None:
@@ -77,6 +80,7 @@ class VMConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
             self._validate_ovmf_efi_disk(name, config)
             self._validate_disk_image(name, config)
             self._validate_disk_size(name, config)
+            self._validate_import_id(name, resource.import_id, config)
 
     def _validate_cpu_type(self, name: str, config: dict[str, Any]) -> None:
         """Warn if cpu_type is not in the known set."""
@@ -250,6 +254,21 @@ class VMConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
             return
         if isinstance(disk_size, bool) or not isinstance(disk_size, int) or disk_size <= 0:
             self._error(name, "disk_size", "disk_size must be a positive integer (GiB).")
+
+    def _validate_import_id(self, name: str, import_id: str | None, config: dict[str, Any]) -> None:
+        """Error if import_id is malformed, mismatched, or set on an OVA/disk-image VM."""
+        if import_id is None:
+            return
+        if "ova_source" in config or "disk_image_source" in config:
+            self._error(
+                name,
+                "import_id",
+                "import_id is not supported for OVA/disk-image VMs; they render no "
+                "importable proxmox_virtual_environment_vm resource.",
+            )
+            return
+        for problem in import_id_problems(import_id, config):
+            self._error(name, "import_id", problem)
 
     def _error(self, name: str, field: str, message: str) -> None:
         self.report.add_check(

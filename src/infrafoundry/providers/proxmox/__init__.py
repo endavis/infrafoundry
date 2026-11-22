@@ -477,6 +477,9 @@ class ProxmoxProvider(
         (proxmox_virtual_environment_download_file + proxmox_virtual_environment_vm
         with template=true). Clone-based templates use proxmox_virtual_environment_vm
         with template=true directly.
+
+        Templates render their own ``import`` blocks from ``import_id``: the shared name
+        match in ``_generate_import_blocks`` cannot reach the ``template_`` prefix.
         """
         self.render_and_write_terraform(
             "proxmox/templates.tf.j2",

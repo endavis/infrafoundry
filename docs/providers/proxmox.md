@@ -166,6 +166,41 @@ templates:
 The cloud-init drive goes on `cloud_init_datastore` when set, otherwise on the
 disk storage (`disk.storage`, then `local-lvm`).
 
+### Adopting existing VMs and templates
+
+Set `import_id: <node>/<vmid>` on a `vm` or `template` to adopt a VM that already
+exists on Proxmox. The field is top-level, next to `name`, and renders a
+Terraform `import` block for the VM resource:
+
+```yaml
+resources:
+  - provider: proxmox
+    type: vm
+    name: web-01
+    import_id: pve-a/100
+    config:
+      target_node: pve-a
+      vmid: 100
+```
+
+The form is checked at plan time. When `vmid` or `target_node` is set in the
+config, it must equal the matching part of `import_id`: Terraform imports by id
+alone, so a mismatch would adopt a different VM into this address and the next
+apply would change it to match the config. VMs built from `ova_source` or
+`disk_image_source` render no importable VM resource, so `import_id` on them is
+rejected.
+
+To adopt:
+
+1. Add `import_id`.
+2. Run `foundry infra plan --env <env> -P proxmox` and check that the plan reads
+   "1 to import" and that the remaining diff is acceptable.
+3. Apply, then remove the field (leaving it is harmless).
+
+Related resources are not imported: the cloud-init user-data file of a VM and
+the downloaded image file of a `download_image` template. Review their diff in
+the plan.
+
 ### Memory ballooning
 
 VMs and templates take an optional `balloon` key, the minimum memory in MiB
