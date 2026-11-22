@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795382119215,
+  "lastUpdate": 1795384786317,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5856,6 +5856,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.00000529911573260733",
             "extra": "mean: 77.402797559547 usec\nrounds: 13604"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7b26b04dd5445a6ff073c75cef7adbd372a56d75",
+          "message": "feat: support advertise_exit_node in the tailscale block for vms and instances (merges PR #1612, addresses #1611)\n\nThe tailscale: block shared by the AWS, OCI and Proxmox providers had no way\nto make a node an exit node, although the pinned tailscale cloud-init module\n(v0.0.11) has an advertise_exit_node variable and enables IP forwarding for\nit.\n\nThe block now takes an optional boolean advertise_exit_node (default\nfalse), validated and carried in tailscale_module_config.\n\n- Templates: the three cloud-init templates render advertise_exit_node =\n  true only when it is set, so generated Terraform for existing configs is\n  unchanged.\n- host provider: it enrolls with tailscale up rather than the module, so\n  advertise_exit_node: true there is an error instead of being silently\n  dropped.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-22T21:58:34Z",
+          "tree_id": "477c2d8699b0e60164d53d90403e869c24d7a001",
+          "url": "https://github.com/endavis/infrafoundry/commit/7b26b04dd5445a6ff073c75cef7adbd372a56d75"
+        },
+        "date": 1795384785599,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 59.963536743454384,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005304825573944332",
+            "extra": "mean: 16.676801508195894 msec\nrounds: 61"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10996.469030075097,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008006654763858283",
+            "extra": "mean: 90.93828184893007 usec\nrounds: 12159"
           }
         ]
       }
