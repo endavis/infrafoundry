@@ -165,3 +165,50 @@ class TestOrdering:
         files = _generate(provider, [_zone(), _vnet(), vm])
 
         assert DEPENDS in files["ova_vms.tf"]
+
+
+def _tpl(name: str = "base-tpl", vmid: Any = 9000) -> ResourceConfig:
+    return ResourceConfig(
+        name=name,
+        type="template",
+        provider="proxmox",
+        config={"name": name, "vmid": vmid, "target_node": "node1", "disk": {"storage": "local"}},
+    )
+
+
+def _clone_vm(name: str, clone_id: Any, bridge: str = "vmbr0") -> ResourceConfig:
+    vm = _vm(name, bridge)
+    vm.config["clone"] = {"vm_id": clone_id}
+    return vm
+
+
+class TestCloneTemplateOrdering:
+    """A VM cloning a managed template depends on it (#1617)."""
+
+    def test_clone_depends_on_template(self, provider: ProxmoxProvider) -> None:
+        out = _generate(provider, [_tpl(), _clone_vm("web-01", 9000)])
+        assert "depends_on = [proxmox_virtual_environment_vm.template_base_tpl]" in out["vms.tf"]
+
+    def test_string_vmid_matches(self, provider: ProxmoxProvider) -> None:
+        out = _generate(provider, [_tpl(vmid="9000"), _clone_vm("web-01", 9000)])
+        assert "depends_on = [proxmox_virtual_environment_vm.template_base_tpl]" in out["vms.tf"]
+        out = _generate(provider, [_tpl(vmid=9000), _clone_vm("web-01", "9000")])
+        assert "depends_on = [proxmox_virtual_environment_vm.template_base_tpl]" in out["vms.tf"]
+
+    def test_non_matching_clone_has_no_depends_on(self, provider: ProxmoxProvider) -> None:
+        out = _generate(provider, [_tpl(), _clone_vm("web-01", 1234)])
+        assert "depends_on" not in out["vms.tf"]
+
+    def test_clone_without_template_resource(self, provider: ProxmoxProvider) -> None:
+        out = _generate(provider, [_clone_vm("web-01", 9000)])
+        assert "depends_on" not in out["vms.tf"]
+
+    def test_combined_with_sdn_applier(self, provider: ProxmoxProvider) -> None:
+        out = _generate(
+            provider,
+            [_zone(), _vnet(), _tpl(), _clone_vm("web-01", 9000, bridge="demolan")],
+        )
+        assert (
+            "depends_on = [proxmox_sdn_applier.apply, "
+            "proxmox_virtual_environment_vm.template_base_tpl]" in out["vms.tf"]
+        )
