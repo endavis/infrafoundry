@@ -29,5 +29,8 @@ vms:
 {% if cloud_init_snippets_storage %}
     cloud_init_snippets_storage: "{{ cloud_init_snippets_storage }}"
 {% endif %}
+{% if import_id %}
+    import_id: "{{ import_id }}"
+{% endif %}
     tags: {{ tags | tojson }}
     onboot: {{ onboot }}
