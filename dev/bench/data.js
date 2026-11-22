@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795390070654,
+  "lastUpdate": 1795391194345,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5970,6 +5970,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005872292407724776",
             "extra": "mean: 77.35806048388167 usec\nrounds: 13640"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "063ebfa66929794eab326ecec62b679b020a3907",
+          "message": "feat: order proxmox clones after a template defined in the same environment (merges PR #1618, addresses #1617)\n\nThe generated VM resource named its clone source by a literal VMID, so\nTerraform saw no link between a new template and a VM cloning it. The\ntwo were created in parallel, and the clone failed because its source\ndid not exist yet.\n\ngenerate_terraform now maps each VM whose clone.vm_id equals the vmid of\na template in the same config to that template's resource address, and\nvms.tf.j2 renders it in depends_on, merged with the SDN applier\ndependency when both apply. The literal vm_id is kept, and a VM cloning\nanything else renders exactly as before.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-22T23:45:17Z",
+          "tree_id": "c1722a749fa9722b875581ee62b9058ce0547fed",
+          "url": "https://github.com/endavis/infrafoundry/commit/063ebfa66929794eab326ecec62b679b020a3907"
+        },
+        "date": 1795391193518,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 48.30800845471285,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0002463330469682943",
+            "extra": "mean: 20.70050146938818 msec\nrounds: 49"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7992.568270719336,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008743472853880238",
+            "extra": "mean: 125.11622874257907 usec\nrounds: 8503"
           }
         ]
       }
