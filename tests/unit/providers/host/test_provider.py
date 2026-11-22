@@ -113,6 +113,7 @@ def test_no_secret_value_or_reference_in_generated_files(provider: HostProvider)
         (host(ansible={"playbooks": ["playbooks/missing.yml"]}), "does not exist"),
         (host(ansible={"playbooks": "base.yml"}), "list of paths"),
         (host(tailscale=tailscale_block(additional_parts=[{"content": "x"}])), "cloud-init only"),
+        (host(tailscale=tailscale_block(advertise_exit_node=True)), "advertise_exit_node"),
         (host(tailscale={"advertise_tags": ["tag:example"]}), "auth"),
     ],
 )
@@ -121,6 +122,11 @@ def test_invalid_hosts_are_rejected(provider: HostProvider, resource: Any, fragm
         del resource.config["address"]
     with pytest.raises(SchemaValidationError, match=fragment):
         provider.generate_host([resource])
+
+
+def test_advertise_exit_node_false_is_allowed_on_a_host(provider: HostProvider) -> None:
+    provider.generate_host([host(tailscale=tailscale_block(advertise_exit_node=False))])
+    assert "vps-01" in _inventory(provider)["all"]["hosts"]
 
 
 def test_escaping_symlink_playbook_is_rejected(provider: HostProvider, repo: Path) -> None:

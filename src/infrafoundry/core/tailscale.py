@@ -314,6 +314,9 @@ def process_tailscale_config(
     accept_routes = _validate_bool(
         resource.name, "accept_routes", tailscale.get("accept_routes"), False
     )
+    advertise_exit_node = _validate_bool(
+        resource.name, "advertise_exit_node", tailscale.get("advertise_exit_node"), False
+    )
 
     remove_on_destroy = _validate_bool(
         resource.name, "remove_on_destroy", tailscale.get("remove_on_destroy"), True
@@ -340,6 +343,7 @@ def process_tailscale_config(
         "remove_on_destroy": remove_on_destroy,
         "advertise_tags": advertise_tags,
         "advertise_routes": advertise_routes,
+        "advertise_exit_node": advertise_exit_node,
         "track": track,
         "additional_parts": additional_parts,
         "base64_encode": base64_encode,

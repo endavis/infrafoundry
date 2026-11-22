@@ -182,6 +182,27 @@ def _session(
     return session
 
 
+class TestAdvertiseExitNodeSchema:
+    def test_defaults_to_false(self) -> None:
+        cfg = process_tailscale_config(_oauth_resource(), base64_encode=False)
+        assert cfg is not None
+        assert cfg["advertise_exit_node"] is False
+
+    def test_accepts_true(self) -> None:
+        resource = _oauth_resource()
+        resource.config["tailscale"]["advertise_exit_node"] = True
+        cfg = process_tailscale_config(resource, base64_encode=False)
+        assert cfg is not None
+        assert cfg["advertise_exit_node"] is True
+
+    @pytest.mark.parametrize("value", ["yes", 1])
+    def test_rejects_non_bool(self, value: Any) -> None:
+        resource = _oauth_resource()
+        resource.config["tailscale"]["advertise_exit_node"] = value
+        with pytest.raises(TailscaleSchemaError, match="advertise_exit_node"):
+            process_tailscale_config(resource, base64_encode=False)
+
+
 class TestRemoveOnDestroySchema:
     def test_defaults_to_true(self) -> None:
         cfg = process_tailscale_config(_oauth_resource(), base64_encode=False)

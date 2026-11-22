@@ -18,6 +18,9 @@ module "{{ ts.module_name }}" {
   {% if ts.advertise_routes %}
   advertise_routes = {{ ts.advertise_routes | tojson }}
   {% endif %}
+  {% if ts.advertise_exit_node %}
+  advertise_exit_node = true
+  {% endif %}
 
   auth_key = var.{{ ts.auth_key_var }}
 

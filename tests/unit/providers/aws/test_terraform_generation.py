@@ -184,6 +184,35 @@ class TestInstance:
         assert 'variable "tailscale_auth_key"' in files["variables.tf"]
         assert "sensitive   = true" in files["variables.tf"]
 
+    def test_advertise_exit_node_rendered(self, provider: AWSProvider) -> None:
+        files = _generate(
+            provider,
+            instance(
+                tailscale={
+                    "hostname": "app",
+                    "advertise_exit_node": True,
+                    "auth": {"auth_key_secret": "tailscale.auth_key"},
+                }
+            ),
+        )
+        assert "advertise_exit_node = true" in files["instances.tf"]
+
+    @pytest.mark.parametrize("extra", [{}, {"advertise_exit_node": False}])
+    def test_advertise_exit_node_absent_by_default(
+        self, provider: AWSProvider, extra: dict[str, bool]
+    ) -> None:
+        files = _generate(
+            provider,
+            instance(
+                tailscale={
+                    "hostname": "app",
+                    "auth": {"auth_key_secret": "tailscale.auth_key"},
+                    **extra,
+                }
+            ),
+        )
+        assert "advertise_exit_node" not in files["instances.tf"]
+
 
 class TestEbsVolume:
     def test_protected_by_default(self, provider: AWSProvider) -> None:
