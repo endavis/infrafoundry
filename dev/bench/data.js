@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795303025691,
+  "lastUpdate": 1795345958030,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5666,6 +5666,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000035804388273127012",
             "extra": "mean: 61.16289545716947 usec\nrounds: 17457"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "feaf67148bdc1fd227b4f6938998a6ec2f14d7be",
+          "message": "feat: prune one provider's rows with state prune --provider (merges PR #1602, addresses #1600)\n\nAdd a repeatable --provider/-P option to `foundry state prune`. It deletes\nonly the named providers' resources, the dependencies touching them and the\ndeployment events stamped with them, leaving deployments, locks, other\nproviders and other environments untouched. Instance ids such as\nopnsense@fw-b match only themselves.\n\nA provider still configured in the environment (providers, provider_settings\nor YAML resources) is refused unless --force is given. Dry run, backup,\nconfirmation and the lock guard behave as for an environment prune.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-22T11:11:17Z",
+          "tree_id": "47191fa3d2984e0b774401d97757d238cdae8452",
+          "url": "https://github.com/endavis/infrafoundry/commit/feaf67148bdc1fd227b4f6938998a6ec2f14d7be"
+        },
+        "date": 1795345957487,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 64.8577717384778,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0013508530184167696",
+            "extra": "mean: 15.418352700000883 msec\nrounds: 70"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12893.078607968922,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004565285604965454",
+            "extra": "mean: 77.5609945775032 usec\nrounds: 13647"
           }
         ]
       }
