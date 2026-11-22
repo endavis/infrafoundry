@@ -83,6 +83,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | List tracked resources | `foundry state resources` |
 | Backup state database | `foundry state backup` |
 | Remove a stale environment from state | `foundry state prune --env <env>` |
+| Remove one provider's rows from state | `foundry state prune --env <env> --provider <provider>` |
 | Rename an environment in state | `foundry state rename-env --env <old> --to-env <new>` |
 | Restore deployed resources hidden by stale planned rows | `foundry state reconcile --env <env>` |
 | Validate backend config | `foundry state backend validate --env <env>` |
@@ -728,11 +729,15 @@ Delete one environment's rows from the state database: resources, resource depen
 foundry state prune --env old-env --dry-run   # row counts per table, deletes nothing
 foundry state prune --env old-env             # backs up, asks to confirm, deletes
 foundry state prune --env old-env --yes --backup-dir ./backups
+foundry state prune --env prod --provider opnsense@fw-b --dry-run   # one provider instance only
 ```
 
-**Options:** `-e/--env TEXT` (required), `--dry-run`, `--force`, `--yes`, `--no-backup`, `--backup-dir DIRECTORY`
+**Options:** `-e/--env TEXT` (required), `-P/--provider TEXT` (repeatable), `--dry-run`, `--force`, `--yes`, `--no-backup`, `--backup-dir DIRECTORY`
 
-- Refuses an environment that still exists in the config repo unless `--force` is given (for a renamed environment).
+- With `--provider` only those providers' rows in the environment are removed: their resources, the dependencies touching them and the deployment events stamped with them (`extra_data.provider`). Deployments, locks, other providers and other environments are untouched. The dry run also lists each resource's provider, type and name.
+- Provider ids match exactly. `opnsense@fw-b` removes only that instance's rows and `opnsense` only the primary's, never every instance.
+- Without `--provider`, refuses an environment that still exists in the config repo unless `--force` is given (for a renamed environment).
+- With `--provider`, that environment guard does not apply. Instead it refuses a provider the environment still configures (in `providers`, in `provider_settings` including declared instances, or by a YAML resource) unless `--force` is given. Remove the objects with `infra apply` first.
 - Refuses an environment with an unexpired deployment lock; release it with `foundry infra unlock`.
 - On SQLite it first copies the database (like `state backup`) and prints the path. The backup goes to `--backup-dir`, which defaults to a `backups` directory next to the state database (created if missing). An existing backup is never overwritten. If the backup fails nothing is deleted.
 - On other backends no file backup is possible: back up with `pg_dump` and pass `--no-backup`.
