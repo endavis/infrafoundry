@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795347929745,
+  "lastUpdate": 1795373260216,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5780,6 +5780,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004375474075414881",
             "extra": "mean: 69.03513292645101 usec\nrounds: 15911"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2e70cc4be3a36397b6000cba4068d6ba6c0e5a47",
+          "message": "fix: cache bitwarden item lookups so provider settings do not re-run bw per component (merges PR #1607, addresses #1606)\n\nEvery OPNsense component builds its API client through\nclient_from_environment, which resolves the provider settings again. A new\nBitwardenSecretBackend ran `bw list items` for every lookup, so a plan made\n108 item lookups and 216 bw runs, and spent about 96% of its time in bw.\n\n_BitwardenSession now keeps an in-memory item cache, shared per process\nand scope like the session itself. The cache lookup and the store run\nunder the session lock.\n\n- Cached: found items, and not-found results (with the same message).\n- Not cached: ambiguous names, bw failures and totp, which still runs\n  every time.\n- teardown() clears the cache. Values never reach disk or logs.\n\nA prod-sized OPNsense plan drops from about 4.5 minutes to about 30 s.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-22T18:46:26Z",
+          "tree_id": "7d8efd6bd8e6d113286235eaffa4e45df72a487a",
+          "url": "https://github.com/endavis/infrafoundry/commit/2e70cc4be3a36397b6000cba4068d6ba6c0e5a47"
+        },
+        "date": 1795373259697,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 68.80022295148412,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000701215003220061",
+            "extra": "mean: 14.534836619718085 msec\nrounds: 71"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12954.344655626795,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004870349679550763",
+            "extra": "mean: 77.19417898655676 usec\nrounds: 13677"
           }
         ]
       }
