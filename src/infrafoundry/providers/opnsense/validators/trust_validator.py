@@ -33,8 +33,10 @@ from infrafoundry.providers.opnsense.services.trust import (
 from infrafoundry.providers.opnsense.validators._xref import resolve_xref
 from infrafoundry.providers.opnsense.validators.context import OPNsenseValidationContext
 
-_CA_KEYS = frozenset({"description", "crt", "prv", "lock"})
-_CERT_KEYS = frozenset({"description", "crt", "prv", "csr", "ca_ref", "type", "lock"})
+# The nested loader copies the entry name into config (package_loader); it is not sent
+# to the box and is not the identity (``description`` is).
+_CA_KEYS = frozenset({"name", "description", "crt", "prv", "lock"})
+_CERT_KEYS = frozenset({"name", "description", "crt", "prv", "csr", "ca_ref", "type", "lock"})
 _HINTS = {
     "descr": "use 'description'",
     "refid": "the box assigns refid; it is not a YAML field",
