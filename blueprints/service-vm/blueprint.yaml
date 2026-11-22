@@ -69,6 +69,11 @@ inputs:
     description: "Additional cloud-init variables merged on top of HOSTNAME"
     default: {}
 
+  # --- Adoption ---
+  - name: import_id
+    description: "Adopt an existing Proxmox VM as <node>/<vmid>; empty: create a new VM"
+    default: ""
+
   # --- Tags & DHCP description ---
   - name: tags
     description: "Proxmox tags applied to the VM"

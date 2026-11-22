@@ -20,6 +20,7 @@ import pytest
 
 from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
 from infrafoundry.core.config.package_loader import PackageLoader
+from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.proxmox import ProxmoxProvider
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -301,3 +302,67 @@ def test_service_vm_config_passes_proxmox_validation(tmp_path: Path) -> None:
     storage_tf_candidates = list(tmp_path.rglob("storage.tf"))
     for candidate in storage_tf_candidates:
         assert "proxmox_virtual_environment_storage" not in candidate.read_text()
+
+
+def _write_import_package(tmp_path: Path, extra_variables: str) -> tuple[Path, Path]:
+    """Write a minimal service-vm package; return (envs dir, package dir)."""
+    envs = tmp_path / "envs"
+    pkg = envs / "test" / "proxmox" / "svc"
+    pkg.mkdir(parents=True)
+    (pkg / "infrafoundry.yml").write_text(
+        textwrap.dedent(
+            """\
+            name: svc
+            description: "Service VM import_id test"
+            blueprint: service-vm
+            variables:
+              vm_name: web-01
+              vmid: 100
+              target_node: node1
+              mac_address: "02:00:00:00:00:01"
+              ip_address: "198.51.100.10"
+              dhcp_subnet: opt1-servers
+            """
+        )
+        + extra_variables
+    )
+    return envs, pkg
+
+
+def _generate_vm_terraform(tmp_path: Path, envs: Path, pkg: Path) -> tuple[ResourceConfig, str]:
+    """Load the package and render the proxmox VM; return (vm resource, vms.tf text)."""
+    pkg_loader = PackageLoader(envs, blueprint_resolver=BlueprintResolver(envs))
+    resources, _events, _variables = pkg_loader.load_package(
+        pkg, provider="proxmox", env_name="test"
+    )
+    vm = next(r for r in resources if r.provider == "proxmox" and r.type == "vm")
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    output_dir = tmp_path / "output"
+    output_dir.mkdir()
+    provider = ProxmoxProvider(config_dir, output_dir)
+    provider.set_environment("test")
+    provider.generate_terraform([vm])
+    rendered = "\n".join(p.read_text() for p in sorted(tmp_path.rglob("*.tf")))
+    return vm, rendered
+
+
+def test_service_vm_import_id_set_renders_import_block(tmp_path: Path) -> None:
+    """A set import_id reaches the VM ResourceConfig and renders an import block."""
+    envs, pkg = _write_import_package(tmp_path, "  import_id: node1/100\n")
+
+    vm, rendered = _generate_vm_terraform(tmp_path, envs, pkg)
+
+    assert vm.import_id == "node1/100"
+    assert "import {" in rendered
+    assert 'id = "node1/100"' in rendered
+
+
+def test_service_vm_import_id_unset_renders_no_import(tmp_path: Path) -> None:
+    """Without import_id the VM has no import_id and no import block is rendered."""
+    envs, pkg = _write_import_package(tmp_path, "")
+
+    vm, rendered = _generate_vm_terraform(tmp_path, envs, pkg)
+
+    assert vm.import_id is None
+    assert "import {" not in rendered

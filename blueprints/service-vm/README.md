@@ -78,6 +78,7 @@ foundry infra apply --env <env> --package my-service
 | `cloud_init_snippets`    | `[]`                           | List of cloud-init snippet names to attach             |
 | `extra_cloud_init_vars`  | `{}`                           | Extra cloud-init vars merged with the `HOSTNAME` entry |
 | `cloud_init_snippets_storage` | `""` | Proxmox storage for the cloud-init snippet file; empty: provider default |
+| `import_id` | `""` | Adopt an existing VM as `<node>/<vmid>` instead of creating one; `vmid` and `target_node` must match it. See [Adopting existing VMs and templates](../../docs/providers/proxmox.md#adopting-existing-vms-and-templates) |
 | `tags`                   | `[]`                           | Proxmox tags applied to the VM                         |
 | `dhcp_description`       | `""` (falls back to `vm_name`) | Description written on the DHCP reservation            |
 
