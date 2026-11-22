@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795389154517,
+  "lastUpdate": 1795390070654,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5932,6 +5932,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004806831829378898",
             "extra": "mean: 69.68563679823104 usec\nrounds: 15914"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e39a78f789e1fa5f3347379d4600928bc830e04a",
+          "message": "feat: pass import_id through the service-vm blueprint (merges PR #1616, addresses #1615)\n\nA package built from service-vm could not use the Proxmox import_id\nfield: the blueprint renders only the variables it declares, so an\nimport_id set in the package was dropped silently, and a VM lost from\nthe Terraform state stayed \"will be created\" on every plan.\n\nThe blueprint now declares an optional import_id variable (default\nempty) and renders it on the VM entry only when set. Output is\nunchanged without it, and the provider's <node>/<vmid> validation\napplies when it is set. The README documents the variable and links to\nthe adopt workflow.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-22T23:26:24Z",
+          "tree_id": "60a7a20dd9bab5a4127ade36a8d0989287fe60c7",
+          "url": "https://github.com/endavis/infrafoundry/commit/e39a78f789e1fa5f3347379d4600928bc830e04a"
+        },
+        "date": 1795390069744,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 67.43854360427854,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006513711662627686",
+            "extra": "mean: 14.828315478873366 msec\nrounds: 71"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12926.901136674182,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005872292407724776",
+            "extra": "mean: 77.35806048388167 usec\nrounds: 13640"
           }
         ]
       }
