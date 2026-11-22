@@ -112,6 +112,33 @@ class TestProxmoxTailscaleAuthKey:
         assert 'version = "0.0.11"' in vms_tf
         assert "auth_key = var.tailscale_auth_key" in vms_tf
 
+    def test_advertise_exit_node_rendered(self, provider: ProxmoxProvider, tmp_dirs: Any) -> None:
+        _, output_dir = tmp_dirs
+        vm = _vm(
+            "ts-control",
+            tailscale={
+                "advertise_exit_node": True,
+                "auth": {"auth_key_secret": "tailscale.auth_key"},
+            },
+        )
+        provider.generate_terraform([vm])
+        vms_tf = _read_tf(output_dir, "vms.tf")
+
+        assert "advertise_exit_node = true" in _module_block(vms_tf, "tailscale_ts_control")
+
+    @pytest.mark.parametrize("extra", [{}, {"advertise_exit_node": False}])
+    def test_advertise_exit_node_absent_by_default(
+        self, provider: ProxmoxProvider, tmp_dirs: Any, extra: dict[str, Any]
+    ) -> None:
+        _, output_dir = tmp_dirs
+        vm = _vm(
+            "ts-control",
+            tailscale={"auth": {"auth_key_secret": "tailscale.auth_key"}, **extra},
+        )
+        provider.generate_terraform([vm])
+
+        assert "advertise_exit_node" not in _read_tf(output_dir, "vms.tf")
+
     def test_base64_encode_is_false(self, provider: ProxmoxProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         vm = _vm(

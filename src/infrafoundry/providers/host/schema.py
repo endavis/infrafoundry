@@ -152,6 +152,15 @@ def _check_tailscale(resource: ResourceConfig) -> list[HostFinding]:
                 "is not supported on an existing host",
             )
         ]
+    if module and module.get("advertise_exit_node"):
+        return [
+            HostFinding(
+                resource.name,
+                err,
+                f"Host '{resource.name}' tailscale.advertise_exit_node is only supported on "
+                "cloud-init instances, not on an existing host",
+            )
+        ]
     return []
 
 

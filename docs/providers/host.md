@@ -77,6 +77,7 @@ The `tailscale:` block is the one the [cloud instances take](tailscale.md#instan
 
 - Enrollment runs at apply through a built-in playbook. It installs Tailscale when missing, skips a host that is already `Running`, and otherwise runs `tailscale up` with the settings of the block.
 - `additional_parts` is cloud-init only and is an error here.
+- `advertise_exit_node` is cloud-init only and is an error here.
 - The auth secret is passed to that run in the `INFRAFOUNDRY_TAILSCALE_AUTH_KEY` environment variable. The playbook writes it to a mode 0600 temporary file on the host, passes it as `--auth-key=file:<path>`, and removes the file afterwards. It is never written to the inventory or to the controller's disk, and tasks that handle it use `no_log`.
 - On `infra destroy`, [tailnet device removal](tailscale.md#removing-the-tailnet-device-on-destroy) applies to the host like any other resource.
 

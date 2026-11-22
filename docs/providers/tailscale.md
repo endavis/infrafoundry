@@ -315,6 +315,7 @@ resources:
 | `hostname` | Tailnet hostname. Defaults to the resource name. |
 | `advertise_tags`, `advertise_routes` | Tags and subnet routes the node advertises. |
 | `accept_dns`, `accept_routes`, `enable_ssh` | Client settings passed to the module. |
+| `advertise_exit_node` | The node offers itself as an exit node. Default `false`. The module enables IP forwarding for it. Its `0.0.0.0/0` and `::/0` routes still need approval, for example with the tailscale provider's `device_subnet_routes`, unless an ACL `autoApprovers` entry covers them. Cloud-init instances only (AWS, OCI, Proxmox). |
 | `track`, `additional_parts` | Tailscale release track and extra cloud-init parts. |
 | `remove_on_destroy` | Remove the tailnet device when the instance is destroyed. Default `true`. |
 

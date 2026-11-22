@@ -113,6 +113,33 @@ class TestOCITailscaleAuthKey:
         assert "client_id" not in instances_tf
         assert "client_secret" not in instances_tf
 
+    def test_advertise_exit_node_rendered(self, provider: OCIProvider, tmp_dirs: Any) -> None:
+        _, output_dir = tmp_dirs
+        instance = _instance(
+            "ts-control",
+            tailscale={
+                "advertise_exit_node": True,
+                "auth": {"auth_key_secret": "tailscale.auth_key"},
+            },
+        )
+        provider.generate_terraform([instance])
+        instances_tf = _read_tf(output_dir, "instances.tf")
+
+        assert "advertise_exit_node = true" in _module_block(instances_tf, "tailscale_ts_control")
+
+    @pytest.mark.parametrize("extra", [{}, {"advertise_exit_node": False}])
+    def test_advertise_exit_node_absent_by_default(
+        self, provider: OCIProvider, tmp_dirs: Any, extra: dict[str, Any]
+    ) -> None:
+        _, output_dir = tmp_dirs
+        instance = _instance(
+            "ts-control",
+            tailscale={"auth": {"auth_key_secret": "tailscale.auth_key"}, **extra},
+        )
+        provider.generate_terraform([instance])
+
+        assert "advertise_exit_node" not in _read_tf(output_dir, "instances.tf")
+
     def test_user_data_uses_module_rendered(self, provider: OCIProvider, tmp_dirs: Any) -> None:
         _, output_dir = tmp_dirs
         instance = _instance(
