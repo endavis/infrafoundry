@@ -1,4 +1,7 @@
-"""Template configuration field-level validation for Proxmox."""
+"""Template configuration field-level validation for Proxmox.
+
+Checks ``download_image.filename`` and the ``import_id`` of a template.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +11,7 @@ from typing import Any, override
 from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
+from infrafoundry.providers.proxmox.validators.import_id import import_id_problems
 
 # Extensions Proxmox VE accepts for ``import`` content (PVE::Storage ``$IMPORT_EXT_RE_1``),
 # which is what ``download_image`` downloads into (#1188).
@@ -19,6 +23,8 @@ class TemplateConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
 
     Performs field-level validation:
     - ERROR for ``download_image.filename`` values Proxmox rejects for import content
+    - ERROR for an ``import_id`` that is not ``<node>/<vmid>`` or disagrees with ``vmid`` or
+      ``target_node``
     """
 
     def __init__(self, report: ValidationReport) -> None:
@@ -42,6 +48,19 @@ class TemplateConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
                 continue
             config = resource.config or {}
             self._validate_download_filename(resource.name, config)
+            self._validate_import_id(resource.name, resource.import_id, config)
+
+    def _validate_import_id(self, name: str, import_id: str | None, config: dict[str, Any]) -> None:
+        """Error if import_id is malformed or disagrees with vmid or target_node."""
+        if import_id is None:
+            return
+        for problem in import_id_problems(import_id, config):
+            self.report.add_check(
+                check_name=f"proxmox_template_{name}_import_id",
+                passed=False,
+                message=f"Template '{name}': {problem}",
+                level=ValidationLevel.ERROR,
+            )
 
     def _validate_download_filename(self, name: str, config: dict[str, Any]) -> None:
         """Error if download_image.filename is missing or has an unaccepted extension."""

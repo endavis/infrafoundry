@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from infrafoundry.core.exceptions import SchemaValidationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.proxmox import ProxmoxProvider
 
@@ -426,3 +427,27 @@ class TestNormalization:
         vm = _make_vm(clone=901)
         provider._normalize_vm_config(vm)
         assert vm.config["clone"] == 901
+
+
+class TestImportBlock:
+    """VM import blocks come from the shared name match (#1613)."""
+
+    @staticmethod
+    def _generate(provider: ProxmoxProvider, import_id: str | None) -> str:
+        vm = _make_vm("web-01", vmid=100)
+        vm.import_id = import_id
+        provider.generate_terraform([vm])
+        return (provider.terraform_dir / "vms.tf").read_text()
+
+    def test_import_block_targets_vm(self, provider: ProxmoxProvider) -> None:
+        content = self._generate(provider, "pve01/100")
+        assert (
+            'import {\n  to = proxmox_virtual_environment_vm.web_01\n  id = "pve01/100"\n}'
+        ) in content
+
+    def test_no_import_id_no_block(self, provider: ProxmoxProvider) -> None:
+        assert "import {" not in self._generate(provider, None)
+
+    def test_malformed_raises(self, provider: ProxmoxProvider) -> None:
+        with pytest.raises(SchemaValidationError, match="import_id"):
+            self._generate(provider, "100")

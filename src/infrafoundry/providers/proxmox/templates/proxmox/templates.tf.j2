@@ -15,6 +15,13 @@ resource "proxmox_virtual_environment_download_file" "cloud_image_{{ template.co
 }
 
 # Step 2: Create template VM with imported disk
+{% if template.import_id %}
+import {
+  to = proxmox_virtual_environment_vm.template_{{ template.config.name | replace('-', '_') }}
+  id = "{{ template.import_id }}"
+}
+
+{% endif %}
 resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | replace('-', '_') }}" {
   name      = "{{ template.config.name }}"
   node_name = "{{ template.config.target_node }}"
@@ -111,6 +118,13 @@ resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | re
 
 {% else %}
 # Create template from clone or manual creation
+{% if template.import_id %}
+import {
+  to = proxmox_virtual_environment_vm.template_{{ template.config.name | replace('-', '_') }}
+  id = "{{ template.import_id }}"
+}
+
+{% endif %}
 resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | replace('-', '_') }}" {
   name      = "{{ template.config.name }}"
   node_name = "{{ template.config.target_node }}"
