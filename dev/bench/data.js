@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795345958030,
+  "lastUpdate": 1795346540267,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5704,6 +5704,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004565285604965454",
             "extra": "mean: 77.5609945775032 usec\nrounds: 13647"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "882034d18964760ef7f62d27bfea94031ca83155",
+          "message": "fix: skip dispatch for providers the environment does not configure (merges PR #1603, addresses #1601)\n\nA provider with managed state rows but no configuration in the\nenvironment (not in providers, no provider_settings block) was dispatched\nwith an empty resource list and failed on its missing settings. It is now\nnot dispatched; a WARNING names the provider and its row count and\nsuggests `foundry state prune --env <env> --provider <name>`.\n\nThe provider filter is applied before the managed-only dispatch is\nannounced, so a provider excluded by -P prints nothing.\n\nAddresses #1601\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-22T11:21:03Z",
+          "tree_id": "5f9f5d094e883366abeafe4c1d3170a0aac7c602",
+          "url": "https://github.com/endavis/infrafoundry/commit/882034d18964760ef7f62d27bfea94031ca83155"
+        },
+        "date": 1795346539548,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 80.87199704682898,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006258977899649078",
+            "extra": "mean: 12.365219563218519 msec\nrounds: 87"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13960.160058440404,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004719927093364314",
+            "extra": "mean: 71.632416520568 usec\nrounds: 14830"
           }
         ]
       }
