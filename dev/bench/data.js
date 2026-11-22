@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795346540267,
+  "lastUpdate": 1795347929745,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -5742,6 +5742,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004719927093364314",
             "extra": "mean: 71.632416520568 usec\nrounds: 14830"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "33987c40362e25e4ffef1aca2affaed5e33afea2",
+          "message": "fix: reuse one bw device identity across runs of the bitwarden backend (merges PR #1605, addresses #1604)\n\nEvery run used a fresh BITWARDENCLI_APPDATA_DIR, so bw generated a new\ndevice id each time, and the server emailed a new-device notice per run.\n\nThe backend now persists only bw's app id (global_applicationId_appId) in a\n0600 file under $INFRAFOUNDRY_STATE_HOME/bw/<server-hash>/ (default\n~/.infrafoundry), and seeds it into each fresh data.json before login. The\nper-run directory, lock, logout and removal are unchanged. bw logout keeps\nthe API client secret in data.json, so the directory itself is still never\nreused.\n\n- The file is created with O_EXCL: when two runs race, the stored id wins.\n- A symlinked, group- or world-writable or foreign-owned file is ignored,\n  and so is a non-UUID id; any I/O error falls back to bw's own id.\n- New optional setting secret_backends.bitwarden.device_id_file (absolute\n  path; ~ expands).\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-22T11:44:37Z",
+          "tree_id": "e82c70a3d38b35c40c7586ba763613ca48ee372c",
+          "url": "https://github.com/endavis/infrafoundry/commit/33987c40362e25e4ffef1aca2affaed5e33afea2"
+        },
+        "date": 1795347928834,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 73.6199871414611,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006253031363178497",
+            "extra": "mean: 13.58326778947266 msec\nrounds: 76"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14485.378061999027,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004375474075414881",
+            "extra": "mean: 69.03513292645101 usec\nrounds: 15911"
           }
         ]
       }
