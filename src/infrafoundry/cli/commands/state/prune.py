@@ -1,4 +1,4 @@
-"""Remove a stale environment's rows from the state database."""
+"""Remove a stale environment's, or one provider's, rows from the state database."""
 
 from __future__ import annotations
 
@@ -10,19 +10,53 @@ from rich.table import Table
 from infrafoundry.core.audit.models import AuditStatus
 from infrafoundry.core.events.types import EventType
 from infrafoundry.core.orchestrator import Orchestrator
+from infrafoundry.core.provider_instances import declared_instances, instance_provider_id
 
 from ...decorators import with_orchestrator
 from ...utils import console
 from .state import active_lock_holder, backup_state_db, copy_state_db, sqlite_db_path
 
 
+def _configured_provider_ids(orchestrator: Orchestrator, env: str) -> set[str]:
+    """Return the provider ids ``env`` still configures, in settings or in YAML resources."""
+    config_manager = orchestrator.config_manager
+    try:
+        env_config = config_manager.load_environment(env)
+    except FileNotFoundError:
+        # A directory without settings.yaml configures nothing in settings.
+        return {r.provider for r in config_manager.get_all_resources_all_providers(env)}
+    configured = set(env_config.providers)
+    for base in env_config.provider_settings:
+        instances = declared_instances(base, env_config.provider_settings)
+        if not instances:
+            configured.add(base)
+        configured.update(
+            instance_provider_id(base, name, env_config.provider_settings) for name in instances
+        )
+    configured.update(r.provider for r in config_manager.get_all_resources_all_providers(env))
+    return configured
+
+
 @click.command("prune")
 @click.option("--env", "-e", required=True, help="Environment whose state rows are removed.")
+@click.option(
+    "--provider",
+    "-P",
+    "providers",
+    multiple=True,
+    help=(
+        "Prune only this provider's rows (repeatable). Accepts an instance id such as "
+        "'opnsense@fw-b'. Without it the whole environment is pruned."
+    ),
+)
 @click.option("--dry-run", is_flag=True, help="Show the row counts without deleting anything.")
 @click.option(
     "--force",
     is_flag=True,
-    help="Prune even if the environment still exists in the config repo.",
+    help=(
+        "Prune even if the environment (or, with --provider, the provider) "
+        "is still configured in the config repo."
+    ),
 )
 @click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
 @click.option(
@@ -44,6 +78,7 @@ def prune(
     _ctx: click.Context,
     orchestrator: Orchestrator,
     env: str,
+    providers: tuple[str, ...],
     dry_run: bool,
     force: bool,
     yes: bool,
@@ -53,12 +88,31 @@ def prune(
     """Delete one environment's rows from the state database.
 
     Removes resources, dependencies, deployments, deployment events and locks.
-    The audit trail is kept. On SQLite a backup is taken first.
+    With --provider only those providers' resources, the dependencies touching
+    them and their deployment events are removed. The audit trail is kept.
+    On SQLite a backup is taken first.
     """
     state_manager = orchestrator.state_manager
+    scope = (
+        f"provider(s) {', '.join(providers)} in environment '{env}'"
+        if providers
+        else f"environment '{env}'"
+    )
 
     in_config = env in orchestrator.config_manager.list_environments()
-    if in_config and not force:
+    if providers:
+        still = (
+            sorted(set(providers) & _configured_provider_ids(orchestrator, env))
+            if in_config
+            else []
+        )
+        if still and not force:
+            raise click.ClickException(
+                f"Provider(s) {', '.join(still)} still configured in environment '{env}' "
+                "(providers, provider_settings or resources). Remove the objects with "
+                "'infra apply', or re-run with --force."
+            )
+    elif in_config and not force:
         raise click.ClickException(
             f"Environment '{env}' still exists in the config repo. "
             "Re-run with --force if it was renamed."
@@ -78,28 +132,37 @@ def prune(
             f"Use 'foundry infra unlock --env {env}' first."
         )
 
-    counts = state_manager.prune_environment(env, dry_run=True)
+    if providers:
+        counts = state_manager.prune_providers(env, providers, dry_run=True)
+    else:
+        counts = state_manager.prune_environment(env, dry_run=True)
     total = sum(counts.values())
     if total == 0:
-        console.info(f"Nothing to prune: no state rows for environment '{env}'.")
+        console.info(f"Nothing to prune: no state rows for {scope}.")
         return
 
-    table = Table(title=f"State rows for '{env}'")
+    table = Table(title=f"State rows for {scope}")
     table.add_column("Table", style="cyan")
     table.add_column("Rows", justify="right")
     for name, count in counts.items():
         table.add_row(name, str(count))
     table.add_row("total", str(total), style="bold")
     console.print(table)
+    if providers:
+        detail = Table(title="Resource rows to delete")
+        detail.add_column("Provider", style="cyan")
+        detail.add_column("Type")
+        detail.add_column("Name")
+        for row in state_manager.list_provider_resources(env, providers):
+            detail.add_row(*row)
+        console.print(detail)
     console.info("The audit trail (audit_entries) is kept.")
 
     if dry_run:
         console.info("Dry run: nothing was deleted.")
         return
 
-    if not yes and not click.confirm(
-        f"Delete {total} state row(s) for environment '{env}'?", default=False
-    ):
+    if not yes and not click.confirm(f"Delete {total} state row(s) for {scope}?", default=False):
         console.warning("Prune cancelled.")
         return
 
@@ -109,8 +172,11 @@ def prune(
             db_path, backup_dir, copier=copy_state_db, unchanged="deleted"
         )
 
-    deleted = state_manager.prune_environment(env)
-    console.success(f"Pruned {sum(deleted.values())} state row(s) for environment '{env}'.")
+    if providers:
+        deleted = state_manager.prune_providers(env, providers)
+    else:
+        deleted = state_manager.prune_environment(env)
+    console.success(f"Pruned {sum(deleted.values())} state row(s) for {scope}.")
 
     orchestrator.audit_logger.log(
         event_type=EventType.STATE_PRUNED,
@@ -118,11 +184,12 @@ def prune(
         status=AuditStatus.SUCCESS,
         environment=env,
         command="state prune",
-        message=f"Pruned {sum(deleted.values())} state rows for environment '{env}'",
+        message=f"Pruned {sum(deleted.values())} state rows for {scope}",
         changes_summary=dict(deleted),
         request_metadata={
             "backup_path": str(backup_path) if backup_path else None,
             "force": force,
+            "providers": list(providers),
             "backend": state_manager.engine.url.drivername,
         },
     )

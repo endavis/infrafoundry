@@ -262,3 +262,259 @@ def test_explicit_backup_dir_honored(
     assert result.exit_code == 0, result.output
     assert len(list(backup_dir.glob("infrafoundry_state_*.db"))) == 1
     assert not (_db_file(manager).parent / "backups").exists()
+
+
+# --- --provider ----------------------------------------------------------------------------
+
+
+def _seed_providers(mgr: StateManager, env: str, providers: list[str]) -> None:
+    dep_id = mgr.create_deployment(env, "apply")
+    mgr.update_deployment_status(dep_id, DeploymentStatus.COMPLETED)
+    for provider in providers:
+        mgr.track_resource(dep_id, env, provider, "vm", f"{provider}-vm", ResourceState.ACTIVE)
+
+
+def _providers_in(mgr: StateManager, env: str) -> list[str]:
+    return sorted(r.provider for r in mgr.get_resources(env))
+
+
+def _write_settings(config_dir: Path, env: str, text: str) -> Path:
+    env_dir = config_dir / "envs" / env
+    env_dir.mkdir(parents=True, exist_ok=True)
+    (env_dir / "settings.yaml").write_text(text)
+    return env_dir
+
+
+def test_provider_dry_run_lists_rows_and_deletes_nothing(
+    manager: StateManager, config_dir: Path, backup_dir: Path
+) -> None:
+    _seed_providers(manager, "stale", ["fw", "dns"])
+
+    result = _run(
+        config_dir, "--env", "stale", "-P", "fw", "--dry-run", "--backup-dir", str(backup_dir)
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "fw-vm" in result.output
+    assert "dns-vm" not in result.output
+    assert "vm" in result.output
+    assert _providers_in(manager, "stale") == ["dns", "fw"]
+    assert not backup_dir.exists()
+    assert AuditLogger(session_factory=manager.SessionLocal).query(action="state_pruned") == []
+
+
+def test_provider_yes_prunes_only_that_provider_and_audits(
+    manager: StateManager, config_dir: Path, backup_dir: Path
+) -> None:
+    _seed_providers(manager, "stale", ["fw", "dns"])
+    _seed_providers(manager, "keep", ["fw"])
+
+    result = _run(
+        config_dir, "--env", "stale", "--provider", "fw", "--yes", "--backup-dir", str(backup_dir)
+    )
+
+    assert result.exit_code == 0, result.output
+    assert _providers_in(manager, "stale") == ["dns"]
+    assert _providers_in(manager, "keep") == ["fw"]
+    assert len(list(backup_dir.glob("infrafoundry_state_*.db"))) == 1
+    entries = AuditLogger(session_factory=manager.SessionLocal).query(action="state_pruned")
+    assert len(entries) == 1
+    assert entries[0].request_metadata is not None
+    assert entries[0].request_metadata["providers"] == ["fw"]
+    assert entries[0].changes_summary is not None
+    assert entries[0].changes_summary["resources"] == 1
+
+
+def test_provider_multiple(manager: StateManager, config_dir: Path, backup_dir: Path) -> None:
+    _seed_providers(manager, "stale", ["fw", "dns", "dhcp"])
+
+    result = _run(
+        config_dir,
+        "--env",
+        "stale",
+        "-P",
+        "fw",
+        "-P",
+        "dns",
+        "--yes",
+        "--backup-dir",
+        str(backup_dir),
+    )
+
+    assert result.exit_code == 0, result.output
+    assert _providers_in(manager, "stale") == ["dhcp"]
+
+
+def test_provider_instance_id_matches_only_itself(
+    manager: StateManager, config_dir: Path, backup_dir: Path
+) -> None:
+    _seed_providers(manager, "stale", ["opnsense", "opnsense@fw-b"])
+
+    result = _run(
+        config_dir,
+        "--env",
+        "stale",
+        "-P",
+        "opnsense@fw-b",
+        "--yes",
+        "--backup-dir",
+        str(backup_dir),
+    )
+
+    assert result.exit_code == 0, result.output
+    assert _providers_in(manager, "stale") == ["opnsense"]
+
+
+@pytest.mark.parametrize(
+    ("settings", "provider"),
+    [
+        ("name: live\nproviders:\n  - fw\n", "fw"),
+        ("name: live\nprovider_settings:\n  fw:\n    api_url: https://fw.example.com\n", "fw"),
+        (
+            "name: live\nprovider_settings:\n  opnsense:\n    primary: fw-a\n    firewalls:\n"
+            "      fw-a:\n        api_url: https://fw-a.example.com\n"
+            "      fw-b:\n        api_url: https://fw-b.example.com\n",
+            "opnsense@fw-b",
+        ),
+    ],
+    ids=["providers-list", "provider-settings", "declared-instance"],
+)
+def test_provider_configured_in_settings_refused_without_force(
+    manager: StateManager,
+    config_dir: Path,
+    backup_dir: Path,
+    settings: str,
+    provider: str,
+) -> None:
+    _write_settings(config_dir, "live", settings)
+    _seed_providers(manager, "live", [provider, "other"])
+
+    refused = _run(
+        config_dir, "--env", "live", "-P", provider, "--yes", "--backup-dir", str(backup_dir)
+    )
+    assert refused.exit_code != 0
+    assert "--force" in refused.output
+    assert "still configured" in refused.output
+    assert _providers_in(manager, "live") == sorted([provider, "other"])
+
+    forced = _run(
+        config_dir,
+        "--env",
+        "live",
+        "-P",
+        provider,
+        "--yes",
+        "--force",
+        "--backup-dir",
+        str(backup_dir),
+    )
+    assert forced.exit_code == 0, forced.output
+    assert _providers_in(manager, "live") == ["other"]
+    entry = AuditLogger(session_factory=manager.SessionLocal).query(action="state_pruned")[0]
+    assert entry.request_metadata is not None
+    assert entry.request_metadata["force"] is True
+
+
+def test_provider_configured_by_yaml_resource_refused_without_force(
+    manager: StateManager, config_dir: Path, backup_dir: Path
+) -> None:
+    env_dir = _write_settings(config_dir, "live", "name: live\n")
+    (env_dir / "resources").mkdir()
+    (env_dir / "resources" / "web.yaml").write_text(
+        "resources:\n  - provider: fw\n    type: vm\n    name: web-01\n"
+        "    config:\n      cores: 1\n"
+    )
+    _seed_providers(manager, "live", ["fw"])
+
+    refused = _run(
+        config_dir, "--env", "live", "-P", "fw", "--yes", "--backup-dir", str(backup_dir)
+    )
+    assert refused.exit_code != 0
+    assert "still configured" in refused.output
+    assert _providers_in(manager, "live") == ["fw"]
+
+    forced = _run(
+        config_dir, "--env", "live", "-P", "fw", "--yes", "--force", "--backup-dir", str(backup_dir)
+    )
+    assert forced.exit_code == 0, forced.output
+    assert _providers_in(manager, "live") == []
+
+
+def test_provider_not_configured_allowed_in_config_environment(
+    manager: StateManager, config_dir: Path, backup_dir: Path
+) -> None:
+    """The environment exists in the config repo, but the pruned provider does not."""
+    _write_settings(config_dir, "live", "name: live\nproviders:\n  - dns\n")
+    _seed_providers(manager, "live", ["fw", "dns"])
+
+    result = _run(config_dir, "--env", "live", "-P", "fw", "--yes", "--backup-dir", str(backup_dir))
+
+    assert result.exit_code == 0, result.output
+    assert _providers_in(manager, "live") == ["dns"]
+
+
+def test_provider_environment_without_settings_file_is_allowed(
+    manager: StateManager, config_dir: Path, backup_dir: Path
+) -> None:
+    _seed_providers(manager, "live", ["fw"])
+
+    result = _run(config_dir, "--env", "live", "-P", "fw", "--yes", "--backup-dir", str(backup_dir))
+
+    assert result.exit_code == 0, result.output
+    assert _providers_in(manager, "live") == []
+
+
+def test_provider_active_lock_refuses_prune(
+    manager: StateManager, config_dir: Path, backup_dir: Path
+) -> None:
+    _seed_providers(manager, "stale", ["fw"])
+    manager.acquire_lock("stale", 3600, "someone")
+
+    result = _run(
+        config_dir, "--env", "stale", "-P", "fw", "--yes", "--backup-dir", str(backup_dir)
+    )
+
+    assert result.exit_code != 0
+    assert "infra unlock" in result.output
+    assert _providers_in(manager, "stale") == ["fw"]
+
+
+def test_provider_declining_prompt_deletes_nothing(
+    manager: StateManager, config_dir: Path, backup_dir: Path
+) -> None:
+    _seed_providers(manager, "stale", ["fw"])
+
+    result = _run(
+        config_dir, "--env", "stale", "-P", "fw", "--backup-dir", str(backup_dir), input="n\n"
+    )
+
+    assert result.exit_code == 0
+    assert "Prune cancelled" in result.output
+    assert _providers_in(manager, "stale") == ["fw"]
+    assert not backup_dir.exists()
+
+
+def test_provider_without_rows_is_nothing_to_prune(manager: StateManager, config_dir: Path) -> None:
+    _seed_providers(manager, "stale", ["dns"])
+
+    result = _run(config_dir, "--env", "stale", "-P", "fw", "--yes")
+
+    assert result.exit_code == 0
+    assert "nothing to prune" in result.output.lower()
+    assert _providers_in(manager, "stale") == ["dns"]
+
+
+def test_whole_environment_prune_unchanged_without_provider(
+    manager: StateManager, config_dir: Path, backup_dir: Path
+) -> None:
+    _write_settings(config_dir, "live", "name: live\nproviders:\n  - fw\n")
+    _seed_providers(manager, "live", ["fw"])
+    _seed_providers(manager, "stale", ["fw", "dns"])
+
+    refused = _run(config_dir, "--env", "live", "--yes", "--backup-dir", str(backup_dir))
+    assert refused.exit_code != 0
+    assert "still exists in the config repo" in refused.output
+
+    result = _run(config_dir, "--env", "stale", "--yes", "--backup-dir", str(backup_dir))
+    assert result.exit_code == 0, result.output
+    assert manager.list_environments() == ["live"]

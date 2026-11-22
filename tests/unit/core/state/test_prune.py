@@ -191,3 +191,137 @@ def test_cross_environment_reference_raises_and_deletes_nothing(manager: StateMa
         manager.prune_environment("stale")
 
     assert _counts(manager) == before
+
+
+# --- prune_providers / list_provider_resources -------------------------------------------
+
+
+def _seed_providers(mgr: StateManager, env: str, providers: list[str]) -> None:
+    """One deployment, plus per provider a resource, a stamped event and a dependency."""
+    with mgr.SessionLocal() as s:
+        dep = Deployment(environment=env, command="apply", status=DeploymentStatus.COMPLETED)
+        s.add(dep)
+        s.flush()
+        s.add(DeploymentEvent(deployment_id=dep.id, event_type="plain"))
+        s.add(
+            DeploymentLock(
+                environment=env,
+                locked_by="me",
+                expires_at=datetime.now(UTC) - timedelta(hours=1),
+                deployment_id=dep.id,
+            )
+        )
+        rows = []
+        for provider in providers:
+            s.add(
+                DeploymentEvent(
+                    deployment_id=dep.id, event_type="x", extra_data={"provider": provider}
+                )
+            )
+            rows.append(
+                Resource(
+                    deployment_id=dep.id,
+                    environment=env,
+                    provider=provider,
+                    resource_type="vm",
+                    name=f"{provider}-vm",
+                    state=ResourceState.ACTIVE,
+                )
+            )
+        s.add_all(rows)
+        s.flush()
+        for a, b in itertools.pairwise(rows):
+            s.add(ResourceDependency(resource_id=a.id, depends_on_id=b.id))
+        s.commit()
+
+
+def _provider_names(mgr: StateManager, env: str) -> list[str]:
+    with mgr.SessionLocal() as s:
+        return sorted(
+            s.execute(select(Resource.provider).where(Resource.environment == env)).scalars()
+        )
+
+
+def test_prune_providers_dry_run_deletes_nothing(manager: StateManager) -> None:
+    _seed_providers(manager, "dev", ["fw", "dns"])
+    before = _counts(manager)
+
+    result = manager.prune_providers("dev", ["fw"], dry_run=True)
+
+    assert result == {"resource_dependencies": 1, "deployment_events": 1, "resources": 1}
+    assert _counts(manager) == before
+
+
+def test_prune_providers_deletes_only_that_provider(manager: StateManager) -> None:
+    _seed_providers(manager, "dev", ["fw", "dns", "dhcp"])
+
+    result = manager.prune_providers("dev", ["fw"])
+
+    assert result == {"resource_dependencies": 1, "deployment_events": 1, "resources": 1}
+    assert _provider_names(manager, "dev") == ["dhcp", "dns"]
+    counts = _counts(manager)
+    assert counts["resource_dependencies"] == 1
+    # the plain event and the other providers' events remain
+    assert counts["deployment_events"] == 3
+    # deployments and locks are never pruned
+    assert counts["deployments"] == 1
+    assert counts["deployment_locks"] == 1
+
+
+def test_prune_providers_leaves_other_environments(manager: StateManager) -> None:
+    _seed_providers(manager, "dev", ["fw", "dns"])
+    _seed_providers(manager, "prod", ["fw", "dns"])
+
+    manager.prune_providers("dev", ["fw"])
+
+    assert _provider_names(manager, "dev") == ["dns"]
+    assert _provider_names(manager, "prod") == ["dns", "fw"]
+    with manager.SessionLocal() as s:
+        prod_events = s.execute(
+            select(func.count())
+            .select_from(DeploymentEvent)
+            .join(Deployment, Deployment.id == DeploymentEvent.deployment_id)
+            .where(Deployment.environment == "prod")
+        ).scalar_one()
+    assert prod_events == 3
+
+
+def test_prune_providers_instance_id_matches_only_itself(manager: StateManager) -> None:
+    _seed_providers(manager, "dev", ["opnsense", "opnsense@fw-b"])
+
+    manager.prune_providers("dev", ["opnsense@fw-b"])
+    assert _provider_names(manager, "dev") == ["opnsense"]
+
+    _seed_providers(manager, "other", ["opnsense", "opnsense@fw-b"])
+    manager.prune_providers("other", ["opnsense"])
+    assert _provider_names(manager, "other") == ["opnsense@fw-b"]
+
+
+def test_prune_providers_multiple(manager: StateManager) -> None:
+    _seed_providers(manager, "dev", ["fw", "dns", "dhcp"])
+
+    result = manager.prune_providers("dev", ["fw", "dns"])
+
+    assert result["resources"] == 2
+    assert result["deployment_events"] == 2
+    assert result["resource_dependencies"] == 2
+    assert _provider_names(manager, "dev") == ["dhcp"]
+
+
+def test_prune_providers_unknown_provider_is_noop(manager: StateManager) -> None:
+    _seed_providers(manager, "dev", ["fw"])
+    before = _counts(manager)
+
+    result = manager.prune_providers("dev", ["ghost"])
+
+    assert not any(result.values())
+    assert _counts(manager) == before
+
+
+def test_list_provider_resources(manager: StateManager) -> None:
+    _seed_providers(manager, "dev", ["fw", "dns", "opnsense@fw-b"])
+    _seed_providers(manager, "prod", ["fw"])
+
+    rows = manager.list_provider_resources("dev", ["fw", "opnsense@fw-b"])
+
+    assert rows == [("fw", "vm", "fw-vm"), ("opnsense@fw-b", "vm", "opnsense@fw-b-vm")]

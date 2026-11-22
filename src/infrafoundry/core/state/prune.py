@@ -1,6 +1,8 @@
-"""Delete one environment's rows from the state database in a single transaction."""
+"""Delete one environment's (or one provider's) rows from the state database."""
 
 from __future__ import annotations
+
+from collections.abc import Sequence
 
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -151,6 +153,128 @@ def prune_environment(
                 )
             )
             session.execute(delete(Deployment).where(Deployment.environment == environment))
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        return counts
+
+
+# Tables touched by a provider prune, in the foreign-key-safe order they are deleted.
+PROVIDER_PRUNE_TABLES: tuple[str, ...] = ("resource_dependencies", "deployment_events", "resources")
+
+
+def _provider_resource_ids(environment: str, providers: Sequence[str]) -> object:
+    return select(Resource.id).where(
+        Resource.environment == environment,
+        Resource.provider.in_(list(providers)),
+    )
+
+
+def _provider_event_ids(session: Session, environment: str, providers: Sequence[str]) -> list[int]:
+    """Ids of the environment's deployment events stamped with one of ``providers``.
+
+    The provider lives in the event's JSON ``extra_data``, so the match is made in
+    Python to stay portable across SQLite and PostgreSQL.
+    """
+    rows = session.execute(
+        select(DeploymentEvent.id, DeploymentEvent.extra_data)
+        .where(DeploymentEvent.deployment_id.in_(_env_deployment_ids(environment)))  # type: ignore[arg-type]
+        .where(DeploymentEvent.extra_data.is_not(None))
+    ).all()
+    wanted = set(providers)
+    return [
+        event_id
+        for event_id, extra in rows
+        if isinstance(extra, dict) and extra.get("provider") in wanted
+    ]
+
+
+def list_provider_resources(
+    session_factory: sessionmaker[Session], environment: str, providers: Sequence[str]
+) -> list[tuple[str, str, str]]:
+    """Return ``(provider, resource_type, name)`` of each resource a provider prune removes.
+
+    Args:
+        session_factory: Session factory bound to the state database.
+        environment: Environment the rows belong to.
+        providers: Provider ids (``opnsense`` or ``opnsense@fw-b``) to match exactly.
+
+    Returns:
+        The rows, sorted by provider, type and name.
+    """
+    with session_factory() as session:
+        rows = session.execute(
+            select(Resource.provider, Resource.resource_type, Resource.name)
+            .where(
+                Resource.environment == environment,
+                Resource.provider.in_(list(providers)),
+            )
+            .order_by(Resource.provider, Resource.resource_type, Resource.name)
+        ).all()
+        return [(str(p), str(t), str(n)) for p, t, n in rows]
+
+
+def prune_providers(
+    session_factory: sessionmaker[Session],
+    environment: str,
+    providers: Sequence[str],
+    dry_run: bool = False,
+) -> dict[str, int]:
+    """Delete (or count, when ``dry_run``) the rows of ``providers`` in one environment.
+
+    Removes the providers' resources, the dependencies touching them and the
+    deployment events stamped with them, in one transaction. Deployments, locks,
+    other providers' rows and other environments are never touched, nor is
+    ``audit_entries``.
+
+    Args:
+        session_factory: Session factory bound to the state database.
+        environment: Environment whose rows are removed.
+        providers: Provider ids to match exactly; an instance id matches only itself.
+        dry_run: Count the rows without deleting.
+
+    Returns:
+        Row count per table in :data:`PROVIDER_PRUNE_TABLES`.
+    """
+    with session_factory() as session:
+        res_ids = _provider_resource_ids(environment, providers)
+        event_ids = _provider_event_ids(session, environment, providers)
+        dep_where = or_(
+            ResourceDependency.resource_id.in_(res_ids),  # type: ignore[arg-type]
+            ResourceDependency.depends_on_id.in_(res_ids),  # type: ignore[arg-type]
+        )
+        counts = {
+            "resource_dependencies": _count(
+                session, select(func.count()).select_from(ResourceDependency).where(dep_where)
+            ),
+            "deployment_events": len(event_ids),
+            "resources": _count(
+                session,
+                select(func.count())
+                .select_from(Resource)
+                .where(
+                    Resource.environment == environment,
+                    Resource.provider.in_(list(providers)),
+                ),
+            ),
+        }
+        if dry_run or not any(counts.values()):
+            return counts
+        try:
+            session.execute(delete(ResourceDependency).where(dep_where))
+            for start in range(0, len(event_ids), 500):
+                session.execute(
+                    delete(DeploymentEvent).where(
+                        DeploymentEvent.id.in_(event_ids[start : start + 500])
+                    )
+                )
+            session.execute(
+                delete(Resource).where(
+                    Resource.environment == environment,
+                    Resource.provider.in_(list(providers)),
+                )
+            )
             session.commit()
         except Exception:
             session.rollback()

@@ -130,7 +130,7 @@ foundry state prune --env old-env --dry-run   # row counts per table
 foundry state prune --env old-env             # backup, confirm, delete
 ```
 
-It deletes the environment's resources, dependencies, deployments, events and locks in one transaction (`StateManager.prune_environment`, [ADR-0007](../decisions/0007-repository-pattern-for-state.md)), keeps the audit trail, and records a `state_pruned` audit entry. See the [CLI reference](../usage/cli-reference.md#state-prune) for the guards and options.
+It deletes the environment's resources, dependencies, deployments, events and locks in one transaction (`StateManager.prune_environment`, [ADR-0007](../decisions/0007-repository-pattern-for-state.md)), keeps the audit trail, and records a `state_pruned` audit entry. With `--provider <id>` (repeatable) it removes only those providers' resources, the dependencies touching them and the deployment events stamped with them (`StateManager.prune_providers`); deployments and locks stay, and an instance id such as `opnsense@fw-b` matches only itself. See the [CLI reference](../usage/cli-reference.md#state-prune) for the guards and options.
 
 ### Renaming an Environment
 

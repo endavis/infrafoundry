@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -28,7 +29,9 @@ from infrafoundry.core.state.pending_on_create import get_pending as _get_pendin
 from infrafoundry.core.state.pending_on_create import record_done as _record_done
 from infrafoundry.core.state.pending_on_create import record_pending as _record_pending
 from infrafoundry.core.state.pool_config import build_engine_kwargs
+from infrafoundry.core.state.prune import list_provider_resources as _list_provider_resources
 from infrafoundry.core.state.prune import prune_environment as _prune_environment
+from infrafoundry.core.state.prune import prune_providers as _prune_providers
 from infrafoundry.core.state.reconcile import ReconcileCandidate
 from infrafoundry.core.state.reconcile import reconcile_planned as _reconcile_planned
 from infrafoundry.core.state.rename import count_environment_rows as _count_environment_rows
@@ -237,6 +240,30 @@ class StateManager(BaseManager):
             StateError: If another environment's resources reference its deployments
         """
         return _prune_environment(self.SessionLocal, environment, dry_run=dry_run)
+
+    def prune_providers(
+        self, environment: str, providers: Sequence[str], dry_run: bool = False
+    ) -> dict[str, int]:
+        """Delete the rows of some providers in one environment, in one transaction.
+
+        Removes their resources, the dependencies touching them and the deployment
+        events stamped with them. Everything else, including the audit trail, stays.
+
+        Args:
+            environment: Environment name
+            providers: Provider ids, matched exactly (``opnsense@fw-b`` is one instance)
+            dry_run: Count the rows without deleting
+
+        Returns:
+            Row count per table
+        """
+        return _prune_providers(self.SessionLocal, environment, providers, dry_run=dry_run)
+
+    def list_provider_resources(
+        self, environment: str, providers: Sequence[str]
+    ) -> list[tuple[str, str, str]]:
+        """Return ``(provider, resource_type, name)`` of the rows a provider prune removes."""
+        return _list_provider_resources(self.SessionLocal, environment, providers)
 
     def record_pending_on_create(
         self,
