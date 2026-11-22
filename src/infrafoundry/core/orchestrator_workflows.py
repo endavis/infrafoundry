@@ -7,7 +7,7 @@ import os
 import tempfile
 import traceback
 import warnings
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -51,6 +51,7 @@ from infrafoundry.core.provider import (
     unsupported_resource_message,
     unsupported_resource_reason,
 )
+from infrafoundry.core.provider_instances import split_provider_id
 from infrafoundry.core.result_types import PlanResult
 from infrafoundry.core.runner_results import raise_on_runner_failure
 from infrafoundry.core.runners import RunnerRegistry
@@ -172,6 +173,9 @@ def find_managed_only_providers(
     providers: dict[str, ProviderBase],
     runners: Iterable[BaseRunner],
     get_managed_resources: Callable[[str, str], Any],
+    configured: Collection[str] | None = None,
+    provider_filter: Collection[str] | None = None,
+    on_unconfigured: Callable[[str, int], None] | None = None,
 ) -> list[str]:
     """Find providers absent from the YAML whose managed objects need deleting (#1260).
 
@@ -181,6 +185,12 @@ def find_managed_only_providers(
         providers: All registered providers by name.
         runners: Runners to ask.
         get_managed_resources: ``StateManager.get_managed_resources``.
+        configured: Provider names the environment configures (``providers`` list or a
+            ``provider_settings`` block). ``None`` skips the check. A provider with managed
+            rows that is not configured is never dispatched (#1601).
+        provider_filter: When set, providers outside it are not considered at all.
+        on_unconfigured: Called with the provider name and its managed row count for each
+            unconfigured provider that still has managed rows.
 
     Returns:
         Names of providers to dispatch with an empty resource list.
@@ -192,24 +202,41 @@ def find_managed_only_providers(
     for name, provider in providers.items():
         if name in resources_by_provider:
             continue
+        if provider_filter and name not in provider_filter:
+            continue
         managed = build_managed_resources(get_managed_resources(env_name, name), name)
         if not managed:
+            continue
+        if configured is not None and not _is_configured(name, configured):
+            if on_unconfigured is not None:
+                on_unconfigured(name, len(managed))
             continue
         if any(d.needs_managed_dispatch(provider, managed) is True for d in dispatchers):
             found.append(name)
     return found
 
 
+def _is_configured(provider_id: str, configured: Collection[str]) -> bool:
+    """Return whether ``provider_id`` or its base provider is in ``configured``."""
+    return provider_id in configured or split_provider_id(provider_id)[0] in configured
+
+
 def _add_managed_only_providers(
     resources_by_provider: dict[str, list[ResourceConfig]],
     env_name: str,
-    finder: Callable[[str, dict[str, list[ResourceConfig]]], list[str]] | None,
+    finder: Callable[..., list[str]] | None,
     console: Console,
+    provider_filter: list[str] | None = None,
 ) -> dict[str, list[ResourceConfig]]:
-    """Return ``resources_by_provider`` plus an empty entry per managed-only provider."""
+    """Return ``resources_by_provider`` plus an empty entry per managed-only provider.
+
+    Only providers that survive ``provider_filter`` are announced (#1601).
+    """
     if finder is None:
         return resources_by_provider
-    extra = finder(env_name, resources_by_provider)
+    extra = finder(env_name, resources_by_provider, provider_filter=provider_filter)
+    if provider_filter:
+        extra = [name for name in extra if name in provider_filter]
     if not extra:
         return resources_by_provider
     result = dict(resources_by_provider)
@@ -705,6 +732,7 @@ class PlanOrchestrator(HookExecutionMixin):
                     env_name,
                     self._find_managed_only_providers,
                     self.console,
+                    provider_filter,
                 )
             resources_by_provider = _apply_provider_filter(resources_by_provider, provider_filter)
 
@@ -1269,6 +1297,7 @@ class ApplyOrchestrator(HookExecutionMixin):
                     env_name,
                     self._find_managed_only_providers,
                     self.console,
+                    provider_filter,
                 )
             resources_by_provider = _apply_provider_filter(resources_by_provider, provider_filter)
             self._store_rollback_snapshot(deployment_id, env_name, all_resources)
