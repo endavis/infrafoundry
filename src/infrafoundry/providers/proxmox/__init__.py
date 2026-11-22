@@ -82,6 +82,9 @@ class ProxmoxProvider(
         # VMs and containers attached to a managed SDN vnet (#1137), set by
         # generate_terraform and read by the VM and container templates.
         self._sdn_dependents: set[str] = set()
+        # VM name -> address of the template resource it clones (#1617), set by
+        # generate_terraform and read by the VM template.
+        self._clone_template_deps: dict[str, str] = {}
         # Use TemplateRendererMixin to set up Jinja2 environment
         self._setup_template_environment()
 
@@ -192,6 +195,7 @@ class ProxmoxProvider(
 
         # SDN first: VMs and containers on a managed vnet depend on its applier.
         self._sdn_dependents = self._sdn_dependent_names(resources_by_type)
+        self._clone_template_deps = self._clone_template_dependencies(resources_by_type)
         if "sdn_zone" in resources_by_type or "sdn_vnet" in resources_by_type:
             self._generate_sdn_terraform(
                 resources_by_type.get("sdn_zone", []), resources_by_type.get("sdn_vnet", [])
@@ -319,7 +323,11 @@ class ProxmoxProvider(
         if regular_vms:
             self.render_and_write_terraform(
                 "proxmox/vms.tf.j2",
-                context={"vms": regular_vms, "sdn_dependents": self._sdn_dependents},
+                context={
+                    "vms": regular_vms,
+                    "sdn_dependents": self._sdn_dependents,
+                    "clone_template_deps": self._clone_template_deps,
+                },
                 output_name="vms.tf",
             )
 
@@ -507,6 +515,43 @@ class ProxmoxProvider(
             if any(isinstance(n, dict) and n.get("bridge") in vnet_ids for n in nics):
                 dependents.add(resource.name)
         return dependents
+
+    @staticmethod
+    def _clone_template_dependencies(
+        resources_by_type: dict[str, list[ResourceConfig]],
+    ) -> dict[str, str]:
+        """Map each VM to the managed template resource it clones (#1617).
+
+        Args:
+            resources_by_type: Resources grouped by type.
+
+        Returns:
+            VM resource name to the Terraform address of the ``template``
+            whose ``vmid`` equals the VM's ``clone.vm_id`` (int or numeric string).
+        """
+
+        def _as_int(value: Any) -> int | None:
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return None
+
+        templates: dict[int, str] = {}
+        for tpl in resources_by_type.get("template", []):
+            tpl_config = tpl.config or {}
+            tpl_id = _as_int(tpl_config.get("vmid"))
+            if tpl_id is not None:
+                tpl_name = str(tpl_config.get("name", tpl.name)).replace("-", "_")
+                templates[tpl_id] = f"proxmox_virtual_environment_vm.template_{tpl_name}"
+        deps: dict[str, str] = {}
+        for vm in resources_by_type.get("vm", []):
+            clone = (vm.config or {}).get("clone")
+            if not isinstance(clone, dict):
+                continue
+            clone_id = _as_int(clone.get("vm_id"))
+            if clone_id is not None and clone_id in templates:
+                deps[vm.name] = templates[clone_id]
+        return deps
 
     def _generate_sdn_terraform(
         self, zones: list[ResourceConfig], vnets: list[ResourceConfig]

@@ -166,6 +166,13 @@ templates:
 The cloud-init drive goes on `cloud_init_datastore` when set, otherwise on the
 disk storage (`disk.storage`, then `local-lvm`).
 
+### Cloning a template in the same apply
+
+A `vm` whose `clone.vm_id` equals the `vmid` of a `template` in the same
+environment gets a `depends_on` on that template, so the template and the VMs
+cloning it can be created in one apply. A string `vmid` is compared as a
+number. Containers and OVA VMs are not affected.
+
 ### Adopting existing VMs and templates
 
 Set `import_id: <node>/<vmid>` on a `vm` or `template` to adopt a VM that already
