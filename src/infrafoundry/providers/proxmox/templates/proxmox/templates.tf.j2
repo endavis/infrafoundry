@@ -60,6 +60,17 @@ resource "terraform_data" "template_customize_{{ tf_name }}" {
 }
 
 {% endif %}
+# Build identity: replacing the template VM is triggered from here. Terraform fires
+# replace_triggered_by only when the referenced resource is updated or replaced, never on its
+# first create, so the identity exists for every download_image template from the start and
+# changes whenever the downloaded image or the customize package list changes.
+resource "terraform_data" "template_build_{{ tf_name }}" {
+  triggers_replace = {
+    download_id        = proxmox_virtual_environment_download_file.cloud_image_{{ tf_name }}.id
+    customize_packages = "{{ custom.install if custom else '' }}"
+  }
+}
+
 # Step 2: Create template VM with imported disk
 {% if template.import_id %}
 import {
@@ -163,9 +174,7 @@ resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | re
 
   lifecycle {
     prevent_destroy = {{ template.config.prevent_destroy | default(true) | tojson }}
-{% if custom %}
-    replace_triggered_by = [terraform_data.template_customize_{{ tf_name }}]
-{% endif %}
+    replace_triggered_by = [terraform_data.template_build_{{ tf_name }}]
   }
 }
 
