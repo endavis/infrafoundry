@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795391194345,
+  "lastUpdate": 1795430885815,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6008,6 +6008,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008743472853880238",
             "extra": "mean: 125.11622874257907 usec\nrounds: 8503"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b825bc20fea766075aaa7c942dda23d51fad2b38",
+          "message": "feat: install packages into proxmox download-image templates at build time (merges PR #1624, addresses #1622)\n\nA template built from download_image was the distribution's cloud image\nunchanged. Clones had to install packages such as qemu-guest-agent\nthrough cloud-init on first boot, which fails when the clone's network\nis not ready. Proxmox then cannot see the VM, and every Terraform\noperation waits out the agent timeout.\n\nTemplates now take an optional customize block, packages only:\n- A terraform_data step copies the downloaded image on the node to\n  <name>-customized.<ext>, runs virt-customize --install on the copy\n  over the existing SSH path, and the template disk imports from that\n  copy. The download is never modified, so its drift detection stays\n  quiet.\n- A change to customize replaces the template.\n- Destroying the step removes the copy.\n- A node without virt-customize fails with a message naming\n  libguestfs-tools.\n- The validator rejects customize without download_image, unknown keys,\n  empty or malformed package lists, and archive (.ova/.ovf) downloads.\n- Templates without customize render unchanged.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T10:47:05Z",
+          "tree_id": "b8abffd647da5d02fbb1e12b17d084324185ebf7",
+          "url": "https://github.com/endavis/infrafoundry/commit/b825bc20fea766075aaa7c942dda23d51fad2b38"
+        },
+        "date": 1795430884920,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 96.36524617081389,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000856929190117651",
+            "extra": "mean: 10.377185134020543 msec\nrounds: 97"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15741.78661046158,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000034396522846509393",
+            "extra": "mean: 63.525190929435304 usec\nrounds: 16493"
           }
         ]
       }
