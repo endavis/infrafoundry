@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795434633679,
+  "lastUpdate": 1795445015491,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6084,6 +6084,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000053374613344000035",
             "extra": "mean: 91.41613731665457 usec\nrounds: 12067"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e4559bcd532b3e38b06b7bf500d57d307adbdec7",
+          "message": "feat: optional ssh settings in the opnsense-vm blueprint bootstrap (merges PR #1628, addresses #1627)\n\nOPNsense 26.1 has no API for its SSH settings, so a firewall built from\nthe blueprint always came up with SSH off. The first-boot bootstrap now\ntakes ssh_enabled, ssh_root_login, ssh_password_auth and\nssh_authorized_keys and writes them into config.xml. With the defaults\nthe rendered bootstrap PHP is unchanged. The role refuses SSH on with\nneither password auth nor a key.\n\nAddresses #1627\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T14:42:23Z",
+          "tree_id": "e89aa4299a692fd1a1533e5509ce44c9cc260b96",
+          "url": "https://github.com/endavis/infrafoundry/commit/e4559bcd532b3e38b06b7bf500d57d307adbdec7"
+        },
+        "date": 1795445014984,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 51.44057512158283,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0022463955809060338",
+            "extra": "mean: 19.439907070176435 msec\nrounds: 57"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10705.701609766918,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005605461849292577",
+            "extra": "mean: 93.40817037976194 usec\nrounds: 11222"
           }
         ]
       }
