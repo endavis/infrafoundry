@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795447456226,
+  "lastUpdate": 1795448054652,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6160,6 +6160,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004832793979583627",
             "extra": "mean: 77.47571320936096 usec\nrounds: 13672"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0510827040dcc470f6063093a8a5b12fda8821e1",
+          "message": "fix: give a ballooned console-connector vm its full memory for the install (merges PR #1633, addresses #1632)\n\nThe virtio balloon lowers the guest's MemTotal, so with balloon set the\nagent installer's memory check could fail when the host had reclaimed\nmemory. When balloon is set, the post-Terraform script now raises the\nVM's balloon minimum to memory on the Proxmox node (root SSH to the new\noptional pve_host input, or target_node), waits for MemTotal to reach the\ninstaller minimum, and restores the configured balloon after the install,\nalso on failure or a timeout kill. Corrects the README sizing note.\n\nAddresses #1632\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T15:32:52Z",
+          "tree_id": "0b09597833ae4a798fc2ba3b160a4da2d3c3265a",
+          "url": "https://github.com/endavis/infrafoundry/commit/0510827040dcc470f6063093a8a5b12fda8821e1"
+        },
+        "date": 1795448054088,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 63.069738346178816,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0010814057877391785",
+            "extra": "mean: 15.85546454166615 msec\nrounds: 72"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12783.956615659115,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005261118491630337",
+            "extra": "mean: 78.22304393423053 usec\nrounds: 13543"
           }
         ]
       }
