@@ -17,7 +17,8 @@ cloud-init installs the private key at first boot and the blueprint scripts conn
 On OCI the key travels the same way, as a ``text/cloud-config`` part of the Tailscale module's
 ``additional_parts`` (OCI instances with ``tailscale:`` only, #1583).
 A VM that is already deployed is *pinned*: only ``ed25519_public`` is recorded, so the VM,
-its cloud-init snippet and its Terraform resources do not change.
+its cloud-init snippet and its Terraform resources do not change. Such a VM cannot be rebuilt
+until it is destroyed and ``--regenerate`` has given it a full pair (#1630).
 
 The helpers here are pure (no I/O). Messages name the resource, the package and the fix,
 never a key.
@@ -26,7 +27,7 @@ never a key.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -256,6 +257,50 @@ def _describe(resource: ResourceConfig) -> str:
     package = resource.package_name or resource.package_path
     where = f"package '{package}' ({resource.package_path})" if package else "no package"
     return f"resource '{resource.name}' ({where})"
+
+
+def has_public_only_pin(resource: ResourceConfig) -> bool:
+    """Return whether a resource's host key entry holds a public key but no private key."""
+    try:
+        if host_key_config(resource) is None:
+            return False
+    except ValueError:
+        return False
+    public, has_private = host_key_entry(resource)
+    return public is not None and not has_private
+
+
+def rebuild_problems(
+    resources: Iterable[ResourceConfig],
+    deployed: Callable[[ResourceConfig], bool | None],
+    env: str,
+) -> list[str]:
+    """Return the resources whose pinned host key would be lost on creation.
+
+    A VM pinned while deployed has only a public key, so cloud-init installs no key on a
+    rebuilt VM and the post-Terraform script fails. Reported only for a resource that is
+    not deployed, which is exactly when ``--regenerate`` is accepted.
+
+    Args:
+        resources: The resources in scope.
+        deployed: Tells whether a resource is deployed; called only for public-only pins.
+        env: Environment name, for the hint.
+
+    Returns:
+        Messages naming the resource and the fix. Never a key.
+    """
+    problems: list[str] = []
+    for resource in resources:
+        if not has_public_only_pin(resource):
+            continue
+        if deployed(resource) is False:
+            problems.append(
+                f"{_describe(resource)} is not deployed and its host key was pinned without "
+                f"a private key (pinned while deployed), so cloud-init cannot install it on "
+                f"the new VM; run 'foundry secrets host-keys --env {env} --regenerate "
+                f"{resource.name}' before applying"
+            )
+    return problems
 
 
 def host_key_problems(

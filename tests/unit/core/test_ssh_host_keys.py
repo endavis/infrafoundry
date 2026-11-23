@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import yaml
@@ -17,6 +18,7 @@ from infrafoundry.core.ssh_host_keys import (
     host_key_problems,
     known_hosts_value,
     private_key_ref,
+    rebuild_problems,
 )
 
 PUBLIC = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleSentinelPublicKey0"
@@ -235,3 +237,47 @@ class TestCloudConfigPart:
         assert part["content"].startswith("#cloud-config\nssh_keys:\n")
         assert "${jsonencode(var.tf_var_x)}" in part["content"]
         assert "PRIVATE KEY" not in part["content"]
+
+
+class TestRebuildProblems:
+    def test_public_only_undeployed_is_reported(self) -> None:
+        vm = _vm(secrets=_secrets(ed25519_public=PUBLIC))
+
+        problems = rebuild_problems([vm], lambda _r: False, "dev")
+
+        assert len(problems) == 1
+        assert "vm-01" in problems[0]
+        assert "demo" in problems[0]
+        assert "--env dev --regenerate vm-01" in problems[0]
+
+    @pytest.mark.parametrize("state", [True, None])
+    def test_deployed_or_unknown_is_not_reported(self, state: bool | None) -> None:
+        vm = _vm(secrets=_secrets(ed25519_public=PUBLIC))
+
+        assert rebuild_problems([vm], lambda _r: state, "dev") == []
+
+    def test_full_pair_missing_entry_and_no_pin_do_not_call_deployed(self) -> None:
+        deployed = MagicMock(return_value=False)
+        resources = [
+            _vm("a", secrets=_secrets("a", **FULL)),
+            _vm("b", secrets=None),
+            _vm("c", address=None, secrets=_secrets("c", ed25519_public=PUBLIC)),
+        ]
+
+        assert rebuild_problems(resources, deployed, "dev") == []
+        deployed.assert_not_called()
+
+    def test_invalid_block_is_skipped(self) -> None:
+        vm = _vm(secrets=_secrets(ed25519_public=PUBLIC))
+        assert vm.config is not None
+        vm.config["ssh_host_key"] = "nope"
+
+        assert rebuild_problems([vm], lambda _r: False, "dev") == []
+
+    def test_messages_hold_no_key_material(self) -> None:
+        vm = _vm(secrets=_secrets(ed25519_public=PUBLIC))
+
+        text = "\n".join(rebuild_problems([vm], lambda _r: False, "dev"))
+
+        assert PUBLIC not in text
+        assert "SENTINEL-NOT-A-REAL-KEY" not in text

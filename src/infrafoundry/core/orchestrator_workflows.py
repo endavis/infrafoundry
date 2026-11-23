@@ -31,6 +31,7 @@ from infrafoundry.core.exceptions import (
 )
 from infrafoundry.core.failed_resources import mark_resources_failed
 from infrafoundry.core.hooks import HookExecutionMixin, HookManager
+from infrafoundry.core.jumphost_preflight import deployment_state
 from infrafoundry.core.known_hosts import forget_on_jumphost, hosts_to_forget
 from infrafoundry.core.managed_set import build_managed_resources
 from infrafoundry.core.protocols import (
@@ -57,6 +58,7 @@ from infrafoundry.core.runner_results import raise_on_runner_failure
 from infrafoundry.core.runners import RunnerRegistry
 from infrafoundry.core.runners.base_runner import SKIPPED_PLAN_SUMMARY, BaseRunner
 from infrafoundry.core.secrets.secret_manager import SecretManager
+from infrafoundry.core.ssh_host_keys import has_public_only_pin, rebuild_problems
 from infrafoundry.core.state import DeploymentStatus, ResourceState, StateManager
 from infrafoundry.core.tailscale import plan_tailnet_cleanup, remove_tailnet_devices
 from infrafoundry.core.types import (
@@ -667,6 +669,29 @@ class PlanOrchestrator(HookExecutionMixin):
         }
         return sorted(filtered.items(), key=get_priority)
 
+    def _check_host_key_rebuilds(self, env_name: str, batches: list[ProviderResourceBatch]) -> None:
+        """Stop a plan that would create a VM whose pinned host key cannot be installed.
+
+        A VM pinned while deployed has only a public key, so cloud-init installs no key on a
+        rebuilt VM (#1630). The state DB is read only when such a pin is in scope.
+
+        Raises:
+            ConfigValidationError: If an in-scope, undeployed VM has a public-only pin.
+        """
+        resources = [r for batch in batches for r in batch.resources]
+        pinned = [r for r in resources if has_public_only_pin(r)]
+        if not pinned:
+            return
+        deployed = deployment_state(self.state_manager, env_name)
+        problems = rebuild_problems(pinned, deployed, env_name)
+        if not problems:
+            return
+        for problem in problems:
+            self.console.print(f"[red]✗ {escape(problem)}[/red]")
+        raise ConfigValidationError(
+            f"SSH host key pins block a rebuild: {len(problems)} resource(s) need --regenerate"
+        )
+
     def plan(
         self,
         env_name: str,
@@ -753,6 +778,8 @@ class PlanOrchestrator(HookExecutionMixin):
                     raise ConfigValidationError(
                         f"Configuration validation failed with {offline_errors} errors"
                     )
+
+            self._check_host_key_rebuilds(env_name, batches)
 
             # Execute environment-level before_plan hooks
             self._execute_env_hooks(env_name, "before_plan", env_config)

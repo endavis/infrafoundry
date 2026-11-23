@@ -165,7 +165,8 @@ wait_for_ssh() {
         if k3s_host_key_error "${WAIT_ERR}"; then
             echo "ERROR: ${host} does not present the pinned SSH host key." >&2
             echo "  The key recorded under ssh_host_keys.${host%%.*} in the package's secrets.yaml does not match." >&2
-            echo "  Re-pin it with 'foundry secrets host-keys --env <env> --regenerate ${host%%.*}' if the node was rebuilt." >&2
+            echo "  If the node was rebuilt, destroy it, run 'foundry secrets host-keys --env <env> --regenerate ${host%%.*}'," >&2
+            echo "  then apply again." >&2
             sed 's/^/    /' "${WAIT_ERR}" >&2
             return 1
         fi

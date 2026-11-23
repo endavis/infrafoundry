@@ -65,7 +65,8 @@ trap 'k3s_ssh_cleanup' EXIT
 fail_host_key() {
     echo "ERROR: $1 ($2) does not present the pinned host key" >&2
     echo "       (ssh_host_keys.$1 in the package secrets.yaml). If the VM was rebuilt," >&2
-    echo "       run 'foundry secrets host-keys --env <env> --regenerate $1' first." >&2
+    echo "       destroy it, run 'foundry secrets host-keys --env <env> --regenerate $1'," >&2
+    echo "       then apply again." >&2
     sed 's/^/    /' "$3" >&2
     exit 1
 }

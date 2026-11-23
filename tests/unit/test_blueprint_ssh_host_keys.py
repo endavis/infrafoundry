@@ -224,6 +224,7 @@ class TestVmScripts:
         assert "vm-01" in result.stderr
         assert "ssh_host_keys.vm-01" in result.stderr
         assert "--regenerate vm-01" in result.stderr
+        assert "destroy" in result.stderr
         assert len(_calls(record)) == 1
 
     @pytest.mark.parametrize(
@@ -303,6 +304,8 @@ class TestK3sScripts:
         assert result.returncode == 1
         assert "srv" in result.stderr
         assert "ssh_host_keys.srv" in result.stderr
+        assert "--regenerate srv" in result.stderr
+        assert "destroy" in result.stderr
         (call,) = _calls(record)
         assert "StrictHostKeyChecking=yes" in call
         assert (record / "used_known_hosts.1").read_text().strip() == known
@@ -438,6 +441,7 @@ class TestOciK3sScripts:
         assert result.returncode == 1
         assert "ssh_host_keys.ctl" in result.stderr
         assert "--regenerate ctl" in result.stderr
+        assert "destroy" in result.stderr
         assert len(_calls(record)) == 1
 
     @pytest.mark.parametrize(("name", "extra"), _OCI_HANDLERS, ids=lambda v: str(v)[:20])

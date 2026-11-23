@@ -342,7 +342,10 @@ VM against the pinned public key (`StrictHostKeyChecking=yes`).
   and once after upgrading a package that now sets `ssh_host_key`. It generates a pair for a VM
   that does not exist yet, and pins a deployed VM by recording the key it presents now (no VM
   change). See [`secrets host-keys`](../usage/cli-reference.md#secrets-host-keys). Until it has
-  run, `infra plan` fails with an error that names the command.
+  run, `infra plan` fails with an error that names the command. A VM pinned while deployed has
+  only its public key, so to rebuild it, destroy it, run `--regenerate <vm>`, then apply;
+  `infra plan` and `infra apply` stop with an error naming that command if it was skipped. A VM
+  with a generated pair is expected to keep its key across rebuilds.
 - **Delivery:** the private key reaches the VM through a sensitive Terraform variable
   (`TF_VAR_*`) in the cloud-init user data. See
   [Secrets Architecture: SSH host keys](../architecture/secrets-architecture.md#ssh-host-keys)

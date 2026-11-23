@@ -65,6 +65,16 @@ If you do not know why, stop and find out first.
 
 `infra doctor` probes deployed VMs from the jumphost against the keys the package pinned in its `ssh_known_hosts` variable. Run `foundry secrets host-keys --env <env>` to pin them.
 
+## Rebuilding a Pinned VM
+
+A VM pinned while it was deployed has only its public key recorded, so cloud-init cannot install a key on a rebuilt VM. Rebuild it in this order:
+
+1. Destroy the VM (`foundry infra destroy --env <env>`).
+2. Run `foundry secrets host-keys --env <env> --regenerate vm-01`.
+3. Apply again (`foundry infra apply --env <env>`).
+
+`infra plan` and `infra apply` stop with an error naming step 2 when it was skipped. A VM whose key was generated keeps it across rebuilds.
+
 ## Failure Messages
 
 A failed apply or doctor run names the host and repeats these steps. ssh's own lines look like this:
