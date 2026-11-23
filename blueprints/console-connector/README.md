@@ -184,7 +184,9 @@ The remote script runs on the VM (Ubuntu 24.04, `apt`), not on the jumphost; see
 
 Set `console_client_id`, `console_client_secret` and `console_admin_email` to
 register the agent during `infra apply`. Set none of them to keep the manual
-flow; setting only some fails with the missing names.
+flow; setting only some fails with the missing names. When the agent has no
+Console login yet, the script first runs the agent's own register step
+(`setup-portal/register`), then registers the agent.
 
 1. In the NetApp Console, create a service account with an admin role (for
    example Organization admin) and copy its client ID and secret.
