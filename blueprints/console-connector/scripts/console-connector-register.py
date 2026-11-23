@@ -22,6 +22,7 @@ import json
 import os
 import ssl
 import sys
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -33,6 +34,8 @@ TOKEN_AUDIENCE = "https://api.cloud.netapp.com"  # nosec B105  # OAuth endpoint 
 ACCOUNTS_URL = "https://api.bluexp.netapp.com/tenancy/account"
 AGENT_URL_TEMPLATE = "https://{ip}/occm/api/occm"
 TIMEOUT = 30
+PORTAL_POLL_INTERVAL = 2.0
+PORTAL_POLL_TIMEOUT = 60.0
 
 ADMIN_HINT = (
     "The service account needs an admin role (e.g. Organization admin) on the "
@@ -101,6 +104,13 @@ def parse_setup_status(payload: dict[str, Any]) -> tuple[bool, str]:
     is_setup = bool((payload.get("setupInfo") or {}).get("isSetup"))
     account = str((payload.get("tenancyServiceInformation") or {}).get("accountId") or "")
     return is_setup, account
+
+
+def needs_portal_register(payload: dict[str, Any]) -> bool:
+    """True when the agent has no Console login (auth0 client ID) yet."""
+    portal = payload.get("portalService") or {}
+    auth0 = portal.get("auth0Information") or {}
+    return not str(auth0.get("clientId") or "").strip()
 
 
 def choose_account(configured: str, accounts: list[dict[str, Any]]) -> str:
@@ -213,11 +223,44 @@ def _request(
         raise RegistrationError(f"non-JSON response from {method} {url}") from None
 
 
-def get_status(cfg: Config, pin: str) -> tuple[bool, str]:
-    """Read the agent's setup status, trusting only the pinned agent certificate."""
+def get_support_services(cfg: Config, pin: str) -> dict[str, Any]:
+    """Read the agent's support-services document, pinned to the agent certificate."""
     base = AGENT_URL_TEMPLATE.format(ip=cfg.ip)
     payload = _request(f"{base}/system/support-services", pin=pin)
-    return parse_setup_status(payload if isinstance(payload, dict) else {})
+    return payload if isinstance(payload, dict) else {}
+
+
+def get_status(cfg: Config, pin: str) -> tuple[bool, str]:
+    """Read the agent's setup status, trusting only the pinned agent certificate."""
+    return parse_setup_status(get_support_services(cfg, pin))
+
+
+def ensure_portal_registered(cfg: Config, pin: str, payload: dict[str, Any]) -> None:
+    """Run the agent's own register step when it has no Console login yet.
+
+    A fresh agent has no ``portalService.auth0Information.clientId`` and refuses
+    ``setup-portal/init`` until it has one. HTTP 409 means the step already ran.
+
+    Raises:
+        RegistrationError: If the register call fails or the client ID never appears.
+    """
+    if not needs_portal_register(payload):
+        return
+    base = AGENT_URL_TEMPLATE.format(ip=cfg.ip)
+    try:
+        _request(f"{base}/setup-portal/register", method="POST", pin=pin)
+    except RegistrationError as exc:
+        if "HTTP 409" not in str(exc):
+            raise
+    deadline = time.monotonic() + PORTAL_POLL_TIMEOUT
+    while True:
+        if not needs_portal_register(get_support_services(cfg, pin)):
+            return
+        if time.monotonic() >= deadline:
+            raise RegistrationError(
+                "agent did not report a Console login (auth0 client ID) after its register step"
+            )
+        time.sleep(PORTAL_POLL_INTERVAL)
 
 
 def fetch_token(cfg: Config) -> str:
@@ -252,9 +295,11 @@ def register(cfg: Config, pin: str) -> str:
         RegistrationError: On any failure.
     """
     pinned_context(pin)  # fail closed before any request
-    is_setup, _ = get_status(cfg, pin)
+    status = get_support_services(cfg, pin)
+    is_setup, _ = parse_setup_status(status)
     if is_setup:
         return "already-registered"
+    ensure_portal_registered(cfg, pin, status)
     token = fetch_token(cfg)
     accounts: list[dict[str, Any]] = []
     if not cfg.account_id:

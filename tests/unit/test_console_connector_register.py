@@ -60,6 +60,9 @@ class FakeConsole:
         self.account = ""
         self.accounts: list[dict[str, str]] = [{"accountPublicId": "acc-1", "accountName": "One"}]
         self.init_status = 200
+        self.client_id = ""
+        self.register_status = 200
+        self.register_sets_client_id = True
         self.requests: list[tuple[str, str, str, dict[str, Any]]] = []
 
 
@@ -91,8 +94,13 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeConsole]:
                     {
                         "setupInfo": {"isSetup": state.is_setup},
                         "tenancyServiceInformation": {"accountId": state.account},
+                        "portalService": {"auth0Information": {"clientId": state.client_id}},
                     },
                 )
+            elif self.path == "/occm/api/occm/setup-portal/register":
+                if state.register_status == 200 and state.register_sets_client_id:
+                    state.client_id = "portal-client"
+                self._reply(state.register_status, {})
             elif self.path == "/occm/api/occm/setup-portal/init":
                 if state.init_status != 200:
                     self._reply(
@@ -185,6 +193,67 @@ def test_already_registered_fetches_no_token(fake: FakeConsole) -> None:
     fake.is_setup = True
     assert reg.register(reg.load_config(FULL_VARS), PIN) == "already-registered"
     assert [r[1] for r in fake.requests] == ["/occm/api/occm/system/support-services"]
+
+
+def _paths(fake: FakeConsole) -> list[str]:
+    return [r[1].rsplit("/", 1)[-1] for r in fake.requests if r[0] == "POST"]
+
+
+def test_needs_portal_register() -> None:
+    assert reg.needs_portal_register({})
+    assert reg.needs_portal_register({"portalService": {"auth0Information": {"clientId": ""}}})
+    assert not reg.needs_portal_register({"portalService": {"auth0Information": {"clientId": "x"}}})
+
+
+def test_register_step_runs_before_init(fake: FakeConsole) -> None:
+    assert reg.register(reg.load_config(FULL_VARS), PIN) == "registered"
+    posts = [p for p in _paths(fake) if p in ("register", "init")]
+    assert posts == ["register", "init"]
+    register = next(r for r in fake.requests if r[1].endswith("/setup-portal/register"))
+    assert register[2] == "" and register[3] == {}
+
+
+def test_register_step_skipped_when_client_id_present(fake: FakeConsole) -> None:
+    fake.client_id = "existing"
+    assert reg.register(reg.load_config(FULL_VARS), PIN) == "registered"
+    assert "register" not in _paths(fake)
+    assert "init" in _paths(fake)
+
+
+def test_register_step_409_continues(fake: FakeConsole, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake.register_status = 409
+    fake.register_sets_client_id = False
+    monkeypatch.setattr(reg, "PORTAL_POLL_INTERVAL", 0.0)
+    calls = {"n": 0}
+    orig = reg.get_support_services
+
+    def late(cfg: Any, pin: str) -> dict[str, Any]:
+        calls["n"] += 1
+        if calls["n"] >= 3:
+            fake.client_id = "portal-client"
+        result: dict[str, Any] = orig(cfg, pin)
+        return result
+
+    monkeypatch.setattr(reg, "get_support_services", late)
+    assert reg.register(reg.load_config(FULL_VARS), PIN) == "registered"
+    assert [p for p in _paths(fake) if p in ("register", "init")] == ["register", "init"]
+
+
+def test_register_step_client_id_never_appears(
+    fake: FakeConsole, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake.register_sets_client_id = False
+    monkeypatch.setattr(reg, "PORTAL_POLL_INTERVAL", 0.0)
+    monkeypatch.setattr(reg, "PORTAL_POLL_TIMEOUT", 0.0)
+    with pytest.raises(reg.RegistrationError, match="client ID"):
+        reg.register(reg.load_config(FULL_VARS), PIN)
+    assert "init" not in _paths(fake)
+
+
+def test_register_step_failure_other_than_409_raises(fake: FakeConsole) -> None:
+    fake.register_status = 500
+    with pytest.raises(reg.RegistrationError, match="HTTP 500"):
+        reg.register(reg.load_config(FULL_VARS), PIN)
 
 
 def test_admin_error_gets_hint(fake: FakeConsole) -> None:
