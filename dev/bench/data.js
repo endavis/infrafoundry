@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795451330732,
+  "lastUpdate": 1795455120344,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6236,6 +6236,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009684911254269336",
             "extra": "mean: 125.49606194043933 usec\nrounds: 8492"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "81aea7b63beb3ca7ccc3cd4e5b1a2a1dda9d1c04",
+          "message": "fix: run the console agent's register step before setup (merges PR #1637, addresses #1636)\n\nA fresh 4.12 agent refuses setup-portal/init with HTTP 412 until its own\nsetup-portal/register step has run, which the agent's web UI does on boot\nwhen no Console login (auth0 clientId) is configured. The registration\nscript now does the same: when support-services shows no clientId it\nPOSTs setup-portal/register to the pinned agent, treats 409 as done,\nwaits for the clientId, then runs init as before.\n\nAddresses #1636\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T17:30:30Z",
+          "tree_id": "5b9dda64af94c60886799c56eb7ee5efcb82be2a",
+          "url": "https://github.com/endavis/infrafoundry/commit/81aea7b63beb3ca7ccc3cd4e5b1a2a1dda9d1c04"
+        },
+        "date": 1795455119227,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 68.20655348774325,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000364282735488127",
+            "extra": "mean: 14.661347757143313 msec\nrounds: 70"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13004.093862991242,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004531266795734077",
+            "extra": "mean: 76.89886050776144 usec\nrounds: 13671"
           }
         ]
       }
