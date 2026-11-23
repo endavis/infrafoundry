@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795445015491,
+  "lastUpdate": 1795447456226,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6122,6 +6122,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005605461849292577",
             "extra": "mean: 93.40817037976194 usec\nrounds: 11222"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e176160c0489aee9710b866cf02d96f837c1669",
+          "message": "fix: stop a rebuild whose host key pin has no private key (merges PR #1631, addresses #1630)\n\nA VM pinned while deployed records only its public key, so cloud-init\ninstalls no key on a rebuilt VM and its post-Terraform script fails after\nthe VM is created. The suggested --regenerate is then refused because\nthe failed apply deployed the VM.\n\nPlan and apply now stop before creating an undeployed VM with a\npublic-only pin and name the --regenerate command. The blueprint\nscripts' mismatch message gives the order that works (destroy,\nregenerate, apply), and the docs and --regenerate help say the same.\n\nAddresses #1630\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T15:22:20Z",
+          "tree_id": "6690cb10c5b69ecc7dda3550eaafc4be9a7848a2",
+          "url": "https://github.com/endavis/infrafoundry/commit/1e176160c0489aee9710b866cf02d96f837c1669"
+        },
+        "date": 1795447454854,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 70.64320041359896,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003438675276433666",
+            "extra": "mean: 14.155644055552981 msec\nrounds: 72"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12907.270660390324,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004832793979583627",
+            "extra": "mean: 77.47571320936096 usec\nrounds: 13672"
           }
         ]
       }
