@@ -74,7 +74,8 @@ host_key_error() {
 fail_host_key() {
     echo "ERROR: ${vm_name} (${ip_address}) does not present the pinned host key" >&2
     echo "       (ssh_host_keys.${vm_name} in the package secrets.yaml). If the VM was rebuilt," >&2
-    echo "       run 'foundry secrets host-keys --env <env> --regenerate ${vm_name}' first." >&2
+    echo "       destroy it, run 'foundry secrets host-keys --env <env> --regenerate ${vm_name}'," >&2
+    echo "       then apply again." >&2
     sed 's/^/    /' "$1" >&2
     exit 1
 }

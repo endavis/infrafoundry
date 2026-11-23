@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import io
+from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -20,7 +22,7 @@ from infrafoundry.core.orchestrator_workflows import (
 )
 from infrafoundry.core.protocols import ValidatesOffline
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
-from infrafoundry.core.state import DeploymentStatus
+from infrafoundry.core.state import DeploymentStatus, ResourceState
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.aws import AWSProvider
 from infrafoundry.providers.esxi import EsxiProvider
@@ -443,3 +445,72 @@ def test_kubernetes_plan_pass_errors_on_missing_configmap_without_touching_clust
 
     probe.assert_not_called()
     assert "missing" in h.text
+
+
+def _pinned_vm(name: str = "vm-01", public_only: bool = True) -> ResourceConfig:
+    entry = {"ed25519_public": "ssh-ed25519 AAAAExampleSentinelPublicKey0"}
+    if not public_only:
+        entry["ed25519_private"] = "SENTINEL-NOT-A-REAL-KEY"
+    return ResourceConfig(
+        name=name,
+        provider="proxmox",
+        type="vm",
+        config={"ssh_host_key": {"address": "192.0.2.10"}},
+        package_name="demo",
+        package_path="proxmox/demo",
+        package_secrets={"ssh_host_keys": {name: entry}},
+    )
+
+
+def _row(state: ResourceState, day: int = 1, name: str = "vm-01") -> SimpleNamespace:
+    return SimpleNamespace(
+        provider="proxmox", name=name, state=state, created_at=datetime(2026, 1, day, tzinfo=UTC)
+    )
+
+
+def _pinned_harness(rows: list[SimpleNamespace], vm: ResourceConfig | None = None) -> _Harness:
+    h = _Harness({"proxmox": _offline_provider(None)}, {"proxmox": [vm or _pinned_vm()]})
+    h.state.get_resources.return_value = rows
+    return h
+
+
+@pytest.mark.parametrize("rows", [[_row(ResourceState.DELETED)], []])
+def test_public_only_pin_on_undeployed_vm_stops_plan(rows: list[SimpleNamespace]) -> None:
+    h = _pinned_harness(rows)
+
+    with pytest.raises(ConfigValidationError, match="SSH host key pins block a rebuild"):
+        h.plan()
+
+    assert "--regenerate vm-01" in h.text
+    h.state.get_managed_resources.assert_not_called()
+
+
+def test_public_only_pin_on_deployed_vm_lets_plan_continue() -> None:
+    h = _pinned_harness([_row(ResourceState.ACTIVE)])
+
+    h.plan()
+
+    h.state.get_managed_resources.assert_called()
+
+
+def test_no_public_only_pin_never_reads_state_resources() -> None:
+    h = _pinned_harness([], _pinned_vm(public_only=False))
+
+    h.plan()
+
+    h.state.get_resources.assert_not_called()
+
+
+def test_rebuild_check_runs_on_dry_run() -> None:
+    h = _pinned_harness([])
+
+    with pytest.raises(ConfigValidationError):
+        h.plan(dry_run=True)
+
+
+def test_rebuild_check_ignores_vm_outside_resource_filter() -> None:
+    h = _pinned_harness([])
+
+    h.plan(resource_filter=["other"])
+
+    h.state.get_resources.assert_not_called()

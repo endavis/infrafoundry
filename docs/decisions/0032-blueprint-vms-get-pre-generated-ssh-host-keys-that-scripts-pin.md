@@ -49,6 +49,7 @@ The other SSH call sites (handler and preflight jumphost connections, ESXi, Prox
 ## Related Issues
 - Issue #1581: pin pre-generated ssh host keys for VMs built by blueprints
 - Issue #1583: the same for k3s-cluster on OCI over Tailscale SSH (OCI instances with `tailscale:`)
+- Issue #1630: a public-key-only pin needs --regenerate between destroy and rebuild; plan/apply catch it
 
 ## Related Documentation
 - [Infrastructure Packages: SSH Host Keys](../configuration/infrastructure-packages.md#ssh-host-keys)

@@ -894,7 +894,9 @@ instance that sets `ssh_host_key`, it writes `variables.ssh_host_keys.<name>` in
   refused.
 
 It prints one line per VM with a fingerprint, never a key, and exits non-zero on a refusal or
-error. Run it before the first apply and once after upgrading a package that now sets
+error. A VM pinned while deployed records only its public key, so before rebuilding it,
+destroy it, run `--regenerate <vm>`, then apply; `infra plan` and `infra apply` stop before
+creating such a VM until then. Run it before the first apply and once after upgrading a package that now sets
 `ssh_host_key`; until then `infra plan` fails.
 
 ```bash
@@ -905,7 +907,7 @@ foundry secrets host-keys --env dev --package oci/k3s-cluster
 foundry secrets host-keys --env dev --regenerate aiqum-01
 ```
 
-**Options:** `-e/--env TEXT` (required), `--package TEXT` (repeatable; package path or name), `--regenerate TEXT` (repeatable; replaces the key of a VM that is not deployed, for example before a rebuild), `--dry-run`
+**Options:** `-e/--env TEXT` (required), `--package TEXT` (repeatable; package path or name), `--regenerate TEXT` (repeatable; replaces the key of a VM that is not deployed; for a VM pinned while deployed, run it after the destroy and before the rebuild), `--dry-run`
 
 ---
 

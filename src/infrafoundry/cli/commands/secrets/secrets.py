@@ -371,7 +371,10 @@ def _host_key_candidates(
     "--regenerate",
     "regenerate",
     multiple=True,
-    help="Replace the recorded key of a VM that is not deployed. Repeatable.",
+    help=(
+        "Replace the recorded key of a VM that is not deployed; for a VM pinned while "
+        "deployed, run it after destroying the VM and before rebuilding it. Repeatable."
+    ),
 )
 @click.option("--dry-run", is_flag=True, help="Show what would be done without changing anything")
 @with_orchestrator("Host key setup failed")
@@ -402,7 +405,7 @@ def secrets_host_keys(
         # Show what would be done
         foundry secrets host-keys --env dev --dry-run
 
-        # Replace the key of a VM that is not deployed (before a rebuild)
+        # After destroying a pinned VM, replace its key before the rebuild
         foundry secrets host-keys --env dev --regenerate aiqum-01
     """
     config_manager = orchestrator.config_manager

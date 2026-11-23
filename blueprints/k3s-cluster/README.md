@@ -159,9 +159,10 @@ one key pair per node, cloud-init installs it, and the public keys reach the scr
   upgrading to a version that pins host keys. `infra plan` fails until it has run.
 - New nodes get a generated key. Nodes that already exist are pinned: the key they present
   now is recorded and the nodes are not changed.
-- Before rebuilding a node, destroy it, then run
-  `foundry secrets host-keys --env <env> --regenerate <node-name>` to give the new node a
-  fresh key.
+- A node pinned while it already existed has only its public key recorded, so before rebuilding
+  it, destroy it, run `foundry secrets host-keys --env <env> --regenerate <node-name>`, then
+  apply. `infra plan` and `infra apply` stop before creating it otherwise. A node whose key was
+  generated keeps that key across a rebuild.
 - `Host key verification failed` from a script or from Ansible means a node does not present
   the recorded key, for example after a rebuild without `--regenerate`.
 - On OCI the nodes are reached over Tailscale SSH, which presents the node's `/etc/ssh`
