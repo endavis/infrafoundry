@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795455120344,
+  "lastUpdate": 1795456888637,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6274,6 +6274,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004531266795734077",
             "extra": "mean: 76.89886050776144 usec\nrounds: 13671"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4d931d351bdcb110dcc6c6a3a480b978f0045896",
+          "message": "feat: deregister the console agent on destroy and look up its id for ontap-cluster (merges PR #1638, addresses #1629)\n\nThe console-connector blueprint now has an on_destroy handler: with the\nservice-account inputs set, it lists the Console's agents, matches those\nwhose callback address is the package's ip_address (exact host match),\nand deletes each one, so a rebuild no longer leaves stale agents. It runs\nafter the VM is gone, skips without the inputs, and fails the destroy\nwith the agent ID and the manual UI path when the Console refuses.\n\nontap-cluster gains an optional console_agent_address input; with\nconsole_agent_id empty, discovery and removal look up the single active\nagent at that address. Both use the agents-mgmt endpoints the Console web\nUI uses (undocumented). Docs drop the manual deregistration step and fix\nthe wrong system/about hint for the agent ID.\n\nAddresses #1629\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T17:59:55Z",
+          "tree_id": "224707d4247c89da94ebcf54c84d5f532c99de9f",
+          "url": "https://github.com/endavis/infrafoundry/commit/4d931d351bdcb110dcc6c6a3a480b978f0045896"
+        },
+        "date": 1795456887702,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 96.7684594865189,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004589597800650452",
+            "extra": "mean: 10.333945639997637 msec\nrounds: 100"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15599.488322511117,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010863843400251696",
+            "extra": "mean: 64.10466672531383 usec\nrounds: 17043"
           }
         ]
       }
