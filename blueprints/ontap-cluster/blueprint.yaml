@@ -253,7 +253,7 @@ events:
     - type: script
       name: ontap-cluster-setup
       script: scripts/ontap-post-terraform.sh
-      description: "Run ONTAP lab Ansible playbook after both VMs are created"
+      description: "Run ONTAP lab Ansible playbook after both VMs are created (safe to re-run)"
       timeout: 3600
       continue_on_error: false
       requires:
