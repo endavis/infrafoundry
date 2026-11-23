@@ -13,6 +13,7 @@ import ssl
 import subprocess
 import sys
 import threading
+import urllib.parse
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -56,6 +57,12 @@ class FakeAIQUM:
     def __init__(self) -> None:
         self.clusters: list[dict[str, Any]] = []
         self.post_status = 201
+        self.delete_status = 200
+        # "remove" drops the record, "start_deletion" marks it as being deleted,
+        # "none" leaves it untouched.
+        self.delete_effect = "remove"
+        # Key -> GET count after which the record vanishes (a deletion finishing).
+        self.vanish_after: dict[str, int] = {}
         self.requests: list[tuple[str, str, dict[str, str], dict[str, Any]]] = []
 
 
@@ -79,6 +86,11 @@ def fake() -> Iterator[tuple[FakeAIQUM, str]]:
             state.requests.append((method, self.path, headers, body))
             base = "/api/admin/datasources/clusters"
             if self.path == base and method == "GET":
+                for key in list(state.vanish_after):
+                    state.vanish_after[key] -= 1
+                    if state.vanish_after[key] <= 0:
+                        del state.vanish_after[key]
+                        state.clusters = [c for c in state.clusters if c.get("key") != key]
                 self._reply(200, {"records": state.clusters, "num_records": len(state.clusters)})
             elif self.path == base and method == "POST":
                 if state.post_status >= 400 and state.post_status != 409:
@@ -86,9 +98,17 @@ def fake() -> Iterator[tuple[FakeAIQUM, str]]:
                 else:
                     self._reply(state.post_status, {})
             elif self.path.startswith(base + "/") and method == "DELETE":
-                key = self.path.rsplit("/", 1)[1]
-                state.clusters = [c for c in state.clusters if c.get("key") != key]
-                self._reply(200, {})
+                key = urllib.parse.unquote(self.path.rsplit("/", 1)[1])
+                if state.delete_effect == "remove":
+                    state.clusters = [c for c in state.clusters if c.get("key") != key]
+                elif state.delete_effect == "start_deletion":
+                    for c in state.clusters:
+                        if c.get("key") == key:
+                            c["operation"] = {"type": "deletion", "state": "in_progress"}
+                if state.delete_status >= 400:
+                    self._reply(state.delete_status, {"error": "notes is null"})
+                else:
+                    self._reply(200, {})
             else:
                 self._reply(404, {})
 
@@ -109,6 +129,21 @@ def fake() -> Iterator[tuple[FakeAIQUM, str]]:
     yield state, f"127.0.0.1:{server.server_address[1]}"
     server.shutdown()
     server.server_close()
+
+
+_NO_WAIT: dict[str, Any] = {"sleep": lambda _s: None}
+KEY = "00000000-0000-0000-0000-000000000001:type=cluster,uuid=00000000-0000-0000-0000-000000000001"
+
+
+def _stale(**extra: Any) -> dict[str, Any]:
+    return {
+        "address": "192.0.2.80",
+        "name": "lab",
+        "key": KEY,
+        "status": "error",
+        "status_message": "Timed out waiting for cluster",
+        **extra,
+    }
 
 
 def _cfg(address: str, **extra: Any) -> Any:
@@ -355,3 +390,139 @@ def test_blueprint_declares_aiqum_inputs_and_destroy_event() -> None:
     assert destroy["script"] == "scripts/ontap-destroy-cleanup.sh"
     assert destroy["continue_on_error"] is True
     assert destroy["requires"] == create["requires"]
+
+
+DELETING = {"type": "deletion", "state": "in_progress"}
+
+
+@pytest.mark.parametrize(
+    ("ds", "deleting", "stale"),
+    [
+        ({"operation": DELETING}, True, True),
+        ({"operation": {"type": "Deletion", "state": "IN_PROGRESS"}}, True, True),
+        ({"operation": {"type": "deletion", "state": "completed"}}, False, False),
+        ({"operation": {"type": "addition", "state": "in_progress"}}, False, False),
+        ({}, False, False),
+        ({"operation": "deletion"}, False, False),
+        ({"operation": None, "status": "ok"}, False, False),
+        ({"status": "error"}, False, True),
+        ({"status": "ERROR"}, False, True),
+    ],
+)
+def test_is_deleting_and_is_stale(ds: dict[str, Any], deleting: bool, stale: bool) -> None:
+    assert aq.is_deleting(ds) is deleting
+    assert aq.is_stale(ds) is stale
+
+
+def test_register_waits_out_a_deletion_in_progress(fake: tuple[FakeAIQUM, str]) -> None:
+    state, address = fake
+    state.clusters = [_stale(operation=DELETING)]
+    state.vanish_after[KEY] = 3
+
+    msg = aq.register(_cfg(address), **_NO_WAIT)
+
+    assert "finish deleting" in msg
+    assert "added cluster 192.0.2.80" in msg
+    assert _calls(state, "DELETE") == []
+    assert len(_calls(state, "POST")) == 1
+
+
+def test_register_replaces_an_error_data_source(fake: tuple[FakeAIQUM, str]) -> None:
+    state, address = fake
+    state.clusters = [_stale()]
+
+    msg = aq.register(_cfg(address), **_NO_WAIT)
+
+    assert "removed stale" in msg
+    assert "added cluster 192.0.2.80" in msg
+    assert len(_calls(state, "DELETE")) == 1
+    assert len(_calls(state, "POST")) == 1
+
+
+def test_register_accepts_a_started_deletion_after_a_delete_error(
+    fake: tuple[FakeAIQUM, str],
+) -> None:
+    state, address = fake
+    state.clusters = [_stale()]
+    state.delete_status = 500
+    state.delete_effect = "start_deletion"
+    state.vanish_after[KEY] = 4
+
+    msg = aq.register(_cfg(address), **_NO_WAIT)
+
+    assert "added cluster 192.0.2.80" in msg
+    assert len(_calls(state, "POST")) == 1
+
+
+def test_register_fails_when_delete_errors_and_source_stays(fake: tuple[FakeAIQUM, str]) -> None:
+    state, address = fake
+    state.clusters = [_stale()]
+    state.delete_status = 500
+    state.delete_effect = "none"
+
+    with pytest.raises(aq.AIQUMError, match="HTTP 500"):
+        aq.register(_cfg(address), **_NO_WAIT)
+    assert _calls(state, "POST") == []
+
+
+def test_register_times_out_when_deletion_never_finishes(fake: tuple[FakeAIQUM, str]) -> None:
+    state, address = fake
+    state.clusters = [_stale(operation=DELETING)]
+    ticks = iter(range(0, 10_000, 10))
+
+    with pytest.raises(aq.AIQUMError, match="still deleting"):
+        aq.register(_cfg(address), timeout=60, interval=10, clock=lambda: next(ticks), **_NO_WAIT)
+    assert _calls(state, "POST") == []
+
+
+def test_register_stale_source_without_key_fails(fake: tuple[FakeAIQUM, str]) -> None:
+    state, address = fake
+    state.clusters = [{"address": "192.0.2.80", "name": "lab", "status": "error"}]
+
+    with pytest.raises(aq.AIQUMError, match="has no key"):
+        aq.register(_cfg(address), **_NO_WAIT)
+    assert _calls(state, "POST") == []
+
+
+def test_remove_counts_a_started_deletion_as_removed(fake: tuple[FakeAIQUM, str]) -> None:
+    state, address = fake
+    state.clusters = [_stale()]
+    state.delete_status = 500
+    state.delete_effect = "start_deletion"
+
+    msg = aq.remove(_cfg(address), **_NO_WAIT)
+
+    assert "deletion in progress" in msg
+    assert len(_calls(state, "DELETE")) == 1
+
+
+def test_remove_counts_a_vanished_source_as_removed(fake: tuple[FakeAIQUM, str]) -> None:
+    state, address = fake
+    state.clusters = [_stale()]
+    state.delete_status = 500
+    state.delete_effect = "remove"
+
+    msg = aq.remove(_cfg(address), **_NO_WAIT)
+
+    assert msg.startswith("removed from AIQUM")
+
+
+def test_remove_fails_when_delete_errors_and_source_stays(fake: tuple[FakeAIQUM, str]) -> None:
+    state, address = fake
+    state.clusters = [_stale()]
+    state.delete_status = 500
+    state.delete_effect = "none"
+
+    with pytest.raises(aq.AIQUMError, match="HTTP 500"):
+        aq.remove(_cfg(address), **_NO_WAIT)
+    assert len(_calls(state, "GET")) == 1 + aq.READBACK_ATTEMPTS
+
+
+def test_remove_does_not_delete_again_while_deleting(fake: tuple[FakeAIQUM, str]) -> None:
+    state, address = fake
+    state.clusters = [_stale(operation=DELETING)]
+
+    msg = aq.remove(_cfg(address), **_NO_WAIT)
+
+    assert "already in progress" in msg
+    assert _calls(state, "DELETE") == []

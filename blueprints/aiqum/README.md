@@ -211,8 +211,12 @@ Step 5 adds only the cluster present when AIQUM is installed. To keep AIQUM in s
 cluster rebuilds and destroys, set the optional `aiqum_*` inputs on the `ontap-cluster`
 package: `aiqum_address` and `aiqum_admin_password` (put the password in the package's
 `secrets.yaml`), plus `aiqum_admin_user` (default `umadmin`) and `aiqum_cluster_user`
-(default `admin`; its password is `ontap_password`). Create then registers the cluster
-(skipped when a data source already matches by address or name), and destroy removes it.
+(default `admin`; its password is `ontap_password`). Create then registers the cluster,
+and destroy removes it. Registration is skipped only when a matching data source (by address
+or name) is healthy. One in `error` is deleted and re-added, and a pending deletion is
+waited out (bounded, 10 minutes). Destroy counts a deletion that AIQUM has started as done,
+even when the DELETE call returns an error. A data source of a destroyed cluster that AIQUM
+has not polled yet (status still ok) is not detected.
 
 The requests carry the AIQUM admin and ONTAP passwords, so AIQUM's certificate is verified.
 For AIQUM's self-signed certificate, set `aiqum_ca_cert` to a PEM file that trusts it, for
