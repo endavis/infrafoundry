@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795466727499,
+  "lastUpdate": 1795469148989,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6388,6 +6388,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009953774695231741",
             "extra": "mean: 128.09269676652633 usec\nrounds: 8350"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b0d63feee039e367ed193ae2e5b0445801f87c2b",
+          "message": "fix: skip ontap cluster create when the cluster already exists (merges PR #1644, addresses #1643)\n\nA re-run of the ontap-cluster setup handler on a built cluster ran the\nwhole playbook again: serial setup hard-stopped both nodes and cluster\ncreate ran on node 1, which destroyed the cluster.\n\nThe serial-setup and cluster-setup playbooks now probe the cluster\nmanagement address first (new ontap-cluster-probe role). A matching\ncluster name skips node 1's serial setup and cluster create; node 2 is\nskipped too when its management address is already a cluster node. No\nanswer means nothing exists yet and setup runs as before. Any other\nanswer (another name, refused credentials, TLS or HTTP errors) stops\nthe run before either node is touched. The decision lives in a filter\nplugin so it is unit-tested without Ansible.\n\nAs a backstop, the create and join expect scripts refuse to run\ncluster setup when the console prompt already shows the configured\ncluster name; a bare prompt still runs setup.\n\nAddresses #1643\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T21:24:22Z",
+          "tree_id": "95b208d5811eebaee5ac76b5d5296d16036fb2d6",
+          "url": "https://github.com/endavis/infrafoundry/commit/b0d63feee039e367ed193ae2e5b0445801f87c2b"
+        },
+        "date": 1795469147841,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 55.362172411641176,
+            "unit": "iter/sec",
+            "range": "stddev: 0.001088531220669316",
+            "extra": "mean: 18.06287500000139 msec\nrounds: 59"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10933.98845232202,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000050516252468407585",
+            "extra": "mean: 91.45793452778275 usec\nrounds: 12112"
           }
         ]
       }
