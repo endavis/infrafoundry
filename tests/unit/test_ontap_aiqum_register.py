@@ -526,3 +526,108 @@ def test_remove_does_not_delete_again_while_deleting(fake: tuple[FakeAIQUM, str]
 
     assert "already in progress" in msg
     assert _calls(state, "DELETE") == []
+
+
+FAILED = {"type": "deletion", "state": "failed", "start_time": "T1"}
+
+
+def _script_clusters(
+    monkeypatch: pytest.MonkeyPatch, polls: list[list[dict[str, Any]]]
+) -> list[dict[str, Any]]:
+    """Serve ``polls`` one per list_clusters call (last repeats); record delete_source calls."""
+    deleted: list[dict[str, Any]] = []
+    queue = list(polls)
+    monkeypatch.setattr(
+        aq, "list_clusters", lambda _cfg: queue.pop(0) if len(queue) > 1 else queue[0]
+    )
+
+    def _delete(_cfg: Any, ds: dict[str, Any], **_kw: Any) -> str:
+        deleted.append(ds)
+        return "deleted"
+
+    monkeypatch.setattr(aq, "delete_source", _delete)
+    return deleted
+
+
+def test_wait_gone_retries_a_deletion_that_fails_mid_wait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deleted = _script_clusters(
+        monkeypatch,
+        [
+            [_stale(operation=DELETING)],
+            [_stale(operation=FAILED)],
+            [_stale(operation=DELETING)],
+            [],
+        ],
+    )
+    aq.wait_gone(_cfg("x"), [KEY], **_NO_WAIT)
+    assert len(deleted) == 1
+
+
+def test_wait_gone_raises_failure_when_retry_fails_too(monkeypatch: pytest.MonkeyPatch) -> None:
+    deleted = _script_clusters(
+        monkeypatch,
+        [
+            [_stale(operation=DELETING)],
+            [_stale(operation=FAILED)],
+            [_stale(operation={**FAILED, "start_time": "T2"})],
+        ],
+    )
+    ticks = iter(range(0, 10_000, 10))
+    with pytest.raises(aq.AIQUMError, match=r"Timed out waiting.*failed again.*by hand") as exc:
+        aq.wait_gone(_cfg("x"), [KEY], timeout=600, clock=lambda: next(ticks), **_NO_WAIT)
+    assert "still deleting" not in str(exc.value)
+    assert len(deleted) == 1
+
+
+def test_wait_gone_ignores_a_failed_deletion_from_before_the_wait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deleted = _script_clusters(
+        monkeypatch, [[_stale(operation=FAILED)], [_stale(operation=FAILED)], []]
+    )
+    aq.wait_gone(_cfg("x"), [KEY], **_NO_WAIT)
+    assert deleted == []
+
+
+def test_wait_gone_does_not_retry_without_a_new_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    # After our retry the old failed operation may still be shown; it must not count again.
+    deleted = _script_clusters(
+        monkeypatch,
+        [[_stale(operation=DELETING)], [_stale(operation=FAILED)], [_stale(operation=FAILED)], []],
+    )
+    aq.wait_gone(_cfg("x"), [KEY], **_NO_WAIT)
+    assert len(deleted) == 1
+
+
+def test_register_error_source_with_old_failed_deletion_is_replaced(
+    fake: tuple[FakeAIQUM, str],
+) -> None:
+    state, address = fake
+    state.clusters = [_stale(operation=FAILED)]
+    state.delete_effect = "none"
+    state.vanish_after[KEY] = 3
+
+    msg = aq.register(_cfg(address), **_NO_WAIT)
+
+    assert "added cluster 192.0.2.80" in msg
+    assert len(_calls(state, "DELETE")) == 1
+
+
+def test_wait_gone_resets_the_deadline_after_a_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The first failure shows up on the last poll before the deadline; without a
+    # fresh deadline the retried deletion's failure would never be observed.
+    deleted = _script_clusters(
+        monkeypatch,
+        [
+            [_stale(operation=DELETING)],
+            [_stale(operation=FAILED)],
+            [_stale(operation={**FAILED, "start_time": "T2"})],
+        ],
+    )
+    ticks = iter([0, 50, 61, 62, 63])
+    with pytest.raises(aq.AIQUMError, match=r"failed again") as exc:
+        aq.wait_gone(_cfg("x"), [KEY], timeout=60, clock=lambda: next(ticks), **_NO_WAIT)
+    assert "still deleting" not in str(exc.value)
+    assert len(deleted) == 1

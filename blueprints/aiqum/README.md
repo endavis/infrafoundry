@@ -214,7 +214,9 @@ package: `aiqum_address` and `aiqum_admin_password` (put the password in the pac
 (default `admin`; its password is `ontap_password`). Create then registers the cluster,
 and destroy removes it. Registration is skipped only when a matching data source (by address
 or name) is healthy. One in `error` is deleted and re-added, and a pending deletion is
-waited out (bounded, 10 minutes). Destroy counts a deletion that AIQUM has started as done,
+waited out (bounded, 15 minutes). A deletion that AIQUM reports as failed ends the wait early:
+the DELETE is retried once, and a second failure stops registration with AIQUM's status message
+and the advice to remove the data source in AIQUM by hand. Destroy counts a deletion that AIQUM has started as done,
 even when the DELETE call returns an error. A data source of a destroyed cluster that AIQUM
 has not polled yet (status still ok) is not detected.
 

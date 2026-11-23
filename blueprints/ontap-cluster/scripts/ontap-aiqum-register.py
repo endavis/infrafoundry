@@ -42,8 +42,9 @@ TIMEOUT = 30
 # Adding a cluster returns only after AIQUM has set up its agent link to the
 # cluster: 12 s when it works, 86 s when the cluster cannot reach AIQUM (#1167).
 ADD_TIMEOUT = 180
-# Seconds to wait for AIQUM to finish deleting a data source.
-DELETE_WAIT = 600
+# Seconds to wait for AIQUM to finish deleting a data source. AIQUM's own deletion
+# times out after about 10 minutes, so the wait must outlast it to see it fail.
+DELETE_WAIT = 900
 POLL_INTERVAL = 10
 # Read-backs after a failed DELETE, POLL_INTERVAL apart.
 READBACK_ATTEMPTS = 3
@@ -286,6 +287,21 @@ def delete_source(
     raise error
 
 
+def _failed_deletion(ds: dict[str, Any]) -> bool:
+    """Return True when the data source's last operation is a failed deletion."""
+    op = ds.get("operation")
+    return (
+        isinstance(op, dict)
+        and str(op.get("type") or "").lower() == "deletion"
+        and str(op.get("state") or "").lower() == "failed"
+    )
+
+
+def _op_start(ds: dict[str, Any]) -> object:
+    op = ds.get("operation")
+    return op.get("start_time") if isinstance(op, dict) else None
+
+
 def wait_gone(
     cfg: Config,
     keys: list[str],
@@ -297,14 +313,46 @@ def wait_gone(
 ) -> None:
     """Poll until none of the data sources in ``keys`` is listed any more.
 
+    A listed source whose deletion reports ``failed`` ends its wait early: the
+    DELETE is retried once and the wait continues. A failed deletion already
+    shown on the first poll, or left unchanged since a DELETE this wait issued,
+    is the previous operation and is ignored until the source reports a
+    different operation (another ``start_time`` or a non-failed state). The
+    retry restarts the deadline, so the retried deletion gets a full wait. The
+    retry budget lives in this call, so it never carries over between waits.
+
     Raises:
-        AIQUMError: If one is still listed after ``timeout`` seconds.
+        AIQUMError: If a deletion fails again after the retry, or a source is
+            still listed after ``timeout`` seconds.
     """
     deadline = clock() + timeout
+    retried: set[str] = set()
+    # Key -> start_time of a failed deletion that is not ours (yet).
+    ignored: dict[str, object] = {}
+    first = True
     while True:
         left = [c for c in list_clusters(cfg) if c.get("key") in keys]
         if not left:
             return
+        for c in left:
+            key = str(c.get("key"))
+            if not _failed_deletion(c):
+                ignored.pop(key, None)
+                continue
+            start = _op_start(c)
+            if first or (key in ignored and ignored[key] == start):
+                ignored[key] = start
+                continue
+            if key in retried:
+                raise AIQUMError(
+                    f"AIQUM's deletion of {_describe(c)} failed again after a retry; remove "
+                    "the data source in AIQUM by hand, then re-run apply"
+                )
+            retried.add(key)
+            delete_source(cfg, c, interval=interval, sleep=sleep)
+            ignored[key] = start
+            deadline = clock() + timeout
+        first = False
         if clock() >= deadline:
             names = ", ".join(_describe(c) for c in left)
             raise AIQUMError(
