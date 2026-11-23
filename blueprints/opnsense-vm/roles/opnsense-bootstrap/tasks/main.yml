@@ -30,6 +30,17 @@
     quiet: true
   when: opnsense_sync_bridge | length > 0
 
+- name: Check the SSH inputs
+  ansible.builtin.assert:
+    that:
+      - opnsense_ssh_authorized_keys is sequence and opnsense_ssh_authorized_keys is not string
+      - opnsense_ssh_password_auth | bool or opnsense_ssh_authorized_keys | length > 0
+    fail_msg: >-
+      ssh_enabled needs ssh_password_auth: true or at least one ssh_authorized_keys entry
+      (a list); otherwise nobody can log in.
+    quiet: true
+  when: opnsense_ssh_enabled | bool
+
 - name: Fail if the VM is already running
   ansible.builtin.command:
     cmd: "qm status {{ opnsense_vmid }}"
@@ -82,6 +93,11 @@
       descr: "{{ opnsense_sync_descr }}"
       ip: "{{ opnsense_sync_ip if opnsense_sync_bridge | length > 0 else '' }}"
       prefix: "{{ opnsense_sync_prefix | string }}"
+    opnsense_bootstrap_ssh:
+      enabled: "{{ opnsense_ssh_enabled | bool | ternary('1', '0') }}"
+      root_login: "{{ opnsense_ssh_root_login | bool | ternary('1', '0') }}"
+      password_auth: "{{ opnsense_ssh_password_auth | bool | ternary('1', '0') }}"
+      authorized_keys: "{{ opnsense_ssh_authorized_keys | map('trim') | select | list }}"
   register: wrapper_bg
   changed_when: true
   no_log: true

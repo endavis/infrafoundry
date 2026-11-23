@@ -109,6 +109,33 @@ $xmlrpc_destination = $xmlrpc_rule->addChild('destination');
 $xmlrpc_destination->addChild('network', 'opt1ip');
 $xmlrpc_destination->addChild('port', '443');
 {% endif %}
+{% if opnsense_bootstrap_ssh is defined and opnsense_bootstrap_ssh.enabled == '1' %}
+
+// Optional SSH daemon settings. The image ships with SSH off, so set every field
+// instead of relying on what it ships.
+$h = json_decode(base64_decode('{{ opnsense_bootstrap_ssh | to_json | b64encode }}'), true);
+if (!isset($cfg->system->ssh)) {
+    $cfg->system->addChild('ssh');
+}
+$ssh = $cfg->system->ssh;
+if ((string)$ssh->group === '') {
+    $ssh->group = 'admins';
+}
+$ssh->enabled = 'enabled';
+if ($h['root_login'] === '1') {
+    $ssh->permitrootlogin = '1';
+} else {
+    unset($ssh->permitrootlogin);
+}
+if ($h['password_auth'] === '1') {
+    $ssh->passwordauth = '1';
+} else {
+    unset($ssh->passwordauth);
+}
+if (count($h['authorized_keys']) > 0) {
+    $root->authorizedkeys = base64_encode(implode("\n", $h['authorized_keys']));
+}
+{% endif %}
 
 Config::getInstance()->save();
 echo "BOOTSTRAP OK\n";

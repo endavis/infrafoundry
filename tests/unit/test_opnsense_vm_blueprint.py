@@ -480,3 +480,184 @@ def test_playbook_and_role_pass_the_sync_inputs_to_the_php() -> None:
     assert defaults["opnsense_sync_if"] == "em2"
     assert defaults["opnsense_sync_descr"] == "SYNC"
     assert defaults["opnsense_sync_bridge"] == ""
+
+
+SSH_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample admin@example.com"
+SSH: dict[str, Any] = {
+    "enabled": "1",
+    "root_login": "0",
+    "password_auth": "0",
+    "authorized_keys": [SSH_KEY],
+}
+
+
+def _ssh_php(**overrides: Any) -> str:
+    return (
+        _ansible_like_env()
+        .get_template("bootstrap.php.j2")
+        .render(opnsense_bootstrap_values=VALUES, opnsense_bootstrap_ssh=SSH | overrides)
+    )
+
+
+def _blobs(php: str) -> list[Any]:
+    return [
+        json.loads(base64.b64decode(e))
+        for e in re.findall(r"base64_decode\('([A-Za-z0-9+/=]+)'\)", php)
+    ]
+
+
+def _ssh_package(tmp_path: Path, extra: str) -> dict[str, Any]:
+    package = tmp_path / "dev" / "proxmox" / "fw-test"
+    package.mkdir(parents=True)
+    source = (PACKAGE_DIR / "infrafoundry.yml").read_text()
+    (package / "infrafoundry.yml").write_text(source.rstrip("\n") + "\n" + extra)
+    loader = PackageLoader(EXAMPLE_ENVS, blueprint_resolver=BlueprintResolver(EXAMPLE_ENVS))
+    _resources, _events, variables = loader.load_package(
+        package, provider="proxmox", env_name="dev"
+    )
+    return variables
+
+
+def test_default_package_has_ssh_off(loaded: Any) -> None:
+    _resources, _events, variables = loaded
+
+    assert variables["ssh_enabled"] is False
+    assert variables["ssh_root_login"] is False
+    assert variables["ssh_password_auth"] is False
+    assert variables["ssh_authorized_keys"] == []
+
+
+def test_ssh_inputs_reach_the_package(tmp_path: Path) -> None:
+    variables = _ssh_package(
+        tmp_path, f'  ssh_enabled: true\n  ssh_authorized_keys:\n    - "{SSH_KEY}"\n'
+    )
+
+    assert variables["ssh_enabled"] is True
+    assert variables["ssh_authorized_keys"] == [SSH_KEY]
+
+
+def test_bootstrap_php_without_ssh_is_unchanged() -> None:
+    php = _bootstrap_php()
+
+    assert "ssh" not in php
+    assert "authorizedkeys" not in php
+    assert php.count("base64_decode(") == 1
+    disabled = (
+        _ansible_like_env()
+        .get_template("bootstrap.php.j2")
+        .render(opnsense_bootstrap_values=VALUES, opnsense_bootstrap_ssh=SSH | {"enabled": "0"})
+    )
+    assert disabled == php
+
+
+def test_bootstrap_php_key_only_ssh() -> None:
+    php = _ssh_php()
+
+    assert "$ssh->enabled = 'enabled';" in php
+    assert "$root->authorizedkeys = base64_encode(implode(\"\\n\", $h['authorized_keys']));" in php
+    assert "if ($h['root_login'] === '1')" in php
+    assert "if ($h['password_auth'] === '1')" in php
+    assert _blobs(php)[1] == SSH
+    assert "AAAAC3NzaC1lZDI1NTE5" not in php
+    assert php.index("$ssh->enabled") < php.index("Config::getInstance()->save();")
+
+
+def test_bootstrap_php_password_ssh() -> None:
+    php = _ssh_php(password_auth="1", root_login="1", authorized_keys=[])
+
+    blob = _blobs(php)[1]
+    assert (blob["password_auth"], blob["root_login"], blob["authorized_keys"]) == ("1", "1", [])
+    assert "$ssh->enabled = 'enabled';" in php
+
+
+def test_bootstrap_php_with_sync_and_ssh_has_three_blobs() -> None:
+    php = (
+        _ansible_like_env()
+        .get_template("bootstrap.php.j2")
+        .render(
+            opnsense_bootstrap_values=VALUES,
+            opnsense_bootstrap_sync=SYNC,
+            opnsense_bootstrap_ssh=SSH,
+        )
+    )
+
+    assert php.count("base64_decode(") == 3
+    assert php.count("addChild('rule')") == 3
+
+
+@pytest.mark.skipif(shutil.which("php") is None, reason="php is not installed")
+@pytest.mark.parametrize("overrides", [{}, {"password_auth": "1", "authorized_keys": []}])
+def test_bootstrap_php_with_ssh_is_valid_php(tmp_path: Path, overrides: dict[str, Any]) -> None:
+    script = tmp_path / "bootstrap.php"
+    script.write_text(_ssh_php(**overrides))
+
+    subprocess.run(["php", "-l", str(script)], check=True, capture_output=True)
+
+
+def test_playbook_and_role_pass_the_ssh_inputs_to_the_php() -> None:
+    import yaml
+
+    role = BLUEPRINT_DIR / "roles" / "opnsense-bootstrap"
+    playbook = yaml.safe_load((BLUEPRINT_DIR / "opnsense-bootstrap.yml").read_text())
+    tasks = yaml.safe_load((role / "tasks" / "main.yml").read_text())
+    defaults = yaml.safe_load((role / "defaults" / "main.yml").read_text())
+
+    role_vars = playbook[0]["roles"][0]["vars"]
+    for name in ("ssh_enabled", "ssh_root_login", "ssh_password_auth"):
+        assert f"INFRAFOUNDRY_VAR_{name}" in role_vars[f"opnsense_{name}"]
+        assert "default('false', true)" in role_vars[f"opnsense_{name}"]
+    assert "INFRAFOUNDRY_PACKAGE_VARS" in role_vars["opnsense_ssh_authorized_keys"]
+    assert "from_json" in role_vars["opnsense_ssh_authorized_keys"]
+    [launch] = [t for t in tasks if "opnsense_bootstrap_ssh" in t.get("vars", {})]
+    ssh = launch["vars"]["opnsense_bootstrap_ssh"]
+    for field in ("enabled", "root_login", "password_auth"):
+        assert "ternary('1', '0')" in ssh[field]
+    assert defaults["opnsense_ssh_enabled"] is False
+    assert defaults["opnsense_ssh_root_login"] is False
+    assert defaults["opnsense_ssh_password_auth"] is False
+    assert defaults["opnsense_ssh_authorized_keys"] == []
+
+
+def _truthy(value: Any) -> bool:
+    return value is True or str(value).lower() in ("true", "1", "yes")
+
+
+def _ssh_check_passes(**role_vars: Any) -> bool | None:
+    """Evaluate the role's SSH assert; None when its `when` skips the task."""
+    import yaml
+
+    tasks = yaml.safe_load(
+        (BLUEPRINT_DIR / "roles" / "opnsense-bootstrap" / "tasks" / "main.yml").read_text()
+    )
+    [task] = [t for t in tasks if t["name"] == "Check the SSH inputs"]
+    env = Environment(undefined=StrictUndefined)
+    env.filters["bool"] = _truthy
+
+    def evaluate(expr: str) -> bool:
+        return env.from_string("{{ " + expr + " }}").render(**role_vars) == "True"
+
+    if not evaluate(task["when"]):
+        return None
+    return all(evaluate(expr) for expr in task["ansible.builtin.assert"]["that"])
+
+
+@pytest.mark.parametrize(
+    ("role_vars", "expected"),
+    [
+        ({"enabled": "true", "password": "false", "keys": []}, False),
+        ({"enabled": "true", "password": "true", "keys": []}, True),
+        ({"enabled": "true", "password": "false", "keys": [SSH_KEY]}, True),
+        ({"enabled": "false", "password": "false", "keys": []}, None),
+        ({"enabled": "true", "password": "false", "keys": SSH_KEY}, False),
+    ],
+)
+def test_role_refuses_ssh_with_no_way_to_log_in(
+    role_vars: dict[str, Any], expected: bool | None
+) -> None:
+    result = _ssh_check_passes(
+        opnsense_ssh_enabled=role_vars["enabled"],
+        opnsense_ssh_password_auth=role_vars["password"],
+        opnsense_ssh_authorized_keys=role_vars["keys"],
+    )
+
+    assert result is expected

@@ -91,6 +91,26 @@ inputs:
     description: "Also allow api_allow_cidr to reach the web GUI/API (TCP 443) on the LAN address through the WAN. Set it when the opnsense provider's api_url is the LAN address"
     type: boolean
     default: false
+
+  # --- SSH (applied once, at first boot) ---
+  # OPNsense 26.1 has no API for these, so the bootstrap writes them into config.xml.
+  # The three inputs after ssh_enabled are ignored unless it is true.
+  - name: ssh_enabled
+    description: "Enable the SSH daemon at first boot. Needs ssh_password_auth or ssh_authorized_keys, or nobody can log in. Reaching TCP 22 needs a firewall rule from the opnsense provider"
+    type: boolean
+    default: false
+  - name: ssh_root_login
+    description: "Permit root login over SSH (only with ssh_enabled)"
+    type: boolean
+    default: false
+  - name: ssh_password_auth
+    description: "Permit password authentication over SSH (only with ssh_enabled)"
+    type: boolean
+    default: false
+  - name: ssh_authorized_keys
+    description: "Public keys written to root's authorized keys (only with ssh_enabled)"
+    type: list
+    default: []
   - name: boot_timeout
     description: "Seconds to wait for the first login prompt on the serial console"
     type: integer
