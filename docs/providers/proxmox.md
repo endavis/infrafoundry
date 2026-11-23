@@ -214,7 +214,14 @@ Rules:
   unknown key fails at plan time.
 - Changing `customize` (or the image) replaces the template. Templates default to
   `prevent_destroy: true`, so set `prevent_destroy: false` first. Existing full
-  clones are not affected.
+  clones are not affected. Every `download_image` template carries a
+  `template_build_<name>` marker that changes with the downloaded image and the
+  package list, so adding `customize` to an existing template also replaces it
+  instead of updating it in place.
+- The marker only triggers a replacement once it exists. A template applied before
+  the marker was introduced gets it as a first-time create, which replaces
+  nothing. Apply once with the template unchanged, then add `customize`: adding
+  both in the same apply updates the template in place and keeps the stock image.
 
 ### Cloning a template in the same apply
 

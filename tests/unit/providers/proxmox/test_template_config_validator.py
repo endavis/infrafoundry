@@ -291,7 +291,8 @@ class TestCustomizeRendering:
         assert f"--install {shlex.quote('qemu-guest-agent,curl')}" in content
         assert 'input = "tank:import/y-customized.qcow2"' in content
         assert "import_from  = terraform_data.template_customize_tpl_a.output" in content
-        assert "replace_triggered_by = [terraform_data.template_customize_tpl_a]" in content
+        assert "replace_triggered_by = [terraform_data.template_build_tpl_a]" in content
+        assert "replace_triggered_by = [terraform_data.template_customize_tpl_a]" not in content
         assert (
             "download_id = proxmox_virtual_environment_download_file.cloud_image_tpl_a.id"
             in content
@@ -305,12 +306,40 @@ class TestCustomizeRendering:
     def test_without_customize_unchanged(self, provider: ProxmoxProvider) -> None:
         tpl = _tpl(**self._CFG)
         content = self._generate(provider, tpl)
-        assert "terraform_data" not in content
+        assert 'resource "terraform_data" "template_build_tpl"' in content
+        assert 'customize_packages = ""' in content
+        assert "template_customize_" not in content
         assert "virt-customize" not in content
         assert (
             "import_from  = proxmox_virtual_environment_download_file.cloud_image_tpl.id" in content
         )
         assert content == provider.render_template("proxmox/templates.tf.j2", {"templates": [tpl]})
+
+    def test_build_identity_with_customize(self, provider: ProxmoxProvider) -> None:
+        tpl = _tpl("tpl-a", customize={"packages": ["qemu-guest-agent", "curl"]}, **self._CFG)
+        content = self._generate(provider, tpl)
+        assert 'resource "terraform_data" "template_build_tpl_a"' in content
+        assert 'customize_packages = "qemu-guest-agent,curl"' in content
+        assert (
+            "download_id        = proxmox_virtual_environment_download_file.cloud_image_tpl_a.id"
+            in content
+        )
+        assert "replace_triggered_by = [terraform_data.template_build_tpl_a]" in content
+        assert "replace_triggered_by = [terraform_data.template_customize" not in content
+
+    def test_build_identity_without_customize(self, provider: ProxmoxProvider) -> None:
+        content = self._generate(provider, _tpl(**self._CFG))
+        assert 'resource "terraform_data" "template_build_tpl"' in content
+        assert 'customize_packages = ""' in content
+        assert "replace_triggered_by = [terraform_data.template_build_tpl]" in content
+        assert "template_customize_" not in content
+
+    def test_clone_template_has_no_build_identity(self, provider: ProxmoxProvider) -> None:
+        tpl = _tpl("tpl-c", vmid=9001, clone=100, network={"bridge": "vmbr0"})
+        content = self._generate(provider, tpl)
+        assert "template_build_" not in content
+        assert "template_customize_" not in content
+        assert "replace_triggered_by" not in content
 
 
 @pytest.mark.parametrize(
