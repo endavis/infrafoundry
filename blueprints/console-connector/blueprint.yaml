@@ -43,8 +43,11 @@ inputs:
     description: "UNVERIFIED sizing (not stated on the install page); override as needed"
     default: 32768
   - name: balloon
-    description: "Minimum memory in MiB the host may shrink the VM to, so it can reclaim guest cache; 0 keeps the provider default (balloon device on, never shrunk)"
+    description: "Minimum memory in MiB the host may shrink the VM to, so it can reclaim guest cache; 0 keeps the provider default (balloon device on, never shrunk). The agent install raises it to memory temporarily, then restores it"
     default: 0
+  - name: pve_host
+    description: "Address to SSH to target_node as root, used only when balloon is set (the install raises the balloon minimum, then restores it); empty: target_node"
+    default: ""
   - name: disk_size
     description: "GiB; /opt needs 120 GiB and /var needs 40 GiB, both on this disk"
     default: 180
