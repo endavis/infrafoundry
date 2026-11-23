@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795462576034,
+  "lastUpdate": 1795466727499,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6350,6 +6350,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000006940674599524702",
             "extra": "mean: 92.5291689042198 usec\nrounds: 12066"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b927fe9f919366ce8ac76700c6ded8f10e6bcc21",
+          "message": "fix: notice a failed aiqum deletion instead of waiting it out (merges PR #1642, addresses #1641)\n\nwait_gone now treats a listed data source whose deletion reports failed\nas finished: it retries the DELETE once, restarts the deadline so the\nretried deletion gets a full wait, and raises a failure error (with\nAIQUM's status message and the advice to remove the source by hand) if\nthe retry fails too. A failed deletion already shown before this wait,\nor unchanged since a DELETE it issued, is the previous operation and is\nignored until the source reports a different one.\n\nDELETE_WAIT rises from 600 to 900 seconds: AIQUM's own deletion gives\nup after about 10 minutes, so a wait of the same length could miss it.\n\nAddresses #1641\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T20:44:05Z",
+          "tree_id": "1e9dde677b9900e302062e087ccc03055c6c71e1",
+          "url": "https://github.com/endavis/infrafoundry/commit/b927fe9f919366ce8ac76700c6ded8f10e6bcc21"
+        },
+        "date": 1795466726649,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 45.939040764923696,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006781660915395867",
+            "extra": "mean: 21.767977374998654 msec\nrounds: 48"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7806.846332720227,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009953774695231741",
+            "extra": "mean: 128.09269676652633 usec\nrounds: 8350"
           }
         ]
       }
