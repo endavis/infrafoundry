@@ -8,7 +8,8 @@ an `on_create` handler that installs Docker Engine and the agent.
 scripted (see [Scripted registration](#scripted-registration)); without the
 service account inputs it is a manual browser step. An `ontap-cluster` package can add itself
 through the agent (see [Add the ONTAP cluster](#add-the-ontap-cluster)).
-Deregistering the agent is a manual step documented below.
+Destroy removes the agent from the Console when the service account inputs are set
+(see [Deregistration on destroy](#deregistration-on-destroy)).
 
 Requirements come from
 <https://docs.netapp.com/us-en/console-setup-admin/task-install-agent-on-prem.html>.
@@ -175,6 +176,9 @@ infra apply --package console-connector
        +-- Phase 4: wait for https://<ip>
        +-- Phase 5: register the agent (console-connector-register.py), or
                     print the manual registration steps
+
+on destroy (after the VM is gone):
+       +-- console-connector-register.py --remove deregisters the agent
 ```
 
 The remote script runs on the VM (Ubuntu 24.04, `apt`), not on the jumphost; see
@@ -207,6 +211,26 @@ exactly that certificate. The NetApp endpoints use normal verification. The
 secret is read from the environment, never passed on a command line or printed. A `User is not associated as admin` error
 means the service account lacks an admin role.
 
+### Deregistration on destroy
+
+With the three service account inputs set, `infra destroy` also removes the agent from
+the Console. The `on_destroy` handler runs after the VM is gone, which matches NetApp's
+UI procedure (stop the VM, then remove the inactive agent).
+
+- It lists the Console's agents and deletes every one whose callback address host equals
+  `ip_address`, so stale agents left by earlier rebuilds at that address go too.
+- Without the inputs it skips; with only some of them it fails.
+- If the Console refuses, the destroy fails with a message naming the agent ID. A rerun
+  will not retry, because the VM is already gone: remove the agent in the Console under
+  Agents > Manage agents, or run the script with `INFRAFOUNDRY_PACKAGE_VARS` set and
+  `--remove`.
+- The `agents-mgmt` endpoints are undocumented; the Console web UI uses them. The DELETE
+  with a service-account token is not yet verified live.
+- Destroy the `ontap-cluster` packages that use the agent first, in a separate run: their
+  Console removal goes through the agent.
+- With `jumphost` set the handler still runs where the other Console calls run and must
+  reach the NetApp endpoints.
+
 ## Manual steps
 
 ### Register the agent (without a service account)
@@ -219,14 +243,10 @@ means the service account lacks an admin role.
 ### Add the ONTAP cluster
 
 An `ontap-cluster` package adds itself to the Console through this agent when
-its `console_client_id`, `console_client_secret` and `console_agent_id` inputs
-are set. See `example-config/envs/dev/proxmox/ontap-cluster/README.md`. For any
+its `console_client_id`, `console_client_secret` and `console_agent_id` (or
+`console_agent_address`, this package's `ip_address`) inputs are set. See `example-config/envs/dev/proxmox/ontap-cluster/README.md`. For any
 other cluster, add it in the NetApp Console through the registered agent.
 
-### Deregister before destroy
-
-`infra destroy` removes the VM and the DHCP reservation only. Remove the agent
-from the NetApp Console first, or its entry stays behind.
 
 ## Notes
 

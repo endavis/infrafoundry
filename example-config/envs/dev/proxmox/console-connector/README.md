@@ -16,7 +16,7 @@ foundry secrets host-keys --env dev --package console-connector
 # Deploy the VM, DHCP reservation and the agent install
 foundry infra apply --env dev --package console-connector
 
-# Destroy (deregister the agent in the NetApp Console first)
+# Destroy (also deregisters the agent when the service account inputs are set)
 foundry infra destroy --env dev --package console-connector
 ```
 

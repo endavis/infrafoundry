@@ -188,9 +188,9 @@ inputs:
     default: true
 
   # --- NetApp Console discovery (optional) ---
-  # Set console_client_id, console_client_secret and console_agent_id to add the
-  # cluster to the NetApp Console through that agent after setup. Leave all three
-  # empty to skip. Put the client ID and secret in secrets.yaml. Destroying the
+  # Set console_client_id, console_client_secret and one of console_agent_id /
+  # console_agent_address to add the cluster to the NetApp Console through that agent
+  # after setup. Leave them all empty to skip. Put the client ID and secret in secrets.yaml. Destroying the
   # package removes the cluster from the Console again (#1225).
   - name: console_client_id
     description: "NetApp Console service account client ID; enables discovery"
@@ -199,7 +199,10 @@ inputs:
     description: "NetApp Console service account secret (secret; set in secrets.yaml)"
     default: ""
   - name: console_agent_id
-    description: "Console agent ID, e.g. from https://<agent>/occm/api/occm/system/about"
+    description: "Console agent ID; empty: look it up by console_agent_address"
+    default: ""
+  - name: console_agent_address
+    description: "Address of the Console agent VM (the console-connector package's ip_address); used when console_agent_id is empty"
     default: ""
   - name: console_account_id
     description: "Console organization ID; empty: the only one the service account sees"

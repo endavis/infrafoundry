@@ -79,7 +79,7 @@ inputs:
     description: 'Extra installer flags, e.g. "--proxy http://proxy:3128 --cacert /path/ca.pem"'
     default: ""
 
-  # --- Optional scripted registration (all three of id/secret/email, or none) ---
+  # --- Optional scripted registration and deregistration on destroy (all three of id/secret/email, or none) ---
   - name: console_client_id
     description: "Service account client ID (NetApp Console). Enables scripted registration"
     default: ""
@@ -117,6 +117,15 @@ events:
       script: scripts/console-connector-post-terraform.sh
       description: "Install Docker and the NetApp Console agent (registers it when service account inputs are set)"
       timeout: 3600
+      continue_on_error: false
+      requires:
+        - "{{ vm_name }}"
+  on_destroy:
+    - type: script
+      name: console-connector-deregister
+      script: scripts/console-connector-destroy.sh
+      description: "Remove the agent from the NetApp Console (when service account inputs are set)"
+      timeout: 300
       continue_on_error: false
       requires:
         - "{{ vm_name }}"

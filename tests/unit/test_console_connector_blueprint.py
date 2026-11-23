@@ -26,6 +26,7 @@ PACKAGE_DIR = EXAMPLE_ENVS / "dev" / "proxmox" / "console-connector"
 SCRIPTS_DIR = REPO_ROOT / "blueprints" / "console-connector" / "scripts"
 POST_SCRIPT = SCRIPTS_DIR / "console-connector-post-terraform.sh"
 REMOTE_SCRIPT = SCRIPTS_DIR / "console-connector-install-remote.sh"
+DESTROY_SCRIPT = SCRIPTS_DIR / "console-connector-destroy.sh"
 
 
 @pytest.fixture
@@ -92,6 +93,56 @@ def test_on_create_event_points_at_executable_script(loader: PackageLoader) -> N
     assert script.stat().st_mode & 0o111
 
 
+def test_on_destroy_event_points_at_executable_script(loader: PackageLoader) -> None:
+    """The on_destroy handler deregisters the agent and fails the destroy on error (#1629)."""
+    _resources, events, _variables = loader.load_package(
+        PACKAGE_DIR, provider="proxmox", env_name="dev"
+    )
+    handlers = events["on_destroy"]
+    assert len(handlers) == 1
+    handler = handlers[0]
+    assert handler["type"] == "script"
+    assert handler["requires"] == ["console-connector"]
+    assert handler["continue_on_error"] is False
+    script = Path(handler["script"])
+    assert script.name == "console-connector-destroy.sh"
+    assert script.is_file()
+    assert script.stat().st_mode & 0o111
+
+
+def test_destroy_script_calls_remove_without_secrets_on_argv() -> None:
+    """The destroy script runs the helper with --remove and passes no secret."""
+    text = DESTROY_SCRIPT.read_text()
+    assert "console-connector-register.py" in text
+    assert "--remove" in text
+    assert "console_client_secret" not in text
+
+
+def _run_destroy(package_vars: str) -> subprocess.CompletedProcess[str]:
+    env = {
+        **os.environ,
+        "INFRAFOUNDRY_BLUEPRINT_DIR": str(REPO_ROOT / "blueprints" / "console-connector"),
+        "INFRAFOUNDRY_PACKAGE_VARS": package_vars,
+    }
+    return subprocess.run(
+        ["bash", str(DESTROY_SCRIPT)], capture_output=True, text=True, env=env, timeout=60
+    )
+
+
+def test_destroy_script_skips_without_service_account_vars() -> None:
+    """No console_* inputs: exit 0 with the skip line, no network."""
+    result = _run_destroy('{"ip_address": "192.0.2.5"}')
+    assert result.returncode == 0, result.stderr
+    assert "Deregistration skipped" in result.stdout
+
+
+def test_destroy_script_fails_on_partial_vars() -> None:
+    """Partial inputs: exit 1 with the manual-removal hint on stderr."""
+    result = _run_destroy('{"ip_address": "192.0.2.5", "console_client_id": "cid"}')
+    assert result.returncode == 1
+    assert "Agents > Manage agents" in result.stderr
+
+
 def test_balloon_is_rendered_when_set(tmp_path: Path) -> None:
     """A non-zero balloon input becomes the VM's balloon minimum (#1183)."""
     envs = tmp_path / "envs"
@@ -150,7 +201,9 @@ def test_missing_required_input_fails(tmp_path: Path) -> None:
         loader.load_package(pkg, provider="proxmox", env_name="test")
 
 
-@pytest.mark.parametrize("script", [POST_SCRIPT, REMOTE_SCRIPT], ids=lambda p: p.name)
+@pytest.mark.parametrize(
+    "script", [POST_SCRIPT, REMOTE_SCRIPT, DESTROY_SCRIPT], ids=lambda p: p.name
+)
 def test_scripts_are_valid_bash(script: Path) -> None:
     """Both scripts pass ``bash -n`` and are executable."""
     result = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True)

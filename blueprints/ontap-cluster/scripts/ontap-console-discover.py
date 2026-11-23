@@ -7,8 +7,12 @@ included) from the environment. No secret is taken from argv or printed.
 With ``--remove`` the script instead deletes the cluster's working environment(s)
 from the NetApp Console (used by the blueprint's ``on_destroy`` event, #1225).
 
-Discovery runs only when ``console_client_id``, ``console_client_secret`` and
-``console_agent_id`` are all set. With none of them set it logs a skip and exits 0;
+Discovery runs only when ``console_client_id``, ``console_client_secret`` and an agent
+are set. The agent is named by ``console_agent_id`` or, when that is empty, by
+``console_agent_address`` (the Console agent VM's address): the script then looks the
+agent ID up in the Console's agent list and uses the one active agent registered at that
+address (#1629). The ``agents-mgmt`` list endpoint is undocumented; it is what the
+Console web UI uses. With none of the inputs set the script logs a skip and exits 0;
 with only some set it fails and names the missing ones.
 
 Every call goes to the NetApp Console API with normal certificate verification. The
@@ -22,6 +26,7 @@ Stdlib only (see docs/development/blueprint-script-portability.md).
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import json
 import os
 import sys
@@ -35,6 +40,7 @@ TOKEN_URL = "https://netapp-cloud-account.auth0.com/oauth/token"  # nosec B105  
 TOKEN_AUDIENCE = "https://api.cloud.netapp.com"  # nosec B105  # OAuth endpoint URL, not a secret
 API_URL = "https://api.bluexp.netapp.com"
 ACCOUNTS_PATH = "/tenancy/account"
+CONNECTORS_PATH = "/agents-mgmt/list-connectors/{account}"
 WORKSPACES_PATH = "/tenancy/account/{account}/workspace"
 ONPREM_PATH = "/occm/api/onprem/working-environments"
 TIMEOUT = 120
@@ -55,6 +61,7 @@ class Config:
     client_id: str
     client_secret: str
     agent_id: str
+    agent_address: str
     account_id: str
     workspace_id: str
 
@@ -76,10 +83,17 @@ def load_config(package_vars: dict[str, Any]) -> Config | None:
     def get(key: str) -> str:
         return str(package_vars.get(key) or "").strip()
 
-    required = ("console_client_id", "console_client_secret", "console_agent_id")
-    missing = [k for k in required if not get(k)]
-    if len(missing) == len(required):
+    keys = (
+        "console_client_id",
+        "console_client_secret",
+        "console_agent_id",
+        "console_agent_address",
+    )
+    if not any(get(k) for k in keys):
         return None
+    missing = [k for k in keys[:2] if not get(k)]
+    if not (get("console_agent_id") or get("console_agent_address")):
+        missing.append("console_agent_id or console_agent_address")
     if missing:
         raise DiscoveryError("discovery is partly configured; also set: " + ", ".join(missing))
     for key in ("cluster_mgmt_ip", "ontap_password"):
@@ -93,6 +107,7 @@ def load_config(package_vars: dict[str, Any]) -> Config | None:
         client_id=get("console_client_id"),
         client_secret=get("console_client_secret"),
         agent_id=get("console_agent_id"),
+        agent_address=get("console_agent_address"),
         account_id=get("console_account_id"),
         workspace_id=get("console_workspace_id"),
     )
@@ -224,19 +239,26 @@ def fetch_token(cfg: Config) -> str:
     return token
 
 
-def resolve_workspace(cfg: Config, token: str) -> str:
-    """Return the workspace to add the cluster to."""
-    if cfg.workspace_id:
-        return cfg.workspace_id
+def resolve_account(cfg: Config, token: str) -> str:
+    """Return the Console account ID (configured, or the only one the token sees)."""
+    if cfg.account_id:
+        return cfg.account_id
     accounts = _request(API_URL + ACCOUNTS_PATH, token=token)
-    account = choose_one(
-        cfg.account_id,
+    return choose_one(
+        "",
         accounts if isinstance(accounts, list) else [],
         "accountPublicId",
         "accountName",
         "account",
         "console_account_id",
     )
+
+
+def resolve_workspace(cfg: Config, token: str) -> str:
+    """Return the workspace to add the cluster to."""
+    if cfg.workspace_id:
+        return cfg.workspace_id
+    account = resolve_account(cfg, token)
     workspaces = _request(API_URL + WORKSPACES_PATH.format(account=account), token=token)
     return choose_one(
         "",
@@ -248,6 +270,85 @@ def resolve_workspace(cfg: Config, token: str) -> str:
     )
 
 
+def _occms(listing: Any) -> list[dict[str, Any]]:
+    """Flatten a list-connectors response into occm dicts (tolerates three shapes)."""
+    entries = listing if isinstance(listing, list) else [listing]
+    occms: list[dict[str, Any]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        nested = entry.get("occms")
+        if isinstance(nested, list):
+            occms.extend(o for o in nested if isinstance(o, dict))
+        else:
+            occms.append(entry)
+    return occms
+
+
+def _callback_host(uri: str) -> str:
+    """Return the lowercase host of a callback URI (scheme optional), or ''."""
+    text = uri.strip()
+    if not text:
+        return ""
+    try:
+        return (urllib.parse.urlsplit(text if "//" in text else "//" + text).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def agents_at_address(listing: Any, address: str) -> list[tuple[str, str]]:
+    """Return ``(agent_id, status)`` for every listed agent whose callback host is address.
+
+    Entries with no agent ID are skipped. The host is compared exactly, not as a substring.
+    """
+    wanted = address.strip().lower()
+    found: list[tuple[str, str]] = []
+    for occm in _occms(listing):
+        agent = occm.get("agent") if isinstance(occm.get("agent"), dict) else {}
+        agent_id = str(agent.get("agentId") or occm.get("agentId") or "")
+        if not agent_id or not wanted:
+            continue
+        if _callback_host(str(occm.get("primaryCallbackUri") or "")) != wanted:
+            continue
+        status = str(occm.get("status") or agent.get("status") or "")
+        found.append((agent_id, status))
+    return found
+
+
+def resolve_agent(cfg: Config, token: str) -> str:
+    """Return the Console agent ID: the configured one, or the active agent at the address.
+
+    Raises:
+        DiscoveryError: If no single active agent is registered at the address.
+    """
+    if cfg.agent_id:
+        return cfg.agent_id
+    account = resolve_account(cfg, token)
+    listing = _request(
+        API_URL + CONNECTORS_PATH.format(account=urllib.parse.quote(account, safe="")),
+        token=token,
+    )
+    matches = agents_at_address(listing, cfg.agent_address)
+    active = [agent_id for agent_id, status in matches if status == "active"]
+    if len(active) == 1:
+        return active[0]
+    if len(active) > 1:
+        raise DiscoveryError(
+            f"more than one active Console agent is registered at {cfg.agent_address}; "
+            "set console_agent_id to one of: " + ", ".join(active)
+        )
+    if not matches:
+        raise DiscoveryError(
+            f"no Console agent registered at {cfg.agent_address}; register the "
+            "console-connector first or set console_agent_id"
+        )
+    listed = ", ".join(f"{agent_id} ({status or 'unknown'})" for agent_id, status in matches)
+    raise DiscoveryError(
+        f"no active Console agent at {cfg.agent_address}; found: {listed}. "
+        "Set console_agent_id once one is active"
+    )
+
+
 def discover(cfg: Config) -> str:
     """Add the cluster unless the Console already has it.
 
@@ -255,6 +356,7 @@ def discover(cfg: Config) -> str:
         A one-line result message.
     """
     token = fetch_token(cfg)
+    cfg = dataclasses.replace(cfg, agent_id=resolve_agent(cfg, token))
     url = API_URL + ONPREM_PATH
     # The listing leaves ontapClusterProperties (and so the address) null unless asked for.
     systems = _request(f"{url}?fields=ontapClusterProperties", token=token, agent_id=cfg.agent_id)
@@ -286,6 +388,7 @@ def remove(cfg: Config) -> str:
         A one-line result message.
     """
     token = fetch_token(cfg)
+    cfg = dataclasses.replace(cfg, agent_id=resolve_agent(cfg, token))
     url = API_URL + ONPREM_PATH
     systems = _request(f"{url}?fields=ontapClusterProperties", token=token, agent_id=cfg.agent_id)
     matches = find_all_matching(systems if isinstance(systems, list) else [], cfg)

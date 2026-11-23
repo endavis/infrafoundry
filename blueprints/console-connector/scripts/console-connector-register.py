@@ -8,6 +8,12 @@ Registration runs only when ``console_client_id``, ``console_client_secret`` and
 ``console_admin_email`` are all set. With none of them set it logs a skip and
 exits 0; with only some set it fails and names the missing ones.
 
+With ``--remove`` the script instead deregisters the agent from the Console (used by
+the blueprint's ``on_destroy`` event, #1629): it lists the Console's agents, picks every
+one whose callback address host equals ``ip_address`` and deletes it. It makes Console
+calls only, so it needs no ``--agent-cert``. The ``agents-mgmt`` endpoints are
+undocumented; they are what the Console web UI uses.
+
 Every request to the agent is TLS-pinned to the agent's own certificate, passed as
 a PEM file path with ``--agent-cert``, so neither the bearer token nor the setup
 status is exchanged with any other server.
@@ -24,6 +30,7 @@ import ssl
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,6 +39,8 @@ from typing import Any
 TOKEN_URL = "https://netapp-cloud-account.auth0.com/oauth/token"  # nosec B105  # OAuth endpoint URL, not a secret
 TOKEN_AUDIENCE = "https://api.cloud.netapp.com"  # nosec B105  # OAuth endpoint URL, not a secret
 ACCOUNTS_URL = "https://api.bluexp.netapp.com/tenancy/account"
+CONNECTORS_URL = "https://api.bluexp.netapp.com/agents-mgmt/list-connectors"
+AGENT_MGMT_URL = "https://api.bluexp.netapp.com/agents-mgmt/agent"
 AGENT_URL_TEMPLATE = "https://{ip}/occm/api/occm"
 TIMEOUT = 30
 PORTAL_POLL_INTERVAL = 2.0
@@ -325,6 +334,86 @@ def register(cfg: Config, pin: str) -> str:
     return "registered"
 
 
+def _occms(listing: Any) -> list[dict[str, Any]]:
+    """Flatten a list-connectors response into occm dicts (tolerates three shapes)."""
+    entries = listing if isinstance(listing, list) else [listing]
+    occms: list[dict[str, Any]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        nested = entry.get("occms")
+        if isinstance(nested, list):
+            occms.extend(o for o in nested if isinstance(o, dict))
+        else:
+            occms.append(entry)
+    return occms
+
+
+def _callback_host(uri: str) -> str:
+    """Return the lowercase host of a callback URI (scheme optional), or ''."""
+    text = uri.strip()
+    if not text:
+        return ""
+    try:
+        return (urllib.parse.urlsplit(text if "//" in text else "//" + text).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def agents_at_address(listing: Any, address: str) -> list[tuple[str, str]]:
+    """Return ``(agent_id, status)`` for every listed agent whose callback host is address.
+
+    Entries with no agent ID are skipped. The host is compared exactly, not as a substring.
+    """
+    wanted = address.strip().lower()
+    found: list[tuple[str, str]] = []
+    for occm in _occms(listing):
+        agent = occm.get("agent") if isinstance(occm.get("agent"), dict) else {}
+        agent_id = str(agent.get("agentId") or occm.get("agentId") or "")
+        if not agent_id or not wanted:
+            continue
+        if _callback_host(str(occm.get("primaryCallbackUri") or "")) != wanted:
+            continue
+        status = str(occm.get("status") or agent.get("status") or "")
+        found.append((agent_id, status))
+    return found
+
+
+def deregister(cfg: Config) -> str:
+    """Remove every Console agent registered at ``cfg.ip``.
+
+    Returns:
+        A one-line result message.
+
+    Raises:
+        RegistrationError: On any failure; a refused DELETE names the agent ID.
+    """
+    token = fetch_token(cfg)
+    account = cfg.account_id
+    if not account:
+        listed = _request(ACCOUNTS_URL, token=token)
+        account = choose_account("", listed if isinstance(listed, list) else [])
+    listing = _request(f"{CONNECTORS_URL}/{urllib.parse.quote(account, safe='')}", token=token)
+    matches = agents_at_address(listing, cfg.ip)
+    if not matches:
+        return f"no Console agent registered at {cfg.ip}; nothing to do"
+    removed: list[str] = []
+    for agent_id, _status in matches:
+        try:
+            _request(
+                f"{AGENT_MGMT_URL}/{urllib.parse.quote(agent_id, safe='')}",
+                method="DELETE",
+                token=token,
+            )
+        except RegistrationError as exc:
+            raise RegistrationError(
+                f"{redact(str(exc), [token])}. Remove agent {agent_id} in the NetApp Console under "
+                "Agents > Manage agents"
+            ) from None
+        removed.append(agent_id)
+    return "removed Console agent(s): " + ", ".join(removed)
+
+
 def _agent_cert_arg(argv: list[str]) -> str:
     """Return the value of --agent-cert from argv, or ''."""
     for i, arg in enumerate(argv):
@@ -338,6 +427,7 @@ def _agent_cert_arg(argv: list[str]) -> str:
 def main(argv: list[str] | None = None) -> int:
     """Entry point; returns the process exit code."""
     args = sys.argv[1:] if argv is None else argv
+    removing = "--remove" in args
     raw = os.environ.get("INFRAFOUNDRY_PACKAGE_VARS", "")
     if not raw:
         print("ERROR: INFRAFOUNDRY_PACKAGE_VARS is not set", file=sys.stderr)
@@ -349,9 +439,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     if cfg is None:
-        print("  Registration skipped: console_client_id/secret/admin_email not set")
+        action = "Deregistration" if removing else "Registration"
+        print(f"  {action} skipped: console_client_id/secret/admin_email not set")
         return 0
     secrets = [cfg.client_secret, cfg.client_id]
+    if removing:
+        try:
+            print(f"  {deregister(cfg)}")
+        except RegistrationError as exc:
+            print(
+                f"ERROR: Console agent deregistration: {redact(str(exc), secrets)}", file=sys.stderr
+            )
+            return 1
+        return 0
     try:
         pin = load_pin(_agent_cert_arg(args))
         result = register(cfg, pin)
