@@ -414,8 +414,8 @@ def test_raise_balloon_targets_the_node(tmp_path: Path, pve_host: str, target: s
         tmp_path, "raise_balloon", variables={"pve_host": pve_host} if pve_host else None
     )
     assert result.returncode == 0, result.stderr
-    # The EXIT trap adds the restore after the raise.
-    assert len(calls) == 2
+    # The raise is the qm set plus the monitor call; the EXIT trap adds the restore.
+    assert len(calls) == 3
     assert target in calls[0]
     assert calls[0].endswith("qm set 230 --balloon 14336")
     assert "StrictHostKeyChecking=yes" in calls[0]
@@ -425,9 +425,9 @@ def test_balloon_restored_when_install_fails(tmp_path: Path) -> None:
     """A failure after the raise still restores the configured balloon on exit."""
     result, calls = _run_balloon(tmp_path, "raise_balloon\nfalse")
     assert result.returncode != 0
-    assert len(calls) == 2
+    assert len(calls) == 3
     assert calls[0].endswith("--balloon 14336")
-    assert calls[1].endswith("qm set 230 --balloon 8192")
+    assert calls[2].endswith("qm set 230 --balloon 8192")
 
 
 def test_balloon_not_restored_twice(tmp_path: Path) -> None:
@@ -436,7 +436,35 @@ def test_balloon_not_restored_twice(tmp_path: Path) -> None:
         tmp_path, 'raise_balloon\nrestore_balloon\n[ "${BALLOON_RAISED}" -eq 0 ]'
     )
     assert result.returncode == 0, result.stderr
-    assert [c.rsplit(" ", 1)[1] for c in calls] == ["14336", "8192"]
+    assert [c.rsplit(" ", 1)[1] for c in calls] == ["14336", "230", "8192"]
+
+
+def test_raise_balloon_sets_minimum_then_live_target(tmp_path: Path) -> None:
+    """The raise sends qm set, then the monitor balloon command, in that order (#1634)."""
+    result, calls = _run_balloon(tmp_path, "raise_balloon")
+    assert result.returncode == 0, result.stderr
+    assert calls[0].endswith("qm set 230 --balloon 14336")
+    assert calls[1].endswith('echo "balloon 14336" | qm monitor 230')
+    assert "root@node1" in calls[1]
+
+
+def test_raise_balloon_warns_and_continues_when_monitor_fails(tmp_path: Path) -> None:
+    """A failing monitor call warns; the raise still succeeds and the restore runs."""
+    log = tmp_path / "ssh.log"
+    extra = f'ssh() {{\n  echo "$*" >> {log}\n  case "$*" in *"qm monitor"*) return 1;; esac\n}}\n'
+    result, calls = _run_balloon(tmp_path, "raise_balloon\necho after-raise", extra=extra)
+    assert result.returncode == 0, result.stderr
+    assert "after-raise" in result.stdout
+    assert "WARNING" in result.stderr
+    assert "qm monitor" in calls[1]
+    assert calls[2].endswith("qm set 230 --balloon 8192")
+
+
+def test_phase_3a_wait_limit_is_600() -> None:
+    """The memory wait after the raise allows 600 seconds."""
+    text = POST_SCRIPT.read_text()
+    phase = text[text.index("    raise_balloon\n") :]
+    assert phase.startswith("    raise_balloon\n    MAX_WAIT=600\n")
 
 
 def test_wait_for_memtotal_succeeds_once_memory_arrives(tmp_path: Path) -> None:

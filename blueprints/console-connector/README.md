@@ -113,8 +113,9 @@ Verified against the NetApp page above:
   but is never shrunk; this blueprint cannot remove the balloon device. The
   virtio balloon lowers the guest's MemTotal, which the installer checks. So
   when `balloon` is set, the setup script raises the VM's balloon minimum to
-  `memory` on `target_node` (SSH as root to `pve_host`, or to `target_node` when
-  that is empty, for example `pve1.example.com`), waits until MemTotal reaches
+  `memory` on `target_node` and sets the live balloon target to `memory` directly
+  (SSH as root to `pve_host`, or to `target_node` when that is empty, for example
+  `pve1.example.com`), waits until MemTotal reaches
   the installer minimum, and restores `balloon` after the install, including
   when the install fails. See [Memory ballooning](../../docs/providers/proxmox.md#memory-ballooning).
 - The idempotency markers (`/opt/application/netapp` present plus a running
