@@ -8,9 +8,13 @@ Runs only when ``aiqum_address`` and ``aiqum_admin_password`` are both set. With
 neither set it logs a skip and exits 0; with only one set it fails and names the
 missing input.
 
-Without arguments the script adds the cluster as an AIQUM data source unless one
-already matches by address or name. With ``--remove`` it deletes every matching
-data source (used by the blueprint's ``on_destroy`` event, #1225).
+Without arguments the script adds the cluster as an AIQUM data source unless a
+healthy one already matches by address or name. A matching data source with a
+deletion in progress is waited out (bounded), and one in ``error`` is deleted and
+waited out, before the cluster is added (#1639). With ``--remove`` it deletes every
+matching data source (used by the blueprint's ``on_destroy`` event, #1225). When
+AIQUM answers a DELETE with an error, the data sources are read back: one that is
+gone, or shows a deletion in progress, counts as removed.
 
 The AIQUM client is copied from ``blueprints/aiqum/scripts/aiqum-initial-setup.py``,
 not imported: each blueprint's ``scripts/`` directory is synced on its own.
@@ -25,8 +29,10 @@ import json
 import os
 import ssl
 import sys
+import time
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -36,6 +42,14 @@ TIMEOUT = 30
 # Adding a cluster returns only after AIQUM has set up its agent link to the
 # cluster: 12 s when it works, 86 s when the cluster cannot reach AIQUM (#1167).
 ADD_TIMEOUT = 180
+# Seconds to wait for AIQUM to finish deleting a data source.
+DELETE_WAIT = 600
+POLL_INTERVAL = 10
+# Read-backs after a failed DELETE, POLL_INTERVAL apart.
+READBACK_ATTEMPTS = 3
+# Only ``in_progress`` has been observed for ``operation.state``; these two are
+# assumed to mean the deletion is over.
+DELETION_DONE_STATES = frozenset({"completed", "failed"})
 
 
 class AIQUMError(Exception):
@@ -208,26 +222,150 @@ def build_add_body(cfg: Config) -> dict[str, Any]:
     }
 
 
-def register(cfg: Config) -> str:
-    """Add the cluster unless AIQUM already has it.
+def is_deleting(ds: dict[str, Any]) -> bool:
+    """Return True when AIQUM is deleting the data source."""
+    op = ds.get("operation")
+    if not isinstance(op, dict):
+        return False
+    return (
+        str(op.get("type") or "").lower() == "deletion"
+        and str(op.get("state") or "").lower() not in DELETION_DONE_STATES
+    )
+
+
+def is_stale(ds: dict[str, Any]) -> bool:
+    """Return True when the data source is in error or being deleted."""
+    return str(ds.get("status") or "").lower() == "error" or is_deleting(ds)
+
+
+def _key_of(ds: dict[str, Any]) -> str:
+    key = str(ds.get("key") or "")
+    if not key:
+        raise AIQUMError(f"AIQUM data source '{ds.get('name')}' has no key")
+    return key
+
+
+def _describe(ds: dict[str, Any]) -> str:
+    return f"'{ds.get('name')}' (status {ds.get('status')}: {ds.get('status_message')})"
+
+
+def delete_source(
+    cfg: Config,
+    ds: dict[str, Any],
+    *,
+    attempts: int = READBACK_ATTEMPTS,
+    interval: float = POLL_INTERVAL,
+    sleep: Callable[[float], None] = time.sleep,
+) -> str:
+    """DELETE a data source; after an error, read the data sources back.
+
+    Returns:
+        ``"deleted"`` when AIQUM accepted the DELETE, ``"gone"`` when it failed
+        but the data source is no longer listed, ``"deletion in progress"`` when
+        it failed but AIQUM shows a deletion running.
+
+    Raises:
+        AIQUMError: If the DELETE failed and the data source is still present
+            with no deletion running, or it has no key.
+    """
+    key = _key_of(ds)
+    try:
+        _request(cfg, "DELETE", f"{CLUSTERS_PATH}/{urllib.parse.quote(key, safe='')}")
+    except AIQUMError as exc:
+        error = exc
+    else:
+        return "deleted"
+    for attempt in range(attempts):
+        if attempt:
+            sleep(interval)
+        current = [c for c in list_clusters(cfg) if c.get("key") == key]
+        if not current:
+            return "gone"
+        if is_deleting(current[0]):
+            return "deletion in progress"
+    raise error
+
+
+def wait_gone(
+    cfg: Config,
+    keys: list[str],
+    *,
+    timeout: float = DELETE_WAIT,
+    interval: float = POLL_INTERVAL,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> None:
+    """Poll until none of the data sources in ``keys`` is listed any more.
+
+    Raises:
+        AIQUMError: If one is still listed after ``timeout`` seconds.
+    """
+    deadline = clock() + timeout
+    while True:
+        left = [c for c in list_clusters(cfg) if c.get("key") in keys]
+        if not left:
+            return
+        if clock() >= deadline:
+            names = ", ".join(_describe(c) for c in left)
+            raise AIQUMError(
+                f"AIQUM is still deleting {names} after {timeout:g}s; re-run apply once it "
+                "finishes, or delete the data source by hand"
+            )
+        sleep(interval)
+
+
+def register(
+    cfg: Config,
+    *,
+    timeout: float = DELETE_WAIT,
+    interval: float = POLL_INTERVAL,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> str:
+    """Add the cluster unless AIQUM already has a healthy data source for it.
+
+    A matching data source with a deletion in progress is waited out; one in
+    ``error`` is deleted and waited out; then the cluster is added.
 
     Returns:
         A one-line result message.
     """
-    existing = find_matching(list_clusters(cfg), cfg)
-    if existing:
+    matches = find_matching(list_clusters(cfg), cfg)
+    healthy = [m for m in matches if not is_stale(m)]
+    if healthy:
         return (
             f"cluster {cfg.cluster_ip} is already an AIQUM data source "
-            f"('{existing[0].get('name')}'); nothing to do"
+            f"('{healthy[0].get('name')}'); nothing to do"
         )
+    notes: list[str] = []
+    keys: list[str] = []
+    for ds in matches:
+        keys.append(_key_of(ds))
+        if is_deleting(ds):
+            notes.append(f"waited for AIQUM to finish deleting {_describe(ds)}")
+        else:
+            delete_source(cfg, ds, interval=interval, sleep=sleep)
+            notes.append(f"removed stale AIQUM data source {_describe(ds)}")
+    if keys:
+        wait_gone(cfg, keys, timeout=timeout, interval=interval, sleep=sleep, clock=clock)
+    prefix = "; ".join(notes) + "; " if notes else ""
     status, _ = _request(cfg, "POST", CLUSTERS_PATH, body=build_add_body(cfg), timeout=ADD_TIMEOUT)
     if status == 409:
-        return f"cluster {cfg.cluster_ip} already exists in AIQUM; nothing to do"
-    return f"added cluster {cfg.cluster_ip} to AIQUM at {cfg.aiqum_address}"
+        return f"{prefix}cluster {cfg.cluster_ip} already exists in AIQUM; nothing to do"
+    return f"{prefix}added cluster {cfg.cluster_ip} to AIQUM at {cfg.aiqum_address}"
 
 
-def remove(cfg: Config) -> str:
+def remove(
+    cfg: Config,
+    *,
+    attempts: int = READBACK_ATTEMPTS,
+    interval: float = POLL_INTERVAL,
+    sleep: Callable[[float], None] = time.sleep,
+) -> str:
     """Delete every AIQUM data source that matches the cluster.
+
+    A DELETE error counts as removed when the data source is gone or AIQUM shows
+    a deletion in progress. Does not wait for a deletion to finish.
 
     Returns:
         A one-line result message.
@@ -237,11 +375,19 @@ def remove(cfg: Config) -> str:
         return f"cluster {cfg.cluster_ip} is not in AIQUM; nothing to do"
     removed: list[str] = []
     for cluster in matches:
-        key = str(cluster.get("key") or "")
-        if not key:
-            raise AIQUMError(f"AIQUM data source '{cluster.get('name')}' has no key")
-        _request(cfg, "DELETE", f"{CLUSTERS_PATH}/{urllib.parse.quote(key, safe='')}")
-        removed.append(f"'{cluster.get('name')}' ({key})")
+        key = _key_of(cluster)
+        label = f"'{cluster.get('name')}' ({key})"
+        if is_deleting(cluster):
+            removed.append(f"{label}: deletion already in progress")
+            continue
+        result = delete_source(cfg, cluster, attempts=attempts, interval=interval, sleep=sleep)
+        if result == "deletion in progress":
+            removed.append(
+                f"{label}: AIQUM accepted the deletion (DELETE returned an error; "
+                "deletion in progress)"
+            )
+        else:
+            removed.append(label)
     return f"removed from AIQUM: {', '.join(removed)}"
 
 
