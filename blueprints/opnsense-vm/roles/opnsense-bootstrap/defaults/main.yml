@@ -15,6 +15,13 @@ opnsense_sync_prefix: 24
 opnsense_sync_if: em2
 opnsense_sync_descr: SYNC
 
+# Optional SSH settings, written into config.xml at first boot. The other three are
+# ignored unless opnsense_ssh_enabled is true.
+opnsense_ssh_enabled: false
+opnsense_ssh_root_login: false
+opnsense_ssh_password_auth: false
+opnsense_ssh_authorized_keys: []
+
 # Seconds to wait for the first login prompt on the serial console
 opnsense_boot_timeout: 600
 

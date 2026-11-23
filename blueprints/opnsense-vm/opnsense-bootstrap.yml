@@ -35,6 +35,12 @@
         opnsense_sync_prefix: "{{ lookup('env', 'INFRAFOUNDRY_VAR_sync_prefix') | default('24', true) }}"
         opnsense_api_allow_cidr: "{{ lookup('env', 'INFRAFOUNDRY_VAR_api_allow_cidr') }}"
         opnsense_api_allow_lan: "{{ lookup('env', 'INFRAFOUNDRY_VAR_api_allow_lan') | default('false', true) }}"
+        opnsense_ssh_enabled: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ssh_enabled') | default('false', true) }}"
+        opnsense_ssh_root_login: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ssh_root_login') | default('false', true) }}"
+        opnsense_ssh_password_auth: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ssh_password_auth') | default('false', true) }}"
+        # List values are not exported as INFRAFOUNDRY_VAR_* (local runs get a Python repr,
+        # jumphost runs skip them), so the keys come from the full JSON instead.
+        opnsense_ssh_authorized_keys: "{{ (lookup('env', 'INFRAFOUNDRY_PACKAGE_VARS') | default('{}', true) | from_json).ssh_authorized_keys | default([], true) }}"
         opnsense_disk_size: "{{ lookup('env', 'INFRAFOUNDRY_VAR_disk_size') | default('0', true) }}"
         opnsense_boot_timeout: "{{ lookup('env', 'INFRAFOUNDRY_VAR_boot_timeout') }}"
         opnsense_root_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_opnsense_root_password') }}"

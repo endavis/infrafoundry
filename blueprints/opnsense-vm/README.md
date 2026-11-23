@@ -45,7 +45,10 @@ reach the API. The OPNsense provider can then manage it with no manual steps.
      443 to the interface's own address (`opt1ip`) for config sync, both from
      the sync subnet. The destination is symbolic, so it stays correct when HA
      rule sync copies the primary's rules to the backup. The OPNsense
-     provider can then use `pfsync_interface: opt1` with no manual step.
+     provider can then use `pfsync_interface: opt1` with no manual step;
+   - with `ssh_enabled: true`, the SSH daemon on, `permitrootlogin` and
+     `passwordauth` as `ssh_root_login` and `ssh_password_auth` say, and
+     `ssh_authorized_keys` written to root's authorized keys.
 
    When `disk_size` is above 0, the script first runs a best-effort grow step
    in the shell (`gpart recover`, `gpart resize`, `growfs -y /`). It logs to
@@ -135,6 +138,10 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 | `domain` | `lab.local` | Domain |
 | `api_allow_cidr` | `192.0.2.0/24` | Source allowed to reach the web GUI/API on the WAN |
 | `api_allow_lan` | `false` | Also let `api_allow_cidr` reach the web GUI/API on the LAN address through the WAN; set it when the provider's `api_url` is the LAN address |
+| `ssh_enabled` | `false` | Enable the SSH daemon at first boot. Needs `ssh_password_auth: true` or at least one key |
+| `ssh_root_login` | `false` | Permit root login over SSH; ignored unless `ssh_enabled` |
+| `ssh_password_auth` | `false` | Permit password authentication over SSH; ignored unless `ssh_enabled` |
+| `ssh_authorized_keys` | `[]` | List of public keys for root; ignored unless `ssh_enabled` |
 | `boot_timeout` | `600` | Seconds to wait for the first login prompt, and for the API afterwards |
 | `base_tags` | `[opnsense, fw-test]` | Base Proxmox tags; changing it on an existing VM changes its tags and replaces the VM |
 | `extra_tags` | `[]` | Extra Proxmox tags, appended to `base_tags` |
@@ -169,6 +176,20 @@ which stops and purges the VM. The cached image stays on the Proxmox host.
 - Nothing secret is written to the Proxmox host. The rendered PHP reaches the
   expect process only through its environment, and the expect log is paused
   while it is sent.
+
+- The SSH settings apply only at first boot, like the rest of the bootstrap.
+  No API reads or writes them on 26.1, so changing them later needs a rebuild.
+  `ssh_root_login`, `ssh_password_auth` and `ssh_authorized_keys` are ignored
+  unless `ssh_enabled` is true. The role refuses `ssh_enabled: true` with no
+  password auth and no keys. Reaching TCP 22 needs a firewall rule from the
+  opnsense provider; the bootstrap adds none. Example:
+
+  ```yaml
+  variables:
+    ssh_enabled: true
+    ssh_authorized_keys:
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample admin@example.com"
+  ```
 
 ### Rebuilding
 
