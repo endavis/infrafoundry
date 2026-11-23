@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795456888637,
+  "lastUpdate": 1795462576034,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6312,6 +6312,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010863843400251696",
             "extra": "mean: 64.10466672531383 usec\nrounds: 17043"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c7fe5e4cb3220edcbba7bdfc18838e5954444e51",
+          "message": "fix: handle stale aiqum data sources and started deletions (merges PR #1640, addresses #1639)\n\nregister skipped the add whenever any data source matched the cluster by\naddress or name, so a rebuilt cluster stayed unmonitored behind the old\ncluster's source (status error, deletion in progress). It now skips only\na healthy match: a pending deletion is waited out (bounded), a source in\nerror is deleted and waited out, then the cluster is added.\n\nremove reported a failure when AIQUM answered the DELETE with HTTP 500\nalthough it had started the deletion. After a failed DELETE it now reads\nthe sources back and counts gone or deletion-in-progress as removed, and\nit no longer re-deletes a source that is already being deleted.\n\nAddresses #1639\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T19:34:45Z",
+          "tree_id": "bc9ac92680933fe07c942f5321ba11bf2e5550df",
+          "url": "https://github.com/endavis/infrafoundry/commit/c7fe5e4cb3220edcbba7bdfc18838e5954444e51"
+        },
+        "date": 1795462575274,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 56.60707751205457,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004797142668737773",
+            "extra": "mean: 17.665635534479737 msec\nrounds: 58"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10807.402809757594,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000006940674599524702",
+            "extra": "mean: 92.5291689042198 usec\nrounds: 12066"
           }
         ]
       }
