@@ -166,6 +166,56 @@ templates:
 The cloud-init drive goes on `cloud_init_datastore` when set, otherwise on the
 disk storage (`disk.storage`, then `local-lvm`).
 
+#### Customizing the image
+
+An optional `customize` block installs packages into the image before the disk
+is imported, so every clone has them from its first boot. A common use is
+`qemu-guest-agent`, which Ubuntu cloud images do not ship: without it, a clone
+whose network is not ready on first boot never gets the agent from cloud-init.
+
+```yaml
+templates:
+  - name: ubuntu-2404
+    vmid: 9000
+    target_node: node1
+    prevent_destroy: false
+    disk:
+      storage: local-store
+    download_image:
+      url: https://cloud-images.example.com/release/image-amd64.img
+      filename: image-amd64.qcow2
+    customize:
+      packages: [qemu-guest-agent]
+```
+
+The download is left untouched. InfraFoundry copies it to
+`<name>-customized.<ext>` (here `image-amd64-customized.qcow2`) on the same
+storage, runs `virt-customize --install` on the copy over SSH to `target_node`,
+and imports the template disk from the copy. The copy is removed when the
+template is destroyed.
+
+Prerequisites:
+
+- `libguestfs-tools` installed on the node (it provides `virt-customize`). The
+  build stops with an error that names the package when it is missing.
+- Internet access from the node during the build, so the package manager can
+  fetch the packages.
+- SSH access to the node as `proxmox_ssh_user`, with the node's host key in your
+  `known_hosts` (see [SSH Host Key Checking](../guides/ssh-host-key-checking.md)).
+- Storage that supports the `import` content type.
+
+Rules:
+
+- `download_image.filename` must end in `.qcow2`, `.raw` or `.vmdk`; an archive
+  (`.ova`, `.ovf`) cannot be customized.
+- Package names start with a letter or digit and contain only letters, digits
+  and `. + _ : ~ -`.
+- `packages` is the only supported key. `run_commands` is not supported, and an
+  unknown key fails at plan time.
+- Changing `customize` (or the image) replaces the template. Templates default to
+  `prevent_destroy: true`, so set `prevent_destroy: false` first. Existing full
+  clones are not affected.
+
 ### Cloning a template in the same apply
 
 A `vm` whose `clone.vm_id` equals the `vmid` of a `template` in the same

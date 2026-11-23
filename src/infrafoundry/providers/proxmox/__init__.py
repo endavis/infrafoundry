@@ -1,7 +1,8 @@
 """Proxmox provider for InfraFoundry."""
 
 import os
-from pathlib import Path
+import shlex
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, ClassVar, cast, override
 
 from infrafoundry.core.config.models import EnvironmentConfig
@@ -38,6 +39,12 @@ if TYPE_CHECKING:
     from infrafoundry.providers.plugin_type import ProviderMetadata
 
     from .api_client import ProxmoxClient
+
+
+def _customized_image_filename(filename: str) -> str:
+    """Insert ``-customized`` before the last suffix: ``a.qcow2`` becomes ``a-customized.qcow2``."""
+    path = PurePosixPath(filename)
+    return f"{path.stem}-customized{path.suffix}"
 
 
 def _imports_disk(vm: ResourceConfig) -> bool:
@@ -488,10 +495,29 @@ class ProxmoxProvider(
 
         Templates render their own ``import`` blocks from ``import_id``: the shared name
         match in ``_generate_import_blocks`` cannot reach the ``template_`` prefix.
+
+        A ``download_image`` template with a ``customize`` block gets a ``terraform_data``
+        step that installs packages into a copy of the downloaded image (#1622). The
+        ``template_customize`` context maps its name to the copy's filename and the
+        shell-quoted package list.
         """
+        template_customize: dict[str, dict[str, str]] = {}
+        for template in templates:
+            config = template.config or {}
+            customize = config.get("customize")
+            download = config.get("download_image")
+            if not isinstance(customize, dict) or not isinstance(download, dict):
+                continue
+            packages = customize.get("packages")
+            if not packages or not isinstance(download.get("filename"), str):
+                continue
+            template_customize[template.name] = {
+                "filename": _customized_image_filename(download["filename"]),
+                "install": shlex.quote(",".join(packages)),
+            }
         self.render_and_write_terraform(
             "proxmox/templates.tf.j2",
-            context={"templates": templates},
+            context={"templates": templates, "template_customize": template_customize},
             output_name="templates.tf",
         )
 

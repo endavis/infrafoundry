@@ -1,6 +1,9 @@
 {% for template in templates %}
 # Template: {{ template.config.name }}
 {% if template.config.download_image is defined %}
+{% set custom = (template_customize | default({})).get(template.name) %}
+{% set tf_name = template.config.name | replace('-', '_') %}
+{% set import_storage = template.config.disk.storage | default('local') %}
 # Download cloud image and create template using native bpg/proxmox provider resources
 # Step 1: Download image to Proxmox storage via API
 resource "proxmox_virtual_environment_download_file" "cloud_image_{{ template.config.name | replace('-', '_') }}" {
@@ -14,6 +17,49 @@ resource "proxmox_virtual_environment_download_file" "cloud_image_{{ template.co
 {% endif %}
 }
 
+{% if custom %}
+# Step 1b: Install packages into a copy of the downloaded image on the node (virt-customize).
+# The download itself is never touched, so its drift detection stays quiet.
+resource "terraform_data" "template_customize_{{ tf_name }}" {
+  input = "{{ import_storage }}:import/{{ custom.filename }}"
+
+  triggers_replace = {
+    download_id = proxmox_virtual_environment_download_file.cloud_image_{{ tf_name }}.id
+    packages    = "{{ custom.install }}"
+    filename    = "{{ custom.filename }}"
+    storage     = "{{ import_storage }}"
+    ssh_cmd     = local.ssh_cmd
+    ssh_user    = var.proxmox_ssh_user
+    ssh_target  = "{{ template.config.target_node }}"
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      ${local.ssh_cmd} ${var.proxmox_ssh_user}@{{ template.config.target_node }} bash -s <<'CUSTOMIZE'
+      set -euo pipefail
+      if ! command -v virt-customize >/dev/null 2>&1; then
+        echo "virt-customize not found on the node; install the libguestfs-tools package" >&2
+        exit 1
+      fi
+      SRC=$(pvesm path '{{ import_storage }}:import/{{ template.config.download_image.filename }}')
+      DST=$(pvesm path '{{ import_storage }}:import/{{ custom.filename }}')
+      cp "$SRC" "$DST.part"
+      LIBGUESTFS_BACKEND=direct virt-customize -a "$DST.part" --install {{ custom.install }}
+      mv "$DST.part" "$DST"
+      CUSTOMIZE
+    EOT
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      ${self.triggers_replace.ssh_cmd} ${self.triggers_replace.ssh_user}@${self.triggers_replace.ssh_target} \
+        "rm -f \"\$(pvesm path '${self.triggers_replace.storage}:import/${self.triggers_replace.filename}')\""
+    EOT
+  }
+}
+
+{% endif %}
 # Step 2: Create template VM with imported disk
 {% if template.import_id %}
 import {
@@ -59,7 +105,11 @@ resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | re
 
   disk {
     datastore_id = "{{ template.config.disk.storage | default('local-lvm') }}"
+{% if custom %}
+    import_from  = terraform_data.template_customize_{{ tf_name }}.output
+{% else %}
     import_from  = proxmox_virtual_environment_download_file.cloud_image_{{ template.config.name | replace('-', '_') }}.id
+{% endif %}
     interface    = "scsi0"
 {% if template.config.disk.size is defined %}
     size         = {{ template.config.disk.size | replace('G', '') }}
@@ -113,6 +163,9 @@ resource "proxmox_virtual_environment_vm" "template_{{ template.config.name | re
 
   lifecycle {
     prevent_destroy = {{ template.config.prevent_destroy | default(true) | tojson }}
+{% if custom %}
+    replace_triggered_by = [terraform_data.template_customize_{{ tf_name }}]
+{% endif %}
   }
 }
 
