@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795448054652,
+  "lastUpdate": 1795451330732,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6198,6 +6198,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005261118491630337",
             "extra": "mean: 78.22304393423053 usec\nrounds: 13543"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "095e22dbdfef1862cd1d9f40ae922c42eec7e1db",
+          "message": "fix: set the balloon target directly before the console-connector install (merges PR #1635, addresses #1634)\n\nRaising the balloon minimum alone left the live target where the host\nhad put it, and autoballooning grows it only about 100 MiB per 10 s, so\na VM that started well below memory timed out in the 300 s wait. The\nscript now also sets the live target to memory through the QEMU monitor\n(warning and relying on autoballooning if that call fails), and the wait\nlimit is 600 s.\n\nAddresses #1634\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T16:27:25Z",
+          "tree_id": "de561bb478fd6479328ca0f2bbcc952cf3704316",
+          "url": "https://github.com/endavis/infrafoundry/commit/095e22dbdfef1862cd1d9f40ae922c42eec7e1db"
+        },
+        "date": 1795451329806,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 45.34395906766436,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004976273803826926",
+            "extra": "mean: 22.053654346938558 msec\nrounds: 49"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7968.377529444724,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009684911254269336",
+            "extra": "mean: 125.49606194043933 usec\nrounds: 8492"
           }
         ]
       }
