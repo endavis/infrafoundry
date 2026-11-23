@@ -4,6 +4,10 @@
 # Creates cluster on node 01, joins node 02, then configures via REST API.
 # Run AFTER serial setup (ontap-sim-serial-setup.yml).
 #
+# Safe to re-run: it first probes the cluster management address. Create and
+# join are skipped for nodes already in the configured cluster, and the run
+# stops when the address answers as something else (#1643).
+#
 # All variables are read from INFRAFOUNDRY_VAR_* environment variables
 # set by the InfraFoundry framework (includes merged secrets from secrets.yaml).
 
@@ -21,12 +25,25 @@
           secrets.yaml before running the ONTAP playbooks.
       no_log: true
 
+- name: Check whether the cluster already exists
+  hosts: ontap_cluster
+  gather_facts: false
+  connection: local
+  roles:
+    - role: ontap-cluster-probe
+      vars:
+        ontap_cluster_name: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_name') }}"
+        ontap_cluster_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_ip') }}"
+        ontap_node02_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_mgmt_ip') }}"
+        ontap_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
+
 - name: Create ONTAP cluster on node 01
   hosts: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_target') }}"
   gather_facts: false
   become: true
   roles:
     - role: ontap-cluster-setup
+      when: not (hostvars['ontap-cluster']['ontap_cluster_exists'] | bool)
       vars:
         ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_vmid') }}"
         ontap_cluster_create: true
@@ -69,9 +86,11 @@
   become: true
   roles:
     - role: ontap-cluster-setup
+      when: not (hostvars['ontap-cluster']['ontap_node02_joined'] | bool)
       vars:
         ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_vmid') }}"
         ontap_cluster_create: false
+        ontap_cluster_name: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_name') }}"
         ontap_cluster_join_ip: "{{ hostvars['ontap-cluster']['ontap_cluster_interconnect_ip'] }}"
         ontap_node_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_mgmt_ip') }}"
         ontap_node_mgmt_mask: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node_mgmt_mask') }}"

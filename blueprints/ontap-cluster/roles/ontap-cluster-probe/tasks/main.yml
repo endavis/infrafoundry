@@ -1,0 +1,55 @@
+---
+# ONTAP Cluster Probe — Tasks
+#
+# Sets ontap_cluster_exists (the configured cluster answers) and
+# ontap_node02_joined (node 02's management IP is a member). Stops the run
+# when the address answers with anything else, rather than create over it.
+
+- name: Probe the cluster management address
+  ansible.builtin.uri:
+    url: "https://{{ ontap_cluster_mgmt_ip }}/api/cluster?fields=name"
+    user: "{{ ontap_admin_user }}"
+    password: "{{ ontap_admin_password }}"
+    validate_certs: "{{ ontap_validate_certs }}"
+    force_basic_auth: true
+    timeout: "{{ ontap_probe_timeout }}"
+    return_content: true
+  register: ontap_probe_cluster
+  failed_when: false
+  no_log: true
+
+- name: Classify the probe
+  ansible.builtin.set_fact:
+    ontap_cluster_probe: "{{ ontap_probe_cluster | ontap_cluster_state(ontap_cluster_name) }}"
+
+- name: Refuse to touch an unknown cluster
+  ansible.builtin.assert:
+    that: ontap_cluster_probe.state != 'conflict'
+    fail_msg: "Refusing to set up ONTAP: {{ ontap_cluster_probe.reason }}"
+    quiet: true
+
+- name: List cluster nodes
+  ansible.builtin.uri:
+    url: "https://{{ ontap_cluster_mgmt_ip }}/api/cluster/nodes?fields=name,management_interfaces"
+    user: "{{ ontap_admin_user }}"
+    password: "{{ ontap_admin_password }}"
+    validate_certs: "{{ ontap_validate_certs }}"
+    force_basic_auth: true
+    timeout: "{{ ontap_probe_timeout }}"
+    return_content: true
+  register: ontap_probe_nodes
+  when: ontap_cluster_probe.state == 'present'
+  no_log: true
+
+- name: Record what already exists
+  ansible.builtin.set_fact:
+    ontap_cluster_exists: "{{ ontap_cluster_probe.state == 'present' }}"
+    ontap_node02_joined: >-
+      {{ (ontap_probe_nodes.json.records | default([]))
+         | ontap_node_has_mgmt_ip(ontap_node02_mgmt_ip) }}
+
+- name: Summarise the probe
+  ansible.builtin.debug:
+    msg: >-
+      {{ ontap_cluster_probe.reason }}; cluster exists: {{ ontap_cluster_exists }},
+      node 02 joined: {{ ontap_node02_joined }}

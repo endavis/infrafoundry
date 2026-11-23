@@ -4,8 +4,23 @@
 # Sets serial console as primary and optionally assigns unique serial/sysid.
 # Must run on first boot BEFORE ONTAP initializes disks.
 #
+# Safe to re-run: it first probes the cluster management address and skips each
+# node that is already in the configured cluster (#1643).
+#
 # All variables are read from INFRAFOUNDRY_VAR_* environment variables
 # set by the InfraFoundry framework.
+
+- name: Check whether the cluster already exists
+  hosts: ontap_cluster
+  gather_facts: false
+  connection: local
+  roles:
+    - role: ontap-cluster-probe
+      vars:
+        ontap_cluster_name: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_name') }}"
+        ontap_cluster_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_ip') }}"
+        ontap_node02_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_mgmt_ip') }}"
+        ontap_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
 
 - name: Install dependencies on Proxmox hosts
   hosts: proxmox_hosts
@@ -28,6 +43,7 @@
   become: true
   roles:
     - role: ontap-serial-setup
+      when: not (hostvars['ontap-cluster']['ontap_cluster_exists'] | bool)
       vars:
         ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_vmid') }}"
 
@@ -38,6 +54,7 @@
   become: true
   roles:
     - role: ontap-serial-setup
+      when: not (hostvars['ontap-cluster']['ontap_node02_joined'] | bool)
       vars:
         ontap_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_vmid') }}"
         ontap_serial_number: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node02_serial_number') }}"

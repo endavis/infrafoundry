@@ -2,6 +2,9 @@
 # ONTAP Simulator Lab — Full Orchestration Playbook
 #
 # Runs serial setup, cluster setup, and console restore in sequence.
+# A re-run probes the cluster management address first, skips serial setup,
+# create and join for nodes already in the configured cluster, and stops on an
+# unknown or mismatched answer (#1643).
 # For selective runs, use the individual playbooks:
 #   - ontap-sim-serial-setup.yml    (first boot only — sets sysid on node 02)
 #   - ontap-sim-cluster-setup.yml   (cluster create, join, post-config)

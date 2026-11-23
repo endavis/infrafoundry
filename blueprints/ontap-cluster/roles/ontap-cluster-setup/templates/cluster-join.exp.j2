@@ -34,6 +34,10 @@ expect {
           "Type yes to confirm and continue*" {
             send "yes\r"
           }
+          -ex "{{ ontap_cluster_name }}::>" {
+            puts "\nERROR: already in cluster {{ ontap_cluster_name }}; refusing setup"
+            exit 1
+          }
           "::>" {
             send "cluster setup\r"
             expect "Type yes to confirm and continue*"
@@ -41,12 +45,20 @@ expect {
           }
         }
       }
+      -ex "{{ ontap_cluster_name }}::>" {
+        puts "\nERROR: already in cluster {{ ontap_cluster_name }}; refusing setup"
+        exit 1
+      }
       "::>" {
         send "cluster setup\r"
         expect "Type yes to confirm and continue*"
         send "yes\r"
       }
     }
+  }
+  -ex "{{ ontap_cluster_name }}::>" {
+    puts "\nERROR: already in cluster {{ ontap_cluster_name }}; refusing setup"
+    exit 1
   }
   "::>" {
     send "cluster setup\r"
