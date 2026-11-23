@@ -64,6 +64,8 @@ class FakeConsole:
         self.register_status = 200
         self.register_sets_client_id = True
         self.requests: list[tuple[str, str, str, dict[str, Any]]] = []
+        self.connectors: Any = {"occms": []}
+        self.delete_status = 204
 
 
 @pytest.fixture
@@ -88,6 +90,17 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeConsole]:
                 self._reply(200, {"access_token": TOKEN})
             elif self.path == "/tenancy/account":
                 self._reply(200, state.accounts)
+            elif method == "GET" and self.path.startswith("/agents-mgmt/list-connectors/"):
+                if self.path == "/agents-mgmt/list-connectors/acc-1":
+                    self._reply(200, state.connectors)
+                else:
+                    self._reply(404, {})
+            elif method == "DELETE" and self.path.startswith("/agents-mgmt/agent/"):
+                if state.delete_status == 204:
+                    self.send_response(204)
+                    self.end_headers()
+                else:
+                    self._reply(state.delete_status, {"message": "forbidden for this token"})
             elif self.path == "/occm/api/occm/system/support-services":
                 self._reply(
                     200,
@@ -124,6 +137,9 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeConsole]:
         def do_POST(self) -> None:
             self._handle("POST")
 
+        def do_DELETE(self) -> None:
+            self._handle("DELETE")
+
         def log_message(self, format: str, *args: Any) -> None:
             return
 
@@ -135,6 +151,8 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeConsole]:
     monkeypatch.setattr(reg, "TOKEN_URL", f"{base}/oauth/token")
     monkeypatch.setattr(reg, "ACCOUNTS_URL", f"{base}/tenancy/account")
     monkeypatch.setattr(reg, "AGENT_URL_TEMPLATE", base + "/occm/api/occm")
+    monkeypatch.setattr(reg, "CONNECTORS_URL", f"{base}/agents-mgmt/list-connectors")
+    monkeypatch.setattr(reg, "AGENT_MGMT_URL", f"{base}/agents-mgmt/agent")
     monkeypatch.setattr(reg, "pinned_context", lambda pem: None)
     yield state
     server.shutdown()
@@ -409,3 +427,125 @@ def test_post_script_fetches_cert_over_ssh_and_passes_path() -> None:
     assert 'remote_cmd "${ip_address}" "openssl s_client' in text
     assert '--agent-cert "$AGENT_CERT"' in text
     assert "mktemp" in text and 'rm -f "$WAIT_ERR" "$CURL_ERR" "$AGENT_CERT"' in text
+
+
+# --- deregistration on destroy (#1629) ---
+
+
+def _occm(agent_id: str, uri: str, status: str = "active") -> dict[str, Any]:
+    return {
+        "agent": {"agentId": agent_id, "name": "default", "status": "pending"},
+        "status": status,
+        "primaryCallbackUri": uri,
+    }
+
+
+def test_agents_at_address_matching() -> None:
+    listing = {
+        "occms": [
+            _occm("agent-a1clients", "https://192.0.2.5:443/occm"),
+            _occm("agent-b2clients", "192.0.2.50"),
+            _occm("agent-c3clients", "http://192.0.2.5"),
+            {"agent": {}, "primaryCallbackUri": "https://192.0.2.5"},
+        ]
+    }
+    assert reg.agents_at_address(listing, "192.0.2.5") == [
+        ("agent-a1clients", "active"),
+        ("agent-c3clients", "active"),
+    ]
+    assert reg.agents_at_address(listing, "192.0.2.50") == [("agent-b2clients", "active")]
+    assert reg.agents_at_address(listing, "") == []
+
+
+def test_agents_at_address_tolerates_shapes() -> None:
+    occm = _occm("agent-a1clients", "https://192.0.2.5")
+    expected = [("agent-a1clients", "active")]
+    assert reg.agents_at_address([{"occms": [occm]}], "192.0.2.5") == expected
+    assert reg.agents_at_address([occm], "192.0.2.5") == expected
+    assert reg.agents_at_address("junk", "192.0.2.5") == []
+
+
+def test_deregister_happy_path(fake: FakeConsole) -> None:
+    fake.connectors = {"occms": [_occm("agent-a1clients", "https://192.0.2.5:443")]}
+    msg = reg.deregister(reg.load_config(FULL_VARS))
+    assert "agent-a1clients" in msg
+    assert [(r[0], r[1]) for r in fake.requests] == [
+        ("POST", "/oauth/token"),
+        ("GET", "/tenancy/account"),
+        ("GET", "/agents-mgmt/list-connectors/acc-1"),
+        ("DELETE", "/agents-mgmt/agent/agent-a1clients"),
+    ]
+    assert fake.requests[-1][2] == f"Bearer {TOKEN}"
+
+
+def test_deregister_removes_all_at_address_only(fake: FakeConsole) -> None:
+    fake.connectors = {
+        "occms": [
+            _occm("agent-a1clients", "https://192.0.2.5", "inactive"),
+            _occm("agent-b2clients", "https://192.0.2.5", "active"),
+            _occm("agent-c3clients", "https://192.0.2.50"),
+        ]
+    }
+    reg.deregister(reg.load_config(FULL_VARS))
+    deleted = [r[1] for r in fake.requests if r[0] == "DELETE"]
+    assert deleted == [
+        "/agents-mgmt/agent/agent-a1clients",
+        "/agents-mgmt/agent/agent-b2clients",
+    ]
+
+
+def test_deregister_no_match_deletes_nothing(fake: FakeConsole) -> None:
+    fake.connectors = {"occms": [_occm("agent-c3clients", "https://192.0.2.50")]}
+    assert "nothing to do" in reg.deregister(reg.load_config(FULL_VARS))
+    assert not [r for r in fake.requests if r[0] == "DELETE"]
+
+
+def test_deregister_configured_account_skips_account_lookup(fake: FakeConsole) -> None:
+    fake.connectors = {"occms": [_occm("agent-a1clients", "https://192.0.2.5")]}
+    cfg = reg.load_config({**FULL_VARS, "console_account_id": "acc-1"})
+    reg.deregister(cfg)
+    assert "/tenancy/account" not in [r[1] for r in fake.requests]
+    assert "/agents-mgmt/list-connectors/acc-1" in [r[1] for r in fake.requests]
+
+
+def test_deregister_refused_names_agent(
+    fake: FakeConsole, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake.connectors = {"occms": [_occm("agent-a1clients", "https://192.0.2.5")]}
+    fake.delete_status = 403
+    with pytest.raises(reg.RegistrationError, match=r"agent-a1clients.*Agents > Manage agents"):
+        reg.deregister(reg.load_config(FULL_VARS))
+    monkeypatch.setenv("INFRAFOUNDRY_PACKAGE_VARS", json.dumps(FULL_VARS))
+    assert reg.main(["--remove"]) == 1
+    out = capsys.readouterr()
+    assert "agent-a1clients" in out.err
+    for secret in (SECRET, "cid", TOKEN):
+        assert secret not in out.out + out.err.replace("agent-a1clients", "")
+
+
+def test_main_remove_skips_without_inputs(
+    fake: FakeConsole, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("INFRAFOUNDRY_PACKAGE_VARS", json.dumps({"ip_address": "192.0.2.5"}))
+    assert reg.main(["--remove"]) == 0
+    assert fake.requests == []
+    assert "Deregistration skipped" in capsys.readouterr().out
+
+
+def test_main_remove_partial_inputs_fail(
+    fake: FakeConsole, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    partial = {"ip_address": "192.0.2.5", "console_client_id": "cid"}
+    monkeypatch.setenv("INFRAFOUNDRY_PACKAGE_VARS", json.dumps(partial))
+    assert reg.main(["--remove"]) == 1
+    assert fake.requests == []
+    assert "console_client_secret" in capsys.readouterr().err
+
+
+def test_main_remove_needs_no_agent_cert(
+    fake: FakeConsole, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake.connectors = {"occms": [_occm("agent-a1clients", "https://192.0.2.5")]}
+    monkeypatch.setenv("INFRAFOUNDRY_PACKAGE_VARS", json.dumps(FULL_VARS))
+    assert reg.main(["--remove"]) == 0
+    assert "removed Console agent(s): agent-a1clients" in capsys.readouterr().out

@@ -36,14 +36,15 @@ end to end.
 ## Adding the cluster to the NetApp Console
 
 After setup, the cluster can add itself to the NetApp Console through a
-registered Console agent (see the `console-connector` blueprint). Set all three
-of these, or none to skip:
+registered Console agent (see the `console-connector` blueprint). Set the client ID,
+secret and one agent input, or none to skip:
 
 | Variable | Where | Value |
 |---|---|---|
 | `console_client_id` | `secrets.yaml` | Service account client ID (admin role) |
 | `console_client_secret` | `secrets.yaml` | Service account secret |
-| `console_agent_id` | `infrafoundry.yml` | The agent's `agentId`, from `https://<agent>/occm/api/occm/system/about` |
+| `console_agent_id` | `infrafoundry.yml` | Optional. The agent's `agentId`; empty: looked up by `console_agent_address` |
+| `console_agent_address` | `infrafoundry.yml` | Optional. The agent VM's address (the connector's `ip_address`, e.g. `192.0.2.51`) |
 
 Optional: `console_account_id` and `console_workspace_id`, needed only when the
 service account sees more than one organization or workspace. Also optional are
@@ -54,8 +55,11 @@ The step, `blueprints/ontap-cluster/scripts/ontap-console-discover.py`, runs on 
 needs HTTPS to `netapp-cloud-account.auth0.com` and `api.bluexp.netapp.com`
 only. The Console forwards the request to the agent, and the agent connects to
 `cluster_mgmt_ip`. A cluster already in the Console, matched by name or
-management address, is left alone. Removing it from the Console before
-`infra destroy` is a manual step.
+management address, is left alone. With `console_agent_address`, the script finds the
+agent ID in the Console's agent list (an undocumented endpoint the Console web UI uses)
+and needs exactly one active agent at that address. `infra destroy` removes the cluster
+from the Console again (`--remove`). Destroy the cluster before the connector, in a
+separate run.
 
 To add a cluster that already exists without rebuilding it, run the script
 with `INFRAFOUNDRY_PACKAGE_VARS` set to a JSON object holding `cluster_name`,

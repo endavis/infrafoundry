@@ -59,6 +59,7 @@ class FakeConsole:
             {"workspacePublicId": "ws-1", "workspaceName": "Test"}
         ]
         self.post_status = 200
+        self.connectors: Any = {"occms": []}
         self.requests: list[tuple[str, str, dict[str, str], dict[str, Any]]] = []
 
 
@@ -85,6 +86,8 @@ def fake(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeConsole]:
                 self._reply(200, {"access_token": TOKEN})
             elif path == "/tenancy/account":
                 self._reply(200, state.accounts)
+            elif path == "/agents-mgmt/list-connectors/acc-1":
+                self._reply(200, state.connectors)
             elif path == "/tenancy/account/acc-1/workspace":
                 self._reply(200, state.workspaces)
             elif path == "/occm/api/onprem/working-environments" and method == "GET":
@@ -331,6 +334,7 @@ def test_blueprint_declares_optional_console_inputs() -> None:
         "console_client_id",
         "console_client_secret",
         "console_agent_id",
+        "console_agent_address",
         "console_account_id",
         "console_workspace_id",
         "console_system_name",
@@ -338,3 +342,100 @@ def test_blueprint_declares_optional_console_inputs() -> None:
         assert inputs[name]["default"] == ""
         assert not inputs[name].get("required")
     assert inputs["console_cluster_user"]["default"] == "admin"
+
+
+# --- agent lookup by address (#1629) ---
+
+ADDRESS_VARS: dict[str, Any] = {
+    **{k: v for k, v in FULL_VARS.items() if k != "console_agent_id"},
+    "console_agent_address": "192.0.2.51",
+}
+
+
+def _occm(agent_id: str, uri: str, status: str = "active") -> dict[str, Any]:
+    return {
+        "agent": {"agentId": agent_id, "status": "pending"},
+        "status": status,
+        "primaryCallbackUri": uri,
+    }
+
+
+def _listing_calls(fake: FakeConsole) -> list[str]:
+    return [r[1] for r in fake.requests if r[1].startswith("/agents-mgmt")]
+
+
+def test_load_config_address_only_is_valid() -> None:
+    cfg = disc.load_config(ADDRESS_VARS)
+    assert cfg.agent_id == ""
+    assert cfg.agent_address == "192.0.2.51"
+
+
+def test_load_config_needs_an_agent_key() -> None:
+    no_agent = {k: v for k, v in FULL_VARS.items() if k != "console_agent_id"}
+    with pytest.raises(disc.DiscoveryError, match="console_agent_id or console_agent_address"):
+        disc.load_config(no_agent)
+
+
+def test_load_config_address_alone_is_partial() -> None:
+    with pytest.raises(disc.DiscoveryError, match="console_client_id, console_client_secret"):
+        disc.load_config({"console_agent_address": "192.0.2.51"})
+
+
+def test_resolve_agent_configured_id_makes_no_call(fake: FakeConsole) -> None:
+    assert disc.resolve_agent(disc.load_config(FULL_VARS), TOKEN) == AGENT
+    assert fake.requests == []
+
+
+def test_resolve_agent_one_active_match(fake: FakeConsole) -> None:
+    fake.connectors = {
+        "occms": [
+            _occm("agent-old1clients", "https://192.0.2.51", "inactive"),
+            _occm("agent-new2clients", "https://192.0.2.51:443"),
+            _occm("agent-other3clients", "https://192.0.2.510"),
+        ]
+    }
+    cfg = disc.load_config(ADDRESS_VARS)
+    assert disc.resolve_agent(cfg, TOKEN) == "agent-new2clients"
+    assert _listing_calls(fake) == ["/agents-mgmt/list-connectors/acc-1"]
+
+
+def test_resolve_agent_no_match_raises(fake: FakeConsole) -> None:
+    fake.connectors = {"occms": [_occm("agent-x1clients", "https://192.0.2.99")]}
+    with pytest.raises(disc.DiscoveryError, match=r"no Console agent registered at 192\.0\.2\.51"):
+        disc.resolve_agent(disc.load_config(ADDRESS_VARS), TOKEN)
+
+
+def test_resolve_agent_none_active_lists_statuses(fake: FakeConsole) -> None:
+    fake.connectors = {"occms": [_occm("agent-x1clients", "https://192.0.2.51", "inactive")]}
+    with pytest.raises(disc.DiscoveryError, match=r"agent-x1clients \(inactive\)"):
+        disc.resolve_agent(disc.load_config(ADDRESS_VARS), TOKEN)
+
+
+def test_resolve_agent_two_active_lists_ids(fake: FakeConsole) -> None:
+    fake.connectors = {
+        "occms": [
+            _occm("agent-a1clients", "https://192.0.2.51"),
+            _occm("agent-b2clients", "https://192.0.2.51"),
+        ]
+    }
+    with pytest.raises(disc.DiscoveryError, match=r"agent-a1clients, agent-b2clients"):
+        disc.resolve_agent(disc.load_config(ADDRESS_VARS), TOKEN)
+
+
+def test_discover_with_address_uses_looked_up_agent(fake: FakeConsole) -> None:
+    fake.connectors = {"occms": [_occm("agent-new2clients", "https://192.0.2.51")]}
+    msg = disc.discover(disc.load_config(ADDRESS_VARS))
+    assert "added cluster 192.0.2.80" in msg
+    onprem = [r for r in fake.requests if r[1].startswith("/occm/api/onprem")]
+    assert [r[0] for r in onprem] == ["GET", "POST"]
+    for _, _, headers, _ in onprem:
+        assert headers["x-agent-id"] == "agent-new2clients"
+
+
+def test_remove_with_address_uses_looked_up_agent(fake: FakeConsole) -> None:
+    fake.connectors = {"occms": [_occm("agent-new2clients", "https://192.0.2.51")]}
+    fake.systems = [{"name": "lab", "publicId": "OnPrem-1"}]
+    disc.remove(disc.load_config(ADDRESS_VARS))
+    deletes = _deletes(fake)
+    assert len(deletes) == 1
+    assert deletes[0][1]["x-agent-id"] == "agent-new2clients"
