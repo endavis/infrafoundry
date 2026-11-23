@@ -45,7 +45,9 @@ SSH_USER="${ssh_user:-ansible}"
 # With `balloon` set, the host may have shrunk the VM, and the virtio balloon lowers the
 # guest's MemTotal, which the agent installer checks. So the install runs with the VM's
 # balloon minimum raised to `memory` (set on the node over SSH as root) and the configured
-# value is restored afterwards, also on failure (cleanup below).
+# value is restored afterwards, also on failure (cleanup below). Raising the minimum alone
+# leaves the live target where the host last put it and only lets autoballooning grow it
+# slowly, so the target is also set directly through the QEMU monitor.
 BALLOON="${balloon:-0}"
 MEMORY="${memory:-}"
 PVE_SSH_HOST="${pve_host:-${target_node:-}}"
@@ -84,6 +86,12 @@ raise_balloon() {
         echo "       Set the pve_host input to an address that accepts root SSH for ${target_node:-the node}," >&2
         echo "       or set balloon to 0." >&2
         exit 1
+    fi
+    # Set the live balloon target now. Failing here is not fatal: the raised minimum still
+    # lets autoballooning grow the VM, and the wait below has the final say.
+    if ! pve_cmd "echo \"balloon ${MEMORY}\" | qm monitor ${vmid}"; then
+        echo "WARNING: could not set the live balloon target of VM ${vmid} to ${MEMORY} MiB;" >&2
+        echo "         relying on autoballooning, which can be slow." >&2
     fi
 }
 
@@ -265,7 +273,7 @@ if balloon_enabled; then
     echo ""
     log "--- Phase 3a: Giving the VM its full memory for the installer ---"
     raise_balloon
-    MAX_WAIT=300
+    MAX_WAIT=600
     wait_for_memtotal
 fi
 
