@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from typing import Any, ClassVar
 from unittest.mock import MagicMock
@@ -11,7 +12,7 @@ import pytest
 from infrafoundry.core.exceptions import SchemaValidationError
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
-from infrafoundry.providers.proxmox import ProxmoxProvider
+from infrafoundry.providers.proxmox import ProxmoxProvider, _customized_image_filename
 from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 from infrafoundry.providers.proxmox.validators.template_config_validator import (
     TemplateConfigValidator,
@@ -204,3 +205,121 @@ class TestImportRendering:
         assert without == provider.render_template(
             "proxmox/templates.tf.j2", {"templates": [_tpl(**config)]}
         )
+
+
+class TestCustomizeValidation:
+    _DL: ClassVar[dict[str, Any]] = _dl("y.qcow2")
+
+    @staticmethod
+    def _validate(report: MagicMock, tpl: ResourceConfig) -> None:
+        TemplateConfigValidator(report).validate(ProxmoxConfigContext(templates=[tpl]))
+
+    def test_valid_adds_no_check(self, report: MagicMock) -> None:
+        tpl = _tpl(customize={"packages": ["qemu-guest-agent", "g++"]}, **self._DL)
+        self._validate(report, tpl)
+        report.add_check.assert_not_called()
+
+    def test_without_download_image_errors(self, report: MagicMock) -> None:
+        self._validate(report, _tpl(customize={"packages": ["curl"]}, clone=100))
+        kwargs = report.add_check.call_args.kwargs
+        assert kwargs["check_name"] == "proxmox_template_tpl_customize"
+        assert kwargs["passed"] is False
+        assert kwargs["level"] == ValidationLevel.ERROR
+        assert "download_image" in kwargs["message"]
+
+    @pytest.mark.parametrize(
+        "customize",
+        [
+            "x",
+            {},
+            {"packages": []},
+            {"packages": "qemu-guest-agent"},
+            {"packages": [1]},
+            {"packages": ["a; rm -rf /"]},
+            {"packages": ["$(id)"]},
+            {"packages": ["-o"]},
+            {"packages": [""]},
+        ],
+    )
+    def test_malformed_errors(self, report: MagicMock, customize: Any) -> None:
+        self._validate(report, _tpl(customize=customize, **self._DL))
+        assert report.add_check.called
+        for call in report.add_check.call_args_list:
+            assert call.kwargs["level"] == ValidationLevel.ERROR
+            assert call.kwargs["check_name"] == "proxmox_template_tpl_customize"
+
+    def test_run_commands_names_unsupported_key(self, report: MagicMock) -> None:
+        customize = {"packages": ["curl"], "run_commands": ["id"]}
+        self._validate(report, _tpl(customize=customize, **self._DL))
+        message = report.add_check.call_args.kwargs["message"]
+        assert "run_commands" in message
+        assert "packages" in message
+
+    def test_ova_filename_errors(self, report: MagicMock) -> None:
+        tpl = _tpl(customize={"packages": ["curl"]}, **_dl("y.ova"))
+        self._validate(report, tpl)
+        messages = [c.kwargs["message"] for c in report.add_check.call_args_list]
+        assert any("disk image" in m for m in messages)
+
+    def test_generate_terraform_rejects_without_download(self, provider: ProxmoxProvider) -> None:
+        tpl = _tpl(vmid=9000, clone=100, customize={"packages": ["curl"]})
+        with pytest.raises(SchemaValidationError, match="customize requires download_image"):
+            provider.generate_terraform([tpl])
+
+
+class TestCustomizeRendering:
+    _CFG: ClassVar[dict[str, Any]] = {
+        "vmid": 9000,
+        "download_image": {"url": "https://x/y", "filename": "y.qcow2"},
+        "disk": {"storage": "tank"},
+        "network": {"bridge": "vmbr0"},
+    }
+
+    @staticmethod
+    def _generate(provider: ProxmoxProvider, tpl: ResourceConfig) -> str:
+        provider.generate_terraform([tpl])
+        return (provider.terraform_dir / "templates.tf").read_text()
+
+    def test_customize_rendered(self, provider: ProxmoxProvider) -> None:
+        tpl = _tpl("tpl-a", customize={"packages": ["qemu-guest-agent", "curl"]}, **self._CFG)
+        content = self._generate(provider, tpl)
+        assert 'resource "terraform_data" "template_customize_tpl_a"' in content
+        assert "command -v virt-customize" in content
+        assert "libguestfs-tools" in content
+        assert "pvesm path 'tank:import/y.qcow2'" in content
+        assert "pvesm path 'tank:import/y-customized.qcow2'" in content
+        assert f"--install {shlex.quote('qemu-guest-agent,curl')}" in content
+        assert 'input = "tank:import/y-customized.qcow2"' in content
+        assert "import_from  = terraform_data.template_customize_tpl_a.output" in content
+        assert "replace_triggered_by = [terraform_data.template_customize_tpl_a]" in content
+        assert (
+            "download_id = proxmox_virtual_environment_download_file.cloud_image_tpl_a.id"
+            in content
+        )
+        assert "when    = destroy" in content
+        assert "rm -f" in content
+        assert content.index('template_customize_tpl_a" {') < content.index(
+            'resource "proxmox_virtual_environment_vm"'
+        )
+
+    def test_without_customize_unchanged(self, provider: ProxmoxProvider) -> None:
+        tpl = _tpl(**self._CFG)
+        content = self._generate(provider, tpl)
+        assert "terraform_data" not in content
+        assert "virt-customize" not in content
+        assert (
+            "import_from  = proxmox_virtual_environment_download_file.cloud_image_tpl.id" in content
+        )
+        assert content == provider.render_template("proxmox/templates.tf.j2", {"templates": [tpl]})
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("y.qcow2", "y-customized.qcow2"),
+        ("A.QCOW2", "A-customized.QCOW2"),
+        ("a.b.raw", "a.b-customized.raw"),
+    ],
+)
+def test_customized_image_filename(filename: str, expected: str) -> None:
+    assert _customized_image_filename(filename) == expected

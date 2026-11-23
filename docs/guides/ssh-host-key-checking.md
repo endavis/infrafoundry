@@ -25,6 +25,7 @@ Package SSH connections to long-lived hosts check the host key against your own 
 | ESXi OVF deployment, power on and destroy (`local-exec` over ssh) | Your `known_hosts` |
 | ESXi config export | Your `known_hosts` |
 | Proxmox appliance disk image VMs (`local-exec` ssh to the node) | Your `known_hosts` |
+| Proxmox template image customization (`local-exec` ssh to the node) | Your `known_hosts` |
 | Ansible runs for the `host` and `oci` providers (`host_key_checking = True`) | Your `known_hosts` |
 | `infra doctor` jumphost preflight, SSH from the jumphost to a deployed VM | The keys the package pins in `ssh_known_hosts` |
 
