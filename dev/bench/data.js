@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795430885815,
+  "lastUpdate": 1795434633679,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6046,6 +6046,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000034396522846509393",
             "extra": "mean: 63.525190929435304 usec\nrounds: 16493"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0da4fe8c68515338f93b4b882785199735c438c2",
+          "message": "fix: replace a proxmox template when customize is added to it (merges PR #1626, addresses #1625)\n\nThe template VM's replace_triggered_by referenced the customize step\nitself. Terraform fires replace_triggered_by only on an update or a\nreplacement of the referenced resource, never on its first create.\nAdding customize to an existing template therefore created the step and\nupdated the template in place, keeping the stock image while the apply\nreported success.\n\nEvery download_image template now renders a template_build_<name>\nidentity resource, and replace_triggered_by references it. Its triggers\nhold the download id and the customize package list (empty when unset),\nso adding, changing or removing customize replaces it and with it the\ntemplate. On upgrade, the identity resource is a first-time create and\nreplaces nothing; the docs say to apply once before adding customize.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-23T11:49:08Z",
+          "tree_id": "d0c69db8c8dd3a386248ab703e61a5189b1efdb0",
+          "url": "https://github.com/endavis/infrafoundry/commit/0da4fe8c68515338f93b4b882785199735c438c2"
+        },
+        "date": 1795434633090,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 57.365748395428156,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003416384347241389",
+            "extra": "mean: 17.432004775861973 msec\nrounds: 58"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10938.987681530663,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000053374613344000035",
+            "extra": "mean: 91.41613731665457 usec\nrounds: 12067"
           }
         ]
       }
