@@ -41,6 +41,86 @@ JUMPHOST="${jumphost:-}"
 JUMP_SSH="ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10"
 SSH_USER="${ssh_user:-ansible}"
 
+# --- balloon helpers: begin ---
+# With `balloon` set, the host may have shrunk the VM, and the virtio balloon lowers the
+# guest's MemTotal, which the agent installer checks. So the install runs with the VM's
+# balloon minimum raised to `memory` (set on the node over SSH as root) and the configured
+# value is restored afterwards, also on failure (cleanup below).
+BALLOON="${balloon:-0}"
+MEMORY="${memory:-}"
+PVE_SSH_HOST="${pve_host:-${target_node:-}}"
+PVE_SSH="ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10"
+BALLOON_RAISED=0
+# 13958643712 bytes (the installer's own minimum) / 1024.
+INSTALLER_MIN_KB=13631488
+
+pve_cmd() { ${PVE_SSH} "root@${PVE_SSH_HOST}" "$@"; }
+
+# True when a balloon minimum is configured (anything but empty or 0).
+balloon_enabled() { [ -n "${BALLOON}" ] && [ "${BALLOON}" != "0" ]; }
+
+# vmid, memory and balloon are interpolated into a remote shell command.
+validate_balloon_inputs() {
+    local name value
+    for name in vmid MEMORY BALLOON; do
+        value="${!name:-}"
+        if ! [[ "${value}" =~ ^[0-9]+$ ]]; then
+            echo "ERROR: ${name} must be a whole number when balloon is set (got '${value}')" >&2
+            exit 1
+        fi
+    done
+    if [ -z "${PVE_SSH_HOST}" ]; then
+        echo "ERROR: set pve_host (or target_node): the install must reach the Proxmox node" >&2
+        exit 1
+    fi
+}
+
+raise_balloon() {
+    validate_balloon_inputs
+    # Set first, so a partly applied raise is still restored.
+    BALLOON_RAISED=1
+    if ! pve_cmd qm set "${vmid}" --balloon "${MEMORY}"; then
+        echo "ERROR: cannot raise the balloon of VM ${vmid} to ${MEMORY} MiB over SSH to root@${PVE_SSH_HOST}" >&2
+        echo "       Set the pve_host input to an address that accepts root SSH for ${target_node:-the node}," >&2
+        echo "       or set balloon to 0." >&2
+        exit 1
+    fi
+}
+
+restore_balloon() {
+    if pve_cmd qm set "${vmid}" --balloon "${BALLOON}"; then
+        BALLOON_RAISED=0
+        return 0
+    fi
+    echo "WARNING: could not restore the balloon of VM ${vmid}. Run on ${target_node:-the node}:" >&2
+    echo "         qm set ${vmid} --balloon ${BALLOON}" >&2
+    echo "         Until then the next plan shows floating ${MEMORY} -> ${BALLOON}, which can reboot the VM." >&2
+    return 1
+}
+
+# Wait until the guest's MemTotal reaches the installer minimum.
+wait_for_memtotal() {
+    local waited=0 line="" kb=0
+    while true; do
+        line=$(remote_cmd "${ip_address}" "grep MemTotal /proc/meminfo" 2>/dev/null || true)
+        kb=$(printf '%s\n' "${line}" | tr -dc '0-9\n' | head -n 1)
+        kb=${kb:-0}
+        if [ "${kb}" -ge "${INSTALLER_MIN_KB}" ]; then
+            echo "  Guest MemTotal: $((kb / 1024)) MiB"
+            return 0
+        fi
+        if [ "${waited}" -ge "${MAX_WAIT}" ]; then
+            echo "ERROR: guest MemTotal is $((kb / 1024)) MiB after ${waited}s; the installer needs 13312 MiB" >&2
+            echo "       The node may have no free memory to give back to the VM." >&2
+            exit 1
+        fi
+        echo "  Waiting for guest memory... MemTotal $((kb / 1024)) MiB (${waited}s)"
+        sleep 5
+        waited=$((waited + 5))
+    done
+}
+# --- balloon helpers: end ---
+
 # The VM's host key is pinned (#1581): InfraFoundry generated it, cloud-init installed it,
 # and ssh_known_hosts (";"-separated "<name>,<address> ssh-ed25519 <key>" lines) holds the
 # public half. Nothing but this file is trusted for the VM.
@@ -50,12 +130,18 @@ AGENT_CERT=""
 KNOWN_HOSTS=$(mktemp)
 REMOTE_KNOWN_HOSTS=""
 cleanup() {
+    if [ "${BALLOON_RAISED}" -eq 1 ]; then
+        restore_balloon || true
+    fi
     rm -f "$WAIT_ERR" "$CURL_ERR" "$AGENT_CERT" "$KNOWN_HOSTS"
     if [ -n "${REMOTE_KNOWN_HOSTS}" ]; then
         ${JUMP_SSH} ${JUMPHOST} "rm -f '${REMOTE_KNOWN_HOSTS}'" >/dev/null 2>&1 || true
     fi
 }
 trap cleanup EXIT
+# Make a signal run the EXIT trap, so the balloon is restored on a timeout kill.
+trap 'exit 130' INT
+trap 'exit 143' TERM
 if [ -z "${ssh_known_hosts:-}" ]; then
     echo "ERROR: ssh_known_hosts is empty: no pinned SSH host key for ${vm_name:-the VM}." >&2
     echo "       Run 'foundry secrets host-keys --env <env>' and re-apply." >&2
@@ -174,10 +260,24 @@ fi
 # Into the VM user's home, not a shared /tmp path.
 remote_upload "${REMOTE_SCRIPT}" "${ip_address}" "console-connector-install-remote.sh"
 
+# --- Phase 3a: Give the VM its full memory for the installer (balloon only) ---
+if balloon_enabled; then
+    echo ""
+    log "--- Phase 3a: Giving the VM its full memory for the installer ---"
+    raise_balloon
+    MAX_WAIT=300
+    wait_for_memtotal
+fi
+
 # --- Phase 3: Install Docker and the Console agent ---
 echo ""
 log "--- Phase 3: Installing Docker ${DOCKER_VERSION} and the Console agent ---"
 remote_cmd_long "${ip_address}" "DOCKER_VERSION='${DOCKER_VERSION}' CONSOLE_AGENT_URL_BASE='${console_agent_url_base}' CONSOLE_AGENT_INSTALLER='${console_agent_installer}' CONSOLE_AGENT_SHA256='${console_agent_sha256}' CONSOLE_AGENT_INSTALL_ARGS='${INSTALL_ARGS}' bash ~/console-connector-install-remote.sh"
+
+if [ "${BALLOON_RAISED}" -eq 1 ]; then
+    log "Restoring the configured balloon (${BALLOON} MiB)"
+    restore_balloon || exit 1
+fi
 
 # --- Phase 4: Wait for the agent web page, print manual steps ---
 echo ""

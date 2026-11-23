@@ -64,6 +64,7 @@ infra apply --env <env> --package console-connector
 | `cores` | `8` | vCPU count (unverified sizing, see below) |
 | `memory` | `32768` | Memory in MiB (unverified sizing, see below) |
 | `balloon` | `0` | Minimum memory in MiB the host may shrink the VM to; `0` never shrinks it (see below) |
+| `pve_host` | `""` | Address to SSH to `target_node` as root, used only when `balloon` is set. Empty: `target_node` |
 | `disk_size` | `180` | Disk GiB: 120 for `/opt` plus 40 for `/var`, plus the OS and headroom (the install script checks the free space) |
 | `bridge` | `vmbr0` | Network bridge |
 | `vlan_tag` | `10` | VLAN tag. Empty: untagged, e.g. on an SDN vnet |
@@ -110,8 +111,12 @@ Verified against the NetApp page above:
   example 8192) to let the host shrink the VM toward that minimum under
   pressure. With `0` the VM keeps its balloon device and returns freed pages,
   but is never shrunk; this blueprint cannot remove the balloon device. The
-  guest still sees the full `memory` at install, so the installer's check is
-  unaffected. See [Memory ballooning](../../docs/providers/proxmox.md#memory-ballooning).
+  virtio balloon lowers the guest's MemTotal, which the installer checks. So
+  when `balloon` is set, the setup script raises the VM's balloon minimum to
+  `memory` on `target_node` (SSH as root to `pve_host`, or to `target_node` when
+  that is empty, for example `pve1.example.com`), waits until MemTotal reaches
+  the installer minimum, and restores `balloon` after the install, including
+  when the install fails. See [Memory ballooning](../../docs/providers/proxmox.md#memory-ballooning).
 - The idempotency markers (`/opt/application/netapp` present plus a running
   container). They live in one function, `console_agent_installed`, in
   `scripts/console-connector-install-remote.sh`.

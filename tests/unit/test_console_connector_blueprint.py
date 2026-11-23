@@ -305,3 +305,190 @@ def test_readme_uses_real_installer_name() -> None:
     text = BLUEPRINT_README.read_text()
     assert "netapp-console-agent-<version>" in text
     assert "NetApp_Console_Agent_Cloud" not in text
+
+
+# --- Balloon handling during the agent install (#1632) ---
+
+_BALLOON_BEGIN = "# --- balloon helpers: begin ---"
+_BALLOON_END = "# --- balloon helpers: end ---"
+
+
+def _balloon_helpers() -> str:
+    """The balloon helper block of the post-Terraform script."""
+    text = POST_SCRIPT.read_text()
+    start = text.index(_BALLOON_BEGIN)
+    return text[start : text.index(_BALLOON_END) + len(_BALLOON_END)]
+
+
+def _cleanup_function() -> str:
+    """The script's real ``cleanup`` function with the balloon restore, nothing else."""
+    text = POST_SCRIPT.read_text()
+    start = text.index("cleanup() {")
+    block = text[start : text.index("\n}\n", start) + 3]
+    # Keep only the balloon part; the rest needs the jumphost state.
+    return block.split("    rm -f")[0] + "}\n"
+
+
+def _run_balloon(
+    tmp_path: Path,
+    body: str,
+    *,
+    variables: dict[str, str] | None = None,
+    memtotals: list[str] | None = None,
+    extra: str = "",
+) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+    """Run ``body`` after the helper block, with stub ssh/sleep; return result and ssh log."""
+    log = tmp_path / "ssh.log"
+    log.write_text("")
+    for name in ("ssh", "sleep"):
+        stub = tmp_path / name
+        if name == "ssh":
+            stub.write_text(f'#!/bin/bash\necho "$*" >> {log}\n')
+        else:
+            stub.write_text("#!/bin/bash\nexit 0\n")
+        stub.chmod(0o755)
+    counter = tmp_path / "counter"
+    counter.write_text("0")
+    values = tmp_path / "memtotals"
+    values.write_text("\n".join(memtotals or ["MemTotal: 14000000 kB"]) + "\n")
+    env_vars = {
+        "vmid": "230",
+        "target_node": "node1",
+        "ip_address": "192.0.2.60",
+        "memory": "14336",
+        "balloon": "8192",
+    }
+    env_vars.update(variables or {})
+    assigns = "".join(f"{k}='{v}'\n" for k, v in env_vars.items())
+    script = (
+        "set -euo pipefail\n"
+        f"{assigns}"
+        "MAX_WAIT=10\n"
+        f"{_balloon_helpers()}\n"
+        f"{_cleanup_function()}"
+        "trap cleanup EXIT\n"
+        "remote_cmd() {\n"
+        f"  local n; n=$(cat {counter}); echo $((n + 1)) > {counter}\n"
+        f"  local total; total=$(wc -l < {values})\n"
+        "  [ $((n + 1)) -gt $total ] && n=$((total - 1))\n"
+        f'  sed -n "$((n + 1))p" {values}\n'
+        "}\n"
+        f"{extra}\n"
+        f"{body}\n"
+    )
+    result = subprocess.run(
+        ["bash", "-c", script],
+        env={**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+    )
+    return result, [ln for ln in log.read_text().splitlines() if ln]
+
+
+@pytest.mark.parametrize("balloon", ["0", ""])
+def test_balloon_disabled_makes_no_ssh_call(tmp_path: Path, balloon: str) -> None:
+    """With balloon 0 or empty the guarded Phase 3a block never touches the node."""
+    result, calls = _run_balloon(
+        tmp_path,
+        "if balloon_enabled; then raise_balloon; wait_for_memtotal; fi",
+        variables={"balloon": balloon},
+    )
+    assert result.returncode == 0, result.stderr
+    assert calls == []
+
+
+def test_balloon_unset_makes_no_ssh_call(tmp_path: Path) -> None:
+    """A package that never sets balloon skips the raise."""
+    script = f"set -euo pipefail\n{_balloon_helpers()}\nballoon_enabled && echo on || echo off\n"
+    result = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+    assert result.stdout.strip() == "off"
+
+
+@pytest.mark.parametrize(
+    ("pve_host", "target"),
+    [("", "root@node1"), ("pve1.example.com", "root@pve1.example.com")],
+)
+def test_raise_balloon_targets_the_node(tmp_path: Path, pve_host: str, target: str) -> None:
+    """The raise sets balloon to memory on pve_host, falling back to target_node."""
+    result, calls = _run_balloon(
+        tmp_path, "raise_balloon", variables={"pve_host": pve_host} if pve_host else None
+    )
+    assert result.returncode == 0, result.stderr
+    # The EXIT trap adds the restore after the raise.
+    assert len(calls) == 2
+    assert target in calls[0]
+    assert calls[0].endswith("qm set 230 --balloon 14336")
+    assert "StrictHostKeyChecking=yes" in calls[0]
+
+
+def test_balloon_restored_when_install_fails(tmp_path: Path) -> None:
+    """A failure after the raise still restores the configured balloon on exit."""
+    result, calls = _run_balloon(tmp_path, "raise_balloon\nfalse")
+    assert result.returncode != 0
+    assert len(calls) == 2
+    assert calls[0].endswith("--balloon 14336")
+    assert calls[1].endswith("qm set 230 --balloon 8192")
+
+
+def test_balloon_not_restored_twice(tmp_path: Path) -> None:
+    """After an explicit restore, the EXIT trap makes no second call."""
+    result, calls = _run_balloon(
+        tmp_path, 'raise_balloon\nrestore_balloon\n[ "${BALLOON_RAISED}" -eq 0 ]'
+    )
+    assert result.returncode == 0, result.stderr
+    assert [c.rsplit(" ", 1)[1] for c in calls] == ["14336", "8192"]
+
+
+def test_wait_for_memtotal_succeeds_once_memory_arrives(tmp_path: Path) -> None:
+    """The wait polls until MemTotal reaches the installer minimum."""
+    result, _ = _run_balloon(
+        tmp_path,
+        "wait_for_memtotal",
+        memtotals=["MemTotal:        9000000 kB", "MemTotal:       14000000 kB"],
+    )
+    assert result.returncode == 0, result.stderr
+    assert "13671 MiB" in result.stdout
+
+
+def test_wait_for_memtotal_times_out(tmp_path: Path) -> None:
+    """A guest that never gets the memory fails with the target in the message."""
+    result, _ = _run_balloon(
+        tmp_path, "wait_for_memtotal", memtotals=["MemTotal:        9000000 kB"]
+    )
+    assert result.returncode != 0
+    assert "13312" in result.stderr
+    assert "MemTotal" in result.stderr
+
+
+@pytest.mark.parametrize("bad", [{"memory": "14336; id"}, {"vmid": "abc"}, {"balloon": "8x"}])
+def test_balloon_inputs_validated_before_ssh(tmp_path: Path, bad: dict[str, str]) -> None:
+    """A non-numeric value is rejected before anything reaches the node."""
+    result, calls = _run_balloon(tmp_path, "raise_balloon", variables=bad)
+    assert result.returncode != 0
+    assert calls == []
+
+
+def test_balloon_phase_ordering() -> None:
+    """Raise and wait come before the installer; the explicit restore comes after it."""
+    text = POST_SCRIPT.read_text()
+    installer = text.index("bash ~/console-connector-install-remote.sh")
+    assert text.index("    raise_balloon\n") < installer
+    assert text.index("    wait_for_memtotal\n") < installer
+    restore = text.index("restore_balloon || exit 1")
+    assert installer < restore < text.index("--- Phase 4")
+
+
+def test_pve_host_is_optional(loader: PackageLoader) -> None:
+    """The example package, which sets no pve_host, still loads."""
+    _resources, _events, variables = loader.load_package(
+        PACKAGE_DIR, provider="proxmox", env_name="dev"
+    )
+    assert variables.get("pve_host", "") == ""
+
+
+def test_readme_describes_the_balloon_raise() -> None:
+    """The README no longer claims the installer is unaffected, and names pve_host."""
+    text = BLUEPRINT_README.read_text()
+    assert "installer's check is\n  unaffected" not in text
+    assert "unaffected" not in text
+    assert "pve_host" in text

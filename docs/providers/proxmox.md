@@ -274,7 +274,8 @@ that Proxmox may shrink the guest to (the bpg `memory.floating` attribute).
   (default 2048). The guest reports free pages to the host but is never shrunk.
 - **`0`**: no balloon device.
 - **A value below `memory`**: Proxmox may shrink the VM to that minimum under
-  host memory pressure.
+  host memory pressure. Shrinking lowers the guest's MemTotal (virtio balloon),
+  so a workload that checks MemTotal at start may see less than `memory`.
 
 ```yaml
 vms:
