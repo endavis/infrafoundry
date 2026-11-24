@@ -211,6 +211,7 @@ Key commands (`foundry` via `uv run foundry ...`):
 **Provider group (`provider`):**
 - `provider proxmox export --env <name> --output <dir>` – export Proxmox config to InfraFoundry YAML
 - `provider proxmox dump --env <name> --output <file>` – dump raw Proxmox API state as a JSON snapshot
+- `provider openwrt upgrade --env <name> [--device <d>] [--yes]` – install the vendor's latest firmware on GL.iNet devices
 
 Generated artifacts should be reviewed (and optionally validated with native Terraform/Ansible tools) from the `generated/` directory hierarchy.
 

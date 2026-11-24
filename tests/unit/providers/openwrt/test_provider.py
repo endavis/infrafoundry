@@ -11,6 +11,7 @@ from infrafoundry.core.protocols import ValidatesOffline
 from infrafoundry.core.requirements.models import CollectionRequirement
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.openwrt import OpenWrtProvider
+from infrafoundry.providers.openwrt.glinet.firmware import FIRMWARE_TYPE
 from infrafoundry.providers.openwrt.schema import SPECS
 from infrafoundry.providers.openwrt.settings import OpenWrtSettings
 
@@ -38,8 +39,8 @@ def _task_names(provider: OpenWrtProvider) -> list[str]:
 def test_resource_types_and_dependencies(tmp_path: Path) -> None:
     provider = _provider(tmp_path)
     assert provider.name == "openwrt"
-    assert provider.get_resource_types() == list(SPECS)
-    assert provider.get_dependencies() == {name: [] for name in SPECS}
+    assert provider.get_resource_types() == [*SPECS, FIRMWARE_TYPE]
+    assert provider.get_dependencies() == {name: [] for name in (*SPECS, FIRMWARE_TYPE)}
 
 
 def test_terraform_prefixes_match_runner_outcome_addresses(tmp_path: Path) -> None:

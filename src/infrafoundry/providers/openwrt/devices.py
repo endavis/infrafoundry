@@ -18,6 +18,10 @@ Each device is a provider instance (``openwrt`` for the primary, ``openwrt@<name
 the others, see :mod:`infrafoundry.core.provider_instances`). :func:`device_settings`
 turns the provider id back into the flat settings dict the rest of the provider
 already understands.
+
+``address``, ``tls_fingerprint`` and ``verify_ssl`` identify one device (the last two
+pin or waive the check of its web certificate, ADR-0036), so they sit in an entry and
+never beside the map.
 """
 
 from __future__ import annotations
@@ -35,8 +39,9 @@ BASE_PROVIDER = "openwrt"
 DEVICES_KEY = "devices"
 PRIMARY_KEY = "primary"
 
-#: Keys that identify one device; they cannot be shared defaults.
-_PER_DEVICE_KEYS = ("address",)
+#: Keys that identify one device (its address and its web certificate pin or unsafe
+#: opt-out, ADR-0036); they cannot be shared defaults.
+_PER_DEVICE_KEYS = ("address", "tls_fingerprint", "verify_ssl")
 
 
 def device_settings(settings_or_env_config: Any, provider_name: str) -> dict[str, Any] | None:

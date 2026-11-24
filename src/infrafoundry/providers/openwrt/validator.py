@@ -15,6 +15,8 @@ from infrafoundry.core.requirements.models import CollectionRequirement
 from infrafoundry.core.validation import ValidationReport
 
 from .devices import device_settings, validate_devices_settings
+from .glinet.firmware import FIRMWARE_TYPE, check_firmware_resources
+from .glinet.settings import web_settings_problems
 from .schema import check_resources
 from .settings import (
     PROVIDER_NAME,
@@ -42,7 +44,9 @@ def _run(argv: list[str]) -> subprocess.CompletedProcess[str]:
     )
 
 
-def ssh_argv(settings: OpenWrtSettings, remote_cmd: str) -> list[str]:
+def ssh_argv(
+    settings: OpenWrtSettings, remote_cmd: str, host_key_alias: str | None = None
+) -> list[str]:
     """Build the ssh command for one fixed remote command.
 
     Host-key checking stays on and the address follows ``--`` so it is never an option.
@@ -50,8 +54,12 @@ def ssh_argv(settings: OpenWrtSettings, remote_cmd: str) -> list[str]:
     Args:
         settings: Device settings.
         remote_cmd: A fixed command string from this module.
+        host_key_alias: When set, the host key is checked strictly under this alias (the
+            firmware upgrade's post-reboot probe uses the settings address).
     """
     argv = ["ssh", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={settings.connect_timeout}"]
+    if host_key_alias:
+        argv += ["-o", "StrictHostKeyChecking=yes", "-o", f"HostKeyAlias={host_key_alias}"]
     argv += ["-p", str(settings.ssh_port)]
     if settings.ssh_private_key_file:
         argv += ["-i", settings.ssh_private_key_file]
@@ -113,6 +121,29 @@ class OpenWrtValidator:
                 message=finding.message,
                 level=finding.level,
             )
+        self._check_firmware(resources)
+
+    def _check_firmware(self, resources: list[ResourceConfig]) -> None:
+        """Check the ``glinet.firmware`` resources and, if present, the device's web settings."""
+        mine = [r for r in resources if r.type == FIRMWARE_TYPE]
+        if not mine:
+            return
+        for finding in check_firmware_resources(mine):
+            self.report.add_check(
+                check_name=f"openwrt_schema_{finding.resource}",
+                passed=False,
+                message=finding.message,
+                level=finding.level,
+            )
+        raw = self.env_config.provider_settings.get(PROVIDER_NAME) or {}
+        if validate_devices_settings(raw if isinstance(raw, dict) else None):
+            return  # reported as openwrt_devices_settings
+        merged = device_settings(raw, self.provider_name)
+        if not merged:
+            return  # reported as openwrt_settings
+        where = device_where(raw, self.provider_name)
+        for problem in web_settings_problems(dict(merged), where):
+            self.report.add_check("openwrt_firmware_settings", False, problem)
 
     def _settings_from_env(self) -> OpenWrtSettings | None:
         raw = self.env_config.provider_settings.get(PROVIDER_NAME) or {}

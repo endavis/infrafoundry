@@ -80,6 +80,7 @@ secret_backend = "infrafoundry.secrets.plugin_type:SecretBackendPluginType"
 
 [project.entry-points."infrafoundry.providers"]
 proxmox = "infrafoundry.providers.proxmox:register"
+openwrt = "infrafoundry.providers.openwrt:register"
 
 [project.entry-points."infrafoundry.secrets"]
 env = "infrafoundry.secrets.backends.env:register"

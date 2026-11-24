@@ -53,7 +53,7 @@ provider_settings:
     connect_timeout: 10               # seconds, default 10
 ```
 
-`secret://env_secrets/...` references resolve from the environment's SOPS secrets. The provider stores no password. With a `secret_backends.bitwarden` block in `settings.yaml`, `secret://bitwarden/<item>/<field>` works wherever `secret://env_secrets/...` does ([Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md)).
+`secret://env_secrets/...` references resolve from the environment's SOPS secrets. Over SSH the provider stores no password; the one exception is the web password of a [`glinet.firmware`](#glinet-firmware) resource. With a `secret_backends.bitwarden` block in `settings.yaml`, `secret://bitwarden/<item>/<field>` works wherever `secret://env_secrets/...` does ([Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md)).
 
 To manage several devices from one environment, see [Several devices per environment](#several-devices-per-environment).
 
@@ -108,6 +108,7 @@ Declare resources in the resource-centric format. Field names are the UCI option
 | `dhcp.pool` | `dhcp` section of type `dhcp` | `interface`, default the resource name | no |
 | `dhcp.host` | `dhcp` section of type `host` (a static lease) | `mac` | yes |
 | `firewall.redirect` | `firewall` section of type `redirect` (a port forward) | `name`, default the resource name | yes |
+| `glinet.firmware` | none; keeps a GL.iNet router's firmware at the vendor's latest release ([GL.iNet firmware](#glinet-firmware)) | the resource name | no |
 
 ```yaml
 # envs/travel/resources/router.yaml
@@ -154,6 +155,72 @@ Notes on the fields:
 - `firewall.redirect`: `absent: true` deletes the forward. `enabled` is a boolean.
 - Values compare as UCI stores them: integers as `"100"`, booleans as `"1"` and `"0"`, `proto` as a space-joined string. A converged device plans clean.
 - Text values may not contain control characters or Jinja markers (`{{`, `{%`, `{#`), because they end up in a generated playbook.
+
+## GL.iNet firmware
+
+A `glinet.firmware` resource keeps one GL.iNet router's firmware at the vendor's latest release ([ADR-0036](../decisions/0036-glinet-firmware-is-upgraded-through-the-vendor-online-upgrade-by-a-provider-command.md), issue #1655). It takes no fields, and a device may have at most one. Like any resource it addresses a device with `device:` (see [Several devices per environment](#several-devices-per-environment)).
+
+```yaml
+# envs/dev/resources/router.yaml
+device: office
+resources:
+  - name: firmware
+    type: glinet.firmware
+```
+
+The upgrade uses the router's web JSON-RPC API (the vendor's online upgrade), so it needs web settings beside the SSH ones:
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| `web_username` | `root` | Shared default; a device entry overrides it. |
+| `web_password` | none | Required. Normally a `secret://` reference. Shared default; a device entry overrides it. One secret per device is recommended. |
+| `web_port` | 443 | 1-65535. |
+| `upgrade_timeout` | 1200 | Seconds, 300-3600. Bounds the wait from the upgrade request until the router answers again. |
+| `tls_fingerprint` | none | SHA-256 of the router's certificate, 64 hex characters, with or without `:`. Per-device only. |
+| `verify_ssl` | `true` | `false` skips the certificate check. Unsafe, per-device only. |
+
+Either `tls_fingerprint` or `verify_ssl: false` is required. Get the pin with:
+
+```bash
+openssl s_client -connect 192.0.2.2:443 </dev/null | openssl x509 -noout -fingerprint -sha256
+```
+
+```yaml
+provider_settings:
+  openwrt:
+    primary: office
+    devices:
+      office:
+        address: 192.0.2.2
+        web_password: secret://env_secrets/openwrt/office_web
+        tls_fingerprint: "AB:CD:EF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC"
+```
+
+The pin is checked during the TLS handshake, before any request is sent. `verify_ssl: false` logs a warning on every connection.
+
+### Plan and upgrade
+
+`foundry infra plan` logs in once per device, asks the router whether the vendor offers a newer release and prints one line, for example `glinet.firmware 'firmware': up to date (4.8.7)` or `glinet.firmware 'firmware': 4.8.7 → 4.8.8 available (run foundry provider openwrt upgrade --env dev)`. The line never makes the plan "have changes", and `infra apply` never upgrades. A failed check (router unreachable, pin mismatch, login refused) prints a warning and does not fail the plan. Drift runs and runs that exclude the resource do not log in.
+
+```bash
+foundry provider openwrt upgrade --env dev [--device office] [--yes] [--lock-timeout 60]
+```
+
+The command holds the environment lock, checks every selected device read-only, prints a table, asks once (unless `--yes`), then upgrades the devices one at a time in declaration order, keeping the configuration and packages. It waits for the router to reboot, verifies the SSH host key and that the router reports the confirmed version, then re-plans the upgraded devices. The first failure stops the run, and the error lists the devices upgraded, failed and not attempted. `--device` is an error for an undeclared device, a device without a `glinet.firmware` resource, or a flat configuration.
+
+### Risks
+
+- A flash cannot be rolled back automatically.
+- The router locks out after repeated failed logins, so a failed login is never retried. Fix `web_password` before running again.
+- `verify_ssl: false` lets anyone on the path read the password. Pin the certificate instead.
+- A new certificate after an upgrade fails the pin ("re-pin `tls_fingerprint`").
+- A device whose only resource is `glinet.firmware` needs no SSH for apply, but the upgrade still needs SSH for the post-reboot host-key check.
+
+### Choices and unverified details
+
+- A run with nothing to stage, delete or forget (a firmware-only device, in apply and in destroy) skips the ansible pass.
+- The login hash is `sha256(user:cipher:nonce)`. If the challenge carries a `hash-method` (`md5`, `sha256` or `sha512`) that method is used instead; an unknown one stops before `login` is sent.
+- **Unverified against a real router:** the `hash-method` field, the shape of the `logout` request (`{"method": "logout", "params": {"sid": ...}}`; logout errors are ignored), and the exact reply of `check_firmware_online` when an update is offered (read from the web UI's code, `version_new`).
 
 ## Matching and adoption
 
@@ -202,6 +269,7 @@ InfraFoundry deletes an undeclared object only when it applied that object befor
 ## Out of scope
 
 - Wireless, system, and any config other than `network`, `dhcp` and `firewall`.
+- Pinning a firmware version and flashing a local image: `glinet.firmware` installs the vendor's latest release only.
 - Terraform.
 
 ## Stock OpenWrt and GL.iNet

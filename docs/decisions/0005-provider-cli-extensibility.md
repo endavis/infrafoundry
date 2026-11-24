@@ -15,6 +15,8 @@ Accepted
 
 Related issue: [#626](https://github.com/endavis/infrafoundry/issues/626)
 
+Second provider CLI: [#1655](https://github.com/endavis/infrafoundry/issues/1655) adds `foundry provider openwrt upgrade` ([ADR-0036](../decisions/0036-glinet-firmware-is-upgraded-through-the-vendor-online-upgrade-by-a-provider-command.md)).
+
 ## Context
 
 Provider-specific operations were starting to accumulate as flags and

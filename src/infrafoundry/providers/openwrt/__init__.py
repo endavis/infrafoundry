@@ -8,6 +8,10 @@ for ``plan`` and for the pre-apply check, and for real on ``apply`` and ``destro
 The real run commits through ``ubus call uci apply`` with rollback and confirms after
 reconnecting (ADR-0028). Each device is a provider instance (ADR-0035).
 Terraform has nothing to do here.
+
+A ``glinet.firmware`` resource keeps a GL.iNet router's firmware at the vendor's latest
+release (ADR-0036). ``plan`` reports whether an update is offered; ``apply`` never
+installs one. ``foundry provider openwrt upgrade`` does.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ from typing import Any, Literal, Self, override
 import yaml
 
 from infrafoundry.core.config.models import EnvironmentConfig
-from infrafoundry.core.exceptions import SchemaValidationError
+from infrafoundry.core.exceptions import InfraFoundryError, SchemaValidationError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_instances import qualified_provider_id
 from infrafoundry.core.provider_mixins import (
@@ -40,6 +44,14 @@ from .components.results import (
     parse_output,
 )
 from .devices import device_label
+from .glinet.firmware import (
+    FIRMWARE_ADDRESS_PREFIX,
+    FIRMWARE_TYPE,
+    check_firmware,
+    plan_line,
+)
+from .glinet.rpc import GlinetRpcClient
+from .glinet.settings import load_web_settings
 from .schema import SPECS, Desired, check_resources, desired_from_resources
 from .settings import PROVIDER_NAME, OpenWrtSettings, load_settings
 from .validator import COLLECTION, OpenWrtValidator
@@ -158,17 +170,19 @@ class OpenWrtProvider(
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return list(SPECS)
+        return [*SPECS, FIRMWARE_TYPE]
 
     @override
     def get_dependencies(self) -> dict[str, list[str]]:
         """Get resource dependencies; UCI stages and commits every type together."""
-        return {name: [] for name in SPECS}
+        return {name: [] for name in (*SPECS, FIRMWARE_TYPE)}
 
     @override
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
         """Map each type to the pseudo prefix of the runner's outcome addresses."""
-        return {name: [f"openwrt_{spec.slug}"] for name, spec in SPECS.items()}
+        types = {name: [f"openwrt_{spec.slug}"] for name, spec in SPECS.items()}
+        types[FIRMWARE_TYPE] = [FIRMWARE_ADDRESS_PREFIX]
+        return types
 
     @override
     def ansible_collection_requirements(self) -> tuple[CollectionRequirement, ...]:
@@ -262,6 +276,51 @@ class OpenWrtProvider(
         return RenderedRun(self.ansible_dir, settings, spec, tags)
 
     @staticmethod
+    def empty_result(run: RenderedRun) -> OpenWrtRunResult | None:
+        """Return a no-op result when the run has nothing to stage, delete or forget.
+
+        Duck-typed hook read by ``OpenWrtAnsibleRunner``: a device whose only resource is
+        ``glinet.firmware`` needs no ansible pass (ADR-0036).
+
+        Args:
+            run: The result of :meth:`render_run`.
+
+        Returns:
+            An empty successful result, or ``None`` when the playbook has work to do.
+        """
+        spec = run.spec
+        if spec.items or spec.forgotten or spec.forgotten_items:
+            return None
+        return OpenWrtRunResult()
+
+    def firmware_plan_lines(
+        self, env_name: str, resources: list[ResourceConfig]
+    ) -> list[tuple[str, bool]]:
+        """Check the router's firmware offer and return plan lines (ADR-0036).
+
+        Duck-typed hook read by ``OpenWrtAnsibleRunner.plan``. It only reads: one login,
+        one ``check_firmware_online``, one logout. A failure becomes a warning line so a
+        router with its web UI down cannot block SSH configuration management.
+
+        Args:
+            env_name: Environment name.
+            resources: This device's resources.
+
+        Returns:
+            ``(line, is_warning)`` pairs; empty when no ``glinet.firmware`` resource exists.
+        """
+        firmware = [r for r in resources if r.type == FIRMWARE_TYPE]
+        if not firmware:
+            return []
+        name = firmware[0].name
+        try:
+            web = load_web_settings(self.config_dir, env_name, self.name)
+            status = check_firmware(GlinetRpcClient(web))
+        except (InfraFoundryError, OSError) as exc:
+            return [(f"{FIRMWARE_TYPE} '{name}': firmware check failed: {exc}", True)]
+        return [(plan_line(name, status, env_name), False)]
+
+    @staticmethod
     def _run_spec(mode: Mode, selected: list[Desired], index: Any, add_only: bool) -> RunSpec:
         if mode == "destroy":
             items = [
@@ -331,3 +390,34 @@ class OpenWrtProvider(
     def deletable_types() -> set[str]:
         """Return the resource types the provider can delete."""
         return {name for name, spec in SPECS.items() if spec.deletable}
+
+
+def register_cli(provider_group: Any) -> None:
+    """Attach the OpenWrt subcommands to the ``foundry provider openwrt`` group.
+
+    Args:
+        provider_group: The Click group created for this provider.
+    """
+    # Imported here so that importing the provider does not pull in the CLI code.
+    from .glinet.cli import openwrt as openwrt_cli_group
+
+    for name, command in openwrt_cli_group.commands.items():
+        provider_group.add_command(command, name=name)
+
+
+def register() -> Any:
+    """Return provider metadata for plugin discovery (the ``infrafoundry.providers`` entry point).
+
+    Returns:
+        A ``ProviderMetadata`` describing the OpenWrt provider.
+    """
+    from infrafoundry.providers.plugin_type import ProviderMetadata
+
+    return ProviderMetadata(
+        name="openwrt",
+        version="0.1.0",
+        description="OpenWrt provider",
+        provider_class=OpenWrtProvider,
+        resource_types=[*SPECS, FIRMWARE_TYPE],
+        cli_registration=register_cli,
+    )
