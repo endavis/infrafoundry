@@ -206,7 +206,7 @@ The pin is checked during the TLS handshake, before any request is sent. `verify
 foundry provider openwrt upgrade --env dev [--device office] [--yes] [--lock-timeout 60]
 ```
 
-The command holds the environment lock, checks every selected device read-only, prints a table, asks once (unless `--yes`), then upgrades the devices one at a time in declaration order, keeping the configuration and packages. It waits for the router to reboot, verifies the SSH host key and that the router reports the confirmed version, then re-plans the upgraded devices. The first failure stops the run, and the error lists the devices upgraded, failed and not attempted. `--device` is an error for an undeclared device, a device without a `glinet.firmware` resource, or a flat configuration.
+The command holds the environment lock, checks every selected device read-only, prints a table, asks once (unless `--yes`), then upgrades the devices one at a time in declaration order, keeping the configuration and packages. It waits for the router to reboot, verifies the SSH host key (retrying until the upgrade timeout, since the router's SSH may be served by another daemon until boot finishes, and passing only when the pinned key is presented) and that the router reports the confirmed version, then re-plans the upgraded devices. The first failure stops the run, and the error lists the devices upgraded, failed and not attempted. `--device` is an error for an undeclared device, a device without a `glinet.firmware` resource, or a flat configuration.
 
 ### Risks
 
