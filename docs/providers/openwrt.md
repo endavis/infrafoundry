@@ -214,7 +214,7 @@ The command holds the environment lock, checks every selected device read-only, 
 - The router locks out after repeated failed logins, so a failed login is never retried. Fix `web_password` before running again.
 - `verify_ssl: false` lets anyone on the path read the password. Pin the certificate instead.
 - A new certificate after an upgrade fails the pin ("re-pin `tls_fingerprint`").
-- A device whose only resource is `glinet.firmware` needs no SSH for apply, but the upgrade still needs SSH for the post-reboot host-key check.
+- A device whose only resource is `glinet.firmware` needs no SSH for apply, but the upgrade still needs SSH for the post-reboot host-key check, which uses no credential, so password-only SSH is enough.
 
 ### Choices and unverified details
 

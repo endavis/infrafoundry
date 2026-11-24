@@ -273,3 +273,62 @@ def test_host_key_probe_checks_strictly_under_the_address_alias() -> None:
 def test_host_key_probe_failure_raises() -> None:
     with pytest.raises(FirmwareUpgradeError, match="ssh exited 255"):
         _probe(255)
+
+
+def _probe_with(returncode: int, stderr: str) -> list[str]:
+    import subprocess
+
+    from infrafoundry.providers.openwrt.settings import OpenWrtSettings
+
+    calls: list[list[str]] = []
+
+    def fake_run(argv: list[str], **_kw: Any) -> Any:
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, returncode, "", stderr)
+
+    settings = OpenWrtSettings("192.0.2.2", ssh_private_key_file="/keys/id")
+    with (
+        patch.object(glinet_cli, "load_settings", return_value=settings),
+        patch.object(glinet_cli.subprocess, "run", fake_run),
+    ):
+        glinet_cli._ssh_host_key_probe(Path("."), "dev", "openwrt")()
+    return calls[0]
+
+
+def test_host_key_probe_uses_no_authentication() -> None:
+    argv = _probe_with(0, "")
+    for option in (
+        "PreferredAuthentications=none",
+        "StrictHostKeyChecking=yes",
+        "HostKeyAlias=192.0.2.2",
+        "BatchMode=yes",
+    ):
+        assert option in argv
+    assert "-i" not in argv
+
+
+def test_host_key_probe_passes_on_permission_denied() -> None:
+    _probe_with(255, "root@192.0.2.2: Permission denied (publickey,password).")
+
+
+@pytest.mark.parametrize(
+    "stderr",
+    [
+        "Host key verification failed.",
+        "@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@",
+        "No ED25519 host key is known for 192.0.2.2 and you have requested strict checking.",
+    ],
+)
+def test_host_key_probe_fails_on_host_key_failure(stderr: str) -> None:
+    with pytest.raises(FirmwareUpgradeError, match="host-key check failed"):
+        _probe_with(255, stderr)
+
+
+def test_host_key_probe_host_key_failure_wins_over_permission_denied() -> None:
+    with pytest.raises(FirmwareUpgradeError, match="host-key check failed"):
+        _probe_with(255, "Host key verification failed.\nPermission denied")
+
+
+def test_host_key_probe_fails_on_connection_refused() -> None:
+    with pytest.raises(FirmwareUpgradeError, match="ssh exited 255"):
+        _probe_with(255, "ssh: connect to host 192.0.2.2 port 22: Connection refused")
