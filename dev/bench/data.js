@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795525571471,
+  "lastUpdate": 1795526825187,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6616,6 +6616,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008431186723517232",
             "extra": "mean: 128.114783038976 usec\nrounds: 8278"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8b23bf6e3b31f8b89a7dbca593fb93da998475aa",
+          "message": "feat: configurable qemu guest agent timeout for proxmox vms (merges PR #1654, addresses #1623)\n\nA Proxmox VM with agent: 1 renders agent { enabled = true } with no\ntimeout, so the bpg provider waits its 15-minute default for the guest\nagent on every create and interface refresh. When the agent never starts\nin the guest, each operation stalls that long.\n\nAdd an optional agent_timeout on vm resources, rendered as the agent\nblock's timeout attribute (a string in the bpg 0.118.0 schema) only when\nset. The validator rejects a value that is not a Terraform duration\n(<number><s|m|h>, combined forms allowed) and agent_timeout without the\nagent enabled. Without the field the rendered output is unchanged.\n\nAddresses #1623\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-24T13:25:43Z",
+          "tree_id": "33c8887e5a0201bb2490a11f530101a958251686",
+          "url": "https://github.com/endavis/infrafoundry/commit/8b23bf6e3b31f8b89a7dbca593fb93da998475aa"
+        },
+        "date": 1795526824597,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 51.78987736301152,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00047455768682559495",
+            "extra": "mean: 19.308792584903916 msec\nrounds: 53"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 9695.254243413476,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007930983269729984",
+            "extra": "mean: 103.14324667445989 usec\nrounds: 10374"
           }
         ]
       }
