@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795516340232,
+  "lastUpdate": 1795520922719,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6502,6 +6502,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005952565565329157",
             "extra": "mean: 77.57903257687714 usec\nrounds: 13660"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fe73d38e723ad4712221de8bff790e15fffc96fe",
+          "message": "fix: retry an empty bw unlock after a sync instead of failing the run (merges PR #1651, addresses #1609)\n\nbw unlock --raw sometimes exits 0 with no session key and leaves the\nvault locked. Reproduced against a self-hosted server: retrying the\nunlock alone stayed empty, while a bw sync run while still locked\nfollowed by one more unlock returned a key, without a second login.\n\nOn an empty unlock the session now pauses, runs bw sync without a\nsession key and unlocks again, at most three unlock attempts. A sync\nthat exits non-zero is recorded and the loop goes on; a timeout still\npropagates. If every attempt is empty, the error names the attempt\ncount, the vault state from bw status (limited to known states, else\nunknown), any failed retry sync exit codes and a master-password\nhint; stderr and values are never included. Login is never retried,\nsince extra logins count towards the server's rate limit.\n\nThe bw stub gains count-driven modes for empty unlocks and syncs while\nlocked; the Vaultwarden docs describe the retry and the new message.\n\nAddresses #1609\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-24T11:47:13Z",
+          "tree_id": "14bdc7ca37131092dfb754132781d9dc60640a5a",
+          "url": "https://github.com/endavis/infrafoundry/commit/fe73d38e723ad4712221de8bff790e15fffc96fe"
+        },
+        "date": 1795520922244,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 65.32991266999625,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0014585658275465348",
+            "extra": "mean: 15.306923874999534 msec\nrounds: 72"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12476.73330568863,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010810975362447279",
+            "extra": "mean: 80.14918452605387 usec\nrounds: 13597"
           }
         ]
       }
