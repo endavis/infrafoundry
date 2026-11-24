@@ -45,7 +45,11 @@ def _run(argv: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 def ssh_argv(
-    settings: OpenWrtSettings, remote_cmd: str, host_key_alias: str | None = None
+    settings: OpenWrtSettings,
+    remote_cmd: str,
+    host_key_alias: str | None = None,
+    *,
+    no_auth: bool = False,
 ) -> list[str]:
     """Build the ssh command for one fixed remote command.
 
@@ -56,12 +60,16 @@ def ssh_argv(
         remote_cmd: A fixed command string from this module.
         host_key_alias: When set, the host key is checked strictly under this alias (the
             firmware upgrade's post-reboot probe uses the settings address).
+        no_auth: Switch authentication off (``PreferredAuthentications=none``) and pass no
+            identity file, so the connection verifies the host key and nothing else.
     """
     argv = ["ssh", "-o", "BatchMode=yes", "-o", f"ConnectTimeout={settings.connect_timeout}"]
     if host_key_alias:
         argv += ["-o", "StrictHostKeyChecking=yes", "-o", f"HostKeyAlias={host_key_alias}"]
+    if no_auth:
+        argv += ["-o", "PreferredAuthentications=none"]
     argv += ["-p", str(settings.ssh_port)]
-    if settings.ssh_private_key_file:
+    if settings.ssh_private_key_file and not no_auth:
         argv += ["-i", settings.ssh_private_key_file]
     argv += ["-l", settings.ssh_user]
     return [*argv, "--", settings.address, remote_cmd]

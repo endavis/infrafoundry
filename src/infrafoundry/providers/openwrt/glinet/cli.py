@@ -26,6 +26,7 @@ from infrafoundry.core.provider_instances import (
     instance_provider_id,
     split_provider_id,
 )
+from infrafoundry.core.ssh_options import host_key_hint
 from infrafoundry.providers.openwrt.devices import BASE_PROVIDER, device_label, devices_declared
 from infrafoundry.providers.openwrt.glinet.firmware import (
     FIRMWARE_TYPE,
@@ -44,21 +45,41 @@ if TYPE_CHECKING:
     from infrafoundry.core.orchestrator import Orchestrator
 
 SSH_PROBE_COMMAND = "true"
+_HOST_KEY_FAILURE_MARKERS = (
+    "Host key verification failed",
+    "REMOTE HOST IDENTIFICATION HAS CHANGED",
+    "host key is known for",
+    "has changed and you have requested strict checking",
+)
 
 
 def _ssh_host_key_probe(config_dir: Path, env: str, provider_id: str) -> Callable[[], None]:
-    """Return a probe that fails unless the device's SSH host key still matches."""
+    """Return a probe that fails unless the device presents its pinned SSH host key.
+
+    The key is verified during the key exchange, before authentication, so the probe
+    uses no credential: exit 0 or a ``Permission denied`` both prove the key matched. A
+    host-key failure, or any other failure such as a refused connection, raises.
+    """
 
     def probe() -> None:
         settings = load_settings(config_dir, env, provider_id)
-        argv = ssh_argv(settings, SSH_PROBE_COMMAND, host_key_alias=settings.address)
+        argv = ssh_argv(settings, SSH_PROBE_COMMAND, host_key_alias=settings.address, no_auth=True)
         result = subprocess.run(  # list argv, no shell
             argv, capture_output=True, text=True, check=False, timeout=60
         )
-        if result.returncode != 0:
-            raise FirmwareUpgradeError(
-                f"ssh exited {result.returncode}: {result.stderr.strip()[:200]}"
+        if result.returncode == 0:
+            return
+        stderr = result.stderr
+        if any(marker in stderr for marker in _HOST_KEY_FAILURE_MARKERS):
+            hint = host_key_hint(stderr, settings.address) or (
+                f"The host key for {settings.address} did not match the pinned key."
             )
+            raise FirmwareUpgradeError(
+                f"ssh exited {result.returncode}: host-key check failed: {hint}"
+            )
+        if "Permission denied" in stderr:
+            return
+        raise FirmwareUpgradeError(f"ssh exited {result.returncode}: {stderr.strip()[:200]}")
 
     return probe
 
