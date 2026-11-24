@@ -67,6 +67,7 @@ import stat
 import subprocess  # nosec B404  # required for running the bitwarden CLI
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -81,6 +82,12 @@ _UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
 _BW_TIMEOUT_SECONDS = 120
+# An unlock can exit 0 with no session key (#1609). A ``bw sync`` while still locked, then one
+# more unlock, recovered it in a measured run, so an empty unlock is retried this many times.
+_UNLOCK_RETRIES = 2
+_UNLOCK_RETRY_DELAY = 2  # seconds
+_KNOWN_VAULT_STATES = ("unauthenticated", "locked", "unlocked")
+_sleep = time.sleep  # module-level so tests can replace it
 _APP_ID_KEY = "global_applicationId_appId"
 _APP_ID_MAX_BYTES = 128
 _ALLOWED_CREDENTIAL_BACKENDS = ("env", "env_secrets")
@@ -342,14 +349,52 @@ class _BitwardenSession:
             )
             state = "locked"
         if state != "unlocked":
+            self.session_key = self._unlock()
+        self.run(["sync"])
+
+    def _unlock(self) -> str:
+        """Unlock and return the session key, retrying an empty result after a sync.
+
+        An empty ``bw unlock --raw`` (exit 0, no output) leaves the vault locked. Each retry
+        pauses, runs ``bw sync`` (still without a session key) and unlocks again. Login is never
+        repeated. Stderr content is never read.
+
+        Raises:
+            SecretBackendError: Every attempt was empty, or a retry sync timed out.
+            _BwError: ``bw unlock`` exited non-zero.
+        """
+        attempts = 1 + _UNLOCK_RETRIES
+        sync_codes: list[int] = []
+        for attempt in range(attempts):
             key = self.run(
                 ["unlock", "--passwordenv", "BW_PASSWORD", "--raw"],
                 {"BW_PASSWORD": self._credentials["master_password"]},
             ).strip()
-            if not key:
-                raise SecretBackendError("bw unlock returned no session key")
-            self.session_key = key
-        self.run(["sync"])
+            if key:
+                return key
+            if attempt == attempts - 1:
+                break
+            _sleep(_UNLOCK_RETRY_DELAY)
+            try:
+                self.run(["sync"])
+            except _BwError as exc:
+                sync_codes.append(exc.code if exc.code is not None else -1)
+        message = (
+            f"bw unlock returned no session key after {attempts} attempts "
+            f"(vault state: {self._vault_state()})"
+        )
+        if sync_codes:
+            message += f"; retry sync exit codes: {', '.join(str(c) for c in sync_codes)}"
+        raise SecretBackendError(message + "; check the master password if this persists")
+
+    def _vault_state(self) -> str:
+        """Return the vault state from ``bw status`` for an error message, else ``unknown``."""
+        try:
+            status = self.run_json(["status"])
+        except (_BwError, SecretBackendError):
+            return "unknown"
+        state = status.get("status") if isinstance(status, dict) else None
+        return state if isinstance(state, str) and state in _KNOWN_VAULT_STATES else "unknown"
 
     def teardown(self) -> None:
         """Lock, log out and remove the private directory. Never raises."""
