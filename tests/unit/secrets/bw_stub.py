@@ -5,6 +5,9 @@ app-data variables it received, and the ``global_applicationId_appId`` read from
 a JSONL file and keeps its own server/login state in the ``BITWARDENCLI_APPDATA_DIR`` it is
 given, like the real ``bw``. Its behaviour is driven by variables that do not start with
 ``BW_`` (the backend strips those): ``STUB_BW_LOG``, ``STUB_BW_FIXTURE`` and ``STUB_BW_FAIL``.
+Optional modes: ``STUB_BW_EMPTY_UNLOCKS=<n>`` (the first n unlocks print nothing and exit 0),
+``STUB_BW_SYNC_WHILE_LOCKED=1``, ``STUB_BW_EMPTY_UNTIL_SYNC=1`` and
+``STUB_BW_FAIL_SYNC_WHILE_LOCKED=<n>``.
 """
 
 from __future__ import annotations
@@ -79,9 +82,24 @@ elif cmd == "unlock":
     ok = argv == ["unlock", "--passwordenv", "BW_PASSWORD", "--raw"]
     if not ok or not os.environ.get("BW_PASSWORD"):
         sys.exit(1)
+    if "empty_unlocks" not in state:
+        state["empty_unlocks"] = int(os.environ.get("STUB_BW_EMPTY_UNLOCKS", "0"))
+    if state["empty_unlocks"] > 0:
+        state["empty_unlocks"] -= 1; save(); sys.exit(0)
     state["status"] = "unlocked"; save(); print("session-key-abc")
 elif cmd in ("lock", "logout"):
     state["status"] = "locked" if cmd == "lock" else "unauthenticated"; save()
+elif (cmd == "sync" and state["status"] == "locked"
+        and (os.environ.get("STUB_BW_SYNC_WHILE_LOCKED") == "1"
+             or int(os.environ.get("STUB_BW_FAIL_SYNC_WHILE_LOCKED", "0")) > 0)):
+    failed = state.get("failed_locked_syncs", 0)
+    if failed < int(os.environ.get("STUB_BW_FAIL_SYNC_WHILE_LOCKED", "0")):
+        state["failed_locked_syncs"] = failed + 1; save()
+        sys.stderr.write("sync failed\\n"); sys.exit(1)
+    state["locked_syncs"] = state.get("locked_syncs", 0) + 1
+    if os.environ.get("STUB_BW_EMPTY_UNTIL_SYNC") == "1":
+        state["empty_unlocks"] = 0
+    save(); print("Syncing complete.")
 elif os.environ.get("BW_SESSION") != "session-key-abc":
     sys.stderr.write("You are not logged in.\\n"); sys.exit(1)
 elif cmd == "sync":
@@ -224,6 +242,13 @@ def install_stub(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> StubBw:
     monkeypatch.setenv("STUB_BW_LOG", str(log))
     monkeypatch.setenv("STUB_BW_FIXTURE", str(fixture))
     monkeypatch.delenv("STUB_BW_FAIL", raising=False)
+    for name in (
+        "STUB_BW_EMPTY_UNLOCKS",
+        "STUB_BW_SYNC_WHILE_LOCKED",
+        "STUB_BW_EMPTY_UNTIL_SYNC",
+        "STUB_BW_FAIL_SYNC_WHILE_LOCKED",
+    ):
+        monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("BW_CLIENTID", CLIENT_ID)
     monkeypatch.setenv("BW_CLIENTSECRET", CLIENT_SECRET)
     monkeypatch.setenv("BW_PASSWORD", MASTER)

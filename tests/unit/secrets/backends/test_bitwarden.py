@@ -358,6 +358,108 @@ def test_unlock_failure_message_has_no_password(
     assert not Path(stub.calls()[0]["appdir"]).exists()
 
 
+# -- empty unlock recovery (#1609) -----------------------------------------------------------
+
+
+@pytest.fixture
+def sleeps(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    recorded: list[float] = []
+    monkeypatch.setattr(bitwarden, "_sleep", recorded.append)
+    return recorded
+
+
+def test_empty_unlock_recovers_after_sync(
+    stub: StubBw, sleeps: list[float], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("STUB_BW_EMPTY_UNLOCKS", "1")
+    monkeypatch.setenv("STUB_BW_SYNC_WHILE_LOCKED", "1")
+    monkeypatch.setenv("STUB_BW_EMPTY_UNTIL_SYNC", "1")
+    assert make().get_secret("Router Admin/password") == FIXTURE_VALUE
+    assert stub.subcommands()[:7] == [
+        "config",
+        "status",
+        "login",
+        "unlock",
+        "sync",
+        "unlock",
+        "sync",
+    ]
+    assert stub.subcommands().count("login") == 1
+    assert sleeps == [bitwarden._UNLOCK_RETRY_DELAY]
+
+
+def test_empty_unlock_is_bounded(
+    stub: StubBw, sleeps: list[float], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("STUB_BW_EMPTY_UNLOCKS", "99")
+    monkeypatch.setenv("STUB_BW_SYNC_WHILE_LOCKED", "1")
+    with pytest.raises(SecretBackendError) as exc:
+        make().get_secret("Router Admin/password")
+    subs = stub.subcommands()
+    assert subs[2:8] == ["login", "unlock", "sync", "unlock", "sync", "unlock"]
+    assert subs.count("login") == 1
+    assert sleeps == [bitwarden._UNLOCK_RETRY_DELAY] * 2
+    msg = str(exc.value)
+    assert "3 attempts" in msg
+    assert "vault state: locked" in msg
+    assert "check the master password" in msg
+    for secret in (MASTER, CLIENT_SECRET, "session-key-abc"):
+        assert secret not in msg
+
+
+def test_empty_unlock_retry_sync_failure_is_reported(
+    stub: StubBw, sleeps: list[float], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("STUB_BW_EMPTY_UNLOCKS", "99")
+    monkeypatch.setenv("STUB_BW_FAIL_SYNC_WHILE_LOCKED", "1")
+    with pytest.raises(SecretBackendError) as exc:
+        make().get_secret("Router Admin/password")
+    msg = str(exc.value)
+    assert "retry sync exit codes: 1" in msg
+    assert "sync failed" not in msg
+    assert stub.subcommands().count("unlock") == 3
+    assert stub.subcommands().count("login") == 1
+
+
+def test_empty_unlock_recovers_after_failed_retry_sync(
+    stub: StubBw, sleeps: list[float], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("STUB_BW_EMPTY_UNLOCKS", "1")
+    monkeypatch.setenv("STUB_BW_FAIL_SYNC_WHILE_LOCKED", "1")
+    assert make().get_secret("Router Admin/password") == FIXTURE_VALUE
+    assert stub.subcommands()[:7] == [
+        "config",
+        "status",
+        "login",
+        "unlock",
+        "sync",
+        "unlock",
+        "sync",
+    ]
+
+
+@pytest.mark.parametrize("mode", ["fails", "odd"])
+def test_unlock_error_state_unknown(
+    stub: StubBw, sleeps: list[float], monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    monkeypatch.setenv("STUB_BW_EMPTY_UNLOCKS", "99")
+    original = bitwarden._BitwardenSession.run_json
+    calls = {"n": 0}
+
+    def fake(self: bitwarden._BitwardenSession, args: list[str]) -> Any:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return original(self, args)
+        if mode == "fails":
+            raise bitwarden._BwError("status", 1, False)
+        return {"status": "something-else"}
+
+    monkeypatch.setattr(bitwarden._BitwardenSession, "run_json", fake)
+    with pytest.raises(SecretBackendError) as exc:
+        make().get_secret("Router Admin/password")
+    assert "vault state: unknown" in str(exc.value)
+
+
 # -- per-session item cache (#1606) ---------------------------------------------------------
 
 
