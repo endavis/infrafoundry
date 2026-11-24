@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795522627799,
+  "lastUpdate": 1795525571471,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6578,6 +6578,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010927707845259936",
             "extra": "mean: 127.21075831647534 usec\nrounds: 8387"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fa956bfa037d71dca60a1dcc5a18fdc2319a4d1f",
+          "message": "feat: pin the openwrt-vm ssh host key (merges PR #1653, addresses #1650)\n\nThe openwrt-vm VM generated a fresh dropbear host key on every build and\nnothing recorded it, so a rebuild broke known_hosts. It now opts into the\nADR-0032 host-key pin with ssh_host_key format: dropbear.\n\n- ssh_host_keys: a dropbear format for HostKeySpec, a stdlib conversion of\n  the pinned OpenSSH ed25519 key to dropbear's 83-byte format, and checks\n  that report an unconvertible or mismatched key without key material.\n- package loader: derives ssh_host_keys_dropbear (<name>=<hex>) only for\n  resources that opt in. No cloud-init fragment or Terraform secret is\n  added for them.\n- bootstrap: writes the key over the serial console in 16-byte printf\n  chunks with the log file closed, checks its length and that dropbearkey\n  -y prints the pinned public key, then limits dropbear to that key with\n  its keyfile list. The rendered expect script is removed in an always:\n  step and its tasks use no_log.\n- post-terraform script: fails early without a pin, verifies the VM with\n  strict checking against only its pinned key, fails at once on a\n  mismatch naming --regenerate, and fails if an RSA or ECDSA key is still\n  served.\n- ADR-0032 records the scoped exception: for format: dropbear the private\n  key reaches that package's script environment.\n\nBREAKING CHANGE: an openwrt-vm package without a pinned host key now fails\ninfra plan. Run `foundry secrets host-keys --env <env>` first; a deployed\nVM is pinned from the key it presents now.\n\nAddresses #1650\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-24T13:04:55Z",
+          "tree_id": "800d13cbaad35f00020814c59e37e4d843dc931c",
+          "url": "https://github.com/endavis/infrafoundry/commit/fa956bfa037d71dca60a1dcc5a18fdc2319a4d1f"
+        },
+        "date": 1795525570938,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 46.825357712914645,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006616950117612982",
+            "extra": "mean: 21.355950041662908 msec\nrounds: 48"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7805.500476051798,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008431186723517232",
+            "extra": "mean: 128.114783038976 usec\nrounds: 8278"
           }
         ]
       }
