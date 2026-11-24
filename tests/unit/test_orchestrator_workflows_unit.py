@@ -2435,6 +2435,7 @@ def _run_destroy(
     resources: list[ResourceConfig],
     deleted: list[str],
     resource_filter: list[str] | None = None,
+    tf_calls: list[str] | None = None,
 ) -> None:
     state_manager = MagicMock()
     state_manager.create_deployment.return_value = 40
@@ -2449,6 +2450,14 @@ def _run_destroy(
     tf_runner.is_iac_runner = True
     tf_runner.destroy = MagicMock(return_value={"success": True, "resource_outcomes": outcomes})
     tf_runner.verify_destroyed = MagicMock(return_value=[])
+    if tf_calls is not None:
+        recorded = tf_calls
+
+        def _record_destroy(*_a: Any, **_kw: Any) -> dict[str, Any]:
+            recorded.append("terraform_destroy")
+            return {"success": True, "resource_outcomes": outcomes}
+
+        tf_runner.destroy = MagicMock(side_effect=_record_destroy)
 
     runner_registry = MagicMock()
     runner_registry.list_runners.return_value = ["terraform"]
@@ -2462,7 +2471,11 @@ def _run_destroy(
         get_providers=lambda: providers,
         load_resources=lambda env: (resources, {"proxmox": resources}),
         iter_provider_batches=lambda rbp, filt, rev, env: [
-            ProviderResourceBatch("proxmox", rbp["proxmox"], len(rbp["proxmox"]))
+            ProviderResourceBatch(
+                "proxmox",
+                [r for r in rbp["proxmox"] if not filt or r.name in filt],
+                len(rbp["proxmox"]),
+            )
         ],
         get_current_user=lambda: "tester",
     )
@@ -2563,6 +2576,156 @@ def test_destroy_aggregate_continue_on_error_does_not_raise(console: Console) ->
     ]
 
     _run_destroy(console, event_manager, [_pkg_resource("a", {"x": 1})], ["a"])
+
+
+def _deleting_calls(event_manager: MagicMock) -> list[Any]:
+    return [
+        c
+        for c in event_manager.emit_event.call_args_list
+        if c.args[0] == EventType.RESOURCE_DELETING
+    ]
+
+
+def _deleting_aggregates(event_manager: MagicMock) -> list[Any]:
+    return [c for c in _deleting_calls(event_manager) if not c.kwargs.get("resource_scoped")]
+
+
+def test_destroy_emits_one_deleting_aggregate_with_package_variables(console: Console) -> None:
+    """An unfiltered destroy emits one non-scoped RESOURCE_DELETING per package (#1646)."""
+    event_manager = MagicMock()
+    event_manager.emit_event.return_value = []
+    resources = [_pkg_resource("a", {"x": 1}), _pkg_resource("b", {"x": 1})]
+
+    _run_destroy(console, event_manager, resources, ["a", "b"])
+
+    aggregates = _deleting_aggregates(event_manager)
+    assert len(aggregates) == 1
+    assert aggregates[0].kwargs["target_resources"] == ["a", "b"]
+    assert aggregates[0].kwargs["package_variables"] == {"x": 1}
+
+
+def test_destroy_emits_one_deleting_aggregate_per_distinct_package_variables(
+    console: Console,
+) -> None:
+    """Packages with different variables never share a RESOURCE_DELETING aggregate."""
+    event_manager = MagicMock()
+    event_manager.emit_event.return_value = []
+    resources = [_pkg_resource("a", {"x": 1}), _pkg_resource("b", {"x": 2})]
+
+    _run_destroy(console, event_manager, resources, ["a", "b"])
+
+    aggregates = _deleting_aggregates(event_manager)
+    assert len(aggregates) == 2
+    seen = {
+        (tuple(c.kwargs["target_resources"]), c.kwargs["package_variables"]["x"])
+        for c in aggregates
+    }
+    assert seen == {(("a",), 1), (("b",), 2)}
+
+
+def test_destroy_deleting_aggregate_precedes_terraform_destroy(console: Console) -> None:
+    """The aggregate RESOURCE_DELETING fires before any terraform destroy runs."""
+    calls: list[str] = []
+    event_manager = MagicMock()
+
+    def emit(event_type: EventType, *args: Any, **kwargs: Any) -> list[EventResult]:
+        if event_type == EventType.RESOURCE_DELETING and not kwargs.get("resource_scoped"):
+            calls.append("deleting_aggregate")
+        return []
+
+    event_manager.emit_event.side_effect = emit
+
+    _run_destroy(console, event_manager, [_pkg_resource("a", {"x": 1})], ["a"], tf_calls=calls)
+
+    assert calls == ["deleting_aggregate", "terraform_destroy"]
+
+
+def test_destroy_per_resource_deleting_emits_are_resource_scoped(console: Console) -> None:
+    """Per-resource RESOURCE_DELETING emits are resource-scoped to their resource."""
+    event_manager = MagicMock()
+    event_manager.emit_event.return_value = []
+
+    _run_destroy(console, event_manager, [_pkg_resource("a", None)], ["a"])
+
+    per_resource = [c for c in _deleting_calls(event_manager) if "resource_id" in c.args[2]]
+    assert len(per_resource) == 1
+    assert per_resource[0].kwargs["resource_scoped"] is True
+    assert per_resource[0].kwargs["target_resources"] == ["a"]
+
+
+def test_destroy_deleting_aggregate_abort_raises_before_terraform_destroy(
+    console: Console,
+) -> None:
+    """An aborting RESOURCE_DELETING aggregate stops the destroy before terraform runs."""
+    calls: list[str] = []
+    event_manager = MagicMock()
+
+    def emit(event_type: EventType, *args: Any, **kwargs: Any) -> list[EventResult]:
+        if event_type == EventType.RESOURCE_DELETING and not kwargs.get("resource_scoped"):
+            return [EventResult(success=False, abort=True, reason="boom", handler_name="h")]
+        return []
+
+    event_manager.emit_event.side_effect = emit
+
+    with pytest.raises(EventAbortedError):
+        _run_destroy(console, event_manager, [_pkg_resource("a", {"x": 1})], ["a"], tf_calls=calls)
+
+    assert calls == []
+
+
+def test_destroy_deleting_aggregate_continue_on_error_proceeds(console: Console) -> None:
+    """A failed, non-aborting RESOURCE_DELETING result does not stop the destroy."""
+    calls: list[str] = []
+    event_manager = MagicMock()
+
+    def emit(event_type: EventType, *args: Any, **kwargs: Any) -> list[EventResult]:
+        if event_type == EventType.RESOURCE_DELETING and not kwargs.get("resource_scoped"):
+            return [EventResult(success=False, abort=False, reason="meh", handler_name="h")]
+        return []
+
+    event_manager.emit_event.side_effect = emit
+
+    _run_destroy(console, event_manager, [_pkg_resource("a", {"x": 1})], ["a"], tf_calls=calls)
+
+    assert calls == ["terraform_destroy"]
+
+
+@pytest.mark.parametrize(
+    ("resource_filter", "deleted", "expected_runs"),
+    [(None, ["a", "b"], 1), (["a"], ["a"], 0)],
+)
+def test_package_on_destroying_requires_runs_once_on_real_bus(
+    console: Console,
+    monkeypatch: pytest.MonkeyPatch,
+    resource_filter: list[str] | None,
+    deleted: list[str],
+    expected_runs: int,
+) -> None:
+    """A package-level on_destroying handler with requires runs once, with its variables."""
+    bus = UnifiedEventBus()
+    monkeypatch.setattr(bus, "clear_handlers", lambda: None)
+    seen: list[dict[str, Any]] = []
+
+    def fake_execute(self: PythonHandler, context: EventContext) -> EventResult:
+        seen.append(dict(context.package_variables or {}))
+        return EventResult()
+
+    monkeypatch.setattr(PythonHandler, "execute", fake_execute)
+    bus.register_handler(
+        EventType.RESOURCE_DELETING,
+        {
+            "type": "python",
+            "module": "dummy",
+            "function": "handler",
+            "requires": ["a", "b"],
+            "_package": "pkg",
+        },
+    )
+    resources = [_pkg_resource("a", {"x": 1}), _pkg_resource("b", {"x": 1})]
+
+    _run_destroy(console, bus, resources, deleted, resource_filter)
+
+    assert seen == [{"x": 1}] * expected_runs
 
 
 @pytest.mark.parametrize(

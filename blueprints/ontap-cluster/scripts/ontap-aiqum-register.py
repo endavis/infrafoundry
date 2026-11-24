@@ -12,9 +12,14 @@ Without arguments the script adds the cluster as an AIQUM data source unless a
 healthy one already matches by address or name. A matching data source with a
 deletion in progress is waited out (bounded), and one in ``error`` is deleted and
 waited out, before the cluster is added (#1639). With ``--remove`` it deletes every
-matching data source (used by the blueprint's ``on_destroy`` event, #1225). When
-AIQUM answers a DELETE with an error, the data sources are read back: one that is
-gone, or shows a deletion in progress, counts as removed.
+matching data source. ``--remove --wait`` also waits for AIQUM to finish the deletion;
+the blueprint's ``on_destroying`` event runs it while the cluster is still up (#1646).
+Plain ``--remove`` is the ``on_destroy`` fallback after the cluster is gone (#1225); it
+finds nothing when the pre-destroy removal succeeded. When AIQUM answers a DELETE with
+an error, the data sources are read back: one that is gone, or shows a deletion in
+progress, counts as removed. A source whose deletion already failed while the cluster
+was down cannot be removed through this script; delete it in the AIQUM UI, then re-run
+apply.
 
 The AIQUM client is copied from ``blueprints/aiqum/scripts/aiqum-initial-setup.py``,
 not imported: each blueprint's ``scripts/`` directory is synced on its own.
@@ -310,6 +315,7 @@ def wait_gone(
     interval: float = POLL_INTERVAL,
     sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
+    rerun: str = "re-run apply",
 ) -> None:
     """Poll until none of the data sources in ``keys`` is listed any more.
 
@@ -320,6 +326,7 @@ def wait_gone(
     different operation (another ``start_time`` or a non-failed state). The
     retry restarts the deadline, so the retried deletion gets a full wait. The
     retry budget lives in this call, so it never carries over between waits.
+    ``rerun`` is the advice the error messages give for trying again.
 
     Raises:
         AIQUMError: If a deletion fails again after the retry, or a source is
@@ -346,7 +353,7 @@ def wait_gone(
             if key in retried:
                 raise AIQUMError(
                     f"AIQUM's deletion of {_describe(c)} failed again after a retry; remove "
-                    "the data source in AIQUM by hand, then re-run apply"
+                    f"the data source in AIQUM by hand, then {rerun}"
                 )
             retried.add(key)
             delete_source(cfg, c, interval=interval, sleep=sleep)
@@ -356,7 +363,7 @@ def wait_gone(
         if clock() >= deadline:
             names = ", ".join(_describe(c) for c in left)
             raise AIQUMError(
-                f"AIQUM is still deleting {names} after {timeout:g}s; re-run apply once it "
+                f"AIQUM is still deleting {names} after {timeout:g}s; {rerun} once it "
                 "finishes, or delete the data source by hand"
             )
         sleep(interval)
@@ -406,14 +413,23 @@ def register(
 def remove(
     cfg: Config,
     *,
+    wait: bool = False,
+    timeout: float = DELETE_WAIT,
     attempts: int = READBACK_ATTEMPTS,
     interval: float = POLL_INTERVAL,
     sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
 ) -> str:
     """Delete every AIQUM data source that matches the cluster.
 
     A DELETE error counts as removed when the data source is gone or AIQUM shows
-    a deletion in progress. Does not wait for a deletion to finish.
+    a deletion in progress. With ``wait`` set, polls until every matched source,
+    including one already being deleted, is gone (the pre-destroy removal, #1646);
+    without it, does not wait for a deletion to finish.
+
+    Raises:
+        AIQUMError: With ``wait``, if a deletion fails again after a retry or does
+            not finish within ``timeout`` seconds.
 
     Returns:
         A one-line result message.
@@ -422,8 +438,10 @@ def remove(
     if not matches:
         return f"cluster {cfg.cluster_ip} is not in AIQUM; nothing to do"
     removed: list[str] = []
+    keys: list[str] = []
     for cluster in matches:
         key = _key_of(cluster)
+        keys.append(key)
         label = f"'{cluster.get('name')}' ({key})"
         if is_deleting(cluster):
             removed.append(f"{label}: deletion already in progress")
@@ -436,7 +454,22 @@ def remove(
             )
         else:
             removed.append(label)
+    if wait and keys:
+        wait_gone(
+            cfg,
+            keys,
+            timeout=timeout,
+            interval=interval,
+            sleep=sleep,
+            clock=clock,
+            rerun="re-run destroy, or delete the data source in the AIQUM UI",
+        )
+        return f"removed from AIQUM (deletion finished): {', '.join(removed)}"
     return f"removed from AIQUM: {', '.join(removed)}"
+
+
+def _do_remove(cfg: Config, waiting: bool) -> str:
+    return remove(cfg, wait=True) if waiting else remove(cfg)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -444,10 +477,15 @@ def main(argv: list[str] | None = None) -> int:
 
     Args:
         argv: Command-line arguments (default: ``sys.argv[1:]``); ``--remove``
-            deletes the cluster from AIQUM instead of adding it.
+            deletes the cluster from AIQUM instead of adding it; ``--wait`` (only
+            with ``--remove``) waits for AIQUM to finish the deletion.
     """
     args = sys.argv[1:] if argv is None else argv
     removing = "--remove" in args
+    waiting = "--wait" in args
+    if waiting and not removing:
+        print("ERROR: --wait is only valid with --remove", file=sys.stderr)
+        return 2
     raw = os.environ.get("INFRAFOUNDRY_PACKAGE_VARS")
     if not raw:
         print("ERROR: INFRAFOUNDRY_PACKAGE_VARS is not set", file=sys.stderr)
@@ -462,7 +500,7 @@ def main(argv: list[str] | None = None) -> int:
         if cfg is None:
             print("AIQUM registration: no aiqum_* inputs set, skipping")
             return 0
-        print(f"AIQUM registration: {remove(cfg) if removing else register(cfg)}")
+        print(f"AIQUM registration: {_do_remove(cfg, waiting) if removing else register(cfg)}")
     except AIQUMError as exc:
         action = "removal" if removing else "registration"
         print(f"ERROR: AIQUM {action}: {redact(str(exc), secrets)}", file=sys.stderr)

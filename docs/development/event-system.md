@@ -296,6 +296,7 @@ apply or destroy, rather than on runner completion. This replaces the
 |:----------|:-----------|:------------------|
 | `on_create` | Terraform created the resource, or an earlier apply created it and failed before the handlers ran | `RESOURCE_CREATED` |
 | `on_update` | Terraform updated the resource in place | `RESOURCE_UPDATED` |
+| `on_destroying` | Before Terraform destroys the package's resources, after the destroy is confirmed (package level only) | `RESOURCE_DELETING` |
 | `on_destroy` | Terraform destroyed the resource | `RESOURCE_DELETED` |
 
 ### How it works
@@ -311,6 +312,15 @@ after every required resource is destroyed (after terraform destroy, so the
 handler must not need the destroyed resources). It receives
 `INFRAFOUNDRY_PACKAGE_VARS` for its package, as `on_create` does on apply.
 Per-resource emits are resource-scoped.
+
+A package-level `on_destroying` handler runs before any Terraform destroy, while the
+resources still exist (#1646). It is package level only, fires once per package group and
+receives `INFRAFOUNDRY_PACKAGE_VARS`. `requires` keeps its meaning: the handler is skipped
+unless every required resource is targeted. Use it for cleanup that needs the resources
+running; `continue_on_error` decides whether a failure stops the destroy. Per-resource
+`RESOURCE_DELETING` emits are resource-scoped. It is not the package `before_destroy` key,
+which maps to the `BEFORE_DESTROY` workflow event: that one runs before the confirmation
+prompt and carries no package variables.
 
 On apply, `on_create` works the same way: after every provider finishes, the
 created resources are grouped by package variables and one `RESOURCE_CREATED`

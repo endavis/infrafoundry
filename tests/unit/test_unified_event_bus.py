@@ -288,6 +288,15 @@ class TestUnifiedEventBusLoadConfig:
 
         assert bus.handler_count() == 0
 
+    def test_load_config_on_destroying_alias(self) -> None:
+        """on_destroying registers under RESOURCE_DELETING (#1646)."""
+        bus = UnifiedEventBus()
+
+        bus.load_config({"on_destroying": [{"type": "python", "module": "hooks.pre"}]})
+
+        assert bus.handler_count(EventType.RESOURCE_DELETING) == 1
+        assert bus.handler_count() == 1
+
 
 class TestBackwardCompatibility:
     """Tests for backward compatibility with legacy EventManager API."""

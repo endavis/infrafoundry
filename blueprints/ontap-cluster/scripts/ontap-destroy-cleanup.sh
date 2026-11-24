@@ -1,7 +1,10 @@
 #!/bin/bash
 # ONTAP Cluster — Destroy Cleanup Event Handler (#1225)
 #
-# Triggered by the blueprint's on_destroy event. Removes the cluster from the
+# Triggered by the blueprint's on_destroy event, after terraform destroy. This is
+# the fallback: ontap-predestroy-deregister.sh (on_destroying, #1646) already
+# removed the cluster while it was up, so this normally finds nothing to do.
+# Removes the cluster from the
 # NetApp Console and from AIQUM so a rebuild registers the new cluster. Each
 # step skips when its inputs (console_* / aiqum_*) are not set.
 #
