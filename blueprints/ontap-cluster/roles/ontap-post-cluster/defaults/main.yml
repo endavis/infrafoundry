@@ -10,8 +10,10 @@ ontap_cluster_mgmt_ip: "192.0.2.220"
 ontap_admin_user: "admin"
 ontap_admin_password: "changeme123"
 
-# Set to true to validate SSL certificates
+# Validate SSL certificates. In the blueprint, group_vars/all.yml derives this
+# from ontap_ca_cert (#1645); this default is the standalone fallback.
 ontap_validate_certs: false
+ontap_ca_cert: ""
 
 # MTU of the Cluster broadcast domain (IPspace Cluster). 1500 works on any
 # network; raise it only when the cluster ports are jumbo end to end.

@@ -33,6 +33,21 @@ domain. The simulator ships with 9000, which drops cluster packets (EMS
 Raise it only when the network under the cluster ports (`e0a`/`e0b`) is jumbo
 end to end.
 
+## Verifying the cluster certificate
+
+By default the blueprint does not verify the cluster's TLS certificate on its
+ONTAP REST calls. That is a lab-only opt-out. Set `ontap_ca_cert` to the
+absolute path of a PEM file (`~` is allowed, for example `~/ontap-ca.pem`) that
+trusts the cluster management certificate, and every ONTAP call checks the
+certificate against it. A missing file stops the run before anything is touched.
+
+The certificate must name `cluster_mgmt_ip`. The simulator creates its own
+self-signed certificate when the cluster is created, so leave `ontap_ca_cert`
+empty for a fresh build. To turn verification on afterwards, install a
+certificate signed by your CA on the cluster, set `ontap_ca_cert` and re-run:
+the probe skips a cluster that already exists. A certificate the CA does not
+trust stops the run with a message naming `ontap_ca_cert`.
+
 ## Adding the cluster to the NetApp Console
 
 After setup, the cluster can add itself to the NetApp Console through a

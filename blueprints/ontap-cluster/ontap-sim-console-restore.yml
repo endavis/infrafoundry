@@ -28,6 +28,14 @@
           secrets.yaml before running the ONTAP playbooks.
       no_log: true
 
+    - name: Assert ontap_ca_cert, when set, is a file
+      ansible.builtin.assert:
+        that:
+          - ontap_ca_cert | length == 0 or ontap_ca_cert is file
+        fail_msg: >-
+          ontap_ca_cert is set to '{{ ontap_ca_cert }}', which is not a file. Point it at
+          the PEM that trusts the cluster certificate, or leave it empty.
+
 - name: Restore Proxmox noVNC console on ONTAP node 01
   hosts: "{{ lookup('env', 'INFRAFOUNDRY_VAR_node01_target') }}"
   gather_facts: false

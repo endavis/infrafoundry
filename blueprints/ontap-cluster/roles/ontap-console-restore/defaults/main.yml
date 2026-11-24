@@ -23,6 +23,10 @@ ontap_cluster_mgmt_ip: ""
 ontap_admin_user: "admin"
 ontap_admin_password: ""
 ontap_validate_certs: false
+# PEM that trusts the cluster certificate, and the environment that hands it to
+# the netapp modules, which take no CA path. group_vars/all.yml sets both (#1645).
+ontap_ca_cert: ""
+ontap_tls_environment: {}
 
 # Per-node ONTAP node name (e.g. "ontap-cluster-01"). Used for the
 # `system node halt -node <name>` command and the cluster health poll.

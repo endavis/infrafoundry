@@ -14,6 +14,14 @@
   hosts: ontap_cluster
   gather_facts: false
   connection: local
+  pre_tasks:
+    - name: Assert ontap_ca_cert, when set, is a file
+      ansible.builtin.assert:
+        that:
+          - ontap_ca_cert | length == 0 or ontap_ca_cert is file
+        fail_msg: >-
+          ontap_ca_cert is set to '{{ ontap_ca_cert }}', which is not a file. Point it at
+          the PEM that trusts the cluster certificate, or leave it empty.
   roles:
     - role: ontap-cluster-probe
       vars:

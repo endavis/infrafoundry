@@ -58,6 +58,12 @@ def ontap_cluster_state(probe: dict[str, Any], expected_name: str) -> dict[str, 
         message = str(probe.get("msg", "")).lower()
         if any(fragment in message for fragment in _NOTHING_THERE):
             return _result("absent", "nothing answers at the cluster management address")
+        if "certificate verify failed" in message:
+            return _result(
+                "conflict",
+                "the cluster certificate is not trusted by ontap_ca_cert "
+                "or does not name the cluster management address",
+            )
         return _result("conflict", f"the probe failed unexpectedly: {probe.get('msg', '')}")
     return _result("conflict", f"unexpected HTTP {status} from the cluster management address")
 

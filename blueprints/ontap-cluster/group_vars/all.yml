@@ -1,0 +1,15 @@
+---
+# Shared ONTAP TLS settings, loaded for every playbook in this directory (#1645).
+#
+# ontap_ca_cert unset: certificate verification stays off (lab only).
+# ontap_ca_cert set: every ONTAP REST call checks the cluster certificate
+# against that PEM. The uri tasks take it as ca_path. The netapp.ontap modules
+# have no CA option, so ontap_tls_environment hands it to them through the
+# environment variables requests (REQUESTS_CA_BUNDLE) and urllib (SSL_CERT_FILE)
+# read. Group vars outrank the role defaults, which stay as standalone fallbacks.
+
+ontap_ca_cert: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_ca_cert') | expanduser }}"
+ontap_validate_certs: "{{ ontap_ca_cert | length > 0 }}"
+ontap_tls_environment: >-
+  {{ {'REQUESTS_CA_BUNDLE': ontap_ca_cert, 'SSL_CERT_FILE': ontap_ca_cert}
+     if ontap_ca_cert else {} }}

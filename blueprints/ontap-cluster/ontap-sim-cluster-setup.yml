@@ -25,6 +25,14 @@
           secrets.yaml before running the ONTAP playbooks.
       no_log: true
 
+    - name: Assert ontap_ca_cert, when set, is a file
+      ansible.builtin.assert:
+        that:
+          - ontap_ca_cert | length == 0 or ontap_ca_cert is file
+        fail_msg: >-
+          ontap_ca_cert is set to '{{ ontap_ca_cert }}', which is not a file. Point it at
+          the PEM that trusts the cluster certificate, or leave it empty.
+
 - name: Check whether the cluster already exists
   hosts: ontap_cluster
   gather_facts: false
@@ -68,7 +76,8 @@
         url: "https://{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_ip') }}/api/network/ip/interfaces?ipspace.name=Cluster&fields=ip.address"
         user: "admin"
         password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
-        validate_certs: false
+        validate_certs: "{{ ontap_validate_certs }}"
+        ca_path: "{{ ontap_ca_cert | default(omit, true) }}"
         force_basic_auth: true
       register: cluster_interfaces
 
@@ -101,13 +110,13 @@
   hosts: ontap_cluster
   gather_facts: false
   connection: local
+  environment: "{{ ontap_tls_environment }}"
   roles:
     - role: ontap-post-cluster
       vars:
         ontap_cluster_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mgmt_ip') }}"
         ontap_admin_user: "admin"
         ontap_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ontap_password') }}"
-        ontap_validate_certs: false
         ontap_cluster_mtu: "{{ lookup('env', 'INFRAFOUNDRY_VAR_cluster_mtu') | default('1500', true) | int }}"
         ontap_licenses: "{{ (lookup('env', 'INFRAFOUNDRY_PACKAGE_VARS') | from_json).get('ontap_licenses', []) if lookup('env', 'INFRAFOUNDRY_PACKAGE_VARS') else [] }}"
         ontap_svm_routes: >-

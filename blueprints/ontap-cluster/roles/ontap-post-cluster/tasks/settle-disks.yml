@@ -16,6 +16,7 @@
     user: "{{ ontap_admin_user }}"
     password: "{{ ontap_admin_password }}"
     validate_certs: "{{ ontap_validate_certs }}"
+    ca_path: "{{ ontap_ca_cert | default(omit, true) }}"
     force_basic_auth: true
   register: ontap_unsettled
   until: ontap_unsettled.json.num_records == 0
@@ -59,6 +60,7 @@
         user: "{{ ontap_admin_user }}"
         password: "{{ ontap_admin_password }}"
         validate_certs: "{{ ontap_validate_certs }}"
+        ca_path: "{{ ontap_ca_cert | default(omit, true) }}"
         force_basic_auth: true
       register: ontap_still_unsettled
       until: ontap_still_unsettled.json.num_records == 0
