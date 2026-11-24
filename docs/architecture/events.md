@@ -107,6 +107,7 @@ Categorized event types for different lifecycle phases and operations.
 4. **Resource Lifecycle Events** - Per-resource outcome-based events *(primary pattern)*
    - `on_create` → `RESOURCE_CREATED` - Resource was newly created
    - `on_update` → `RESOURCE_UPDATED` - Resource was modified in place
+   - `on_destroying` → `RESOURCE_DELETING` - Package's resources are about to be destroyed (package level only)
    - `on_destroy` → `RESOURCE_DELETED` - Resource was destroyed
    - Declared directly on resource definitions with `requires` for group dependencies
    - Fire based on actual Terraform/OpenTofu outcomes, not runner completion
@@ -267,6 +268,8 @@ events:
 
 The group semantics apply to `on_destroy` too: a handler with `requires` fires
 once, after all required resources are destroyed, with its package's variables.
+`on_destroying` (`RESOURCE_DELETING`) works the same way but fires once before any
+Terraform destroy, while the resources still exist.
 On apply, `on_create` emits one `RESOURCE_CREATED` per package-variables group
 (not one merged event), so handlers never see another package's variables.
 

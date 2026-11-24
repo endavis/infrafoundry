@@ -410,6 +410,7 @@ class UnifiedEventBus(BaseManager):
         # Map lifecycle shorthand names to EventType values
         lifecycle_aliases: dict[str, str] = {
             "on_create": EventType.RESOURCE_CREATED.value,
+            "on_destroying": EventType.RESOURCE_DELETING.value,
             "on_destroy": EventType.RESOURCE_DELETED.value,
             "on_update": EventType.RESOURCE_UPDATED.value,
         }

@@ -429,6 +429,11 @@ Package `before_plan`, `before_apply` and `before_destroy` handlers are register
 event fires, so they run for whole-environment operations too. If resource loading fails, the
 operation emits its `*_failed` event without the `before_*` event.
 
+For cleanup that needs the package's resources still running and its variables, use a
+package `on_destroying` handler instead: it fires once per package group, after the
+destroy is confirmed and before any Terraform destroy (see
+[Event System](../development/event-system.md#event-keys)).
+
 ## Package Discovery
 
 Packages are discovered automatically during resource loading from two locations:

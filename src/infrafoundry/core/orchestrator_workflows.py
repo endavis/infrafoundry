@@ -1574,9 +1574,17 @@ class DestroyOrchestrator(HookExecutionMixin):
 
             # Use REVERSE order for destroy - application providers (kubernetes) before
             # infrastructure providers (proxmox, opnsense)
-            for batch in self._iter_provider_batches(
+            batches = self._iter_provider_batches(
                 resources_by_provider, resource_filter, True, env_name
-            ):
+            )
+
+            # Package-level on_destroying handlers run now, while the resources
+            # still exist and before any terraform destroy (#1646).
+            self._emit_aggregate_destroying_events(
+                env_name, [r for b in batches for r in b.resources], package_filter
+            )
+
+            for batch in batches:
                 provider_name = batch.name
                 resources = batch.resources
                 provider = providers.get(provider_name)
@@ -1622,7 +1630,7 @@ class DestroyOrchestrator(HookExecutionMixin):
                     )
 
                 resource_ids = self._track_destroying_resources(
-                    deployment_id, env_name, provider_name, resources
+                    deployment_id, env_name, provider_name, resources, package_filter
                 )
 
                 provider_results: dict[str, Any] = {}
@@ -1864,6 +1872,7 @@ class DestroyOrchestrator(HookExecutionMixin):
         env_name: str,
         provider_name: str,
         resources: list[ResourceConfig],
+        package_filter: str | None = None,
     ) -> dict[str, int]:
         resource_ids: dict[str, int] = {}
         for resource in resources:
@@ -1886,6 +1895,9 @@ class DestroyOrchestrator(HookExecutionMixin):
                     "name": resource.name,
                     "terraform_id": tracked_resource.terraform_id,
                 },
+                target_resources=[resource.name],
+                package_filter=package_filter,
+                resource_scoped=True,
             )
         return resource_ids
 
@@ -2056,6 +2068,41 @@ class DestroyOrchestrator(HookExecutionMixin):
             for hr in handler_results:
                 if not hr.success and hr.abort:
                     raise EventAbortedError(EventType.RESOURCE_DELETED, hr)
+
+    def _emit_aggregate_destroying_events(
+        self,
+        env_name: str,
+        resources: list[ResourceConfig],
+        package_filter: str | None = None,
+    ) -> None:
+        """Emit one aggregate RESOURCE_DELETING per package-variables group.
+
+        Runs after confirmation and before any provider is destroyed, so group
+        handlers (``on_destroying`` with ``requires: [...]``) fire once, with
+        their package's variables, while the resources still exist.
+
+        Args:
+            env_name: Environment name
+            resources: Resources about to be destroyed
+            package_filter: Optional package name to restrict event handlers
+
+        Raises:
+            EventAbortedError: If a handler fails with ``abort`` set
+        """
+        groups = group_by_package_variables((r.name, r.package_variables) for r in resources)
+
+        for names, group_vars in groups:
+            handler_results = self.event_manager.emit_event(
+                EventType.RESOURCE_DELETING,
+                env_name,
+                {"action": "delete", "resources": names},
+                target_resources=names,
+                package_variables=group_vars,
+                package_filter=package_filter,
+            )
+            for hr in handler_results:
+                if not hr.success and hr.abort:
+                    raise EventAbortedError(EventType.RESOURCE_DELETING, hr)
 
     def _emit_aggregate_destroy_events(
         self,

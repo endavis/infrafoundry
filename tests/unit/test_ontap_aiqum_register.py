@@ -631,3 +631,167 @@ def test_wait_gone_resets_the_deadline_after_a_retry(monkeypatch: pytest.MonkeyP
         aq.wait_gone(_cfg("x"), [KEY], timeout=60, clock=lambda: next(ticks), **_NO_WAIT)
     assert "still deleting" not in str(exc.value)
     assert len(deleted) == 1
+
+
+# --- Pre-destroy removal that waits (#1646) ---
+
+
+def test_remove_wait_deletes_and_waits_for_the_deletion_to_finish(
+    fake: tuple[FakeAIQUM, str],
+) -> None:
+    state, address = fake
+    state.clusters = [_stale()]
+    state.delete_effect = "start_deletion"
+    state.vanish_after[KEY] = 3
+
+    msg = aq.remove(_cfg(address), wait=True, **_NO_WAIT)
+
+    assert "deletion finished" in msg
+    assert len(_calls(state, "DELETE")) == 1
+    assert state.clusters == []
+
+
+def test_remove_wait_waits_on_a_source_already_being_deleted(
+    fake: tuple[FakeAIQUM, str],
+) -> None:
+    state, address = fake
+    state.clusters = [_stale(operation=DELETING)]
+    state.vanish_after[KEY] = 3
+
+    msg = aq.remove(_cfg(address), wait=True, **_NO_WAIT)
+
+    assert "deletion finished" in msg
+    assert "already in progress" in msg
+    assert _calls(state, "DELETE") == []
+    assert state.clusters == []
+
+
+def test_remove_wait_failure_after_retry_gives_destroy_advice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    deleted = _script_clusters(
+        monkeypatch,
+        [
+            [_stale()],
+            [_stale(operation=DELETING)],
+            [_stale(operation=FAILED)],
+            [_stale(operation={**FAILED, "start_time": "T2"})],
+        ],
+    )
+    ticks = iter(range(0, 10_000, 10))
+    with pytest.raises(aq.AIQUMError, match=r"failed again") as exc:
+        aq.remove(_cfg("x"), wait=True, timeout=600, clock=lambda: next(ticks), **_NO_WAIT)
+    assert "re-run destroy" in str(exc.value)
+    assert "AIQUM UI" in str(exc.value)
+    assert "re-run apply" not in str(exc.value)
+    assert len(deleted) == 2
+
+
+def test_remove_wait_timeout_gives_destroy_advice(monkeypatch: pytest.MonkeyPatch) -> None:
+    _script_clusters(monkeypatch, [[_stale(operation=DELETING)]])
+    ticks = iter(range(0, 10_000, 100))
+    with pytest.raises(aq.AIQUMError, match=r"still deleting") as exc:
+        aq.remove(_cfg("x"), wait=True, timeout=250, clock=lambda: next(ticks), **_NO_WAIT)
+    assert "re-run destroy" in str(exc.value)
+    assert "re-run apply" not in str(exc.value)
+
+
+@pytest.mark.parametrize("wait", [True, False])
+def test_remove_with_no_matches_does_not_wait(
+    fake: tuple[FakeAIQUM, str], monkeypatch: pytest.MonkeyPatch, wait: bool
+) -> None:
+    _state, address = fake
+
+    def _boom(*_a: Any, **_kw: Any) -> None:
+        raise AssertionError("wait_gone must not be called")
+
+    monkeypatch.setattr(aq, "wait_gone", _boom)
+
+    msg = aq.remove(_cfg(address), wait=wait, **_NO_WAIT)
+
+    assert "is not in AIQUM; nothing to do" in msg
+
+
+def test_wait_gone_default_messages_keep_rerun_apply(monkeypatch: pytest.MonkeyPatch) -> None:
+    _script_clusters(monkeypatch, [[_stale(operation=DELETING)]])
+    ticks = iter(range(0, 10_000, 100))
+    with pytest.raises(aq.AIQUMError, match=r"re-run apply once it finishes"):
+        aq.wait_gone(_cfg("x"), [KEY], timeout=250, clock=lambda: next(ticks), **_NO_WAIT)
+
+
+def test_main_wait_without_remove_returns_2(capsys: pytest.CaptureFixture[str]) -> None:
+    assert aq.main(["--wait"]) == 2
+    assert "--wait is only valid with --remove" in capsys.readouterr().err
+
+
+def test_main_remove_wait_routes_to_remove_with_wait(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def _remove(_cfg: Any, **kw: Any) -> str:
+        seen.update(kw)
+        return "done"
+
+    monkeypatch.setattr(aq, "remove", _remove)
+    monkeypatch.setenv("INFRAFOUNDRY_PACKAGE_VARS", json.dumps(FULL_VARS))
+
+    assert aq.main(["--remove", "--wait"]) == 0
+    assert seen == {"wait": True}
+    assert "done" in capsys.readouterr().out
+
+
+def test_predestroy_script_is_wired_and_executable() -> None:
+    script = SCRIPTS / "ontap-predestroy-deregister.sh"
+    assert os.access(script, os.X_OK)
+    text = script.read_text()
+    assert 'ontap-console-discover.py" --remove' in text
+    assert 'ontap-aiqum-register.py" --remove --wait' in text
+    assert text.index("ontap-console-discover.py") < text.index("ontap-aiqum-register.py")
+
+
+def test_predestroy_script_skips_without_inputs() -> None:
+    env = {
+        **os.environ,
+        "INFRAFOUNDRY_BLUEPRINT_DIR": str(BLUEPRINT),
+        "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"cluster_mgmt_ip": "192.0.2.80"}),
+    }
+    result = subprocess.run(
+        ["bash", str(SCRIPTS / "ontap-predestroy-deregister.sh")],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "no console_* inputs set, skipping" in result.stdout
+    assert "no aiqum_* inputs set, skipping" in result.stdout
+
+
+def test_predestroy_script_exits_nonzero_when_a_removal_fails() -> None:
+    env = {
+        **os.environ,
+        "INFRAFOUNDRY_BLUEPRINT_DIR": str(BLUEPRINT),
+        "INFRAFOUNDRY_PACKAGE_VARS": json.dumps({"aiqum_address": "x"}),
+    }
+    result = subprocess.run(
+        ["bash", str(SCRIPTS / "ontap-predestroy-deregister.sh")],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert "delete the data source by hand" in result.stderr
+
+
+def test_blueprint_declares_on_destroying_with_fallback_on_destroy() -> None:
+    bp = yaml.safe_load((BLUEPRINT / "blueprint.yaml").read_text())
+    (create,) = bp["events"]["on_create"]
+    (pre,) = bp["events"]["on_destroying"]
+    assert pre["script"] == "scripts/ontap-predestroy-deregister.sh"
+    assert pre["continue_on_error"] is True
+    assert pre["requires"] == create["requires"]
+    assert pre["timeout"] >= 2 * aq.DELETE_WAIT
+    (destroy,) = bp["events"]["on_destroy"]
+    assert destroy["script"] == "scripts/ontap-destroy-cleanup.sh"

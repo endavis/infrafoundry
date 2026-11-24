@@ -38,6 +38,7 @@ We will define **19 granular event types** in the `EventType` enum, covering eve
 ## Related Issues
 
 - [#336](https://github.com/endavis/infrafoundry/issues/336) — Wire events config in settings.yaml to UnifiedEventBus
+- [#1646](https://github.com/endavis/infrafoundry/issues/1646) — Add the `on_destroying` lifecycle alias for `RESOURCE_DELETING`
 
 ## Alternatives Considered
 - **Generic Events (`LOG_INFO`, `LOG_ERROR`):** Rejected because it makes programmatic reaction (e.g., "trigger webhook on failure") difficult to parse.

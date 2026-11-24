@@ -220,7 +220,10 @@ inputs:
   # --- AIQUM registration (optional) ---
   # Set aiqum_address and aiqum_admin_password to add the cluster to Active IQ
   # Unified Manager after setup and remove it on destroy (#1225). Leave both
-  # empty to skip. Put the password in secrets.yaml.
+  # empty to skip. Put the password in secrets.yaml. Destroy removes the cluster
+  # while it is still up and waits for AIQUM to finish (#1646). A data source
+  # whose deletion already failed cannot be removed by the script: delete it in
+  # the AIQUM UI by hand, then re-run apply.
   - name: aiqum_address
     description: "AIQUM host or IP; enables AIQUM registration"
     default: ""
@@ -259,11 +262,21 @@ events:
       requires:
         - "{{ node01_name }}"
         - "{{ node02_name }}"
+  on_destroying:
+    - type: script
+      name: ontap-cluster-deregister
+      script: scripts/ontap-predestroy-deregister.sh
+      description: "Remove the cluster from the NetApp Console and AIQUM before its VMs are destroyed"
+      timeout: 2100
+      continue_on_error: true
+      requires:
+        - "{{ node01_name }}"
+        - "{{ node02_name }}"
   on_destroy:
     - type: script
       name: ontap-cluster-cleanup
       script: scripts/ontap-destroy-cleanup.sh
-      description: "Remove the cluster from the NetApp Console and AIQUM"
+      description: "Fallback: remove the cluster from the Console and AIQUM if the pre-destroy deregistration did not"
       timeout: 600
       continue_on_error: true
       requires:
