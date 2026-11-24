@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795515840241,
+  "lastUpdate": 1795516340232,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6464,6 +6464,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000003625152861045831",
             "extra": "mean: 60.935253765241725 usec\nrounds: 17595"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a6b429970c63a7e2d99c0d22a19e689b24f2c44a",
+          "message": "feat: export the aiqum certificate for ontap-cluster to trust (merges PR #1649, addresses #1648)\n\n* feat: export the aiqum certificate for ontap-cluster to trust\n\nThe aiqum blueprint generates a new self-signed HTTPS certificate on\nevery build, while ontap-cluster verifies AIQUM against a fixed PEM\npath the user had to refresh by hand after each rebuild.\n\nNew aiqum input aiqum_cert_export (empty: unchanged). When set, the\nsetup script fetches the certificate AIQUM serves on the VM through the\nhost-key-pinned SSH channel (a stdlib helper piped to the VM's python3),\ncompares it with the certificate served over the network, and writes it\natomically to that path; a mismatch fails without touching the file. A\nrelative path is rejected before the install starts. On jumphost runs\nthe handler's outputs entry copies the file back to the controller.\n\nScriptHandler skips an outputs entry whose source and dest both render\nempty, so an unset optional output no longer warns. ontap-cluster's\nAIQUM registration expands ~ in aiqum_ca_cert and names\naiqum_cert_export when the file is missing.\n\nAddresses #1648\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: require tls 1.2 or newer when reading the aiqum certificate\n\nThe certificate-export helper's TLS client context set no minimum\nprotocol version, so TLS 1.0 and 1.1 were allowed. Move the context\ninto client_context() and set its minimum to TLS 1.2; verification\nstays off on purpose because the self-signed certificate is what is\nbeing learned and is trusted only after the two copies match.\n\nAddresses #1648\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-24T10:30:48Z",
+          "tree_id": "097a9d406e55b5e18b3db0cb9a6d32911555c407",
+          "url": "https://github.com/endavis/infrafoundry/commit/a6b429970c63a7e2d99c0d22a19e689b24f2c44a"
+        },
+        "date": 1795516339087,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 68.66042490637352,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0008022207174892779",
+            "extra": "mean: 14.564430694444674 msec\nrounds: 72"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12890.080821890213,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005952565565329157",
+            "extra": "mean: 77.57903257687714 usec\nrounds: 13660"
           }
         ]
       }
