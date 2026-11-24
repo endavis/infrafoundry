@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795530271226,
+  "lastUpdate": 1795537587977,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6730,6 +6730,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005735601498053135",
             "extra": "mean: 70.71730026138931 usec\nrounds: 16066"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ac247fc8faf4de7bf1698a74fffb6a740d683895",
+          "message": "fix: openwrt firmware upgrade host-key probe fails on routers without key ssh (merges PR #1661, addresses #1659)\n\nThe post-upgrade probe ran ssh in BatchMode and required exit 0, so a\nGL.iNet router that accepts only password SSH always failed it, after\nthe firmware had already been flashed. A glinet.firmware device does\nnot otherwise need key-based SSH.\n\nThe probe now switches authentication off (PreferredAuthentications=\nnone, no identity file) and still checks the host key strictly under\nthe settings address. The key is verified during the key exchange,\nbefore authentication, so exit 0 or \"Permission denied\" both prove it\nmatched. A host-key failure fails at once with the host-key hint, and\nany other failure, such as a refused connection, still fails. Doctor's\nssh call is unchanged.\n\nAddresses #1659\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-24T16:24:54Z",
+          "tree_id": "85b5b9a1abd78707654120783f3d380bcd0fbc2d",
+          "url": "https://github.com/endavis/infrafoundry/commit/ac247fc8faf4de7bf1698a74fffb6a740d683895"
+        },
+        "date": 1795537586970,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 59.83199262786152,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004634759878813772",
+            "extra": "mean: 16.713466426226585 msec\nrounds: 61"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 11382.858924698394,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000049343586935957205",
+            "extra": "mean: 87.85139187047392 usec\nrounds: 12448"
           }
         ]
       }
