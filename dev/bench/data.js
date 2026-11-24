@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795520922719,
+  "lastUpdate": 1795522627799,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6540,6 +6540,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010810975362447279",
             "extra": "mean: 80.14918452605387 usec\nrounds: 13597"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "94184e55fc29d27f3ba5c13d81ac81253cbebf0e",
+          "message": "feat: verify ontap rest certificates against a configured ca (merges PR #1652, addresses #1645)\n\n* feat: verify ontap rest certificates against a configured ca\n\nAdd an optional ontap_ca_cert input to the ontap-cluster blueprint. A new\ngroup_vars/all.yml beside the playbooks derives ontap_validate_certs and\nontap_tls_environment from it, so every call site follows one definition:\nuri tasks pass it as ca_path, and the netapp.ontap modules, which take no\nCA option, get it through REQUESTS_CA_BUNDLE and SSL_CERT_FILE.\n\nUnset, verification stays off as before. A set path that is not a file\nstops the run before any play touches the cluster, and the cluster probe\nreports an untrusted certificate as its own conflict naming ontap_ca_cert.\nThe hard-coded validate_certs: false in the cluster setup playbook is gone.\n\nAddresses #1645\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* test: require tls 1.2 on the ontap ca test server\n\nAddresses #1645\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-24T12:16:02Z",
+          "tree_id": "da094f1efa65c4ab7e41f1d10ccb00e70928787a",
+          "url": "https://github.com/endavis/infrafoundry/commit/94184e55fc29d27f3ba5c13d81ac81253cbebf0e"
+        },
+        "date": 1795522626955,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 45.74830015669362,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0004783975373909039",
+            "extra": "mean: 21.858735659573703 msec\nrounds: 47"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7860.970355291782,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010927707845259936",
+            "extra": "mean: 127.21075831647534 usec\nrounds: 8387"
           }
         ]
       }
