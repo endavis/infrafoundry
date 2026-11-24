@@ -55,6 +55,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | Create from a blueprint | `foundry config new create <blueprint> <dir>` |
 | Export Proxmox config to YAML | `foundry provider proxmox export --env <env> --output <dir>` |
 | Dump raw Proxmox API state | `foundry provider proxmox dump --env <env> --output <file>.json` |
+| Install the vendor's latest GL.iNet firmware | `foundry provider openwrt upgrade --env <env> [--device <name>] [--yes]` |
 | Generate JSON schemas for IDE | `foundry config schema export` |
 | Migrate existing infra to config | `foundry config migrate --env <env> --provider opnsense --component <comp>` |
 | Plan changes | `foundry infra plan --env <env>` |
@@ -345,6 +346,23 @@ each provider package's plugin entry point (see
 !!! warning "Breaking change"
     `foundry config export --provider proxmox` was removed. Use
     `foundry provider proxmox export` instead.
+
+### `provider openwrt upgrade`
+
+Install the vendor's latest firmware on the GL.iNet devices that have a
+`glinet.firmware` resource. Holds the environment lock, checks each selected
+device read-only, asks once, upgrades the devices one at a time keeping their
+configuration, stops at the first failure and re-plans the upgraded devices. See
+[GL.iNet firmware](../providers/openwrt.md#glinet-firmware).
+
+```bash
+foundry provider openwrt upgrade --env dev
+foundry provider openwrt upgrade --env dev --device office --yes
+```
+
+**Options:** `-e/--env TEXT` (required), `--device TEXT` (needs a `devices:`
+map), `-y/--yes` (do not ask before flashing), `--lock-timeout INTEGER`
+(default: 0, fail fast).
 
 ### `provider proxmox dump`
 

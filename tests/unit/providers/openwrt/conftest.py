@@ -63,3 +63,6 @@ def make_env(settings: dict[str, Any] | None = None) -> EnvironmentConfig:
         name="test",
         provider_settings={"openwrt": settings} if settings is not None else {},
     )
+
+
+from .glinet_fake import served_glinet as served_glinet  # noqa: E402  # re-exported fixture

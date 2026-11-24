@@ -170,3 +170,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0033](0033-package-ssh-connections-check-host-keys-against-the-operators-known-hosts.md) | Package SSH connections check host keys against the operator's known_hosts | Accepted |
 | [0034](0034-a-bitwarden-secret-backend-resolves-through-the-bw-cli-with-private-per-run-cli-state.md) | A bitwarden secret:// backend resolves through the bw CLI with private per-run CLI state | Accepted |
 | [0035](0035-openwrt-devices-are-provider-instances-several-per-environment.md) | OpenWrt devices are provider instances, several per environment | Accepted |
+| [0036](0036-glinet-firmware-is-upgraded-through-the-vendor-online-upgrade-by-a-provider-command.md) | GL.iNet firmware is upgraded through the vendor online upgrade by a provider command | Accepted |

@@ -37,6 +37,9 @@ from infrafoundry.core.types import ResourceOutcome
 
 logger = logging.getLogger(__name__)
 
+FIRMWARE_TYPE = "glinet.firmware"
+"""Resource type the plan reports on (the provider package owns the definition, ADR-0036)."""
+
 ANSIBLE_BINARY = "ansible-playbook"
 """The executable the runner resolves and runs (``tool_name`` is only the registry key)."""
 
@@ -279,7 +282,16 @@ class OpenWrtAnsibleRunner(BaseRunner):
         check: bool,
         reconnect_host: str | None = None,
     ) -> tuple[_RunResult | None, str | None]:
-        """Run and interpret one pass; return ``(result, error)``."""
+        """Run and interpret one pass; return ``(result, error)``.
+
+        A provider that reports an ``empty_result`` for the run (a device whose only
+        resource is ``glinet.firmware``) is not sent a playbook.
+        """
+        empty = getattr(provider, "empty_result", None)
+        if callable(empty):
+            skipped = empty(run)
+            if skipped is not None:
+                return cast(_RunResult, skipped), None
         stdout, error = self._playbook(
             run, check=check, reconnect_host=reconnect_host, label=self._label(provider)
         )
@@ -292,8 +304,13 @@ class OpenWrtAnsibleRunner(BaseRunner):
 
     def _check_pass(
         self, provider: ProviderBase, kwargs: dict[str, Any]
-    ) -> tuple[_Rendered | None, _RunResult | None, str | None]:
-        """Render and run the check pass shared by ``plan`` and ``apply``."""
+    ) -> tuple[_Rendered | None, _RunResult | None, str | None, list[ResourceConfig]]:
+        """Render and run the check pass shared by ``plan`` and ``apply``.
+
+        Returns:
+            ``(run, result, error, resources)``; ``resources`` are the provider's loaded
+            resources, so the caller does not load them twice.
+        """
         env_name = self._env_name(provider, kwargs)
         resources = self._load_resources(provider, env_name)
         target_resources = kwargs.get("target_resources")
@@ -306,13 +323,40 @@ class OpenWrtAnsibleRunner(BaseRunner):
             target_resources=target_resources,
         )
         result, error = self._pass(provider, run, check=True)
-        return run, result, error
+        return run, result, error, resources
 
     @staticmethod
     def _refusal_text(verb: str, result: _RunResult) -> str:
         return f"openwrt {verb} refused, it could cut the management connection:\n" + "\n".join(
             f"- {r}" for r in result.refusals
         )
+
+    def _print_firmware(
+        self, provider: ProviderBase, kwargs: dict[str, Any], resources: list[ResourceConfig]
+    ) -> None:
+        """Print the firmware offer lines (ADR-0036); never changes the plan's outcome.
+
+        Skipped for add-only (drift) runs and when ``target_resources`` excludes every
+        ``glinet.firmware`` resource, so scheduled drift runs never log in to the router.
+        """
+        hook = getattr(provider, "firmware_plan_lines", None)
+        if not callable(hook) or kwargs.get("add_only"):
+            return
+        targets = kwargs.get("target_resources")
+        firmware = [r for r in resources if r.type == FIRMWARE_TYPE]
+        if targets:
+            firmware = [r for r in firmware if r.name in targets]
+        if not firmware:
+            return
+        try:
+            lines = hook(self._env_name(provider, kwargs), firmware)
+        except Exception as exc:  # a firmware check must never fail the plan
+            logger.warning("openwrt_ansible firmware check failed: %s", type(exc).__name__)
+            return
+        label = self._label(provider)
+        for line, warning in lines:
+            style = "yellow" if warning else "dim"
+            self.console.print(f"  [{style}]{label}: {escape(line)}[/{style}]")
 
     def plan(self, provider: ProviderBase, **kwargs: Any) -> PlanResult:
         """Diff the YAML against the device with a check-mode run; writes nothing.
@@ -327,7 +371,7 @@ class OpenWrtAnsibleRunner(BaseRunner):
         if not self._supports(provider):
             return PlanResult(success=True, has_changes=False, changes_summary="No changes")
         try:
-            _run_files, result, error = self._check_pass(provider, kwargs)
+            _run_files, result, error, resources = self._check_pass(provider, kwargs)
         except Exception as exc:
             logger.exception("openwrt_ansible plan failed")
             return PlanResult(success=False, error=str(exc))
@@ -340,6 +384,7 @@ class OpenWrtAnsibleRunner(BaseRunner):
         lines = result.summary_lines()
         for line in lines:
             self.console.print(f"  [dim]{self._label(provider)}: {escape(line)}[/dim]")
+        self._print_firmware(provider, kwargs, resources)
         return PlanResult(
             success=True,
             has_changes=result.has_changes,
@@ -393,7 +438,7 @@ class OpenWrtAnsibleRunner(BaseRunner):
         if not self._supports(provider):
             return ApplyResult(success=True, resources_created=0, resources_updated=0)
         try:
-            run, checked, error = self._check_pass(provider, kwargs)
+            run, checked, error, _resources = self._check_pass(provider, kwargs)
             if error is not None or checked is None or run is None:
                 return ApplyResult(success=False, error=error or "openwrt check failed")
             if not checked.success:

@@ -4,7 +4,8 @@ import getpass
 import logging
 import os
 import socket
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -613,6 +614,33 @@ class Orchestrator:
         return self.validation_orchestrator.validate(
             env_name, resource_filter, verbose, provider_filter=provider_filter
         )
+
+    @contextmanager
+    def environment_lock(
+        self, env_name: str, *, timeout: int = 0, ttl: int = 600
+    ) -> Iterator[None]:
+        """Hold the environment's deployment lock for the duration of the block.
+
+        For commands outside ``apply``/``destroy`` that must exclude them, such as the
+        firmware upgrade. The heartbeat extends the lock while the block runs.
+
+        Args:
+            env_name: Environment to lock.
+            timeout: Seconds to wait for a held lock; 0 fails fast.
+            ttl: Lock time-to-live in seconds, renewed by the heartbeat.
+
+        Raises:
+            LockAcquisitionError: If the lock stays held by another run.
+        """
+        with environment_lock(
+            self.state_manager,
+            env_name,
+            ttl=ttl,
+            locked_by=_build_lock_holder_id(),
+            timeout=timeout,
+            event_manager=self.event_manager,
+        ):
+            yield
 
     def plan(
         self,

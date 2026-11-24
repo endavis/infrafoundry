@@ -45,10 +45,12 @@ Finding: handing the staged files to the session by copying them into rpcd's sav
 - Issue #1482: manage OpenWrt devices over SSH
 - Issue #1481: read-only collectors for unmanaged devices (ADR-0027)
 - Issue #1656: several devices per environment (see ADR-0035)
+- Issue #1655: GL.iNet firmware upgrade (see ADR-0036); "the provider stores no password" no longer holds for the `glinet.firmware` resource, which takes a `secret://` web password
 
 ## Related Documentation
 
 - [OpenWrt provider](../providers/openwrt.md)
+- [ADR-0036](../decisions/0036-glinet-firmware-is-upgraded-through-the-vendor-online-upgrade-by-a-provider-command.md)
 - [ADR-0026](0026-mikrotik-routeros-is-managed-natively-over-the-rest-api-by-a-direct-runner.md)
 - [ADR-0022](0022-existing-hosts-are-configured-through-a-host-provider-and-runner-that-never-create-or-delete-the-machine.md)
 - [ADR-0018](0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md)
