@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795537587977,
+  "lastUpdate": 1795539801504,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6768,6 +6768,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000049343586935957205",
             "extra": "mean: 87.85139187047392 usec\nrounds: 12448"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "efc13349b77898e8568fe60f4d48e1f330861aa9",
+          "message": "fix: glinet.firmware entries without config fail validation (merges PR #1662, addresses #1660)\n\nThe package loader uses the whole entry as the config when a\nresource-centric entry has no config: key, so the documented\nglinet.firmware entry (provider, type, name, device and no config)\nfailed with \"takes no fields; unknown field(s): device, provider,\ntype\".\n\nThe firmware check now ignores the loader's entry-level keys: name,\nprovider, type, events, import_id and the instance selector keys\n(taken from SELECTOR_KEYS, not hard-coded). Any other key is still\nrejected, including a field under an explicit config:. The generic\nloader is unchanged.\n\nAddresses #1660\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-24T17:02:06Z",
+          "tree_id": "30d27d6bbd9e3af0c2404ee48d82092797988d27",
+          "url": "https://github.com/endavis/infrafoundry/commit/efc13349b77898e8568fe60f4d48e1f330861aa9"
+        },
+        "date": 1795539800918,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 48.610176040357445,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00023542756197095547",
+            "extra": "mean: 20.57182428571692 msec\nrounds: 49"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 8001.143563722501,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008633746958729582",
+            "extra": "mean: 124.98213437064662 usec\nrounds: 8484"
           }
         ]
       }
