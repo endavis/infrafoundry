@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795469148989,
+  "lastUpdate": 1795515840241,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6426,6 +6426,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000050516252468407585",
             "extra": "mean: 91.45793452778275 usec\nrounds: 12112"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f82d3645903d00af8c848f6ea3505464657de480",
+          "message": "fix: deregister the ontap cluster before its vms are destroyed (merges PR #1647, addresses #1646)\n\nThe ontap-cluster blueprint removed the cluster from AIQUM and the\nNetApp Console in its on_destroy handler, which runs after terraform\ndestroy. AIQUM's data-source deletion needs the cluster reachable, so\nit timed out and left a stale source that later DELETEs could not\nremove, breaking the next registration at the same address.\n\nAdd a package-level on_destroying event (alias of RESOURCE_DELETING):\nthe destroy orchestrator emits it once per package-variables group\nafter confirmation and before any provider is destroyed, with the\npackage variables and requires semantics of on_destroy. A handler that\nfails with abort stops the destroy before terraform runs. The\nper-resource RESOURCE_DELETING emits become resource-scoped, matching\nRESOURCE_DELETED.\n\nontap-cluster uses it: a new pre-destroy script removes the cluster\nfrom the Console, then from AIQUM with ontap-aiqum-register.py\n--remove --wait, which waits for AIQUM's deletion to finish. It runs\nwith continue_on_error; on_destroy stays as the fallback and finds\nnothing when the pre-destroy removal succeeded.\n\nAddresses #1646\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-24T10:22:32Z",
+          "tree_id": "452cab2e8a4ee01d9cdb57d1f6fe140c87e709a3",
+          "url": "https://github.com/endavis/infrafoundry/commit/f82d3645903d00af8c848f6ea3505464657de480"
+        },
+        "date": 1795515839128,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 96.0039713150438,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0015360141864816394",
+            "extra": "mean: 10.416235769231145 msec\nrounds: 104"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 16410.86133574803,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000003625152861045831",
+            "extra": "mean: 60.935253765241725 usec\nrounds: 17595"
           }
         ]
       }
