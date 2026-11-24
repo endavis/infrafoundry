@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795526825187,
+  "lastUpdate": 1795528518064,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6654,6 +6654,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007930983269729984",
             "extra": "mean: 103.14324667445989 usec\nrounds: 10374"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f45480b298a4a4e944977f0aecc3ccfed62a2243",
+          "message": "feat: manage several openwrt devices per environment (merges PR #1657, addresses #1656)\n\nThe OpenWrt provider handled one device per environment. Adopt the\nprovider-instance model of ADR-0024/ADR-0030: provider_settings.openwrt\n.devices maps names to per-device settings (address per device; SSH and\ntimeouts as shared defaults an entry overrides), primary keeps the id\nopenwrt and every other device is openwrt@<name>.\n\n- provider_instances: an openwrt spec. Its \"device\" selector is not\n  exclusive, because device: is also an ordinary field of tailscale and\n  opnsense entries; firewall: and cluster: keep their strict error.\n- loaders: a generic file-level selector helper (cluster, device) and a\n  package manifest device:, so a resource picks its device by entry,\n  file or manifest, else the primary.\n- provider, validator and runner resolve settings per device: each gets\n  its own inventory and HostKeyAlias, doctor results are labelled with\n  the device, and runner output reads openwrt_ansible[<name>].\n- -P openwrt expands to every declared device with resources.\n- ADR-0035 records the deltas from ADR-0024/ADR-0030; ADR-0028 points\n  to it.\n\nFlat single-device settings are unchanged, and converting them to\ndevices: with the same primary keeps the state rows.\n\nAddresses #1656\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-24T13:54:14Z",
+          "tree_id": "6b2145a0e8b9f0e988320b51998fb4fb3d0fc357",
+          "url": "https://github.com/endavis/infrafoundry/commit/f45480b298a4a4e944977f0aecc3ccfed62a2243"
+        },
+        "date": 1795528517500,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 47.03671751726755,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00038283004573391765",
+            "extra": "mean: 21.259986937500308 msec\nrounds: 48"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7912.790460958124,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008508538072039257",
+            "extra": "mean: 126.37766726340362 usec\nrounds: 8379"
           }
         ]
       }
