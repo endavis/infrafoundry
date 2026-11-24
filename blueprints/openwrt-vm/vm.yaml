@@ -19,6 +19,11 @@ vms:
     disk_bus: ide
     disk_storage: "{{ disk_storage }}"
     serial: true
+    # The pinned dropbear host key is installed by the serial-console bootstrap, not
+    # cloud-init (#1650).
+    ssh_host_key:
+      address: "{{ mgmt_ip }}"
+      format: dropbear
     boot_order: [ide0]
     onboot: false
     tags:

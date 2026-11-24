@@ -13,12 +13,15 @@ from infrafoundry.core.ssh_host_keys import (
     HOST_KEYS_VARIABLE,
     apply_host_key,
     cloud_config_fragment,
+    dropbear_ed25519_key,
+    dropbear_keys_value,
     host_key_config,
     host_key_entry,
     host_key_problems,
     known_hosts_value,
     private_key_ref,
     rebuild_problems,
+    wants_dropbear_key,
 )
 
 PUBLIC = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleSentinelPublicKey0"
@@ -281,3 +284,182 @@ class TestRebuildProblems:
 
         assert PUBLIC not in text
         assert "SENTINEL-NOT-A-REAL-KEY" not in text
+
+
+# --- dropbear format (#1650) -------------------------------------------------------------
+
+
+def _generated_key(*, passphrase: bytes | None = None) -> tuple[str, str, bytes]:
+    """Generate an ed25519 key at test time: (OpenSSH PEM, public line, expected blob)."""
+    import struct
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    key = Ed25519PrivateKey.generate()
+    encryption: serialization.KeySerializationEncryption = (
+        serialization.BestAvailableEncryption(passphrase)
+        if passphrase
+        else serialization.NoEncryption()
+    )
+    pem = key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.OpenSSH, encryption
+    ).decode()
+    public = (
+        key.public_key()
+        .public_bytes(serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH)
+        .decode()
+    )
+    seed = key.private_bytes(
+        serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption()
+    )
+    pub = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+
+    def pack(b: bytes) -> bytes:
+        return struct.pack(">I", len(b)) + b
+
+    return pem, public, pack(b"ssh-ed25519") + pack(seed + pub)
+
+
+def _dropbear_vm(pem: str, public: str, name: str = "vm-01", fmt: str = "dropbear") -> Any:
+    vm = _vm(name, secrets=_secrets(name, ed25519_private=pem, ed25519_public=public))
+    vm.config["ssh_host_key"]["format"] = fmt
+    return vm
+
+
+class TestDropbearConversion:
+    def test_matches_the_measured_recipe(self) -> None:
+        pem, public, expected = _generated_key()
+        blob = dropbear_ed25519_key(pem, public)
+        assert blob == expected
+        assert len(blob) == 83
+        assert blob.startswith(b"\x00\x00\x00\x0bssh-ed25519")
+
+    def test_rejects_an_encrypted_key_without_leaking(self) -> None:
+        pem, public, _ = _generated_key(passphrase=b"pw")
+        with pytest.raises(ValueError, match="encrypted") as err:
+            dropbear_ed25519_key(pem, public)
+        assert pem.splitlines()[1] not in str(err.value)
+
+    def test_rejects_garbage_and_bad_base64(self) -> None:
+        _, public, _ = _generated_key()
+        with pytest.raises(ValueError):
+            dropbear_ed25519_key("nope", public)
+        armour_end = "-----END OPENSSH " + "PRIVATE KEY-----"
+        bad = "-----BEGIN OPENSSH " + "PRIVATE KEY-----\n!!!!\n" + armour_end
+        with pytest.raises(ValueError, match="base64"):
+            dropbear_ed25519_key(bad, public)
+        wrong = (
+            "-----BEGIN OPENSSH " + "PRIVATE KEY-----\nAAAA\n-----END OPENSSH " + "PRIVATE KEY-----"
+        )
+        with pytest.raises(ValueError):
+            dropbear_ed25519_key(wrong, public)
+
+    def test_rejects_a_non_ed25519_key(self) -> None:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        pem = (
+            ec.generate_private_key(ec.SECP256R1())
+            .private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.OpenSSH,
+                serialization.NoEncryption(),
+            )
+            .decode()
+        )
+        _, public, _ = _generated_key()
+        with pytest.raises(ValueError, match="ed25519"):
+            dropbear_ed25519_key(pem, public)
+
+    def test_rejects_a_public_key_that_does_not_match(self) -> None:
+        pem, _, _ = _generated_key()
+        _, other_public, _ = _generated_key()
+        with pytest.raises(ValueError, match="does not match") as err:
+            dropbear_ed25519_key(pem, other_public)
+        assert other_public.split()[1] not in str(err.value)
+
+    def test_rejects_more_than_one_key(self) -> None:
+        import base64
+
+        pem, public, _ = _generated_key()
+        lines = pem.strip().splitlines()
+        data = bytearray(base64.b64decode("".join(lines[1:-1])))
+        offset = len(b"openssh-key-v1\x00") + 4 + 4 + 4 + 4 + 4  # cipher, kdf, kdfopts lengths
+        assert data[offset - 4 : offset] == b"\x00\x00\x00\x00"
+        data[offset + 3] = 2
+        mangled = lines[0] + "\n" + base64.b64encode(bytes(data)).decode() + "\n" + lines[-1] + "\n"
+        with pytest.raises(ValueError, match="exactly one"):
+            dropbear_ed25519_key(mangled, public)
+
+
+class TestFormat:
+    def test_defaults_to_openssh_and_accepts_dropbear(self) -> None:
+        assert host_key_config(_vm()).format == "openssh"  # type: ignore[union-attr]
+        vm = _vm()
+        vm.config["ssh_host_key"]["format"] = "dropbear"
+        assert host_key_config(vm).format == "dropbear"  # type: ignore[union-attr]
+
+    def test_rejects_other_formats(self) -> None:
+        vm = _vm()
+        vm.config["ssh_host_key"]["format"] = "pem"
+        with pytest.raises(ValueError, match="format"):
+            host_key_config(vm)
+
+    def test_apply_host_key_adds_no_secret_ref_for_dropbear(self) -> None:
+        pem, public, _ = _generated_key()
+        vm = _dropbear_vm(pem, public)
+        assert apply_host_key(vm) is None
+        assert "terraform_secrets" not in vm.config
+        openssh = _dropbear_vm(pem, public, fmt="openssh")
+        assert apply_host_key(openssh) is not None
+
+
+class TestDropbearKeysValue:
+    def test_lists_hex_blobs_joined_by_semicolons(self) -> None:
+        pem_a, pub_a, blob_a = _generated_key()
+        pem_b, pub_b, blob_b = _generated_key()
+        value = dropbear_keys_value(
+            [_dropbear_vm(pem_a, pub_a, "vm-a"), _dropbear_vm(pem_b, pub_b, "vm-b")]
+        )
+        assert value == f"vm-a={blob_a.hex()};vm-b={blob_b.hex()}"
+        assert all(len(item.split("=")[1]) == 166 for item in value.split(";"))
+
+    def test_skips_openssh_public_only_and_invalid_entries(self) -> None:
+        pem, public, _ = _generated_key()
+        _, other_public, _ = _generated_key()
+        resources = [
+            _dropbear_vm(pem, public, "vm-a", fmt="openssh"),
+            _vm("vm-b", secrets=_secrets("vm-b", ed25519_public=public)),
+            _dropbear_vm(pem, other_public, "vm-c"),
+            _dropbear_vm(SENTINEL_PRIVATE, public, "vm-d"),
+        ]
+        resources[1].config["ssh_host_key"]["format"] = "dropbear"
+        assert dropbear_keys_value(resources) == ""
+
+    def test_wants_dropbear_key(self) -> None:
+        pem, public, _ = _generated_key()
+        assert wants_dropbear_key(_dropbear_vm(pem, public))
+        assert not wants_dropbear_key(_dropbear_vm(pem, public, fmt="openssh"))
+
+
+class TestDropbearProblems:
+    def test_a_mismatched_pair_is_reported_without_key_material(self) -> None:
+        pem, _, _ = _generated_key()
+        _, other_public, _ = _generated_key()
+        problems = host_key_problems(_dropbear_vm(pem, other_public))
+        assert len(problems) == 1
+        assert "dropbear" in problems[0]
+        assert "--regenerate vm-01" in problems[0]
+        assert pem.splitlines()[1] not in problems[0]
+        assert other_public.split()[1] not in problems[0]
+
+    def test_a_matching_pair_has_no_problem(self) -> None:
+        pem, public, _ = _generated_key()
+        assert host_key_problems(_dropbear_vm(pem, public)) == []
+
+    def test_rebuild_message_no_longer_names_cloud_init(self) -> None:
+        vm = _vm(secrets=_secrets(ed25519_public=PUBLIC))
+        (problem,) = rebuild_problems([vm], lambda _r: False, "dev")
+        assert "cloud-init" not in problem
+        assert "--regenerate vm-01" in problem

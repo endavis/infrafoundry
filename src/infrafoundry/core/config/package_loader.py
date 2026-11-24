@@ -39,10 +39,13 @@ from infrafoundry.core.provider_instances import (
 from infrafoundry.core.secrets.provider import SecretProvider
 from infrafoundry.core.secrets.providers.sops import SopsSecretProvider
 from infrafoundry.core.ssh_host_keys import (
+    DROPBEAR_KEYS_VARIABLE,
     HOST_KEY_FIELD,
     HOST_KEYS_VARIABLE,
     KNOWN_HOSTS_VARIABLE,
+    dropbear_keys_value,
     known_hosts_value,
+    wants_dropbear_key,
 )
 
 if TYPE_CHECKING:
@@ -519,6 +522,10 @@ class PackageLoader:
         # the JSON round trip below (#1581).
         if any(HOST_KEY_FIELD in r.config for r in resources):
             manifest.variables[KNOWN_HOSTS_VARIABLE] = known_hosts_value(resources)
+        # ``format: dropbear`` VMs get their key from a console bootstrap, so it travels as a
+        # scalar package variable of this package only (ADR-0032, #1650).
+        if any(wants_dropbear_key(r) for r in resources):
+            manifest.variables[DROPBEAR_KEYS_VARIABLE] = dropbear_keys_value(resources)
 
         if manifest.firewall is not None or manifest.cluster is not None:
             stamp_selected(

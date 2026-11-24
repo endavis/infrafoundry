@@ -2,8 +2,10 @@
 # OpenWrt Bootstrap — Tasks
 #
 # Starts the VM with an expect script already listening on its serial
-# socket, so the script sees the first console prompt. There is no secret:
-# the SSH public key is public, and only its type and base64 fields are used.
+# socket, so the script sees the first console prompt. The SSH public key is
+# public, but the pinned dropbear host key (#1650) is a private key: it is
+# rendered into the expect script, which is removed in the always: section, and
+# the tasks that hold it use no_log.
 
 - name: Check the bootstrap inputs
   ansible.builtin.assert:
@@ -33,64 +35,80 @@
   changed_when: false
   failed_when: "vm_status.rc != 0 or 'status: stopped' not in vm_status.stdout"
 
-- name: Deploy expect script
-  ansible.builtin.template:
-    src: bootstrap.exp.j2
-    dest: "/tmp/openwrt-bootstrap-{{ openwrt_vmid }}.exp"
-    mode: "0700"
+# openwrt_host_key_hex and openwrt_host_key_public come from vars/main.yml.
+- name: Check the pinned host key inputs
+  ansible.builtin.assert:
+    that:
+      - openwrt_host_key_hex is match('^[0-9a-f]{166}$')
+      - openwrt_host_key_public is match('^ssh-ed25519 [A-Za-z0-9+/]+={0,3}$')
+    fail_msg: >-
+      No usable pinned SSH host key for {{ openwrt_hostname }}; run
+      'foundry secrets host-keys --env <env>' and apply again.
+    quiet: true
 
-- name: Deploy wrapper script that waits for the serial socket, then runs expect
-  ansible.builtin.copy:
-    dest: "/tmp/openwrt-bootstrap-{{ openwrt_vmid }}-wrapper.sh"
-    mode: "0700"
-    content: |
-      #!/bin/bash
-      SOCKET="/var/run/qemu-server/{{ openwrt_vmid }}.serial0"
-      for _ in $(seq 1 60); do
-        [ -S "$SOCKET" ] && exec /tmp/openwrt-bootstrap-{{ openwrt_vmid }}.exp
-        sleep 0.5
-      done
-      echo "ERROR: Serial socket not found after 30s"
-      exit 1
+- name: Bootstrap the VM, then remove the scripts that hold the host key
+  block:
+    - name: Deploy expect script
+      ansible.builtin.template:
+        src: bootstrap.exp.j2
+        dest: "/tmp/openwrt-bootstrap-{{ openwrt_vmid }}.exp"
+        mode: "0700"
+      no_log: true
+      diff: false
 
-- name: Launch wrapper in background (listens before the VM boots)
-  ansible.builtin.shell: |
-    nohup /tmp/openwrt-bootstrap-{{ openwrt_vmid }}-wrapper.sh \
-      > /tmp/openwrt-bootstrap-wrapper-{{ openwrt_vmid }}.out 2>&1 &
-    echo $!
-  register: wrapper_bg
-  changed_when: true
+    - name: Deploy wrapper script that waits for the serial socket, then runs expect
+      ansible.builtin.copy:
+        dest: "/tmp/openwrt-bootstrap-{{ openwrt_vmid }}-wrapper.sh"
+        mode: "0700"
+        content: |
+          #!/bin/bash
+          SOCKET="/var/run/qemu-server/{{ openwrt_vmid }}.serial0"
+          for _ in $(seq 1 60); do
+            [ -S "$SOCKET" ] && exec /tmp/openwrt-bootstrap-{{ openwrt_vmid }}.exp
+            sleep 0.5
+          done
+          echo "ERROR: Serial socket not found after 30s"
+          exit 1
 
-- name: Start VM
-  ansible.builtin.command:
-    cmd: "qm start {{ openwrt_vmid }}"
-  changed_when: true
+    - name: Launch wrapper in background (listens before the VM boots)
+      ansible.builtin.shell: |
+        nohup /tmp/openwrt-bootstrap-{{ openwrt_vmid }}-wrapper.sh \
+          > /tmp/openwrt-bootstrap-wrapper-{{ openwrt_vmid }}.out 2>&1 &
+        echo $!
+      register: wrapper_bg
+      changed_when: true
 
-- name: Wait for the expect script to finish
-  ansible.builtin.shell: |
-    TIMEOUT={{ openwrt_boot_timeout | int + 300 }}
-    ELAPSED=0
-    while kill -0 {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null; do
-      sleep 5
-      ELAPSED=$((ELAPSED + 5))
-      if [ $ELAPSED -ge $TIMEOUT ]; then
-        kill {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null || true
-        echo "ERROR: Expect script timed out after ${TIMEOUT}s"
-        break
-      fi
-    done
-    # Only the status lines of the expect script are shown; console output never
-    # reaches this file (the expect script runs with log_user 0).
-    grep -E "^(ERROR:|Bootstrap applied)" /tmp/openwrt-bootstrap-wrapper-{{ openwrt_vmid }}.out 2>/dev/null
-    ! grep -q "ERROR:" /tmp/openwrt-bootstrap-wrapper-{{ openwrt_vmid }}.out
-  register: bootstrap_run
-  changed_when: true
+    - name: Start VM
+      ansible.builtin.command:
+        cmd: "qm start {{ openwrt_vmid }}"
+      changed_when: true
 
-- name: Remove the bootstrap scripts
-  ansible.builtin.file:
-    path: "{{ item }}"
-    state: absent
-  loop:
-    - "/tmp/openwrt-bootstrap-{{ openwrt_vmid }}.exp"
-    - "/tmp/openwrt-bootstrap-{{ openwrt_vmid }}-wrapper.sh"
-    - "/tmp/openwrt-bootstrap-wrapper-{{ openwrt_vmid }}.out"
+    - name: Wait for the expect script to finish
+      ansible.builtin.shell: |
+        TIMEOUT={{ openwrt_boot_timeout | int + 300 }}
+        ELAPSED=0
+        while kill -0 {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null; do
+          sleep 5
+          ELAPSED=$((ELAPSED + 5))
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            kill {{ wrapper_bg.stdout_lines[0] }} 2>/dev/null || true
+            echo "ERROR: Expect script timed out after ${TIMEOUT}s"
+            break
+          fi
+        done
+        # Only the status lines of the expect script are shown; console output never
+        # reaches this file (the expect script runs with log_user 0).
+        grep -E "^(ERROR:|Bootstrap applied)" /tmp/openwrt-bootstrap-wrapper-{{ openwrt_vmid }}.out 2>/dev/null
+        ! grep -q "ERROR:" /tmp/openwrt-bootstrap-wrapper-{{ openwrt_vmid }}.out
+      register: bootstrap_run
+      changed_when: true
+
+  always:
+    - name: Remove the bootstrap scripts
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/openwrt-bootstrap-{{ openwrt_vmid }}.exp"
+        - "/tmp/openwrt-bootstrap-{{ openwrt_vmid }}-wrapper.sh"
+        - "/tmp/openwrt-bootstrap-wrapper-{{ openwrt_vmid }}.out"

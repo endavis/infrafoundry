@@ -26,6 +26,8 @@
         openwrt_vmid: "{{ lookup('env', 'INFRAFOUNDRY_VAR_vmid') }}"
         openwrt_hostname: "{{ lookup('env', 'INFRAFOUNDRY_VAR_vm_name') }}"
         openwrt_ssh_public_key: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ssh_public_key') }}"
+        openwrt_host_keys_dropbear: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ssh_host_keys_dropbear') }}"
+        openwrt_known_hosts: "{{ lookup('env', 'INFRAFOUNDRY_VAR_ssh_known_hosts') }}"
         openwrt_mgmt_ip: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_ip') }}"
         openwrt_mgmt_netmask: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_netmask') | default('255.255.255.0', true) }}"
         openwrt_mgmt_gateway: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_gateway') | default('', true) }}"

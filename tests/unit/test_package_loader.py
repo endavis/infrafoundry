@@ -1,5 +1,6 @@
 """Unit tests for PackageLoader."""
 
+import re
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -1595,6 +1596,69 @@ class TestSshHostKeys:
         manifest = {"name": "example-app", "resources": ["vm.yaml"]}
         _r, _e, variables = self._load(temp_dir, manifest, {"vm.yaml": "vm:\n  - name: node-1\n"})
         assert "ssh_known_hosts" not in variables
+
+    @staticmethod
+    def _dropbear_pair() -> tuple[str, str]:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        key = Ed25519PrivateKey.generate()
+        pem = key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.OpenSSH,
+            serialization.NoEncryption(),
+        ).decode()
+        public = (
+            key.public_key()
+            .public_bytes(serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH)
+            .decode()
+        )
+        return pem, public
+
+    _DROPBEAR_VM = (
+        "vm:\n  - name: node-1\n    ssh_host_key:\n      address: 192.0.2.10\n"
+        "      format: dropbear\n"
+    )
+
+    def test_dropbear_keys_variable_is_set_only_for_dropbear_resources(
+        self, temp_dir: Path
+    ) -> None:
+        pem, public = self._dropbear_pair()
+        secrets = yaml.dump(
+            {
+                "variables": {
+                    "ssh_host_keys": {"node-1": {"ed25519_private": pem, "ed25519_public": public}}
+                }
+            }
+        )
+        manifest = {"name": "example-app", "resources": ["vm.yaml"]}
+        _r, _e, variables = self._load(
+            temp_dir, manifest, {"vm.yaml": self._DROPBEAR_VM, "secrets.yaml": secrets}
+        )
+
+        name, _, value = variables["ssh_host_keys_dropbear"].partition("=")
+        assert name == "node-1"
+        assert re.fullmatch(r"[0-9a-f]{166}", value)
+        assert "ssh_host_keys" not in variables
+        assert pem.splitlines()[1] not in repr(variables)
+
+    def test_dropbear_keys_variable_is_empty_without_a_private_key(self, temp_dir: Path) -> None:
+        _pem, public = self._dropbear_pair()
+        secrets = yaml.dump(
+            {"variables": {"ssh_host_keys": {"node-1": {"ed25519_public": public}}}}
+        )
+        manifest = {"name": "example-app", "resources": ["vm.yaml"]}
+        _r, _e, variables = self._load(
+            temp_dir, manifest, {"vm.yaml": self._DROPBEAR_VM, "secrets.yaml": secrets}
+        )
+        assert variables["ssh_host_keys_dropbear"] == ""
+
+    def test_dropbear_keys_variable_is_absent_for_openssh_resources(self, temp_dir: Path) -> None:
+        manifest = {"name": "example-app", "resources": ["vm.yaml"]}
+        _r, _e, variables = self._load(
+            temp_dir, manifest, {"vm.yaml": self._VM, "secrets.yaml": self._secrets()}
+        )
+        assert "ssh_host_keys_dropbear" not in variables
 
     def test_event_env_renders_to_valid_json_events(self, temp_dir: Path) -> None:
         manifest = {

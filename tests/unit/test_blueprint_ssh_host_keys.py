@@ -26,6 +26,8 @@ AIQUM_SCRIPT = BLUEPRINTS / "aiqum" / "scripts" / "aiqum-post-terraform.sh"
 CC_SCRIPT = BLUEPRINTS / "console-connector" / "scripts" / "console-connector-post-terraform.sh"
 K3S_DIR = BLUEPRINTS / "k3s-cluster" / "scripts" / "proxmox"
 K3S_SCRIPT = K3S_DIR / "k3s-post-terraform.sh"
+OPENWRT_DIR = BLUEPRINTS / "openwrt-vm"
+OPENWRT_SCRIPT = OPENWRT_DIR / "scripts" / "openwrt-post-terraform.sh"
 
 PUBLIC_A = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleSentinelPublicKey0"
 PUBLIC_B = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleSentinelPublicKey1"
@@ -92,6 +94,7 @@ OCI_DIR = BLUEPRINTS / "k3s-cluster" / "scripts" / "oci"
 ALL_SCRIPTS = [
     AIQUM_SCRIPT,
     CC_SCRIPT,
+    OPENWRT_SCRIPT,
     *sorted(K3S_DIR.glob("*.sh")),
     *sorted(OCI_DIR.glob("*.sh")),
 ]
@@ -536,3 +539,147 @@ class TestOciK3sScripts:
         assert result.returncode == 0, result.stderr
         assert _calls(record) == []
         assert "no pinned SSH host keys" in (tmp_path / "w" / "warnings.jsonl").read_text()
+
+
+# --- openwrt-vm: dropbear key pinned by the serial-console bootstrap (#1650) ---------------
+
+_OPENWRT_STUBS = {
+    "ssh": """#!/bin/sh
+printf '%s\\n' "$*" >> "$RECORD/ssh_calls"
+for a in "$@"; do
+    case "$a" in
+    UserKnownHostsFile=*)
+        f="${a#UserKnownHostsFile=}"
+        printf '%s\\n' "$f" > "$RECORD/known_hosts_path"
+        cp "$f" "$RECORD/used_known_hosts" ;;
+    esac
+done
+[ -n "$FAKE_SSH_OUT" ] && echo "$FAKE_SSH_OUT" >&2
+exit "${FAKE_SSH_RC:-255}"
+""",
+    "ssh-keyscan": "#!/bin/sh\nprintf '%s' \"$FAKE_KEYSCAN\"\n",
+    "ansible-playbook": '#!/bin/sh\ntouch "$RECORD/ansible_ran"\n',
+    "timeout": "#!/bin/sh\nprintf 'SSH-'\n",
+    "sleep": "#!/bin/sh\nexit 0\n",
+}
+_OPENWRT_PUBLIC = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleSentinelPublicKey2"
+_OPENWRT_HEX = "ab" * 83
+
+
+def _run_openwrt(tmp_path: Path, **overrides: str) -> tuple[subprocess.CompletedProcess[str], Path]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    record = tmp_path / "record"
+    record.mkdir()
+    package_dir = tmp_path / "package"
+    package_dir.mkdir()
+    for name, body in _OPENWRT_STUBS.items():
+        stub = bin_dir / name
+        stub.write_text(body)
+        stub.chmod(0o755)
+    env = {
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "HOME": str(tmp_path),
+        "RECORD": str(record),
+        "TMPDIR": str(tmp_path),
+        "INFRAFOUNDRY_PACKAGE_DIR": str(package_dir),
+        "INFRAFOUNDRY_BLUEPRINT_DIR": str(OPENWRT_DIR),
+        "INFRAFOUNDRY_VAR_vmid": "952",
+        "INFRAFOUNDRY_VAR_vm_name": "openwrt-test",
+        "INFRAFOUNDRY_VAR_target_node": "pve-node1",
+        "INFRAFOUNDRY_VAR_pve_host": "192.0.2.13",
+        "INFRAFOUNDRY_VAR_ssh_public_key": "ssh-ed25519 AAAA key",
+        "INFRAFOUNDRY_VAR_mgmt_ip": "192.0.2.242",
+        "INFRAFOUNDRY_VAR_boot_timeout": "0",
+        "INFRAFOUNDRY_VAR_ssh_known_hosts": f"other,192.0.2.5 {PUBLIC_B};"
+        f"openwrt-test,192.0.2.242 {_OPENWRT_PUBLIC}",
+        "INFRAFOUNDRY_VAR_ssh_host_keys_dropbear": f"openwrt-test={_OPENWRT_HEX}",
+        "FAKE_SSH_RC": "255",
+        "FAKE_SSH_OUT": "",
+        "FAKE_KEYSCAN": "",
+        **overrides,
+    }
+    result = subprocess.run(
+        ["bash", str(OPENWRT_SCRIPT)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    return result, record
+
+
+class TestOpenwrtScript:
+    @pytest.mark.parametrize(
+        "overrides",
+        [
+            {"INFRAFOUNDRY_VAR_ssh_known_hosts": ""},
+            {"INFRAFOUNDRY_VAR_ssh_known_hosts": "openwrt-test not-a-key-line"},
+            {"INFRAFOUNDRY_VAR_ssh_known_hosts": f"other,192.0.2.5 {PUBLIC_B}"},
+            {"INFRAFOUNDRY_VAR_ssh_host_keys_dropbear": ""},
+            {"INFRAFOUNDRY_VAR_ssh_host_keys_dropbear": f"other={_OPENWRT_HEX}"},
+            {"INFRAFOUNDRY_VAR_ssh_host_keys_dropbear": "openwrt-test=abcd"},
+        ],
+    )
+    def test_missing_or_malformed_pin_fails_before_ansible_or_ssh(
+        self, tmp_path: Path, overrides: dict[str, str]
+    ) -> None:
+        result, record = _run_openwrt(tmp_path, **overrides)
+
+        assert result.returncode == 1
+        assert "secrets host-keys" in result.stderr
+        assert not (record / "ansible_ran").exists()
+        assert _calls(record) == []
+        assert _OPENWRT_HEX not in result.stdout + result.stderr
+        assert PUBLIC_B not in result.stdout + result.stderr
+
+    def test_strict_connection_uses_only_the_pinned_file(self, tmp_path: Path) -> None:
+        result, record = _run_openwrt(tmp_path, FAKE_SSH_RC="255", FAKE_SSH_OUT="Permission denied")
+
+        assert result.returncode == 0, result.stderr
+        (call,) = _calls(record)
+        assert "StrictHostKeyChecking=yes" in call
+        assert "GlobalKnownHostsFile=/dev/null" in call
+        assert "HostKeyAlgorithms=ssh-ed25519" in call
+        assert "PreferredAuthentications=none" in call
+        assert "root@192.0.2.242" in call
+        assert (record / "used_known_hosts").read_text().splitlines() == [
+            f"openwrt-test,192.0.2.242 {_OPENWRT_PUBLIC}"
+        ]
+        assert (record / "ansible_ran").exists()
+        assert not Path((record / "known_hosts_path").read_text().strip()).exists()
+
+    def test_a_mismatched_host_key_fails_at_once_naming_the_fix(self, tmp_path: Path) -> None:
+        result, record = _run_openwrt(
+            tmp_path,
+            INFRAFOUNDRY_VAR_boot_timeout="600",
+            FAKE_SSH_OUT="Host key verification failed.",
+        )
+
+        assert result.returncode == 1
+        assert len(_calls(record)) == 1
+        assert "openwrt-test" in result.stderr
+        assert "ssh_host_keys.openwrt-test" in result.stderr
+        assert "--regenerate openwrt-test" in result.stderr
+        assert not Path((record / "known_hosts_path").read_text().strip()).exists()
+
+    def test_success_exit_also_counts_as_verified(self, tmp_path: Path) -> None:
+        result, _record = _run_openwrt(tmp_path, FAKE_SSH_RC="0")
+        assert result.returncode == 0
+
+    def test_an_unreachable_host_times_out_without_a_key_error(self, tmp_path: Path) -> None:
+        result, _record = _run_openwrt(tmp_path, FAKE_SSH_OUT="Connection refused")
+
+        assert result.returncode == 1
+        assert "could not verify the host key" in result.stderr
+
+    def test_a_served_rsa_key_fails(self, tmp_path: Path) -> None:
+        result, _record = _run_openwrt(
+            tmp_path,
+            FAKE_SSH_OUT="Permission denied",
+            FAKE_KEYSCAN="192.0.2.242 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAA\n",
+        )
+
+        assert result.returncode == 1
+        assert "unpinned RSA or ECDSA" in result.stderr

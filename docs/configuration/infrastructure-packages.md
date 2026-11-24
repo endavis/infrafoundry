@@ -327,10 +327,14 @@ VM against the pinned public key (`StrictHostKeyChecking=yes`).
 
 - **Opt-in:** a Proxmox `vm` resource or an OCI `instance` resource with a `tailscale:` block
   sets `ssh_host_key: {address: "<address the scripts use>"}`. The `aiqum`,
-  `console-connector` and `k3s-cluster` (Proxmox and OCI) blueprints do. A Proxmox VM with a
+  `console-connector`, `openwrt-vm` and `k3s-cluster` (Proxmox and OCI) blueprints do. A Proxmox VM with a
   `tailscale:` block, an OCI instance without one, or cloud-init snippets or parts that
   already set `ssh_keys`, cannot use it. On OCI the address is `<node>.<tailnet>` and the key
   travels in an extra `text/cloud-config` part of the Tailscale module.
+- **Format:** `ssh_host_key.format` is `openssh` (default, installed by cloud-init) or `dropbear`
+  (#1650, for a guest without cloud-init such as `openwrt-vm`). A `dropbear` key is installed
+  by the blueprint's serial-console bootstrap and never reaches Terraform; the package gets the
+  derived variable `ssh_host_keys_dropbear`, a scalar of `;`-separated `<name>=<hex>` entries.
 - **Reserved secret:** `variables.ssh_host_keys.<resource-name>.{ed25519_private, ed25519_public}`
   in the package's `secrets.yaml`. The loader keeps `ssh_host_keys` out of the merged
   variables, so the private key never reaches script env, `INFRAFOUNDRY_PACKAGE_VARS` or
@@ -369,6 +373,7 @@ environment variables for the script to consume:
 |:---------|:-----------|
 | `INFRAFOUNDRY_VAR_<KEY>` | Individual package variable (key uppercased, e.g., `INFRAFOUNDRY_VAR_CLUSTER_NAME`) |
 | `INFRAFOUNDRY_PACKAGE_VARS` | JSON dict of all merged package variables (manifest + secrets.yaml) |
+| `INFRAFOUNDRY_VAR_ssh_host_keys_dropbear` | The pinned host key of each `format: dropbear` VM as `<name>=<hex>`, `;`-separated. A private key: set only for a package that opts in, never log it (see [Secrets Architecture: SSH host keys](../architecture/secrets-architecture.md#ssh-host-keys)) |
 | `INFRAFOUNDRY_VAR_ssh_known_hosts` | Pinned VM host keys, `;`-separated known_hosts lines, when a resource sets `ssh_host_key` (see [SSH Host Keys](#ssh-host-keys)) |
 | `INFRAFOUNDRY_ENV` | Environment name |
 | `INFRAFOUNDRY_PROVIDER` | Provider name |
