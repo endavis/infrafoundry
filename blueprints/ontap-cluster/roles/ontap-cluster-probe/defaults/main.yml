@@ -10,6 +10,8 @@ ontap_node02_mgmt_ip: "192.0.2.222"
 ontap_admin_user: "admin"
 ontap_admin_password: ""
 ontap_validate_certs: false
+# PEM that trusts the cluster certificate; group_vars/all.yml sets it (#1645).
+ontap_ca_cert: ""
 
 # Seconds to wait for the probe; a silent address counts as "no cluster".
 ontap_probe_timeout: 15

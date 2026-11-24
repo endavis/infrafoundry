@@ -217,6 +217,17 @@ inputs:
     description: "ONTAP user the agent logs in as; ontap_password is its password"
     default: admin
 
+  # --- ONTAP REST certificate verification (optional) ---
+  # The certificate must name cluster_mgmt_ip. The simulator's self-signed
+  # certificate is created at cluster create, so leave this empty for a fresh
+  # simulator build (#1645).
+  - name: ontap_ca_cert
+    description: >-
+      Absolute path (~ allowed) of the PEM that trusts the cluster management certificate; turns
+      on certificate verification for every ONTAP REST call. A missing file is an error. Empty:
+      no verification (lab only)
+    default: ""
+
   # --- AIQUM registration (optional) ---
   # Set aiqum_address and aiqum_admin_password to add the cluster to Active IQ
   # Unified Manager after setup and remove it on destroy (#1225). Leave both

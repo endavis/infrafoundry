@@ -11,6 +11,7 @@
     user: "{{ ontap_admin_user }}"
     password: "{{ ontap_admin_password }}"
     validate_certs: "{{ ontap_validate_certs }}"
+    ca_path: "{{ ontap_ca_cert | default(omit, true) }}"
     force_basic_auth: true
     timeout: "{{ ontap_probe_timeout }}"
     return_content: true
@@ -34,6 +35,7 @@
     user: "{{ ontap_admin_user }}"
     password: "{{ ontap_admin_password }}"
     validate_certs: "{{ ontap_validate_certs }}"
+    ca_path: "{{ ontap_ca_cert | default(omit, true) }}"
     force_basic_auth: true
     timeout: "{{ ontap_probe_timeout }}"
     return_content: true

@@ -84,6 +84,20 @@ class TestClusterState:
         """Anything unconfirmable stops the run."""
         assert plugin.ontap_cluster_state({"status": -1, "msg": msg}, "c")["state"] == "conflict"
 
+    @pytest.mark.parametrize(
+        "msg",
+        [
+            "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed>",
+            "Failed to validate the SSL certificate: certificate verify failed",
+        ],
+    )
+    def test_untrusted_certificate_names_the_ca_input(self, msg: str) -> None:
+        """A failed certificate check is its own conflict, naming ontap_ca_cert (#1645)."""
+        out = plugin.ontap_cluster_state({"status": -1, "msg": msg}, "c")
+        assert out["state"] == "conflict"
+        assert "ontap_ca_cert" in out["reason"]
+        assert "unexpectedly" not in out["reason"]
+
     def test_matching_name_is_present(self) -> None:
         """The configured cluster answering means it exists."""
         out = plugin.ontap_cluster_state({"status": 200, "json": {"name": "c"}}, "c")

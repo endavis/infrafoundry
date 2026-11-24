@@ -27,6 +27,7 @@
         user: "{{ ontap_admin_user }}"
         password: "{{ ontap_admin_password }}"
         validate_certs: "{{ ontap_validate_certs }}"
+        ca_path: "{{ ontap_ca_cert | default(omit, true) }}"
         force_basic_auth: true
         return_content: true
       register: ontap_cluster_nodes
@@ -99,6 +100,7 @@
       changed_when: true
 
     - name: Halt ONTAP node cleanly via cluster API (HA-aware)
+      environment: "{{ ontap_tls_environment }}"
       netapp.ontap.na_ontap_command:
         hostname: "{{ ontap_cluster_mgmt_ip }}"
         username: "{{ ontap_admin_user }}"
@@ -176,6 +178,7 @@
         user: "{{ ontap_admin_user }}"
         password: "{{ ontap_admin_password }}"
         validate_certs: "{{ ontap_validate_certs }}"
+        ca_path: "{{ ontap_ca_cert | default(omit, true) }}"
         force_basic_auth: true
         return_content: true
       register: node_health
