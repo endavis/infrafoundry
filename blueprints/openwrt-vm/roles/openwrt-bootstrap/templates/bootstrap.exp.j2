@@ -1,14 +1,17 @@
 #!/usr/bin/expect -f
 # OpenWrt Bootstrap — Expect Script
 #
-# Answers the "press Enter" console prompt, then installs the SSH key, turns
-# SSH password login off, sets the hostname and the static LAN address, and
-# optionally turns the LAN DHCP, router advertisement and DHCPv6 services off.
+# Answers the "press Enter" console prompt, then installs the SSH key and the
+# pinned dropbear host key (#1650), turns SSH password login off, sets the
+# hostname and the static LAN address, and optionally turns the LAN DHCP,
+# router advertisement and DHCPv6 services off.
 #
-# There is no secret here. Console output never reaches stdout (log_user 0),
-# so the Ansible task output carries only this script's own puts lines. The
-# key reaches the Tcl strings bare: the role asserts it matches
-# [A-Za-z0-9+/= -] only, which needs no quoting.
+# This file holds the dropbear host PRIVATE key (as octal escapes), so the role
+# removes it in an always: step. Console output never reaches stdout (log_user
+# 0), so the Ansible task output carries only this script's own puts lines. The
+# key lines go through run_secret, which closes the log file around them and
+# never prints the command. The SSH key reaches the Tcl strings bare: the role
+# asserts it matches [A-Za-z0-9+/= -] only, which needs no quoting.
 #
 # Every console command is sent as "<cmd>; echo @@RC=$?@@" and the script
 # waits for @@RC=<digits>@@. The echoed command line holds a literal $?, never
@@ -117,6 +120,31 @@ proc run {cmd} {
   expect -re $prompt
 }
 
+# Sends a line that carries key material: the log file is closed while it and its
+# echo go by, and no message names the command.
+proc run_secret {cmd} {
+  global prompt logpath
+  log_file
+  send "$cmd; echo \"@@RC=\$?@@\"\r"
+  set rc 1
+  expect {
+    -re {@@RC=([0-9]+)@@} { set rc $expect_out(1,string) }
+    eof {
+      log_file -a $logpath
+      fail "Serial console closed while writing the host key"
+    }
+    timeout {
+      log_file -a $logpath
+      fail "Timed out writing the host key"
+    }
+  }
+  expect -re $prompt
+  log_file -a $logpath
+  if {$rc != 0} {
+    fail "writing the host key failed"
+  }
+}
+
 run "n=0; until logread 2>/dev/null | grep -q 'procd: - init complete -'; do n=\$((n+1)); \[ \$n -ge 120 \] && break; sleep 1; done; logread | grep -q 'procd: - init complete -'"
 run "mkdir -p /etc/dropbear && chmod 700 /etc/dropbear"
 # The serial console has no flow control: a long line (an RSA key is over 700
@@ -129,6 +157,20 @@ run "printf '%s' '{{ openwrt_ssh_key[start:start + 64] }}' >> /etc/dropbear/auth
 {% endfor %}
 run "echo >> /etc/dropbear/authorized_keys.new && \[ \"\$(wc -c < /etc/dropbear/authorized_keys.new)\" -eq {{ (openwrt_ssh_key | length) + 1 }} \]"
 run "mv /etc/dropbear/authorized_keys.new /etc/dropbear/authorized_keys && chmod 600 /etc/dropbear/authorized_keys"
+# The pinned ed25519 host key, in dropbear's private key format, 16 bytes per line
+# (the console drops characters from long lines). It is checked on the VM before
+# it replaces the generated key.
+run_secret ": > /etc/dropbear/dropbear_ed25519_host_key.new && chmod 600 /etc/dropbear/dropbear_ed25519_host_key.new"
+{% for start in range(0, openwrt_host_key_hex | length, 32) %}
+run_secret "printf '{% for i in range(start, [start + 32, openwrt_host_key_hex | length] | min, 2) %}\\{{ '%03o' | format(openwrt_host_key_hex[i:i + 2] | int(base=16)) }}{% endfor %}' >> /etc/dropbear/dropbear_ed25519_host_key.new"
+{% endfor %}
+run "\[ \"\$(wc -c < /etc/dropbear/dropbear_ed25519_host_key.new)\" -eq {{ (openwrt_host_key_hex | length) // 2 }} \]"
+run "dropbearkey -y -f /etc/dropbear/dropbear_ed25519_host_key.new | grep -qF '{{ openwrt_host_key_public }}'"
+run "mv /etc/dropbear/dropbear_ed25519_host_key.new /etc/dropbear/dropbear_ed25519_host_key"
+# Only the pinned ed25519 key may be served: a client that took another key on first use
+# would bypass the pin. The init script regenerates any missing RSA/ECDSA key on every
+# start, so the keys stay on disk and dropbear is told (-r via keyfile) to load only this one.
+run "uci -q delete dropbear.@dropbear\[0\].keyfile; uci add_list dropbear.@dropbear\[0\].keyfile=/etc/dropbear/dropbear_ed25519_host_key"
 run "uci set dropbear.@dropbear\[0\].PasswordAuth=off"
 run "uci set dropbear.@dropbear\[0\].RootPasswordAuth=off"
 run "uci set system.@system\[0\].hostname='{{ openwrt_hostname }}'"
@@ -147,6 +189,7 @@ run "uci set dhcp.lan.dhcpv6=disabled"
 run "uci set dhcp.lan.ndp=disabled"
 {% endif %}
 run "uci commit"
+run "\[ \"\$(uci get dropbear.@dropbear\[0\].keyfile)\" = /etc/dropbear/dropbear_ed25519_host_key \]"
 run "/etc/init.d/system reload; /etc/init.d/dropbear restart; /etc/init.d/dnsmasq restart; /etc/init.d/odhcpd restart"
 run "/etc/init.d/network reload"
 

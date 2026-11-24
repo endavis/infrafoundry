@@ -30,6 +30,13 @@ comes up with key-only root SSH at a static management address.
      `/etc/dropbear/authorized_keys`. The serial console has no flow control
      and drops characters from a long line, so the key is sent in 64-character
      chunks and installed only when the file has the expected length;
+   - installs the pinned ed25519 host key in dropbear's format (see
+     [SSH host keys](#ssh-host-keys)), 16 bytes per console line with the log
+     file closed, and checks it on the VM (`dropbearkey -y` must print the
+     pinned public key) before it replaces the generated key;
+   - sets dropbear's `keyfile` list to the pinned key only, so dropbear (`-r`)
+     serves it alone; the RSA and ECDSA keys stay on disk, because the init
+     script regenerates any missing key type on every start;
    - turns `PasswordAuth` and `RootPasswordAuth` off, so SSH is key-only (the
      root password stays unset);
    - sets the hostname to `vm_name` and the LAN address to
@@ -40,7 +47,9 @@ comes up with key-only root SSH at a static management address.
 
    Every console command is sent with an exit-code marker, and a non-zero code
    fails the run. The handler then waits until `mgmt_ip` port 22 sends an SSH
-   banner.
+   banner, and connects with strict host key checking against the pinned
+   public key only (no credential is used). A mismatch stops it at once and
+   names the VM; it also fails if the VM still serves an RSA or ECDSA key.
 3. **Manage it.** Point the OpenWrt provider at `mgmt_ip` with key-based root
    SSH. The provider needs `/usr/bin/ucode`, which stock 25.12 ships.
 4. **Destroy.** `infra destroy` stops and purges the VM through the Proxmox
@@ -60,8 +69,32 @@ on it.
 
 ## Secrets
 
-There is none. The SSH public key is a normal input, and the root password
-stays unset.
+The SSH public key is a normal input, and the root password stays unset. The
+pinned host key lives in the package's SOPS `secrets.yaml` under
+`variables.ssh_host_keys.<vm_name>`. Run `foundry secrets host-keys --env <env>`
+before the first apply: `infra plan` fails until it has run, like the other VM
+blueprints (a breaking change for existing `openwrt-vm` packages). A deployed VM
+is pinned: the key it presents is recorded and the VM is not changed. To rebuild
+it, destroy it, run `foundry secrets host-keys --env <env> --regenerate
+<vm_name>`, then apply.
+
+## SSH host keys
+
+The VM opts in with `ssh_host_key: {address: <mgmt_ip>, format: dropbear}`
+([ADR-0032](../../docs/decisions/0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md)).
+There is no cloud-init, so the bootstrap installs the key over the serial
+console. The framework converts it to dropbear's format and passes it to the
+bootstrap as the package variable `ssh_host_keys_dropbear`; the public key
+reaches the script as `ssh_known_hosts`.
+
+- The bootstrap limits dropbear to the pinned key through its `keyfile` list,
+  and the post-apply script fails if the VM still serves an RSA or ECDSA key.
+  The pin covers ed25519 only, so a client that took another key on first use
+  would bypass it. Deleting the other keys does not work: OpenWrt's dropbear
+  init script regenerates every missing key type when it starts.
+- Record the pinned key (`ssh_known_hosts`) in the `known_hosts` of the machine
+  that runs the OpenWrt provider, which checks host keys strictly (ADR-0033). A
+  rebuilt VM presents the same pinned key.
 
 ## Usage
 
@@ -107,6 +140,12 @@ Verified with OpenWrt 25.12.6 (x86-64 ext4 combined image) on Proxmox VE:
 - the LAN address is set, and the LAN DHCP server, RA, DHCPv6 and NDP proxy are
   off.
 
+Not live-verified yet: the full bootstrap with the host key install over the
+console. Checked by hand on a 25.12 VM: the 83-byte dropbear key built by the
+framework loads with `dropbearkey -y`, and a dropbear started with `-r` and only
+the ed25519 key serves no RSA or ECDSA key. The bootstrap and the post-apply
+script fail if either does not hold on a real run.
+
 Three faults surfaced on the way and are handled by the script:
 
 - the serial socket refused the first connection;
@@ -115,6 +154,12 @@ Three faults surfaced on the way and are handled by the script:
 
 ## Secrets in logs
 
-There is no secret. The expect script runs with `log_user 0`, so console output
-never reaches the Ansible output either; its log file is
-`/tmp/openwrt-bootstrap-<vmid>-<time>.log` on the Proxmox host.
+The expect script runs with `log_user 0`, so console output never reaches the
+Ansible output either; its log file is
+`/tmp/openwrt-bootstrap-<vmid>-<time>.log` on the Proxmox host. The host key
+lines are not logged: the log file is closed while they are sent, and no error
+message names them. The rendered expect script holds the key, so the role
+removes it, the wrapper and the output file in an `always:` step; the tasks that
+hold the key use `no_log`. The key is also in `INFRAFOUNDRY_VAR_ssh_host_keys_dropbear`
+of this package's script environment (and in the JSON on stdin to a jumphost),
+and never in Terraform state.

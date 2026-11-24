@@ -207,3 +207,70 @@ class TestValidateOffline:
 
     def test_resources_without_the_field_are_ignored(self) -> None:
         assert not self._run([_vm(host_key=False)]).has_errors()
+
+
+def _generated_pair() -> tuple[str, str]:
+    """An ed25519 OpenSSH private key and its public line, generated at test time."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    key = Ed25519PrivateKey.generate()
+    pem = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.OpenSSH,
+        serialization.NoEncryption(),
+    ).decode()
+    public = (
+        key.public_key()
+        .public_bytes(serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH)
+        .decode()
+    )
+    return pem, public
+
+
+def _dropbear_vm(pem: str, public: str) -> ResourceConfig:
+    vm = _vm(
+        entry={"ed25519_private": pem, "ed25519_public": public},
+        disk_image_source="https://example.com/openwrt.img.gz",
+    )
+    vm.config["ssh_host_key"]["format"] = "dropbear"
+    return vm
+
+
+class TestDropbearFormat:
+    """``format: dropbear`` keys never reach Terraform (#1650)."""
+
+    def test_no_secret_ref_cloud_init_or_variable(
+        self, provider: ProxmoxProvider, dirs: tuple[Path, Path]
+    ) -> None:
+        _, output_dir = dirs
+        pem, public = _generated_pair()
+        vm = _dropbear_vm(pem, public)
+
+        provider.generate_terraform([vm])
+
+        assert "terraform_secrets" not in vm.config
+        body = pem.splitlines()[1]
+        for path in (output_dir / "test").rglob("*"):
+            if path.is_file():
+                text = path.read_text(errors="ignore")
+                assert body not in text, path
+                assert "ssh_keys:" not in text, path
+                assert "ed25519_private" not in text, path
+
+    def test_a_mismatched_pair_is_a_validation_error(self) -> None:
+        pem, _ = _generated_pair()
+        _, other_public = _generated_pair()
+        report = TestValidateOffline._run([_dropbear_vm(pem, other_public)])
+        failed = [r for r in report.results if not r.passed]
+        assert [r.check_name for r in failed] == ["proxmox_ssh_host_key_vm-01"]
+        assert pem.splitlines()[1] not in failed[0].message
+
+    def test_a_matching_pair_passes_and_a_missing_entry_names_the_fix(self) -> None:
+        pem, public = _generated_pair()
+        assert not TestValidateOffline._run([_dropbear_vm(pem, public)]).has_errors()
+        vm = _dropbear_vm(pem, public)
+        vm.package_secrets = {}
+        report = TestValidateOffline._run([vm])
+        failed = [r for r in report.results if not r.passed]
+        assert "foundry secrets host-keys" in failed[0].message

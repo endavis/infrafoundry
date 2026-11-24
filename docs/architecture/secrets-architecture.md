@@ -179,7 +179,14 @@ travels through these places:
 | OCI instance metadata | `user_data` is readable by anyone with instance read rights on the OCI API, and from the node by any process that can reach the metadata service (including k3s pods). The Tailscale OAuth secret travels the same way. |
 | The VM | `/etc/ssh` (mode 0600) and cloud-init's root-only copy of the user data. |
 
-It never reaches generated `.tf` files (they hold only a variable reference), tfvars, script
+A VM with `ssh_host_key.format: dropbear` (the `openwrt-vm` blueprint, #1650) is the one exception to
+"never script environment". Its key is converted to dropbear's format and installed over the serial
+console, so it travels as the package variable `ssh_host_keys_dropbear` of that package only: in the
+script environment, in the JSON on stdin to a jumphost, and in the expect script rendered on the
+Proxmox host until an `always:` step removes it. It is never in Terraform state, generated files or
+logs (the key lines are sent with the log file closed, and the Ansible tasks use `no_log`).
+
+Otherwise it never reaches generated `.tf` files (they hold only a variable reference), tfvars, script
 environment, inventories, logs or outputs, and the plan shows `(sensitive value)`. The public
 keys are not secret and are passed to scripts as `ssh_known_hosts`.
 

@@ -31,6 +31,12 @@ ROLE_DIR = BLUEPRINT_DIR / "roles" / "openwrt-bootstrap"
 EXAMPLE_ENVS = REPO_ROOT / "example-config" / "envs"
 PACKAGE_DIR = EXAMPLE_ENVS / "dev" / "proxmox" / "openwrt-test"
 KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyNotARealKeyDoNotUse0000000"
+# A fake 83-byte dropbear blob with the bytes that need escaping (NUL, '%', backslash, quote).
+HOST_KEY_BLOB = (
+    b"\x00\x00\x00\x0bssh-ed25519\x00\x00\x00\x40" + b"%\\'\x00" * 4 + bytes(range(1, 49))
+)
+HOST_KEY_HEX = HOST_KEY_BLOB.hex()
+HOST_KEY_PUBLIC = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleHostKeyNotReal0000000"
 
 
 def _load(package: Path) -> tuple[list[Any], dict[str, Any], dict[str, Any]]:
@@ -114,6 +120,8 @@ def _expect_script(**overrides: Any) -> str:
         "openwrt_hostname": "openwrt-test",
         "openwrt_ssh_key": KEY,
         "openwrt_mgmt_ip": "192.0.2.242",
+        "openwrt_host_key_hex": HOST_KEY_HEX,
+        "openwrt_host_key_public": HOST_KEY_PUBLIC,
         **defaults,
         **overrides,
     }
@@ -392,3 +400,157 @@ def test_bootstrap_presses_enter_again_when_the_first_one_is_dropped(tmp_path: P
     assert sent[:3] == ["", "", ""]
     assert "init complete" in sent[3]
     assert "Bootstrap applied" in result.stdout
+
+
+# --- pinned dropbear host key (#1650) ----------------------------------------------------
+
+SECRET_LINE = re.compile(
+    r"(?m)^run_secret \"printf '([^']*)' >> /etc/dropbear/dropbear_ed25519_host_key\.new\"$"
+)
+
+
+def _secret_chunks(script: str) -> list[str]:
+    return SECRET_LINE.findall(script)
+
+
+def _shell_bytes(chunks: list[str]) -> bytes:
+    # Tcl turns a double backslash inside "..." into one; the shell's printf then decodes it.
+    out = b""
+    for chunk in chunks:
+        shell = chunk.replace("\\\\", "\\")
+        out += subprocess.run(
+            ["sh", "-c", f"printf '{shell}'"], capture_output=True, check=True
+        ).stdout
+    return out
+
+
+def test_example_vm_opts_in_to_a_dropbear_pinned_host_key(loaded: Any) -> None:
+    resources, _events, variables = loaded
+
+    [vm] = resources
+    assert vm.config["ssh_host_key"] == {"address": variables["mgmt_ip"], "format": "dropbear"}
+    assert variables["ssh_known_hosts"] == ""
+    assert variables["ssh_host_keys_dropbear"] == ""
+
+
+def test_host_key_lines_are_short_and_rebuild_the_exact_blob() -> None:
+    script = _expect_script()
+
+    chunks = _secret_chunks(script)
+    assert len(chunks) == 6  # 83 bytes, 16 per line
+    lines = re.findall(r'(?m)^(?:run|run_secret) "(.*)"$', script)
+    assert max(len(line) for line in lines) < 200
+    assert _shell_bytes(chunks) == HOST_KEY_BLOB
+    assert b"\x00" in HOST_KEY_BLOB and b"%" in HOST_KEY_BLOB and b"\\" in HOST_KEY_BLOB
+
+
+def test_host_key_is_checked_on_the_vm_before_it_replaces_the_generated_key() -> None:
+    script = _expect_script()
+
+    new = "/etc/dropbear/dropbear_ed25519_host_key.new"
+    length = script.index(f'-eq {len(HOST_KEY_BLOB)} \\]"')
+    pubcheck = script.index(f"dropbearkey -y -f {new} | grep -qF '{HOST_KEY_PUBLIC}'")
+    move = script.index(f'run "mv {new} /etc/dropbear/dropbear_ed25519_host_key"')
+    keyfile = script.index(
+        "uci add_list dropbear.@dropbear\\[0\\].keyfile=/etc/dropbear/dropbear_ed25519_host_key"
+    )
+    commit = script.index('run "uci commit"')
+    check = script.index('\\"\\$(uci get dropbear.@dropbear\\[0\\].keyfile)\\" = ')
+    restart = script.index("/etc/init.d/dropbear restart")
+    reload_ = script.index('run "/etc/init.d/network reload"')
+    last_chunk = script.rindex("run_secret ")
+    assert last_chunk < length < pubcheck < move < keyfile < commit < check < restart < reload_
+    assert script.rindex("run ") == reload_
+
+
+def test_dropbear_is_limited_to_the_pinned_key_not_by_deleting_the_others() -> None:
+    """The init script regenerates missing RSA/ECDSA keys on start, so they are not deleted."""
+    script = _expect_script()
+
+    assert "rm -f /etc/dropbear/dropbear_rsa_host_key" not in script
+    assert "uci -q delete dropbear.@dropbear\\[0\\].keyfile;" in script
+
+
+def test_run_secret_never_names_the_command_and_closes_the_log() -> None:
+    script = _expect_script()
+
+    proc = script[script.index("proc run_secret") : script.index('run "n=0;')]
+    assert proc.count("$cmd") == 1  # only the send line
+    assert proc.index("$cmd") > proc.index("log_file\n")
+    assert 'fail "' in proc
+    assert "log_file\n" in proc
+    assert proc.count("log_file -a $logpath") == 3
+    assert proc.index("log_file\n") < proc.index("send ")
+
+
+def test_host_key_never_reaches_the_task_output() -> None:
+    tasks = yaml.safe_load((ROLE_DIR / "tasks" / "main.yml").read_text())
+
+    [block] = [t for t in tasks if "block" in t]
+    [deploy] = [t for t in block["block"] if "ansible.builtin.template" in t]
+    assert deploy["no_log"] is True
+    assert deploy["diff"] is False
+    removed = [t for t in block["always"] if "ansible.builtin.file" in t]
+    assert [t["ansible.builtin.file"]["state"] for t in removed] == ["absent"]
+    assert set(removed[0]["loop"]) == {
+        "/tmp/openwrt-bootstrap-{{ openwrt_vmid }}.exp",
+        "/tmp/openwrt-bootstrap-{{ openwrt_vmid }}-wrapper.sh",
+        "/tmp/openwrt-bootstrap-wrapper-{{ openwrt_vmid }}.out",
+    }
+    [check] = [t for t in tasks if t.get("name") == "Check the pinned host key inputs"]
+    that = " ".join(check["ansible.builtin.assert"]["that"])
+    assert "[0-9a-f]{166}" in that
+    assert "ssh-ed25519 [A-Za-z0-9+/]+" in that
+    assert "foundry secrets host-keys" in check["ansible.builtin.assert"]["fail_msg"]
+
+
+def test_role_derives_this_vms_key_from_the_package_variables() -> None:
+    derived = yaml.safe_load((ROLE_DIR / "vars" / "main.yml").read_text())
+    play = yaml.safe_load((BLUEPRINT_DIR / "openwrt-bootstrap.yml").read_text())
+    role_vars = play[0]["roles"][0]["vars"]
+
+    env = Environment(undefined=StrictUndefined)
+    env.tests["match"] = lambda value, pattern: re.match(pattern, value) is not None
+    context = {
+        "openwrt_hostname": "openwrt-test",
+        "openwrt_host_keys_dropbear": "other=aa;openwrt-test=ab12",
+        "openwrt_known_hosts": "other,192.0.2.5 ssh-ed25519 AAAA1;"
+        "openwrt-test,192.0.2.242 ssh-ed25519 BBBB2",
+    }
+    assert env.from_string(derived["openwrt_host_key_hex"]).render(**context) == "ab12"
+    assert (
+        env.from_string(derived["openwrt_host_key_public"]).render(**context) == "ssh-ed25519 BBBB2"
+    )
+    assert "INFRAFOUNDRY_VAR_ssh_host_keys_dropbear" in role_vars["openwrt_host_keys_dropbear"]
+    assert "INFRAFOUNDRY_VAR_ssh_known_hosts" in role_vars["openwrt_known_hosts"]
+
+
+@pytest.mark.skipif(not shutil.which("expect"), reason="expect is not installed")
+def test_bootstrap_installs_the_key_without_logging_it(tmp_path: Path) -> None:
+    result, inputs = _run_bootstrap(tmp_path, "")
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    sent = inputs.read_text().splitlines()
+    # the fake console recorded the key lines it received, so they were sent
+    chunks = [line for line in sent if line.startswith("printf '\\")]
+    assert len(chunks) == 6
+    log = (tmp_path / "bootstrap.log").read_text()
+    assert "uci commit" in log
+    assert "dropbear_ed25519_host_key.new" in log  # the non-secret steps are logged
+    assert "printf '\\" not in log
+    assert "\\000" not in log
+    assert HOST_KEY_HEX not in log
+    assert "\\045" not in log
+    assert "Bootstrap applied" in result.stdout
+
+
+@pytest.mark.skipif(not shutil.which("expect"), reason="expect is not installed")
+def test_a_failing_key_line_reports_no_key_text(tmp_path: Path) -> None:
+    first = _secret_chunks(_expect_script())[0].replace("\\\\", "\\")
+
+    result, _inputs = _run_bootstrap(tmp_path, first)
+
+    assert result.returncode != 0
+    assert "ERROR: writing the host key failed" in result.stdout
+    assert first not in result.stdout + result.stderr
+    assert "\\000" not in result.stdout + result.stderr

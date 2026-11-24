@@ -1,0 +1,19 @@
+---
+# OpenWrt Bootstrap — derived variables
+#
+# Lazy expressions rather than a set_fact task, so the key is never a task result.
+# openwrt_host_keys_dropbear is ";"-separated "<name>=<hex>" entries and
+# openwrt_known_hosts ";"-separated "<name>,<address> ssh-ed25519 <key>" lines
+# (both from the package variables). Empty when this VM has no entry.
+
+# The hex of this VM's dropbear key.
+openwrt_host_key_hex: >-
+  {{ (openwrt_host_keys_dropbear.split(';')
+      | select('match', '^' ~ openwrt_hostname ~ '=')
+      | list | first | default('')).split('=', 1)[-1] }}
+
+# "ssh-ed25519 <base64>" of this VM's pinned public key.
+openwrt_host_key_public: >-
+  {{ (openwrt_known_hosts.split(';')
+      | select('match', '^([^ ,]*,)*' ~ openwrt_hostname ~ '(,[^ ,]*)* ssh-ed25519 ')
+      | list | first | default('')).split()[1:3] | join(' ') }}

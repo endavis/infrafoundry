@@ -26,7 +26,10 @@ never a key.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import re
+import struct
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
@@ -41,6 +44,12 @@ HOST_KEYS_VARIABLE = "ssh_host_keys"
 
 #: Derived package variable holding the ``;``-separated known_hosts lines.
 KNOWN_HOSTS_VARIABLE = "ssh_known_hosts"
+
+#: Derived package variable holding ``;``-separated ``<name>=<hex>`` dropbear key blobs (#1650).
+DROPBEAR_KEYS_VARIABLE = "ssh_host_keys_dropbear"
+
+#: Host key formats a VM can ask for. ``dropbear`` is installed by a console bootstrap.
+HOST_KEY_FORMATS = ("openssh", "dropbear")
 
 #: Resource config field that opts a VM in.
 HOST_KEY_FIELD = "ssh_host_key"
@@ -61,9 +70,12 @@ class HostKeySpec:
 
     Attributes:
         address: The address the blueprint scripts connect to.
+        format: ``openssh`` (cloud-init installs the key) or ``dropbear`` (a console bootstrap
+            installs it in dropbear format, #1650).
     """
 
     address: str
+    format: str = "openssh"
 
 
 def host_key_config(resource: ResourceConfig) -> HostKeySpec | None:
@@ -94,7 +106,13 @@ def host_key_config(resource: ResourceConfig) -> HostKeySpec | None:
             f"'{HOST_KEY_FIELD}.address' on resource '{resource.name}' may only hold letters, "
             f"digits and . : _ -"
         )
-    return HostKeySpec(address=address)
+    key_format = raw.get("format", "openssh")
+    if key_format not in HOST_KEY_FORMATS:
+        raise ValueError(
+            f"'{HOST_KEY_FIELD}.format' on resource '{resource.name}' must be one of "
+            f"{', '.join(HOST_KEY_FORMATS)}"
+        )
+    return HostKeySpec(address=address, format=key_format)
 
 
 def _entry(resource: ResourceConfig) -> dict[str, Any] | None:
@@ -141,7 +159,9 @@ def apply_host_key(resource: ResourceConfig) -> tuple[str, str] | None:
 
     Returns:
         ``(terraform variable name, public key)`` when cloud-init has to install a key, or
-        None when the resource has no ``ssh_host_key``, is only pinned (no private key), or
+        None when the resource has no ``ssh_host_key``, uses ``format: dropbear`` (a console
+        bootstrap installs that key, so nothing reaches Terraform), is only pinned (no
+        private key), or
         is not from a package.
     """
     # Imported here: provider_mixins imports the config package, which imports this module.
@@ -153,7 +173,7 @@ def apply_host_key(resource: ResourceConfig) -> tuple[str, str] | None:
         spec = host_key_config(resource)
     except ValueError:
         return None
-    if spec is None:
+    if spec is None or spec.format == "dropbear":
         return None
     public, has_private = host_key_entry(resource)
     if not has_private or public is None:
@@ -234,6 +254,123 @@ def known_hosts_value(resources: Iterable[ResourceConfig]) -> str:
     return ";".join(lines)
 
 
+def _read_ssh_string(data: bytes, offset: int) -> tuple[bytes, int]:
+    if offset + 4 > len(data):
+        raise ValueError("truncated OpenSSH private key")
+    (length,) = struct.unpack(">I", data[offset : offset + 4])
+    end = offset + 4 + length
+    if end > len(data):
+        raise ValueError("truncated OpenSSH private key")
+    return data[offset + 4 : end], end
+
+
+def dropbear_ed25519_key(private: str, public: str) -> bytes:
+    """Convert an unencrypted OpenSSH ed25519 private key to dropbear's key format.
+
+    Dropbear reads ``string("ssh-ed25519") || string(seed || public)``, 83 bytes (#1650).
+
+    Args:
+        private: The OpenSSH private key PEM.
+        public: The ``ssh-ed25519 <base64>`` line the key must match.
+
+    Returns:
+        The 83-byte dropbear private key.
+
+    Raises:
+        ValueError: If the key is not an unencrypted single ed25519 key that matches
+            *public*. The message never holds key material.
+    """
+    lines = [line.strip() for line in private.strip().splitlines()]
+    footer = _PRIVATE_KEY_ARMOUR.replace("BEGIN", "END")
+    if len(lines) < 3 or lines[0] != _PRIVATE_KEY_ARMOUR or lines[-1] != footer:
+        raise ValueError("not an OpenSSH private key")
+    try:
+        data = base64.b64decode("".join(lines[1:-1]), validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("the OpenSSH private key is not valid base64") from exc
+    magic = b"openssh-key-v1\x00"
+    if not data.startswith(magic):
+        raise ValueError("not an openssh-key-v1 private key")
+    offset = len(magic)
+    cipher, offset = _read_ssh_string(data, offset)
+    kdf, offset = _read_ssh_string(data, offset)
+    _, offset = _read_ssh_string(data, offset)
+    if cipher != b"none" or kdf != b"none":
+        raise ValueError("the OpenSSH private key is encrypted; a passphrase is not supported")
+    if offset + 4 > len(data) or struct.unpack(">I", data[offset : offset + 4])[0] != 1:
+        raise ValueError("the OpenSSH private key must hold exactly one key")
+    blob, offset = _read_ssh_string(data, offset + 4)
+    pub_type, pub_off = _read_ssh_string(blob, 0)
+    pub_raw, _ = _read_ssh_string(blob, pub_off)
+    if pub_type != b"ssh-ed25519" or len(pub_raw) != 32:
+        raise ValueError("the OpenSSH private key is not an ed25519 key")
+    section, _ = _read_ssh_string(data, offset)
+    if len(section) < 8 or section[:4] != section[4:8]:
+        raise ValueError("the OpenSSH private key could not be decoded")
+    key_type, pos = _read_ssh_string(section, 8)
+    inner_pub, pos = _read_ssh_string(section, pos)
+    pair, _ = _read_ssh_string(section, pos)
+    consistent = len(pair) == 64 and inner_pub == pub_raw and pair[32:] == pub_raw
+    if key_type != b"ssh-ed25519" or not consistent:
+        raise ValueError("the OpenSSH private key is not a consistent ed25519 key")
+    fields = public.split()
+    if len(fields) < 2 or fields[0] != "ssh-ed25519":
+        raise ValueError("the public key is not an ssh-ed25519 line")
+    try:
+        expected = base64.b64decode(fields[1], validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("the public key is not valid base64") from exc
+    if expected != blob:
+        raise ValueError("the private key does not match the pinned public key")
+
+    def pack(value: bytes) -> bytes:
+        return struct.pack(">I", len(value)) + value
+
+    return pack(b"ssh-ed25519") + pack(pair)
+
+
+def wants_dropbear_key(resource: ResourceConfig) -> bool:
+    """Return whether a resource sets ``ssh_host_key.format: dropbear``."""
+    try:
+        spec = host_key_config(resource)
+    except ValueError:
+        return False
+    return spec is not None and spec.format == "dropbear"
+
+
+def dropbear_keys_value(resources: Iterable[ResourceConfig]) -> str:
+    """Build the ``ssh_host_keys_dropbear`` package variable (#1650).
+
+    Args:
+        resources: The package's resources.
+
+    Returns:
+        ``;``-separated ``<name>=<lowercase hex of the dropbear key>`` entries for the
+        resources that set ``format: dropbear`` and hold a valid private key. Others are
+        skipped. Empty string when there are none.
+    """
+    entries: list[str] = []
+    for resource in resources:
+        try:
+            spec = host_key_config(resource)
+        except ValueError:
+            continue
+        if spec is None or spec.format != "dropbear":
+            continue
+        entry = _entry(resource)
+        public, has_private = host_key_entry(resource)
+        if entry is None or public is None or not has_private:
+            continue
+        try:
+            blob = dropbear_ed25519_key(str(entry.get("ed25519_private")), public)
+        except ValueError:
+            continue
+        item = f"{resource.name}={blob.hex()}"
+        if item not in entries:
+            entries.append(item)
+    return ";".join(entries)
+
+
 def known_hosts_for(value: str, name: str) -> tuple[str, ...]:
     """Pick the lines of an ``ssh_known_hosts`` value that name one VM.
 
@@ -296,7 +433,7 @@ def rebuild_problems(
         if deployed(resource) is False:
             problems.append(
                 f"{_describe(resource)} is not deployed and its host key was pinned without "
-                f"a private key (pinned while deployed), so cloud-init cannot install it on "
+                f"a private key (pinned while deployed), so it cannot be installed on "
                 f"the new VM; run 'foundry secrets host-keys --env {env} --regenerate "
                 f"{resource.name}' before applying"
             )
@@ -380,6 +517,14 @@ def host_key_problems(
             f"{_describe(resource)}: '{HOST_KEYS_VARIABLE}.{resource.name}.ed25519_private' "
             f"is not an OpenSSH private key"
         )
+    elif has_private and spec.format == "dropbear" and public is not None:
+        try:
+            dropbear_ed25519_key(str(private), public)
+        except ValueError as exc:
+            problems.append(
+                f"{_describe(resource)}: '{HOST_KEYS_VARIABLE}.{resource.name}' cannot be "
+                f"converted to a dropbear key ({exc}); {_FIX_HINT} --regenerate {resource.name}"
+            )
     return problems
 
 
