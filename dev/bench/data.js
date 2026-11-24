@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795539801504,
+  "lastUpdate": 1795556368256,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6806,6 +6806,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008633746958729582",
             "extra": "mean: 124.98213437064662 usec\nrounds: 8484"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a4adc00e20ee1320615046e027f110f41a48082d",
+          "message": "fix: retry the gl.inet post-reboot host-key probe until the deadline (merges PR #1664, addresses #1663)\n\nThe firmware upgrader checked the SSH host key once, as soon as the\nweb UI answered after the reboot. A router whose SSH on the managed\naddress is served by another daemon (Tailscale SSH) can briefly\nanswer with a different key while it boots, so a correct upgrade was\nreported as failed and the version check never ran.\n\nThe post-reboot probe now retries on any failure until the upgrade's\nexisting deadline and passes only when the pinned key is presented.\nAt the deadline the last failure is raised as before. The version\ncheck runs only after the probe passes.\n\nAddresses #1663\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-24T21:38:04Z",
+          "tree_id": "4dcc1979839048e3792ea2e41b4a848c58de00f1",
+          "url": "https://github.com/endavis/infrafoundry/commit/a4adc00e20ee1320615046e027f110f41a48082d"
+        },
+        "date": 1795556367807,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 46.79819648174188,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000211959377951539",
+            "extra": "mean: 21.368344833334458 msec\nrounds: 48"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7882.245647756101,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010793654994219063",
+            "extra": "mean: 126.86739854202308 usec\nrounds: 8368"
           }
         ]
       }
