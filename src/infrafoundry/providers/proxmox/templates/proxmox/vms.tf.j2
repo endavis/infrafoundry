@@ -127,6 +127,9 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   # Agent
   agent {
     enabled = {{ 'true' if vm.config.agent == 1 else 'false' }}
+    {% if vm.config.agent_timeout is defined and vm.config.agent == 1 %}
+    timeout = "{{ vm.config.agent_timeout }}"
+    {% endif %}
   }
   {% endif %}
 

@@ -292,6 +292,29 @@ vms:
     provider reboots the VM to apply it (`reboot_after_update`). Set
     `balloon: 0` on such a VM to keep the old behavior and avoid the reboot.
 
+### QEMU guest agent timeout
+
+A VM with `agent: 1` renders an `agent {}` block. The bpg provider then waits
+15 minutes by default for the guest agent to report IP addresses on every create
+and on refreshes that read network interfaces. When the agent never starts in
+the guest, each operation stalls for that long. The optional `agent_timeout`
+renders as the block's `timeout` attribute (a string, confirmed in the bpg
+0.118.0 schema).
+
+```yaml
+vms:
+  - name: app-01
+    target_node: node1
+    agent: 1
+    agent_timeout: 2m   # also 90s, 1h, 1m30s
+```
+
+- **Format**: a Terraform duration string, one or more `<number><s|m|h>` parts.
+  A malformed value fails validation.
+- **Requires `agent: 1`**: without it no `agent {}` block renders, so setting
+  `agent_timeout` is a validation error.
+- **Unset**: no `timeout` line is rendered and the provider default applies.
+
 ### SDN zones and vnets
 
 An SDN vnet is a network shared by every node in its zone, so VMs on different

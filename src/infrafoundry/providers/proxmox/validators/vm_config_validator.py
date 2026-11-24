@@ -36,6 +36,8 @@ ISO_PATH_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+:iso/.+\.iso$")
 
 # A disk image is imported from a path on the PVE host or downloaded from a URL (#1094).
 DISK_IMAGE_SOURCE_PATTERN = re.compile(r"^(/|https?://).+\.img(\.bz2|\.gz|\.zip)?$")
+# Terraform duration string: one or more <number><s|m|h> parts, e.g. "2m" or "1m30s".
+AGENT_TIMEOUT_PATTERN = re.compile(r"^(\d+(\.\d+)?[smh])+$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -81,6 +83,34 @@ class VMConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
             self._validate_disk_image(name, config)
             self._validate_disk_size(name, config)
             self._validate_import_id(name, resource.import_id, config)
+            self._validate_agent_timeout(name, config)
+
+    def _validate_agent_timeout(self, name: str, config: dict[str, Any]) -> None:
+        """Error if agent_timeout is not a duration string or the agent is not enabled."""
+        if "agent_timeout" not in config:
+            return
+        timeout = config["agent_timeout"]
+        if not isinstance(timeout, str) or not AGENT_TIMEOUT_PATTERN.match(timeout):
+            self.report.add_check(
+                check_name=f"proxmox_vm_{name}_agent_timeout",
+                passed=False,
+                message=(
+                    f"VM '{name}': agent_timeout '{timeout}' is invalid. Must be a duration "
+                    f"string such as '2m', '90s' or '1m30s' (<number><s|m|h>)."
+                ),
+                level=ValidationLevel.ERROR,
+            )
+            return
+        if config.get("agent") != 1:  # YAML true compares equal to 1
+            self.report.add_check(
+                check_name=f"proxmox_vm_{name}_agent_timeout",
+                passed=False,
+                message=(
+                    f"VM '{name}': agent_timeout requires the guest agent to be enabled "
+                    f"(agent: 1); without it no agent block is rendered."
+                ),
+                level=ValidationLevel.ERROR,
+            )
 
     def _validate_cpu_type(self, name: str, config: dict[str, Any]) -> None:
         """Warn if cpu_type is not in the known set."""
