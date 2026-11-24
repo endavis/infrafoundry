@@ -252,6 +252,55 @@ def test_other_probe_exceptions_are_wrapped() -> None:
         _upgrader(client, FakeClock(), ssh).upgrade("4.8.8", 1200)
 
 
+def _scripted_ssh(failures: list[Exception]) -> tuple[Any, list[int]]:
+    calls: list[int] = []
+
+    def ssh() -> None:
+        calls.append(1)
+        if len(calls) <= len(failures):
+            raise failures[len(calls) - 1]
+
+    return ssh, calls
+
+
+def test_host_key_probe_retries_mismatch_then_passes() -> None:
+    mismatch = FirmwareUpgradeError("host key mismatch")
+    ssh, calls = _scripted_ssh([mismatch, mismatch])
+    clock = FakeClock()
+    client = FakeClient([OFFER, NEW], statuses=[{"status": 6}], probes=[DOWN, None])
+    result = _upgrader(client, clock, ssh).upgrade("4.8.8", 1200)
+    assert result.current_version == "4.8.8"
+    assert len(calls) == 3
+    assert clock.now >= 4.0  # slept between the attempts
+
+
+def test_host_key_mismatch_until_the_deadline_fails_before_the_version_check() -> None:
+    def ssh() -> None:
+        raise FirmwareUpgradeError("host key mismatch")
+
+    client = FakeClient([OFFER, NEW], statuses=[{"status": 6}], probes=[DOWN, None])
+    with pytest.raises(FirmwareUpgradeError, match="host key mismatch"):
+        _upgrader(client, FakeClock(), ssh).upgrade("4.8.8", 300)
+    assert client.methods().count("check_firmware_online") == 1  # only the offer check
+
+
+def test_host_key_probe_other_exception_then_passes() -> None:
+    ssh, calls = _scripted_ssh([OSError("no ssh yet")])
+    client = FakeClient([OFFER, NEW], statuses=[{"status": 6}], probes=[DOWN, None])
+    assert _upgrader(client, FakeClock(), ssh).upgrade("4.8.8", 1200).current_version == "4.8.8"
+    assert len(calls) == 2
+
+
+def test_host_key_probe_other_exception_until_the_deadline_is_wrapped() -> None:
+    def ssh() -> None:
+        raise OSError("no ssh")
+
+    client = FakeClient([OFFER, NEW], statuses=[{"status": 6}], probes=[DOWN, None])
+    with pytest.raises(FirmwareUpgradeError, match="could not be verified after the upgrade"):
+        _upgrader(client, FakeClock(), ssh).upgrade("4.8.8", 300)
+    assert client.methods().count("check_firmware_online") == 1
+
+
 def test_coming_back_on_the_old_version_is_an_error() -> None:
     client = FakeClient([OFFER, OLD], statuses=[{"status": 6}], probes=[DOWN, None])
     with pytest.raises(FirmwareUpgradeError, match="did not install"):

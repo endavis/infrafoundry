@@ -196,28 +196,25 @@ class FirmwareUpgrader:
 
         Args:
             expected_new: The version the user confirmed.
-            timeout: Seconds from the upgrade request until the router answers again.
+            timeout: Seconds from the upgrade request until the router answers again and
+                its SSH host key checks out. The post-reboot host-key check retries until
+                this deadline, because a router's SSH may be served by another daemon until
+                boot finishes; it passes only once the pinned key is presented.
 
         Returns:
             The router's status after the upgrade.
 
         Raises:
             FirmwareUpgradeError: On any failure; a rejected offer, a failed status, a
-                timeout, a host-key mismatch or a version that did not change.
+                timeout, a host key still not matching at the deadline or a version that
+                did not change.
             GlinetRpcError: On a transport, pin, login or API-shape failure.
         """
         deadline = self._clock() + timeout
         already_down = self._start(expected_new, deadline)
         self._wait_for_down(deadline, already_down)
         self._wait_for_up(deadline)
-        try:
-            self._host_key_probe()
-        except FirmwareUpgradeError:
-            raise
-        except Exception as exc:
-            raise FirmwareUpgradeError(
-                f"the router's SSH host key could not be verified after the upgrade: {exc}"
-            ) from exc
+        self._verify_host_key(deadline)
         status = check_firmware(self._client)
         if status.current_version != expected_new:
             raise FirmwareUpgradeError(
@@ -283,6 +280,23 @@ class FirmwareUpgrader:
             if self._clock() >= deadline:
                 raise FirmwareUpgradeError("timed out waiting for the router to reboot")
             self._sleep(self._poll)
+
+    def _verify_host_key(self, deadline: float) -> None:
+        """Run the host-key probe, retrying until it passes or the deadline is reached."""
+        while True:
+            try:
+                self._host_key_probe()
+            except Exception as exc:
+                if self._clock() >= deadline:
+                    if isinstance(exc, FirmwareUpgradeError):
+                        raise
+                    raise FirmwareUpgradeError(
+                        f"the router's SSH host key could not be verified after the upgrade: {exc}"
+                    ) from exc
+                logger.debug("host-key check not yet passing (%s); retrying", exc)
+                self._sleep(self._poll)
+                continue
+            return
 
     def _wait_for_up(self, deadline: float) -> None:
         while True:
