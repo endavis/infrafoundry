@@ -60,6 +60,11 @@ inputs:
     default: ""
   - name: aiqum_admin_user
     default: umadmin
+  - name: aiqum_cert_export
+    description: >-
+      Absolute path (~ allowed) to write the PEM of the HTTPS certificate AIQUM serves,
+      for ontap-cluster's aiqum_ca_cert; empty: no export
+    default: ""
 
   # --- SMTP ---
   - name: smtp_port
@@ -108,5 +113,10 @@ events:
       description: "Install AIQUM, complete first-experience wizard, add ONTAP cluster"
       timeout: 5400
       continue_on_error: false
+      # #1648: with a jumphost the script runs there, so the exported certificate is pulled
+      # back (source == dest). Unset aiqum_cert_export renders empty and is skipped.
+      outputs:
+        - source: "{{ aiqum_cert_export }}"
+          dest: "{{ aiqum_cert_export }}"
       requires:
         - "{{ vm_name }}"

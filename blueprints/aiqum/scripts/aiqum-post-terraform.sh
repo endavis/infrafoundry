@@ -2,7 +2,8 @@
 # AIQUM Post-Terraform Setup
 #
 # Installs AIQUM RPM on the Rocky 9 VM, waits for the web UI,
-# then runs the initial setup wizard (FEW) via REST API.
+# then runs the initial setup wizard (FEW) via REST API. When aiqum_cert_export is set
+# it also writes the HTTPS certificate AIQUM serves to that path (Phase 4b, #1648).
 #
 # All remote commands run through the ansible jumphost since the SSH key
 # for the AIQUM VM only exists there.
@@ -49,10 +50,13 @@ JUMP_SSH="ssh -o StrictHostKeyChecking=yes -o ConnectTimeout=10"
 PREFLIGHT_ERR=""
 WAIT_ERR=""
 CURL_ERR=""
+CERT_PEM=""
+CERT_ERR=""
+CERT_EXPORT="${aiqum_cert_export:-}"
 KNOWN_HOSTS=$(mktemp)
 REMOTE_KNOWN_HOSTS=""
 cleanup() {
-    rm -f "$KNOWN_HOSTS" "$PREFLIGHT_ERR" "$WAIT_ERR" "$CURL_ERR"
+    rm -f "$KNOWN_HOSTS" "$PREFLIGHT_ERR" "$WAIT_ERR" "$CURL_ERR" "$CERT_PEM" "$CERT_ERR"
     if [ -n "${REMOTE_KNOWN_HOSTS}" ]; then
         ${JUMP_SSH} ${JUMPHOST} "rm -f '${REMOTE_KNOWN_HOSTS}'" >/dev/null 2>&1 || true
     fi
@@ -95,6 +99,15 @@ fi
 # no keys loaded or the first hop is fundamentally broken.
 echo ""
 log "--- Phase 0: Preflight checks ---"
+
+# A bad export path would only surface after the long install, so check it first.
+case "${CERT_EXPORT}" in
+    "" | /* | "~"*) ;;
+    *)
+        echo "ERROR: aiqum_cert_export must be an absolute path (got '${CERT_EXPORT}')" >&2
+        exit 1
+        ;;
+esac
 
 if ! ssh-add -l >/dev/null 2>&1; then
     rc=$?
@@ -240,6 +253,27 @@ while ! curl -skS -o /dev/null -w "%{http_code}" "https://${ip_address}/" 2>"$CU
     ELAPSED=$((ELAPSED + 10))
 done
 echo "  AIQUM web UI is back"
+
+# --- Phase 4b: Export the HTTPS certificate (#1648) ---
+# ontap-cluster needs a PEM that trusts AIQUM. The certificate is fetched on the VM through
+# the pinned SSH channel (the helper is piped over stdin: the jumphost remote_cmd wraps the
+# command in single quotes, so it must hold none), then compared with the one served over
+# the network and written atomically.
+if [ -n "${CERT_EXPORT}" ]; then
+    echo ""
+    log "--- Phase 4b: Exporting HTTPS certificate ---"
+    CERT_PEM=$(mktemp)
+    CERT_ERR=$(mktemp)
+    if ! remote_cmd "${ip_address}" "python3 - served-cert 127.0.0.1 443" \
+        <"${SCRIPT_DIR}/aiqum-cert-export.py" >"$CERT_PEM" 2>"$CERT_ERR"; then
+        if host_key_error "$CERT_ERR"; then fail_host_key "$CERT_ERR"; fi
+        echo "ERROR: cannot read the HTTPS certificate on ${vm_name} (${ip_address}):" >&2
+        sed 's/^/    /' "$CERT_ERR" >&2
+        exit 1
+    fi
+    python3 "${SCRIPT_DIR}/aiqum-cert-export.py" export \
+        --pem-file "$CERT_PEM" --host "${ip_address}" --out "${CERT_EXPORT}"
+fi
 
 # --- Phase 5: Run initial setup wizard (FEW) ---
 echo ""

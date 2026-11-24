@@ -314,6 +314,38 @@ def test_make_ssl_context_rejects_unreadable_ca_cert(tmp_path: Path) -> None:
         aq.make_ssl_context(cfg)
 
 
+def test_make_ssl_context_missing_ca_cert_points_at_aiqum_cert_export(tmp_path: Path) -> None:
+    missing = tmp_path / "aiqum-https.pem"
+    cfg = aq.load_config({**FULL_VARS, "aiqum_ca_cert": str(missing)})
+    with pytest.raises(aq.AIQUMError, match="aiqum_cert_export") as excinfo:
+        aq.make_ssl_context(cfg)
+    assert str(missing) in str(excinfo.value)
+    assert "does not exist" in str(excinfo.value)
+
+
+def test_make_ssl_context_expands_home_in_ca_cert(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    certifi = pytest.importorskip("certifi")
+    (tmp_path / "ca.pem").write_bytes(Path(certifi.where()).read_bytes())
+    monkeypatch.setenv("HOME", str(tmp_path))
+    cfg = aq.load_config({**FULL_VARS, "aiqum_ca_cert": "~/ca.pem"})
+    ctx = aq.make_ssl_context(cfg)
+    assert ctx.verify_mode == ssl.CERT_REQUIRED
+    assert ctx.cert_store_stats()["x509_ca"] > 0
+
+
+def test_make_ssl_context_insecure_ignores_missing_ca_cert(tmp_path: Path) -> None:
+    cfg = aq.load_config(
+        {
+            **FULL_VARS,
+            "aiqum_ca_cert": str(tmp_path / "missing.pem"),
+            "aiqum_tls_insecure": "true",
+        }
+    )
+    assert aq.make_ssl_context(cfg).verify_mode == ssl.CERT_NONE
+
+
 @pytest.mark.parametrize("value", ["true", "True", "1", "yes"])
 def test_make_ssl_context_insecure_only_on_opt_in(value: str) -> None:
     cfg = aq.load_config({**FULL_VARS, "aiqum_tls_insecure": value})

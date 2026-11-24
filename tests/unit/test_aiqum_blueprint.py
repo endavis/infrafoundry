@@ -423,3 +423,58 @@ def test_aiqum_dns_override_names_are_distinct_per_instance(tmp_path: Path) -> N
     name_a = next(r.name for r in a if r.type == "unbound.host_overrides")
     name_b = next(r.name for r in b if r.type == "unbound.host_overrides")
     assert {name_a, name_b} == {"aiqum-a-dns", "aiqum-b-dns"}
+
+
+def test_aiqum_cert_export_defaults_empty_and_declares_outputs(loader: PackageLoader) -> None:
+    """Unset ``aiqum_cert_export`` is empty and the setup handler declares an output (#1648)."""
+    _resources, events, variables = loader.load_package(
+        PACKAGE_DIR, provider="proxmox", env_name="dev"
+    )
+
+    assert variables["aiqum_cert_export"] == ""
+    handler = events["on_create"][0]
+    # The loader renders the entry; unset renders empty, which ScriptHandler skips silently.
+    assert handler["outputs"] == [{"source": "", "dest": ""}]
+
+
+def test_aiqum_cert_export_renders_into_outputs(tmp_path: Path) -> None:
+    """With ``aiqum_cert_export`` set, the handler's outputs render to that path (#1648)."""
+    envs = tmp_path / "envs"
+    pkg = envs / "test" / "proxmox" / "aiqum"
+    pkg.mkdir(parents=True)
+    (pkg / "infrafoundry.yml").write_text(
+        textwrap.dedent(
+            """\
+            name: aiqum
+            description: "AIQUM"
+            blueprint: aiqum
+            variables:
+              vm_name: aiqum
+              vmid: 230
+              target_node: node1
+              disk_storage: local-lvm
+              ip_address: "198.51.100.51"
+              dhcp_subnet: subnet-a
+              aiqum_admin_password: "pw"
+              aiqum_admin_email: "a@example.com"
+              aiqum_url_base: "http://web/aiqum"
+              jumphost: "ansible@host"
+              smtp_server: "smtp.example.com"
+              smtp_user: "aiqum"
+              smtp_password: "pw"
+              ontap_cluster_ip: "192.0.2.220"
+              ontap_admin_password: "pw"
+              aiqum_cert_export: "/srv/config/envs/test/aiqum/aiqum-https.pem"
+            """
+        )
+    )
+    loader = PackageLoader(envs, blueprint_resolver=BlueprintResolver(envs))
+
+    _resources, events, variables = loader.load_package(pkg, provider="proxmox", env_name="test")
+
+    assert variables["aiqum_cert_export"] == "/srv/config/envs/test/aiqum/aiqum-https.pem"
+    (entry,) = events["on_create"][0]["outputs"]
+    assert entry == {
+        "source": variables["aiqum_cert_export"],
+        "dest": variables["aiqum_cert_export"],
+    }

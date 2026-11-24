@@ -74,6 +74,7 @@ infra apply --env <env> --package aiqum
 | `vlan_tag` | `10` | VLAN tag for the VM NIC. Empty: untagged, e.g. on an SDN vnet |
 | `mac_address` | `""` | VM MAC (empty = Proxmox auto-assigns) |
 | `aiqum_admin_user` | `umadmin` | AIQUM admin username |
+| `aiqum_cert_export` | `""` | Absolute path (`~` allowed) to write the PEM of the HTTPS certificate AIQUM serves. Empty: no export (see [Keeping AIQUM in step with ontap-cluster](#keeping-aiqum-in-step-with-ontap-cluster)) |
 | `smtp_port` | `587` | SMTP port |
 | `ontap_admin_user` | `admin` | ONTAP admin username |
 | `ontap_cert_fingerprint` | `""` | SHA-256 fingerprint of the ONTAP management certificate. Enables the Step 5 DNS pre-check (see [ONTAP must resolve the AIQUM hostname](#ontap-must-resolve-the-aiqum-hostname)) |
@@ -192,6 +193,7 @@ infra apply --package aiqum
             |    +-- Install AIQUM RPM + 225 dependencies
             +-- Phase 3: Wait for AIQUM web UI
             +-- Phase 4: Regenerate certificates (FQDN-based)
+            +-- Phase 4b: Export the HTTPS certificate (only if aiqum_cert_export is set)
             +-- Phase 5: Run aiqum-initial-setup.py (FEW wizard)
                  +-- Step 1: Configure email + SMTP
                  +-- Step 2: Enable AutoSupport
@@ -221,9 +223,21 @@ even when the DELETE call returns an error. A data source of a destroyed cluster
 has not polled yet (status still ok) is not detected.
 
 The requests carry the AIQUM admin and ONTAP passwords, so AIQUM's certificate is verified.
-For AIQUM's self-signed certificate, set `aiqum_ca_cert` to a PEM file that trusts it, for
-example the certificate exported from the AIQUM web UI. `aiqum_tls_insecure: "true"` skips
-the check, which is not recommended.
+For AIQUM's self-signed certificate, set `aiqum_ca_cert` to a PEM file that trusts it.
+`aiqum_tls_insecure: "true"` skips the check, which is not recommended. A missing
+`aiqum_ca_cert` file is an error that names `aiqum_cert_export`.
+
+To have the `aiqum` package produce that PEM, set `aiqum_cert_export` on `aiqum` and
+`aiqum_ca_cert` on `ontap-cluster` to the same absolute path (`~` allowed), for example
+`/srv/config/envs/<env>/aiqum/aiqum-https.pem`. After Phase 4, once the web UI is back,
+Phase 4b reads the certificate AIQUM serves on the VM over the pinned SSH session and compares
+it with the one served at `<ip_address>:443` from the host running the script. Only when
+the two match does it write the PEM (atomically, mode 0644). A mismatch fails the setup and
+names both fingerprints. With `jumphost` set, the script runs on the jumphost, so the framework
+copies the file back to the same path after the run succeeds. That copy is not atomic and a
+failure is only a warning, so a stale file would then fail `ontap-cluster` with the missing or
+untrusted certificate error. Every AIQUM rebuild generates a new certificate and rewrites that
+file, so it changes in the config repo each time.
 
 Entries left behind by a destroy done before this existed must be removed once by hand:
 
