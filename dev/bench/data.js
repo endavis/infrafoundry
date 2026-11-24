@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795528518064,
+  "lastUpdate": 1795530271226,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6692,6 +6692,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008508538072039257",
             "extra": "mean: 126.37766726340362 usec\nrounds: 8379"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7fbdd4fb78d7f2c3ad9449bd53bbc71f58bb27c8",
+          "message": "feat: keep gl.inet firmware at the vendor's latest release (merges PR #1658, addresses #1655)\n\nGL.iNet routers managed through the OpenWrt provider had no way to take\nthe vendor's firmware updates; they were applied by hand in the web UI.\nAdd a glinet.firmware resource that tracks the vendor's latest release\n(no version pinning) through the router's own online upgrade.\n\n- infra plan logs in once per device over the router's JSON-RPC API and\n  reports \"up to date\" or \"current -> version_new\". A failed check is a\n  warning, never a plan failure, and drift runs skip it. infra apply\n  never upgrades; a firmware-only device skips the ansible pass.\n- foundry provider openwrt upgrade --env <env> [--device <name>] [--yes]\n  holds the environment lock, checks every selected device, asks once,\n  then upgrades one device at a time with settings kept: re-check the\n  offer, upgrade_online, poll the status codes, wait for the reboot,\n  verify the SSH host key and the new version. The first failure stops\n  the run before the next router is touched. It re-plans afterwards.\n- HTTPS to the router is pinned to a per-device SHA-256 certificate\n  fingerprint, checked before any request byte is sent; verify_ssl:\n  false is a per-device, documented-unsafe opt-out. The admin password\n  is a secret:// setting. Login is never retried (the router locks out).\n- crypt (MD5/SHA-256/SHA-512) is implemented in pure Python: Python 3.13\n  has no crypt module and no dependency is added.\n- ADR-0036 records the design; ADR-0028 and ADR-0005 link to it.\n\nAddresses #1655\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-24T14:23:33Z",
+          "tree_id": "28d503bf3679595383499a0d92232b89f3f4c5ee",
+          "url": "https://github.com/endavis/infrafoundry/commit/7fbdd4fb78d7f2c3ad9449bd53bbc71f58bb27c8"
+        },
+        "date": 1795530270457,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 74.26381100271873,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0007454805397155902",
+            "extra": "mean: 13.46550879220824 msec\nrounds: 77"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14140.8113192068,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005735601498053135",
+            "extra": "mean: 70.71730026138931 usec\nrounds: 16066"
           }
         ]
       }
