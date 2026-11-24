@@ -50,10 +50,7 @@ def fetch_der(host: str, port: int, timeout: float = 30) -> bytes:
     Raises:
         ExportError: If the handshake fails or no certificate is presented.
     """
-    # Unverified on purpose: the certificate is self-signed and is what we are learning.
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
+    ctx = client_context()
     try:
         with (
             socket.create_connection((host, port), timeout=timeout) as sock,
@@ -65,6 +62,20 @@ def fetch_der(host: str, port: int, timeout: float = 30) -> bytes:
     if not der:
         raise ExportError(f"{host}:{port} presented no certificate")
     return der
+
+
+def client_context() -> ssl.SSLContext:
+    """Return the TLS client context used to read the served certificate.
+
+    Certificate verification is off on purpose: the certificate is self-signed and is
+    what is being learned; it is trusted only after the two copies are compared.
+    Protocols older than TLS 1.2 are refused.
+    """
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
 
 
 def parse_pem(text: str) -> bytes:

@@ -107,6 +107,13 @@ def _der(cert: Path) -> bytes:
     return ssl.PEM_cert_to_DER_cert(cert.read_text(encoding="ascii"))
 
 
+def test_client_context_refuses_protocols_older_than_tls12() -> None:
+    ctx = ce.client_context()
+    assert ctx.minimum_version == ssl.TLSVersion.TLSv1_2
+    assert ctx.verify_mode == ssl.CERT_NONE
+    assert ctx.check_hostname is False
+
+
 def test_fetch_der_returns_the_served_certificate(
     certs: tuple[Path, Path, Path], tls_server: int
 ) -> None:
