@@ -1,6 +1,7 @@
 """Runner for OpenWrt devices through generated ``community.openwrt`` playbooks (ADR-0028).
 
-``OpenWrtAnsibleRunner`` acts only for ``provider.name == "openwrt"``. It is separate
+``OpenWrtAnsibleRunner`` acts only for the ``openwrt`` provider and its
+``openwrt@<device>`` instances (ADR-0035). It is separate
 from the generic ``AnsibleRunner`` on purpose: that runner is not an IaC runner, runs
 one ``playbook.yml`` per provider without ``--diff`` and returns no per-resource
 outcomes. This runner shells out to the same ``ansible-playbook`` and the same
@@ -29,6 +30,7 @@ from rich.markup import escape
 
 from infrafoundry.core.managed_set import ManagedResources, ReleasedResource
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.provider_instances import split_provider_id
 from infrafoundry.core.result_types import ApplyResult, DestroyResult, DriftInfo, PlanResult
 from infrafoundry.core.runners.base_runner import BaseRunner
 from infrafoundry.core.types import ResourceOutcome
@@ -174,10 +176,29 @@ class OpenWrtAnsibleRunner(BaseRunner):
 
     @staticmethod
     def _supports(provider: ProviderBase) -> bool:
-        """Return True for the openwrt provider only (every IaC runner sees every provider)."""
-        return getattr(provider, "name", None) == "openwrt" and callable(
-            getattr(provider, "generate_openwrt_ansible", None)
+        """Return True for the openwrt provider and its device instances only."""
+        name = getattr(provider, "name", None)
+        return (
+            isinstance(name, str)
+            and split_provider_id(name)[0] == "openwrt"
+            and callable(getattr(provider, "generate_openwrt_ansible", None))
         )
+
+    @staticmethod
+    def _label(provider: ProviderBase) -> str:
+        """Return the output label: ``openwrt_ansible`` or ``openwrt_ansible[<device>]``.
+
+        The bracket appears only when the provider reports a device label (``devices:``
+        declared); anything else, including a mock, gets the plain label.
+        """
+        getter = getattr(provider, "device_label", None)
+        env_name = getattr(provider, "_current_environment", None)
+        if callable(getter) and isinstance(env_name, str) and env_name:
+            device = getter(env_name)
+            if isinstance(device, str) and device:
+                # Escaped: Rich would read ``[office]`` as a style tag and drop it.
+                return escape(f"openwrt_ansible[{device}]")
+        return "openwrt_ansible"
 
     @staticmethod
     def _env_name(provider: ProviderBase, kwargs: dict[str, Any]) -> str:
@@ -217,6 +238,7 @@ class OpenWrtAnsibleRunner(BaseRunner):
         *,
         check: bool,
         reconnect_host: str | None = None,
+        label: str = "openwrt_ansible",
     ) -> tuple[str, str | None]:
         """Run the playbook once; return ``(stdout, error)``.
 
@@ -239,9 +261,7 @@ class OpenWrtAnsibleRunner(BaseRunner):
             "ANSIBLE_STDOUT_CALLBACK": JSON_CALLBACK,
             "ANSIBLE_HOST_KEY_CHECKING": "True",
         }
-        self.console.print(
-            f"  [dim]openwrt_ansible: {'check' if check else 'run'} {run.playbook}[/dim]"
-        )
+        self.console.print(f"  [dim]{label}: {'check' if check else 'run'} {run.playbook}[/dim]")
         try:
             result = _run(argv, run.ansible_dir, env)
         except OSError as exc:
@@ -260,7 +280,9 @@ class OpenWrtAnsibleRunner(BaseRunner):
         reconnect_host: str | None = None,
     ) -> tuple[_RunResult | None, str | None]:
         """Run and interpret one pass; return ``(result, error)``."""
-        stdout, error = self._playbook(run, check=check, reconnect_host=reconnect_host)
+        stdout, error = self._playbook(
+            run, check=check, reconnect_host=reconnect_host, label=self._label(provider)
+        )
         if error is not None:
             return None, error
         try:
@@ -317,7 +339,7 @@ class OpenWrtAnsibleRunner(BaseRunner):
             return PlanResult(success=False, error=self._refusal_text("plan", result))
         lines = result.summary_lines()
         for line in lines:
-            self.console.print(f"  [dim]openwrt_ansible: {escape(line)}[/dim]")
+            self.console.print(f"  [dim]{self._label(provider)}: {escape(line)}[/dim]")
         return PlanResult(
             success=True,
             has_changes=result.has_changes,

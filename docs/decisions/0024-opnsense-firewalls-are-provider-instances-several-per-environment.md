@@ -46,6 +46,7 @@ Alternatives rejected:
 - Issue #1442: trigger OPNsense HA config sync after destroy
 - Issue #1393: CARP health in infra doctor
 - Issue #1539: Kubernetes clusters reuse this model (see ADR-0030)
+- Issue #1656: OpenWrt devices reuse this model (see ADR-0035)
 
 ## Related Documentation
 

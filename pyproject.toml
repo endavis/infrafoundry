@@ -549,6 +549,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_sops.py",
     "tests/unit/test_cli_firewall_filter.py",
     "tests/unit/test_cluster_selection_loader.py",
+    "tests/unit/test_device_selection_loader.py",
     "tests/unit/test_execution_planner_instances.py",
     "tests/unit/test_firewall_selection_loader.py",
     "tests/unit/test_orchestrator_backend_keys.py",

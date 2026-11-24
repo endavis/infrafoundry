@@ -1,8 +1,9 @@
 """Provider instances: several targets of one provider in one environment (#1450).
 
 A provider that supports instances (see :data:`INSTANCE_SPECS`: ``opnsense`` and
-``kubernetes``) is configured with an instance map in ``provider_settings``
-(``firewalls:`` for OPNsense, ``clusters:`` for Kubernetes). Each extra entry is a
+``kubernetes`` and ``openwrt``) is configured with an instance map in ``provider_settings``
+(``firewalls:`` for OPNsense, ``clusters:`` for Kubernetes, ``devices:`` for
+OpenWrt). Each extra entry is a
 separate provider instance whose id is ``<provider>@<name>``. The primary entry keeps
 the plain provider id, so a flat configuration and state rows written before instances
 existed keep working unchanged.
@@ -43,16 +44,26 @@ class InstanceSpec:
     selector_key: str
     #: Singular word used in messages (``firewall``).
     noun: str
+    #: ``False`` when the selector key is also an ordinary field of other providers'
+    #: entries (OpenWrt's ``device``), so a foreign provider's entry carrying it is
+    #: not an error (#1656).
+    exclusive_selector: bool = True
 
 
 #: base provider id -> how it names its instances
 INSTANCE_SPECS: dict[str, InstanceSpec] = {
     "opnsense": InstanceSpec("firewalls", "primary", "firewall", "firewall"),
     "kubernetes": InstanceSpec("clusters", "primary", "cluster", "cluster"),
+    "openwrt": InstanceSpec("devices", "primary", "device", "device", exclusive_selector=False),
 }
 
 #: Every selector key (``firewall`` ...) some instance-capable provider honours.
 SELECTOR_KEYS: frozenset[str] = frozenset(spec.selector_key for spec in INSTANCE_SPECS.values())
+
+#: Selector keys that other providers also use as ordinary fields (``device``).
+_SHARED_SELECTOR_KEYS: frozenset[str] = frozenset(
+    spec.selector_key for spec in INSTANCE_SPECS.values() if not spec.exclusive_selector
+)
 
 #: Instance names stay short so ``<provider>@<name>`` fits the 50-character provider column.
 INSTANCE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
@@ -189,6 +200,9 @@ def entry_instance_provider(
     for key in sorted(SELECTOR_KEYS):
         value = item.get(key)
         if value is None:
+            continue
+        own_spec = INSTANCE_SPECS.get(base)
+        if key in _SHARED_SELECTOR_KEYS and (own_spec is None or own_spec.selector_key != key):
             continue
         validate_instance_name(
             base, value, f"{source}: entry '{item.get('name', '?')}' ({where})", key

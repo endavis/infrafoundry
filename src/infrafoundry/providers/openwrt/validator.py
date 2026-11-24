@@ -14,11 +14,13 @@ from infrafoundry.core.requirements.checker import check_collection, installed_c
 from infrafoundry.core.requirements.models import CollectionRequirement
 from infrafoundry.core.validation import ValidationReport
 
+from .devices import device_settings, validate_devices_settings
 from .schema import check_resources
 from .settings import (
     PROVIDER_NAME,
     OpenWrtSettings,
     OpenWrtSettingsError,
+    device_where,
     load_settings,
     settings_from_mapping,
 )
@@ -69,6 +71,7 @@ class OpenWrtValidator:
         run: Runner | None = None,
         which: Which | None = None,
         collections_lookup: CollectionsLookup = installed_collections,
+        provider_name: str = PROVIDER_NAME,
     ) -> None:
         """Initialize the validator.
 
@@ -79,7 +82,9 @@ class OpenWrtValidator:
             run: Runs the ssh probe; replaced in tests.
             which: Locates ``ansible-playbook``; replaced in tests.
             collections_lookup: Returns installed Ansible collections; replaced in tests.
+            provider_name: ``openwrt`` or ``openwrt@<device>``: the device this validates.
         """
+        self.provider_name = provider_name
         self.env_config = env_config
         self.report = report
         self.config_dir = config_dir
@@ -93,6 +98,13 @@ class OpenWrtValidator:
         Args:
             resources: Resources to validate; only OpenWrt types are checked.
         """
+        if self.provider_name == PROVIDER_NAME:
+            # The shape of the devices map is reported once, on the primary.
+            raw_all = self.env_config.provider_settings.get(PROVIDER_NAME)
+            for message in validate_devices_settings(
+                raw_all if isinstance(raw_all, dict) else None
+            ):
+                self.report.add_check("openwrt_devices_settings", False, message)
         settings = self._settings_from_env()
         for finding in check_resources(resources, settings):
             self.report.add_check(
@@ -104,8 +116,19 @@ class OpenWrtValidator:
 
     def _settings_from_env(self) -> OpenWrtSettings | None:
         raw = self.env_config.provider_settings.get(PROVIDER_NAME) or {}
+        if validate_devices_settings(raw if isinstance(raw, dict) else None):
+            return None  # reported as openwrt_devices_settings
+        merged = device_settings(raw, self.provider_name)
+        if merged is not None and not merged and raw:
+            self.report.add_check(
+                "openwrt_settings",
+                False,
+                f"device '{self.provider_name}' is not declared under "
+                "provider_settings.openwrt.devices",
+            )
+            return None
         try:
-            return settings_from_mapping(dict(raw))
+            return settings_from_mapping(dict(merged or {}), device_where(raw, self.provider_name))
         except OpenWrtSettingsError as exc:
             self.report.add_check("openwrt_settings", False, str(exc))
             return None
@@ -166,4 +189,4 @@ class OpenWrtValidator:
     def _load(self) -> OpenWrtSettings:
         if self.config_dir is None:
             raise InfraFoundryError("openwrt: no config directory to load settings from")
-        return load_settings(self.config_dir, self.env_config.name)
+        return load_settings(self.config_dir, self.env_config.name, self.provider_name)

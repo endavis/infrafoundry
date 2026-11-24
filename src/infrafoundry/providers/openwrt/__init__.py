@@ -1,24 +1,28 @@
-"""OpenWrt provider: manages one device through generated ``community.openwrt`` playbooks.
+"""OpenWrt provider: manages one or several devices through generated playbooks.
+
+The playbooks use the ``community.openwrt`` collection.
 
 The provider writes an inventory, an ``ansible.cfg`` and ``openwrt.yml``. The playbook
 stages UCI changes without committing; ``OpenWrtAnsibleRunner`` runs it in check mode
 for ``plan`` and for the pre-apply check, and for real on ``apply`` and ``destroy``.
 The real run commits through ``ubus call uci apply`` with rollback and confirms after
-reconnecting (ADR-0028). Terraform has nothing to do here.
+reconnecting (ADR-0028). Each device is a provider instance (ADR-0035).
+Terraform has nothing to do here.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, override
+from typing import Any, Literal, Self, override
 
 import yaml
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import SchemaValidationError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
+from infrafoundry.core.provider_instances import qualified_provider_id
 from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
     TemplateRendererMixin,
@@ -35,6 +39,7 @@ from .components.results import (
     interpret,
     parse_output,
 )
+from .devices import device_label
 from .schema import SPECS, Desired, check_resources, desired_from_resources
 from .settings import PROVIDER_NAME, OpenWrtSettings, load_settings
 from .validator import COLLECTION, OpenWrtValidator
@@ -74,14 +79,76 @@ class OpenWrtProvider(
     ResourceGrouperMixin,
     TerraformGeneratorMixin,
 ):
-    """Provider for one OpenWrt device, managed over SSH with Ansible."""
+    """Provider for one OpenWrt device, managed over SSH with Ansible.
+
+    With ``provider_settings.openwrt.devices`` declared, each extra device is another
+    instance named ``openwrt@<device>``.
+    """
 
     renders_terraform_backend = False
 
-    def __init__(self, config_dir: Path, output_dir: Path) -> None:
-        """Initialize the OpenWrt provider."""
-        super().__init__(PROVIDER_NAME, config_dir, output_dir)
+    def __init__(self, config_dir: Path, output_dir: Path, device: str | None = None) -> None:
+        """Initialize the OpenWrt provider.
+
+        Args:
+            config_dir: Configuration directory.
+            output_dir: Base output directory.
+            device: Device name for a non-primary instance (``openwrt@<device>``).
+        """
+        super().__init__(qualified_provider_id(PROVIDER_NAME, device), config_dir, output_dir)
         self._setup_template_environment()
+        self._label_cache: dict[str, str | None] = {}
+
+    def spawn_instance(self, name: str) -> Self:
+        """Return a provider for the named device instance (#1656).
+
+        Args:
+            name: Device name from ``provider_settings.openwrt.devices``.
+
+        Returns:
+            A new provider named ``openwrt@<name>`` sharing this provider's directories.
+        """
+        instance = type(self)(self.config_dir, self.base_output_dir, device=name)
+        current = getattr(self, "_current_environment", None)
+        if current:
+            instance.set_environment(current)
+        return instance
+
+    def device_label(self, env_name: str) -> str | None:
+        """Return the device name for output labels, or ``None`` for a flat config (#1656).
+
+        Duck-typed hook read by ``OpenWrtAnsibleRunner``. The result is cached per environment.
+
+        Args:
+            env_name: Environment whose settings declare the devices.
+        """
+        if env_name not in self._label_cache:
+            from infrafoundry.core.config import ConfigManager
+
+            try:
+                env_config = ConfigManager(self.config_dir).load_environment(env_name)
+            except (FileNotFoundError, OSError):
+                label = None
+            else:
+                label = device_label(env_config, self.name)
+            self._label_cache[env_name] = label
+        return self._label_cache[env_name]
+
+    def _run_labelled(
+        self,
+        env_config: EnvironmentConfig,
+        report: ValidationReport,
+        checks: Callable[[OpenWrtValidator], None],
+    ) -> None:
+        """Run ``checks`` for this device, prefixing its new results with ``[<device>] ``."""
+        validator = OpenWrtValidator(env_config, report, self.config_dir, provider_name=self.name)
+        start = len(report.results)
+        checks(validator)
+        label = device_label(env_config, self.name)
+        if label is None:
+            return
+        for result in report.results[start:]:
+            result.message = f"[{label}] {result.message}"
 
     @override
     def validate_config(self, config: dict[str, Any]) -> bool:
@@ -113,7 +180,7 @@ class OpenWrtProvider(
         self, env_config: EnvironmentConfig, report: ValidationReport
     ) -> None:
         """Check the controller tools and probe the device read-only."""
-        OpenWrtValidator(env_config, report, self.config_dir).validate_connectivity()
+        self._run_labelled(env_config, report, lambda v: v.validate_connectivity())
 
     @override
     def validate_references(
@@ -123,7 +190,7 @@ class OpenWrtProvider(
         report: ValidationReport,
     ) -> None:
         """Run schema and settings checks."""
-        OpenWrtValidator(env_config, report, self.config_dir).validate_references(resources)
+        self._run_labelled(env_config, report, lambda v: v.validate_references(resources))
 
     def validate_offline(
         self,
@@ -133,7 +200,7 @@ class OpenWrtProvider(
         report: ValidationReport,
     ) -> None:
         """Run schema and settings checks without touching the network."""
-        OpenWrtValidator(env_config, report, self.config_dir).validate_offline(resources)
+        self._run_labelled(env_config, report, lambda v: v.validate_offline(resources))
 
     @override
     def generate_terraform(self, resources: list[ResourceConfig]) -> None:
@@ -176,7 +243,7 @@ class OpenWrtProvider(
             SchemaValidationError: If a resource is invalid.
             OpenWrtSettingsError: If the settings are missing or invalid.
         """
-        settings = load_settings(self.config_dir, env_name)
+        settings = load_settings(self.config_dir, env_name, self.name)
         errors = [f.message for f in check_resources(resources, settings)]
         if errors:
             raise SchemaValidationError("OpenWrt configuration is invalid:\n" + "\n".join(errors))

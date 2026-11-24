@@ -234,6 +234,8 @@ class PackageManifest(BaseModel):
     firewall: str | None = None
     # Default kubernetes cluster (provider instance) for the package's resources (#1539).
     cluster: str | None = None
+    # Default openwrt device (provider instance) for the package's resources (#1656).
+    device: str | None = None
     blueprint: str | None = None
     variables: dict[str, Any] = Field(default_factory=dict)
     resources: list[str] = Field(default_factory=list)
