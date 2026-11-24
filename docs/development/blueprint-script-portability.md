@@ -159,7 +159,9 @@ The framework renders both paths against the package variables, then
 copies (`shutil.copy2`) or `scp`'s (one `scp` per entry, when a jumphost
 is set) the rendered source to the rendered dest after the script
 reports success. All pull-back failures are non-fatal warnings, so
-missing or conditional outputs don't fail the handler.
+missing or conditional outputs don't fail the handler. An entry whose
+source and dest both render empty (an optional output whose variable is
+unset) is skipped silently, so an optional output needs no condition.
 
 See [Event System → Declaring script outputs](event-system.md#declaring-script-outputs)
 for the full schema and semantics.

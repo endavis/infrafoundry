@@ -231,6 +231,8 @@ Contract:
   non-absolute value emits a warning and skips that entry without
   failing the handler. `~` is expanded on the operator side; on a
   jumphost source it is expanded by the remote shell via `scp`.
+- An entry whose `source` and `dest` both render empty (an optional
+  output whose variable is unset) is skipped silently, with no warning.
 - Pull-back runs **only when the script succeeds** (exit code 0).
   Failed runs skip outputs processing entirely so partial artifacts
   don't leak to the operator.

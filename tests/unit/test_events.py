@@ -1761,6 +1761,62 @@ class TestScriptHandlerOutputs:
         assert mock_copy.call_count == 0
         assert "source must be an absolute path" in warnings_file.read_text()
 
+    def test_local_entry_rendering_empty_is_skipped_silently(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An optional output whose variable is unset renders empty: no copy, no warning."""
+        warnings_file = tmp_path / "warnings.jsonl"
+        monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": "{{ cert_export }}", "dest": "{{ cert_export }}"}],
+        )
+        with patch("infrafoundry.core.events.handlers.script.shutil.copy2") as mock_copy:
+            result = handler.execute(self._context(cert_export=""))
+        assert result.success
+        assert mock_copy.call_count == 0
+        assert not warnings_file.exists() or warnings_file.read_text() == ""
+
+    def test_remote_entry_rendering_empty_is_skipped_silently(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With a jumphost, an entry that renders empty runs no scp and warns nothing."""
+        warnings_file = tmp_path / "warnings.jsonl"
+        monkeypatch.setenv("INFRAFOUNDRY_WARNINGS_FILE", str(warnings_file))
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": "{{ cert_export }}", "dest": "{{ cert_export }}"}],
+        )
+        context = self._context(jumphost="jump@host", cert_export="")
+        scp_calls: list[list[str]] = []
+        with (
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.run",
+                side_effect=self._jumphost_run_ok(scp_calls),
+            ),
+            patch(
+                "infrafoundry.core.events.handlers.script.subprocess.Popen",
+                return_value=_make_fake_process(returncode=0),
+            ),
+        ):
+            result = handler.execute(context)
+        assert result.success
+        # The only scp is the framework's own warnings pull-back, never an output.
+        assert all("warnings" in " ".join(call) for call in scp_calls)
+        assert not warnings_file.exists() or warnings_file.read_text() == ""
+
+    def test_local_set_path_equal_source_and_dest_is_left_alone(self, tmp_path: Path) -> None:
+        """The aiqum shape: source == dest, set; the script's own file is the result."""
+        target = tmp_path / "out" / "aiqum.pem"
+        handler, _ = self._handler(
+            tmp_path,
+            outputs=[{"source": "{{ cert_export }}", "dest": "{{ cert_export }}"}],
+            script_content=f"#!/bin/bash\nmkdir -p {target.parent}\necho pem > {target}\n",
+        )
+        result = handler.execute(self._context(cert_export=str(target)))
+        assert result.success
+        assert target.read_text() == "pem\n"
+
     def test_local_copy_oserror_warns(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

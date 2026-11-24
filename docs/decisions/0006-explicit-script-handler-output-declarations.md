@@ -13,7 +13,8 @@ tags:
 
 Accepted
 
-Related issue: [#660](https://github.com/endavis/infrafoundry/issues/660)
+Related issues: [#660](https://github.com/endavis/infrafoundry/issues/660),
+[#1648](https://github.com/endavis/infrafoundry/issues/1648)
 
 ## Context
 
@@ -80,7 +81,9 @@ Contract:
   time so runtime-computed variables are visible.
 - Both rendered paths must be absolute (start with `/` or `~`). A
   non-absolute path emits a warning and skips that entry without
-  failing the handler.
+  failing the handler. An entry whose `source` and `dest` both render
+  empty (an optional output whose variable is unset) is skipped silently,
+  without a warning (#1648).
 - Pull-back runs **only when the script succeeds** (exit code 0). Failed
   runs skip outputs processing entirely so partial or stale artifacts
   don't leak to the operator.

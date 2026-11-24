@@ -39,6 +39,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 
@@ -133,15 +134,24 @@ def make_ssl_context(cfg: Config) -> ssl.SSLContext:
         The ``ssl.SSLContext`` to use.
 
     Raises:
-        AIQUMError: If ``aiqum_ca_cert`` cannot be loaded.
+        AIQUMError: If ``aiqum_ca_cert`` is missing or cannot be loaded.
     """
     if cfg.tls_insecure:
         ctx = ssl.create_default_context()
         ctx.check_hostname = False  # explicit aiqum_tls_insecure opt-in
         ctx.verify_mode = ssl.CERT_NONE  # explicit aiqum_tls_insecure opt-in
         return ctx
+    cafile: str | None = None
+    if cfg.ca_cert:
+        ca_path = Path(cfg.ca_cert).expanduser()
+        if not ca_path.is_file():
+            raise AIQUMError(
+                f"aiqum_ca_cert {ca_path} does not exist: deploy AIQUM with aiqum_cert_export "
+                "set to this path, or point aiqum_ca_cert at a PEM that trusts AIQUM"
+            )
+        cafile = str(ca_path)
     try:
-        return ssl.create_default_context(cafile=cfg.ca_cert or None)
+        return ssl.create_default_context(cafile=cafile)
     except (OSError, ssl.SSLError) as exc:
         raise AIQUMError(f"cannot load aiqum_ca_cert {cfg.ca_cert}: {exc}") from None
 

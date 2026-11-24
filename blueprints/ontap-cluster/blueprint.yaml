@@ -240,7 +240,10 @@ inputs:
   # aiqum_ca_cert at a PEM file that trusts it; aiqum_tls_insecure skips the
   # check entirely and sends the passwords over an unverified connection.
   - name: aiqum_ca_cert
-    description: "PEM file of the CA (or self-signed cert) AIQUM presents; empty: system trust store"
+    description: >-
+      Absolute path (~ allowed) of the PEM that trusts AIQUM's certificate; pair it with the
+      aiqum package's aiqum_cert_export (same path). A missing file is an error. Empty: system
+      trust store
     default: ""
   - name: aiqum_tls_insecure
     description: "Skip AIQUM certificate verification (not recommended)"

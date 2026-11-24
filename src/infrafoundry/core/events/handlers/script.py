@@ -220,7 +220,8 @@ class ScriptHandler(BaseHandler):
             execution it is copied with ``shutil.copy2``. All pull-back
             failures (missing source, scp error, permission denied) are
             non-fatal and logged as warnings via
-            ``INFRAFOUNDRY_WARNINGS_FILE``. See
+            ``INFRAFOUNDRY_WARNINGS_FILE``. An entry whose source and dest both
+            render empty is skipped silently, for optional outputs. See
             ``docs/development/event-system.md`` for details.
 
     Environment variables injected:
@@ -969,7 +970,9 @@ class ScriptHandler(BaseHandler):
         errors, non-absolute paths, missing sources, scp non-zero, permission
         issues — are non-fatal: they emit a warning via
         :func:`infrafoundry.core.warnings.emit_warning` and the loop
-        continues to the next entry.
+        continues to the next entry. An entry whose ``source`` and ``dest``
+        both render empty (an optional output whose variable is unset) is
+        skipped silently, without a warning.
 
         Args:
             outputs: The validated (possibly empty) ``outputs`` list from the
@@ -1001,6 +1004,11 @@ class ScriptHandler(BaseHandler):
                 )
                 logger.debug(message)
                 emit_warning("script_handler_outputs", message)
+                continue
+
+            # An optional output whose variable is unset renders empty: nothing to copy.
+            if not rendered_source.strip() and not rendered_dest.strip():
+                logger.debug("skipping output entry: source and dest both render empty")
                 continue
 
             if not self._is_absolute_output_path(rendered_source):

@@ -256,6 +256,43 @@ def test_console_connector_cert_fetch_goes_through_the_pinned_channel() -> None:
     assert 'SSH="ssh ${VM_SSH_OPTS}' in text
 
 
+@pytest.mark.parametrize("value", ["relative/aiqum.pem", "aiqum.pem", "./aiqum.pem"])
+def test_aiqum_relative_cert_export_exits_before_any_ssh(tmp_path: Path, value: str) -> None:
+    """A bad ``aiqum_cert_export`` is caught in Phase 0, before the long install (#1648)."""
+    env = _vm_script_env(AIQUM_SCRIPT, aiqum_cert_export=value)
+
+    result, record = _run(AIQUM_SCRIPT, tmp_path, env)
+
+    assert result.returncode == 1
+    assert "aiqum_cert_export must be an absolute path" in result.stderr
+    assert _calls(record) == []
+
+
+def test_aiqum_absolute_cert_export_passes_the_path_check(tmp_path: Path) -> None:
+    """An absolute (or ``~``) path is accepted: the run goes on to the ssh probe."""
+    for value in ("/srv/config/aiqum.pem", "~/aiqum.pem"):
+        run_dir = tmp_path / value.strip("/~").replace("/", "_")
+        run_dir.mkdir()
+        env = _vm_script_env(AIQUM_SCRIPT, aiqum_cert_export=value)
+
+        result, record = _run(AIQUM_SCRIPT, run_dir, env)
+
+        assert "must be an absolute path" not in result.stderr
+        assert len(_calls(record)) == 1
+
+
+def test_aiqum_cert_export_phase_is_gated_and_pipes_the_helper_over_remote_cmd() -> None:
+    text = AIQUM_SCRIPT.read_text()
+    assert 'if [ -n "${CERT_EXPORT}" ]; then' in text
+    phase = text.split("Phase 4b: Exporting HTTPS certificate", 1)[1].split("Phase 5", 1)[0]
+    assert 'remote_cmd "${ip_address}" "python3 - served-cert 127.0.0.1 443"' in phase
+    assert '<"${SCRIPT_DIR}/aiqum-cert-export.py"' in phase
+    # remote_cmd wraps the command in single quotes with a jumphost: it must hold none.
+    remote = phase.split('remote_cmd "${ip_address}" "', 1)[1].split('"', 1)[0]
+    assert "'" not in remote
+    assert '"$CERT_PEM" "$CERT_ERR"' in text.split("cleanup() {", 1)[1].split("}", 1)[0]
+
+
 def test_aiqum_variable_export_quotes_values_and_skips_non_scalars(tmp_path: Path) -> None:
     """The ``eval`` block shell-quotes scalars and ignores lists and bad names."""
     text = AIQUM_SCRIPT.read_text()
