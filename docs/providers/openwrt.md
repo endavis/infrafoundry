@@ -9,7 +9,7 @@ tags:
 
 # OpenWrt Provider
 
-The OpenWrt provider manages one OpenWrt device (stock OpenWrt or a vendor build such as GL.iNet) through UCI. It generates an Ansible playbook for the [`community.openwrt`](https://galaxy.ansible.com/ui/repo/published/community/openwrt/) collection and runs it with `ansible-playbook`. It does not generate Terraform. The decision and the rejected alternatives are in [ADR-0028](../decisions/0028-openwrt-devices-are-managed-through-generated-communityopenwrt-playbooks-with-ubus-apply-rollback.md).
+The OpenWrt provider manages one or more OpenWrt devices (stock OpenWrt or a vendor build such as GL.iNet) through UCI. It generates an Ansible playbook for the [`community.openwrt`](https://galaxy.ansible.com/ui/repo/published/community/openwrt/) collection and runs it with `ansible-playbook`. It does not generate Terraform. The decision and the rejected alternatives are in [ADR-0028](../decisions/0028-openwrt-devices-are-managed-through-generated-communityopenwrt-playbooks-with-ubus-apply-rollback.md).
 
 For a read-only backup of a device InfraFoundry does not manage, see [Device config collectors](../guides/device-config-collectors.md) (`openwrt-ssh`).
 
@@ -37,7 +37,7 @@ For a read-only backup of a device InfraFoundry does not manage, see [Device con
 
 ## Settings
 
-One device per environment, under `provider_settings.openwrt` in `envs/<env>/settings.yaml`:
+One device, under `provider_settings.openwrt` in `envs/<env>/settings.yaml`:
 
 ```yaml
 providers:
@@ -55,7 +55,48 @@ provider_settings:
 
 `secret://env_secrets/...` references resolve from the environment's SOPS secrets. The provider stores no password. With a `secret_backends.bitwarden` block in `settings.yaml`, `secret://bitwarden/<item>/<field>` works wherever `secret://env_secrets/...` does ([Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md)).
 
-Several devices per environment are not supported yet.
+To manage several devices from one environment, see [Several devices per environment](#several-devices-per-environment).
+
+## Several devices per environment
+
+Declare a `devices:` map instead of a flat `address`. Shared defaults (`ssh_user`, `ssh_port`, `ssh_private_key_file`, `rollback_timeout`, `connect_timeout`) sit beside the map and an entry overrides them:
+
+```yaml
+provider_settings:
+  openwrt:
+    ssh_user: root
+    primary: gateway
+    devices:
+      gateway:
+        address: 192.0.2.2
+      office:
+        address: 198.51.100.2
+        ssh_port: 2222
+```
+
+- The flat shape is unchanged. Combining `devices:` with a top-level `address` is an error, `primary` is required once more than one device is declared, and device names are 1-32 characters of lowercase letters, digits and `-`.
+- The primary keeps the provider id `openwrt`; every other device is `openwrt@<name>`. Converting a flat configuration to `devices:` with the same device as `primary` keeps its state rows and its `generated/<env>/ansible/openwrt/` directory. Other devices get `ansible/openwrt@<name>/`, so each has its own inventory and its own `HostKeyAlias` (that device's address).
+- A resource picks its device with `device:`, most specific first: the entry's own `device:`, a file-level `device:` beside `resources:`, the package manifest's `device:`, then the primary. Use the resource-centric format:
+
+```yaml
+device: office
+resources:
+  - name: printer
+    type: dhcp.host
+    provider: openwrt
+    config: {mac: "02:00:00:00:00:0a", ip: 192.0.2.50}
+  - name: lan
+    type: network.interface
+    provider: openwrt
+    device: gateway
+    config: {ipaddr: 192.0.2.1, netmask: 255.255.255.0}
+```
+
+  The same resource name may exist on two devices. `device:` on a resource of another provider is an ordinary field and is not read as a selection.
+- `-P openwrt` runs the primary and every declared device that has resources. There is no `--device` option.
+- `infra doctor` prefixes each device's results with `[<name>] `, and the runner prints `openwrt_ansible[<name>]`. OpenWrt reads no environment overrides, so ADR-0024's primary-only rule has nothing to apply to.
+
+The decision is in [ADR-0035](../decisions/0035-openwrt-devices-are-provider-instances-several-per-environment.md), which builds on [ADR-0024](../decisions/0024-opnsense-firewalls-are-provider-instances-several-per-environment.md).
 
 ## Supported Resources
 
@@ -161,7 +202,6 @@ InfraFoundry deletes an undeclared object only when it applied that object befor
 ## Out of scope
 
 - Wireless, system, and any config other than `network`, `dhcp` and `firewall`.
-- Several devices per environment.
 - Terraform.
 
 ## Stock OpenWrt and GL.iNet

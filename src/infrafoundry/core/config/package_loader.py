@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import copy
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -167,6 +168,26 @@ FIREWALL_FILE_KEY: str = "firewall"
 # Top-level key beside ``resources:`` or the provider-centric list that selects the
 # kubernetes cluster for the whole file (#1539).
 CLUSTER_FILE_KEY: str = "cluster"
+# Top-level key beside ``resources:`` that selects the openwrt device for the whole file (#1656).
+DEVICE_FILE_KEY: str = "device"
+# Every file-level selector key, in the order they are read.
+FILE_SELECTOR_KEYS: tuple[str, ...] = (CLUSTER_FILE_KEY, DEVICE_FILE_KEY)
+
+
+def file_selections(data: Any) -> dict[str, str | None]:
+    """Return the file-level instance selections (``cluster``, ``device``) of a config file.
+
+    Args:
+        data: The parsed YAML document; non-mappings select nothing.
+
+    Returns:
+        Selector key -> instance name for each string value; non-string values are ignored.
+    """
+    if not isinstance(data, Mapping):
+        return {}
+    return {
+        key: data[key] if isinstance(data.get(key), str) else None for key in FILE_SELECTOR_KEYS
+    }
 
 
 _MAX_REFERENCE_PASSES = 10
@@ -527,10 +548,14 @@ class PackageLoader:
         if any(wants_dropbear_key(r) for r in resources):
             manifest.variables[DROPBEAR_KEYS_VARIABLE] = dropbear_keys_value(resources)
 
-        if manifest.firewall is not None or manifest.cluster is not None:
+        if any(v is not None for v in (manifest.firewall, manifest.cluster, manifest.device)):
             stamp_selected(
                 resources,
-                {"firewall": manifest.firewall, "cluster": manifest.cluster},
+                {
+                    "firewall": manifest.firewall,
+                    "cluster": manifest.cluster,
+                    "device": manifest.device,
+                },
                 f"package '{manifest.name}' instance selection",
             )
 
@@ -766,13 +791,12 @@ class PackageLoader:
                 firewall=data.get(FIREWALL_FILE_KEY),
             )
 
-        file_cluster = data.get(CLUSTER_FILE_KEY)
-        selections = {"cluster": file_cluster if isinstance(file_cluster, str) else None}
+        selections = file_selections(data)
 
         # Check for resource-centric format
         if "resources" in data and isinstance(data["resources"], list):
             centric = self._parse_resource_centric(data["resources"], resource_file, provider)
-            stamp_selected(centric, selections, f"{resource_file}: 'cluster'")
+            stamp_selected(centric, selections, f"{resource_file}: file-level selection")
             return centric
 
         # Provider-centric: extract resource type from filename
@@ -812,7 +836,7 @@ class PackageLoader:
             for item in resource_list
             if isinstance(item, dict) and "name" in item
         ]
-        stamp_selected(parsed, selections, f"{resource_file}: 'cluster'")
+        stamp_selected(parsed, selections, f"{resource_file}: file-level selection")
         return parsed
 
     def _parse_nested_provider_format(

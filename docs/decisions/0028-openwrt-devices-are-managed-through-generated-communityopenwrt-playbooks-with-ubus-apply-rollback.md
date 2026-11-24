@@ -32,7 +32,7 @@ Add an `openwrt` provider that generates a playbook for the `community.openwrt` 
 - **Commit.** The playbook stages UCI changes without committing, replays them into an rpcd session with a ucode helper through the ubus `uci` API, runs `ubus call uci apply` with rollback, reconnects, and sends `ubus call uci confirm`. A device that cannot be reached afterwards reverts on its own. If the run fails before the apply was reached, a rescue reverts the staging. A preflight refuses to run when changes are already pending.
 - **Management safety.** A change to a `network.interface` that affects the subnet of the settings address is refused at plan time unless the resource sets `confirm_management_change: true`. A port forward that covers the SSH port on the WAN needs the same flag.
 - **Provider-declared collections.** `ProviderBase.ansible_collection_requirements()` returns the collections a provider needs, empty by default. `RequirementsManager` merges them with the blueprint requirements for the providers that have resources in scope, so `foundry deps check` and `deps sync` handle `community.openwrt`. The change is additive: an optional `providers` argument, and a defaulted `providers` field on `RequirementStatus`.
-- **One device per environment**, under `provider_settings.openwrt`, following the MikroTik precedent. Several devices per environment (the OPNsense instance model of ADR-0024) are a follow-up.
+- **One device per environment**, under `provider_settings.openwrt`, following the MikroTik precedent. Several devices per environment are provider instances as in ADR-0024, decided in ADR-0035.
 - **Managed set (ADR-0018).** Only `dhcp.host` and `firewall.redirect` are deleted; `network.interface` and `dhcp.pool` are only forgotten.
 
 ## Rationale
@@ -44,6 +44,7 @@ Finding: handing the staged files to the session by copying them into rpcd's sav
 
 - Issue #1482: manage OpenWrt devices over SSH
 - Issue #1481: read-only collectors for unmanaged devices (ADR-0027)
+- Issue #1656: several devices per environment (see ADR-0035)
 
 ## Related Documentation
 

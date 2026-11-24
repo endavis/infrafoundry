@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 from unittest.mock import MagicMock, patch
 
 import click
@@ -261,3 +261,26 @@ class TestClusterCommands:
             *flag,
         )
         assert result.exit_code != 0
+
+
+class TestExpandOpenWrtDevices:
+    DEVICES: ClassVar[dict[str, Any]] = {
+        "openwrt": {
+            "primary": "gateway",
+            "devices": {
+                "gateway": {"address": "192.0.2.2"},
+                "office": {"address": "192.0.2.3"},
+                "spare": {"address": "192.0.2.4"},
+            },
+        }
+    }
+
+    def test_provider_openwrt_expands_to_devices_with_resources(self) -> None:
+        orchestrator = _orchestrator(self.DEVICES, ["openwrt", "openwrt@office", "proxmox"])
+        result = expand_provider_filter(orchestrator, "e", ("openwrt",), ())
+        assert result == ["openwrt", "openwrt@office"]
+
+    def test_flat_environment_keeps_the_exact_filter(self) -> None:
+        flat = {"openwrt": {"address": "192.0.2.2"}}
+        orchestrator = _orchestrator(flat, ["openwrt"])
+        assert expand_provider_filter(orchestrator, "e", ("openwrt",), ()) == ["openwrt"]

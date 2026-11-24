@@ -289,3 +289,25 @@ def test_stamp_selected_uses_each_providers_own_selector() -> None:
     ]
     stamp_selected(resources, {"firewall": "fw-b", "cluster": "cloud"}, "test")
     assert [r.provider for r in resources] == ["opnsense@fw-b", "kubernetes@cloud", "proxmox"]
+
+
+def test_entry_instance_provider_selects_an_openwrt_device() -> None:
+    item = {"name": "x", "device": "office"}
+    assert entry_instance_provider(item, "openwrt", "f.yaml", "t") == "openwrt@office"
+
+
+def test_entry_instance_provider_ignores_device_fields_of_other_providers() -> None:
+    tailscale = {"name": "x", "device": {"hostname": "fw-test"}}
+    assert entry_instance_provider(tailscale, "tailscale", "f.yaml", "t") is None
+    assert entry_instance_provider({"name": "x", "device": "vlan01"}, "opnsense", "f", "t") is None
+
+
+def test_entry_instance_provider_rejects_an_invalid_device_name() -> None:
+    with pytest.raises(InvalidConfigurationError, match="invalid device name"):
+        entry_instance_provider({"name": "x", "device": "Office_1"}, "openwrt", "f.yaml", "t")
+
+
+def test_entry_instance_provider_keeps_strict_firewall_and_cluster_selectors() -> None:
+    for key in ("firewall", "cluster"):
+        with pytest.raises(InvalidConfigurationError, match="only supported for provider"):
+            entry_instance_provider({"name": "x", key: "a"}, "proxmox", "f.yaml", "t")

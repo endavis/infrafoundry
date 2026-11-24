@@ -13,6 +13,7 @@ from infrafoundry.core.config.package_loader import (
     FIREWALL_FILE_KEY,
     NESTED_PROVIDER_NAMESPACE,
     PackageLoader,
+    file_selections,
 )
 from infrafoundry.core.config.yaml_loader import load_config_yaml
 from infrafoundry.core.exceptions import InvalidConfigurationError
@@ -143,9 +144,7 @@ class ProviderCentricLoader:
             for item in resource_list
             if isinstance(item, dict) and "name" in item
         ]
-        file_cluster = data.get(CLUSTER_FILE_KEY) if isinstance(data, dict) else None
-        if isinstance(file_cluster, str):
-            stamp_selected(resources, {"cluster": file_cluster}, f"{resource_path}: 'cluster'")
+        stamp_selected(resources, file_selections(data), f"{resource_path}: file-level selection")
 
         return resources
 

@@ -22,6 +22,7 @@ from infrafoundry.core.provider_instances import (
 
 BASE = "opnsense"
 CLUSTER_BASE = "kubernetes"
+OPENWRT_BASE = "openwrt"
 
 FIREWALL_HELP = (
     "Limit operation to the named firewall(s) of provider opnsense (can be used multiple "
@@ -51,6 +52,8 @@ def expand_provider_filter(
       ``opnsense@<name>`` for the others.
     - ``-P kubernetes`` and ``--cluster <name>`` work the same way for ``kubernetes`` and
       ``kubernetes@<name>``.
+    - ``-P openwrt`` expands to ``openwrt`` plus each declared ``openwrt@<name>`` that has
+      resources (there is no ``--device`` option).
     - An environment without the instance map keeps the legacy behaviour.
 
     Args:
@@ -73,6 +76,7 @@ def expand_provider_filter(
     for base, option, names in (
         (BASE, "--firewall", firewalls),
         (CLUSTER_BASE, "--cluster", clusters),
+        (OPENWRT_BASE, "--device", ()),
     ):
         if names or base in providers:
             current = _expand(

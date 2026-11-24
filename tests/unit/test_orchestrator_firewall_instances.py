@@ -69,3 +69,28 @@ def test_missing_settings_file_is_not_an_error(tmp_path: Path) -> None:
     orchestrator = _orchestrator(tmp_path, {}, load_error=True)
     _, by_provider = orchestrator._load_resources("dev")
     assert list(by_provider) == ["opnsense"]
+
+
+def test_declared_openwrt_devices_are_registered(tmp_path: Path) -> None:
+    settings = {
+        "openwrt": {
+            "primary": "gateway",
+            "devices": {"gateway": {"address": "192.0.2.2"}, "office": {"address": "192.0.2.3"}},
+        }
+    }
+    orchestrator = _orchestrator(tmp_path, settings)
+    base = _Base()
+    base.name = "openwrt"
+    orchestrator.providers["openwrt"] = base  # type: ignore[assignment]
+    orchestrator._load_resources("dev")
+    assert base.spawned == ["office"]
+    assert "openwrt@office" in orchestrator.providers
+    assert "openwrt@gateway" not in orchestrator.providers
+
+
+def test_flat_openwrt_settings_register_nothing(tmp_path: Path) -> None:
+    orchestrator = _orchestrator(tmp_path, {"openwrt": {"address": "192.0.2.2"}})
+    base = _Base()
+    orchestrator.providers["openwrt"] = base  # type: ignore[assignment]
+    orchestrator._load_resources("dev")
+    assert base.spawned == []
