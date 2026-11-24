@@ -17,6 +17,7 @@ from typing import Any, Protocol
 
 from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.provider_instances import SELECTOR_KEYS
 from infrafoundry.core.validation import ValidationLevel
 from infrafoundry.providers.openwrt.glinet.rpc import (
     GlinetApiDriftError,
@@ -39,7 +40,11 @@ STATUS_REBOOTING = frozenset({4, 6})
 STATUS_DOWNLOADING = 1
 
 _NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
-_IGNORED_CONFIG_KEYS = {"name"}
+# An entry without ``config:`` is loaded with the whole entry as its config (#1660), so the
+# entry-level keys, including the instance selectors (``device`` ...), are not fields.
+_IGNORED_CONFIG_KEYS = (
+    frozenset({"name", "provider", "type", "events", "import_id"}) | SELECTOR_KEYS
+)
 
 
 class FirmwareUpgradeError(InfraFoundryError):
