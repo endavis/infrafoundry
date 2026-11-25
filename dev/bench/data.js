@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795605253922,
+  "lastUpdate": 1795613747572,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7034,6 +7034,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005030700886857292",
             "extra": "mean: 89.95015290808223 usec\nrounds: 12138"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "16177cfb43ffe85606197de679278f4a2b3daa2b",
+          "message": "refactor: move gl.inet tls pinning onto core tls_pin (merges PR #1677, addresses #1673)\n\nThe GL.iNet client kept its own copy of the certificate-pinning code\n(TLS context, pinned HTTPS connection, fingerprint normalization) next\nto the generalized one in core/tls_pin.py. Two copies of a security\ncheck can drift apart.\n\nGL.iNet now imports them from core/tls_pin.py and passes an on_mismatch\nfactory that raises GlinetTlsPinError with the same message. The names\nstay importable from the GL.iNet modules. Settings keys, defaults and\nbehaviour are unchanged; only the unreachable non-TLS branch now raises\nthe mismatch message instead of a separate one.\n\nAddresses #1673\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-25T13:34:20Z",
+          "tree_id": "2f738a73b14015d610ede932775a15b52ac5bab7",
+          "url": "https://github.com/endavis/infrafoundry/commit/16177cfb43ffe85606197de679278f4a2b3daa2b"
+        },
+        "date": 1795613746895,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 69.48100358975967,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00039442576749872647",
+            "extra": "mean: 14.39242308450742 msec\nrounds: 71"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13174.341852067098,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004640061345803302",
+            "extra": "mean: 75.90512006055897 usec\nrounds: 13893"
           }
         ]
       }
