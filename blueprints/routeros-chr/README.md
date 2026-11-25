@@ -28,7 +28,9 @@ the REST service enabled.
      logging off while it is sent;
    - sets `/system identity` to `vm_name`;
    - with `mgmt_ip` set, replaces the DHCP client on `ether1` with
-     `mgmt_ip`/`mgmt_prefix`, plus a default route via `mgmt_gateway`;
+     `mgmt_ip`/`mgmt_prefix`, plus a default route via `mgmt_gateway` and
+     `/ip dns set servers=` from `mgmt_dns` (a comma-separated list sets several),
+     each only when set;
    - runs `/ip service set www disabled=no` (plain HTTP; `www-ssl` needs a
      certificate on the box).
 
@@ -67,6 +69,7 @@ variables:
   pve_host: "192.0.2.13"
   mgmt_ip: "192.0.2.241"
   mgmt_gateway: "192.0.2.1"
+  mgmt_dns: "192.0.2.53"
 ```
 
 ```bash
@@ -78,7 +81,7 @@ foundry infra apply --env dev --package chr-test
 See `blueprint.yaml`. Required: `vm_name`, `vmid`, `target_node`, `pve_host`.
 Everything else has a default: `image_source` (CHR 7.25.1 `.img.zip`),
 `image_sha256`, `memory` 512, `cores` 1, `mgmt_bridge` `vmbr0`, `mgmt_vlan` 0,
-`mgmt_ip` empty, `mgmt_prefix` 24, `mgmt_gateway` empty, `trunk_bridge`
+`mgmt_ip` empty, `mgmt_prefix` 24, `mgmt_gateway` empty, `mgmt_dns` empty (needs `mgmt_ip`), `trunk_bridge`
 `vmbr1`, `trunk_nics` 2, `boot_timeout` 300.
 
 ## Verified on a live CHR

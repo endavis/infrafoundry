@@ -234,6 +234,24 @@ def test_expect_script_adds_the_default_route_with_a_gateway() -> None:
     assert "/ip route add dst-address=0.0.0.0/0 gateway=192.0.2.1" in script
 
 
+def test_expect_script_sets_dns_servers_only_when_given() -> None:
+    assert "/ip dns set" not in _expect_script(routeros_mgmt_ip="192.0.2.241")
+
+    script = _expect_script(
+        routeros_mgmt_ip="192.0.2.241", routeros_mgmt_dns="192.0.2.53,192.0.2.54"
+    )
+
+    assert 'run "/ip dns set servers=192.0.2.53,192.0.2.54"' in script
+
+
+def test_dns_input_needs_a_static_address() -> None:
+    tasks = yaml.safe_load((ROLE_DIR / "tasks" / "main.yml").read_text())
+
+    [check] = [t for t in tasks if t["name"] == "Check the DNS input"]
+    assert check["ansible.builtin.assert"]["that"] == ["routeros_mgmt_ip | length > 0"]
+    assert check["when"] == "routeros_mgmt_dns | length > 0"
+
+
 def test_success_marker_is_split_in_the_sent_command() -> None:
     script = _expect_script()
 

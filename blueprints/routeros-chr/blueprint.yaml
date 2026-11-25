@@ -53,6 +53,9 @@ inputs:
   - name: mgmt_gateway
     description: "Default gateway; used only with mgmt_ip"
     default: ""
+  - name: mgmt_dns
+    description: "DNS server for the router itself; a comma-separated list sets several; used only with mgmt_ip; empty sets none"
+    default: ""
 
   # --- Trunk NICs (ether2..) ---
   - name: trunk_bridge
