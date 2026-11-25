@@ -27,6 +27,8 @@ from infrafoundry.core.runners.base_runner import BaseRunner
 
 logger = logging.getLogger(__name__)
 
+UPDATE_TYPE = "system.package.update"  # core must not import the provider package
+
 
 class _Plan(Protocol):
     """What the runner reads from a provider plan."""
@@ -198,6 +200,36 @@ class MikroTikRestRunner(BaseRunner):
             if r.provider == provider.name
         ]
 
+    def _print_update(
+        self,
+        provider: ProviderBase,
+        kwargs: dict[str, Any],
+        env_name: str,
+        resources: list[ResourceConfig],
+    ) -> None:
+        """Print the RouterOS update lines (ADR-0037); never changes the plan's outcome.
+
+        Skipped for add-only (drift) runs and when ``target_resources`` excludes every
+        ``system.package.update`` resource, so scheduled drift runs never ask the vendor.
+        """
+        hook = getattr(provider, "update_plan_lines", None)
+        if not callable(hook) or kwargs.get("add_only"):
+            return
+        targets = kwargs.get("target_resources")
+        updates = [r for r in resources if r.type == UPDATE_TYPE]
+        if targets:
+            updates = [r for r in updates if r.name in targets]
+        if not updates:
+            return
+        try:
+            lines = hook(env_name, updates)
+        except Exception as exc:  # an update check must never fail the plan
+            logger.warning("mikrotik_rest update check failed: %s", type(exc).__name__)
+            return
+        for line, warning in lines:
+            style = "yellow" if warning else "dim"
+            self.console.print(f"  [{style}]mikrotik_rest: {escape(line)}[/{style}]")
+
     def plan(self, provider: ProviderBase, **kwargs: Any) -> PlanResult:
         """Diff the YAML against the device; writes nothing.
 
@@ -240,6 +272,7 @@ class MikroTikRestRunner(BaseRunner):
                 f"  [dim]mikrotik_rest: {type_name}: unmanaged (kept): "
                 f"{escape(', '.join(names))}[/dim]"
             )
+        self._print_update(provider, kwargs, env_name, resources)
         return PlanResult(
             success=True,
             has_changes=plan.has_changes,

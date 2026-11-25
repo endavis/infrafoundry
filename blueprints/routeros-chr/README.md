@@ -100,6 +100,9 @@ Checked against RouterOS 7.25.1 CHR on Proxmox VE 9 (#1485):
 - With `trunk_nics: 2` the box has `ether1`..`ether3`. The static address goes
   on `ether1`, and REST answers 401 without credentials and 200 with them.
 - `infra destroy` removes the VM.
+- With `mgmt_dns` set (#1666), `/ip dns` lists that server after the bootstrap
+  and the RouterOS update check resolves the vendor's server (checked with a
+  single server, #1665).
 
 Not checked: whether `ether1` has a DHCP client before the bootstrap removes
 it (`remove [find ...]` succeeds either way), and which NIC maps to which

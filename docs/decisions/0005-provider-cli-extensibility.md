@@ -17,6 +17,8 @@ Related issue: [#626](https://github.com/endavis/infrafoundry/issues/626)
 
 Second provider CLI: [#1655](https://github.com/endavis/infrafoundry/issues/1655) adds `foundry provider openwrt upgrade` ([ADR-0036](../decisions/0036-glinet-firmware-is-upgraded-through-the-vendor-online-upgrade-by-a-provider-command.md)).
 
+Third provider CLI: [#1665](https://github.com/endavis/infrafoundry/issues/1665) adds `foundry provider mikrotik upgrade` ([ADR-0037](../decisions/0037-mikrotik-routeros-is-upgraded-to-the-latest-release-of-a-channel-by-a-provider-command.md)).
+
 ## Context
 
 Provider-specific operations were starting to accumulate as flags and

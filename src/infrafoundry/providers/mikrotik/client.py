@@ -133,6 +133,18 @@ class RouterOSClient:
         data = self._request("POST", "execute", json={"script": script, "as-string": True})
         return str(data.get("ret", "")) if isinstance(data, dict) else ""
 
+    def post(self, path: str, body: dict[str, Any] | None = None) -> Any:
+        """Call an action endpoint with ``POST`` and return the decoded JSON reply.
+
+        Args:
+            path: REST path without the ``/rest/`` prefix, e.g. ``system/reboot``.
+            body: The call's arguments; an empty object when omitted.
+
+        Returns:
+            The decoded reply: a list, a dict or ``None`` for an empty reply.
+        """
+        return self._request("POST", path, json=body or {})
+
     def put(self, path: str, body: dict[str, str]) -> dict[str, str]:
         """Create a row with ``PUT`` and return it (the row carries its ``.id``).
 

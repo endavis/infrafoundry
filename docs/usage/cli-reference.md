@@ -56,6 +56,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | Export Proxmox config to YAML | `foundry provider proxmox export --env <env> --output <dir>` |
 | Dump raw Proxmox API state | `foundry provider proxmox dump --env <env> --output <file>.json` |
 | Install the vendor's latest GL.iNet firmware | `foundry provider openwrt upgrade --env <env> [--device <name>] [--yes]` |
+| Install the latest MikroTik RouterOS of the declared channel | `foundry provider mikrotik upgrade --env <env> [--yes]` |
 | Generate JSON schemas for IDE | `foundry config schema export` |
 | Migrate existing infra to config | `foundry config migrate --env <env> --provider opnsense --component <comp>` |
 | Plan changes | `foundry infra plan --env <env>` |
@@ -363,6 +364,23 @@ foundry provider openwrt upgrade --env dev --device office --yes
 **Options:** `-e/--env TEXT` (required), `--device TEXT` (needs a `devices:`
 map), `-y/--yes` (do not ask before flashing), `--lock-timeout INTEGER`
 (default: 0, fail fast).
+
+### `provider mikrotik upgrade`
+
+Install the latest RouterOS of the channel a `system.package.update` resource
+declares, then the RouterBOARD firmware when it lags. Holds the environment lock,
+checks read-only, asks once, then installs and reboots (once or twice, each
+interrupting traffic through the device) and re-plans. There is no `--device`:
+MikroTik has one device per environment. See
+[RouterOS and RouterBOARD Updates](../providers/mikrotik.md#routeros-and-routerboard-updates).
+
+```bash
+foundry provider mikrotik upgrade --env lab
+foundry provider mikrotik upgrade --env lab --yes
+```
+
+**Options:** `-e/--env TEXT` (required), `-y/--yes` (do not ask before
+upgrading), `--lock-timeout INTEGER` (default: 0, fail fast).
 
 ### `provider proxmox dump`
 

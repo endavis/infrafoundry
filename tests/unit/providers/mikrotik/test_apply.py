@@ -200,3 +200,18 @@ def test_step_failure_names_the_step_and_keeps_completed_outcomes(
     assert [o.resource_name for o in result.outcomes] == ["br2"]
     assert result.released == []
     assert "pw-example" not in result.error
+
+
+def test_update_resource_is_never_applied_or_destroyed(
+    wan_edge: FakeRouterOS, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    resources = [*converged_wan_edge(), resource("system.package.update", "ros")]
+    manager = manager_for(wan_edge, monkeypatch)
+    plan = manager.plan("test", resources)
+    assert not plan.has_changes
+    assert manager.apply("test", plan).success
+    only = [resource("system.package.update", "ros")]
+    assert manager.apply("test", manager.plan("test", only)).success
+    assert manager.destroy("test", only).success
+    assert wan_edge.writes() == []
+    assert not any(c[0] in ("POST", "EXECUTE") for c in wan_edge.calls)

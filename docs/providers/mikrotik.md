@@ -38,6 +38,7 @@ provider_settings:
     password: secret://env_secrets/mikrotik/password
     verify_ssl: true   # default
     timeout: 10        # seconds, default
+    upgrade_timeout: 900   # seconds per reboot stage; default 900, range 120-3600
 ```
 
 `secret://env_secrets/...` references resolve from the environment's SOPS secrets. The password never appears in logs or error messages. With a `secret_backends.bitwarden` block in `settings.yaml`, `secret://bitwarden/<item>/<field>` works wherever `secret://env_secrets/...` does ([Bitwarden / Vaultwarden secret backend](../configuration/secrets-vaultwarden.md)).
@@ -57,6 +58,7 @@ The resource type with `.` replaced by `/` is the REST path. YAML field names ar
 | `ip.address` | `/rest/ip/address` | `address` (CIDR); moving it to another interface is an update |
 | `ip.dhcp-client` | `/rest/ip/dhcp-client` | `interface` |
 | `ip.service` | `/rest/ip/service` | `name`; update only, never created or deleted |
+| `system.package.update` | `/rest/system/package/update` | one per environment; never applied, see [RouterOS and RouterBOARD Updates](#routeros-and-routerboard-updates) |
 
 For types keyed by `name`, the resource name is the default. Declare the objects in the resource-centric format, with the type in each entry (the provider-centric file name cannot carry the hyphen of `ip.dhcp-client`):
 
@@ -178,9 +180,64 @@ If the host cannot be resolved and the plan touches bridge, VLAN or address type
 
 `infra drift detect` plans the device add-only through the same runner. A live object that differs from your YAML (for example an out-of-band PVID change on a managed port) is reported and fires `DRIFT_DETECTED`. Undeclared objects are not reported as drift, because drift runs never delete.
 
+Drift runs make no update check and never contact the vendor.
+
+## RouterOS and RouterBOARD Updates
+
+A `system.package.update` resource marks the device whose RouterOS follows the latest release of an update channel ([ADR-0037](../decisions/0037-mikrotik-routeros-is-upgraded-to-the-latest-release-of-a-channel-by-a-provider-command.md)). Its only field is `channel`: `stable` (default), `long-term`, `testing` or `development`. A version cannot be pinned, and only one is allowed per environment.
+
+```yaml
+# envs/lab/resources/routeros-update.yaml
+resources:
+  - name: routeros
+    type: system.package.update
+    provider: mikrotik
+    channel: stable
+```
+
+`infra plan` only reports, for example:
+
+```text
+mikrotik_rest: system.package.update 'routeros': up to date (7.25)
+mikrotik_rest: system.package.update 'routeros': 7.24 → 7.25 available (run foundry provider mikrotik upgrade --env lab)
+mikrotik_rest: system.package.update 'routeros': up to date (7.25); RouterBOARD firmware 7.20 → 7.25 pending (run foundry provider mikrotik upgrade --env lab)
+```
+
+A failed check is a warning and never fails the plan. `infra apply`, `infra destroy` and drift runs never install, flash or reboot.
+
+### The upgrade command
+
+```bash
+foundry provider mikrotik upgrade --env lab
+foundry provider mikrotik upgrade --env lab --yes --lock-timeout 60
+```
+
+There is no `--device`: one device per environment. The command holds the environment lock, checks read-only, asks once (unless `--yes`), runs the stages and re-plans. It runs two stages, each with its own deadline of `upgrade_timeout` seconds, because each ends in a reboot:
+
+1. **RouterOS**, when the channel offers a newer release: `install`, wait for the device to go down and come back, then verify the installed version.
+2. **RouterBOARD firmware** (the bootloader), when `current-firmware` differs from `upgrade-firmware` (it lags the packages on real hardware, and runs alone when RouterOS is already current): `routerboard/upgrade`, `reboot`, wait, verify. It is skipped on a device without RouterBOARD firmware, such as a CHR.
+
+Success is proven by polling for the device going down and coming back and by re-reading the versions, not by the replies of the write calls. A failure names the step (`check`, `install`, `reboot-wait`, `verify-routeros`, `routerboard-upgrade`, `reboot` or `verify-routerboard`) and the versions the device reports, and says that a flash cannot be rolled back automatically.
+
+**Channel switch.** RouterOS checks the channel set on the device. When it differs from the declared one, the plan warns and makes no update check, and the command's table shows both channels and no available version. Nothing is written before the confirmation; afterwards the command sets the channel, checks, and upgrades without asking again if a release is offered.
+
+!!! warning "Run it from a path that does not cross the switch"
+    Run the command from a machine that reaches the management address directly, not over a path through the switch's own uplink, or the polling loses its connection for the whole outage.
+
+!!! warning "Plan the outage"
+    Each reboot interrupts traffic through the device (one or two reboots per run). On a WAN-edge switch that cuts internet access for everything behind the firewalls for each reboot, while LAN and inter-VLAN traffic that does not cross the switch keeps working. An HA or CARP pair gives no protection when both firewalls' WAN links run through this one switch. Run the command when the outage is acceptable.
+
+### Verification status
+
+Verified read-only against a RouterOS 7.25 device: `GET system/package/update` (no `latest-version` or `status` until a check has run), `POST system/package/update/check-for-updates` (a list of progress sections, the last one carries the result; status "New version is available") and `GET system/routerboard`.
+
+**Verified live on a RouterOS 7.25.1 CHR (#1665):** `foundry provider mikrotik upgrade` took the CHR from 7.25.1 to 7.25.2 in one run of about 15 seconds. `POST system/package/update/install` installed the release and rebooted the device once (the log shows `installed system-7.25.2` and `router rebooted by api`). The command saw it go down and come back, verified the version and re-planned "up to date (7.25.2)". The "up to date" status string is `System is already up to date`. `POST system/package/update/set {"channel": ...}` returns `[]` and the channel reads back changed. On a CHR, `GET system/routerboard` returns API 400 (`no such command or directory`), which the command treats as "no RouterBOARD firmware" and skips stage 2.
+
+**Not yet verified:** `POST system/routerboard/upgrade` and `POST system/reboot`, which need RouterBOARD hardware; a CHR has neither. The first run on a hardware switch exercises them. The command ignores the replies of the write calls apart from their HTTP status and proves each stage by polling and re-reading the versions, so a different reply shape cannot report a failed stage as a success.
+
 ## Doctor
 
-`infra doctor` checks the schema, the settings and their secret references, that the device answers `/rest/system/resource` with RouterOS 7 or later, and that every interface a resource references exists on the device or is declared.
+`infra doctor` checks the schema (including `system.package.update`), the settings (including `upgrade_timeout`) and their secret references, that the device answers `/rest/system/resource` with RouterOS 7 or later, and that every interface a resource references exists on the device or is declared.
 
 ## Test target: a CHR VM
 

@@ -145,3 +145,40 @@ def test_put_with_a_non_object_response_returns_empty() -> None:
     client = RouterOSClient(SETTINGS)
     with patch.object(requests.Session, "request", return_value=_response(200, [])):
         assert client.put("interface/bridge", {}) == {}
+
+
+def test_post_sends_json_body_and_returns_list() -> None:
+    client = RouterOSClient(SETTINGS)
+    sections = [{".section": "0"}, {".section": "1", "latest-version": "7.25"}]
+    with patch.object(requests.Session, "request", return_value=_response(200, sections)) as r:
+        assert client.post("system/package/update/check-for-updates") == sections
+    assert r.call_args.args == (
+        "POST",
+        "https://192.0.2.2/rest/system/package/update/check-for-updates",
+    )
+    assert r.call_args.kwargs["json"] == {}
+    with patch.object(requests.Session, "request", return_value=_response(200, [])) as r:
+        client.post("system/package/update/set", {"channel": "stable"})
+    assert r.call_args.kwargs["json"] == {"channel": "stable"}
+
+
+def test_post_empty_reply_is_none() -> None:
+    client = RouterOSClient(SETTINGS)
+    response = _response(204, None)
+    with patch.object(requests.Session, "request", return_value=response):
+        assert client.post("system/reboot") is None
+
+
+def test_post_error_status_and_transport_failure() -> None:
+    client = RouterOSClient(SETTINGS)
+    with (
+        patch.object(requests.Session, "request", return_value=_response(400, {"message": "bad"})),
+        pytest.raises(RouterOSAPIError) as caught,
+    ):
+        client.post("system/reboot")
+    assert caught.value.status_code == 400
+    with (
+        patch.object(requests.Session, "request", side_effect=requests.ConnectionError("x")),
+        pytest.raises(RouterOSConnectionError),
+    ):
+        client.post("system/reboot")

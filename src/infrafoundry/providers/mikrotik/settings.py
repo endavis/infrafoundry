@@ -13,6 +13,9 @@ from infrafoundry.secrets.environment import resolved_provider_settings
 
 PROVIDER_NAME = "mikrotik"
 DEFAULT_TIMEOUT = 10
+DEFAULT_UPGRADE_TIMEOUT = 900
+MIN_UPGRADE_TIMEOUT = 120
+MAX_UPGRADE_TIMEOUT = 3600
 _REQUIRED = ("api_url", "username", "password")
 
 
@@ -29,6 +32,7 @@ class MikroTikSettings:
     password: str = field(repr=False)
     verify_ssl: bool = True
     timeout: int = DEFAULT_TIMEOUT
+    upgrade_timeout: int = DEFAULT_UPGRADE_TIMEOUT
 
     @property
     def scheme(self) -> str:
@@ -56,6 +60,26 @@ def management_host(api_url: str) -> str:
     return host
 
 
+def upgrade_timeout_problem(raw: Any) -> str | None:
+    """Return a problem text for a bad ``upgrade_timeout`` value, or ``None`` when it is fine.
+
+    The text names the key, never the value.
+
+    Args:
+        raw: The configured value (``None`` means the default).
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        return "provider_settings.mikrotik.upgrade_timeout must be an integer number of seconds"
+    if not MIN_UPGRADE_TIMEOUT <= raw <= MAX_UPGRADE_TIMEOUT:
+        return (
+            "provider_settings.mikrotik.upgrade_timeout must be within "
+            f"{MIN_UPGRADE_TIMEOUT}-{MAX_UPGRADE_TIMEOUT} seconds"
+        )
+    return None
+
+
 def settings_from_mapping(raw: dict[str, Any]) -> MikroTikSettings:
     """Build settings from an already secret-resolved mapping.
 
@@ -69,12 +93,16 @@ def settings_from_mapping(raw: dict[str, Any]) -> MikroTikSettings:
     if missing:
         raise MikroTikSettingsError("provider_settings.mikrotik is missing: " + ", ".join(missing))
     management_host(str(raw["api_url"]))
+    problem = upgrade_timeout_problem(raw.get("upgrade_timeout"))
+    if problem:
+        raise MikroTikSettingsError(problem)
     return MikroTikSettings(
         api_url=str(raw["api_url"]).rstrip("/"),
         username=str(raw["username"]),
         password=str(raw["password"]),
         verify_ssl=bool(raw.get("verify_ssl", True)),
         timeout=int(raw.get("timeout", DEFAULT_TIMEOUT)),
+        upgrade_timeout=int(raw.get("upgrade_timeout", DEFAULT_UPGRADE_TIMEOUT)),
     )
 
 

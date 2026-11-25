@@ -118,3 +118,12 @@ def test_reference_to_interface_declared_in_another_package(factory: FakeRouterO
     with patch("infrafoundry.providers.mikrotik.validator.load_settings", return_value=SETTINGS):
         validator.validate_references([addr])
     assert _failed(report) == ["mikrotik_reference_a"]
+
+
+def test_offline_update_resource_findings_and_timeout() -> None:
+    validator, report = _validator()
+    validator.validate_offline([resource("system.package.update", "ros", channel="beta")])
+    assert _failed(report) == ["mikrotik_schema_ros"]
+    validator, report = _validator(settings={**GOOD, "upgrade_timeout": 5})
+    validator.validate_offline([resource("system.package.update", "ros")])
+    assert _failed(report) == ["mikrotik_upgrade_timeout"]

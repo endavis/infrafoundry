@@ -49,6 +49,15 @@ def test_provider_discovers_proxmox() -> None:
     assert "export" in result.output
 
 
+def test_provider_discovers_mikrotik() -> None:
+    """MikroTik's ``register()`` is invoked and its ``upgrade`` command is attached."""
+    from infrafoundry.cli.main import foundry
+
+    result = CliRunner().invoke(foundry, ["provider", "mikrotik", "--help"])
+    assert result.exit_code == 0, result.output
+    assert "upgrade" in result.output
+
+
 def test_provider_ignores_provider_without_cli_hook() -> None:
     """A provider whose ProviderMetadata has no cli_registration is skipped."""
 
