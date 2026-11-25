@@ -111,6 +111,9 @@ run "/ip address add address={{ routeros_mgmt_ip }}/{{ routeros_mgmt_prefix }} i
 {% if routeros_mgmt_gateway %}
 run "/ip route add dst-address=0.0.0.0/0 gateway={{ routeros_mgmt_gateway }}"
 {% endif %}
+{% if routeros_mgmt_dns %}
+run "/ip dns set servers={{ routeros_mgmt_dns }}"
+{% endif %}
 {% endif %}
 run "/ip service set www disabled=no"
 

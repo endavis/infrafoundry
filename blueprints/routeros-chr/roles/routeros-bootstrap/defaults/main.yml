@@ -7,6 +7,8 @@ routeros_mgmt_if: ether1
 routeros_mgmt_ip: ""
 routeros_mgmt_prefix: 24
 routeros_mgmt_gateway: ""
+# DNS servers of the router itself; a comma-separated list sets several
+routeros_mgmt_dns: ""
 
 # Seconds to wait for the first login prompt on the serial console
 routeros_boot_timeout: 300

@@ -24,6 +24,14 @@
     quiet: true
   when: routeros_mgmt_gateway | length > 0
 
+- name: Check the DNS input
+  ansible.builtin.assert:
+    that:
+      - routeros_mgmt_ip | length > 0
+    fail_msg: mgmt_dns needs mgmt_ip.
+    quiet: true
+  when: routeros_mgmt_dns | length > 0
+
 - name: Fail if the VM is already running
   ansible.builtin.command:
     cmd: "qm status {{ routeros_vmid }}"
