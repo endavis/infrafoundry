@@ -163,3 +163,58 @@ def test_password_constant_matches_the_literal() -> None:
 def test_repr_shows_host_and_port_only(served_qnap: ServedQnap) -> None:
     text = repr(QnapClient(settings_for(served_qnap)))
     assert "127.0.0.1" in text and PASSWORD not in text
+
+
+def test_get_raw_returns_exact_bytes_with_bearer(served_qnap: ServedQnap) -> None:
+    payload = b"\x1f\x8b\x00binary-example"
+    served_qnap.state.raw["system/config"] = payload
+    client = QnapClient(settings_for(served_qnap))
+    with client.session():
+        assert client.get_raw("system/config") == payload
+    request = next(r for r in served_qnap.state.requests if r[1].endswith("system/config"))
+    assert request[2] == f"Bearer {TOKEN}"
+
+
+@pytest.mark.parametrize("body", [b"<!DOCTYPE html><html></html>", b"<html>x</html>", b""])
+def test_get_raw_rejects_html_and_empty(served_qnap: ServedQnap, body: bytes) -> None:
+    served_qnap.state.raw["system/config"] = body
+    client = QnapClient(settings_for(served_qnap))
+    with client.session(), pytest.raises(QnapApiDriftError):
+        client.get_raw("system/config")
+
+
+def test_get_raw_envelope_error_code_and_success(served_qnap: ServedQnap) -> None:
+    served_qnap.state.envelopes["a"] = {"error_code": 500, "error_message": "x", "result": None}
+    served_qnap.state.envelopes["b"] = {"error_code": 200, "error_message": "OK", "result": 1}
+    served_qnap.state.envelopes["c"] = {"error_code": 401, "error_message": "x", "result": None}
+    client = QnapClient(settings_for(served_qnap))
+    with client.session():
+        with pytest.raises(QnapApiError) as caught:
+            client.get_raw("a")
+        assert caught.value.error_code == 500
+        with pytest.raises(QnapApiDriftError, match="not a download"):
+            client.get_raw("b")
+        with pytest.raises(QnapAuthError):
+            client.get_raw("c")
+
+
+def test_get_raw_without_login_is_an_auth_error(served_qnap: ServedQnap) -> None:
+    client = QnapClient(settings_for(served_qnap))
+    with pytest.raises(QnapAuthError):
+        client.get_raw("firmware/info")
+
+
+def test_get_raw_errors_leak_nothing(
+    served_qnap: ServedQnap, caplog: pytest.LogCaptureFixture
+) -> None:
+    served_qnap.state.raw["system/config"] = b"<html>x</html>"
+    client = QnapClient(settings_for(served_qnap))
+    with (
+        caplog.at_level(logging.DEBUG),
+        pytest.raises(QnapApiDriftError) as caught,
+        client.session(),
+    ):
+        client.get_raw("system/config")
+    secrets = [PASSWORD, ez_encode(PASSWORD), TOKEN]
+    haystack = str(caught.value) + repr(client) + caplog.text
+    assert not any(secret in haystack for secret in secrets)

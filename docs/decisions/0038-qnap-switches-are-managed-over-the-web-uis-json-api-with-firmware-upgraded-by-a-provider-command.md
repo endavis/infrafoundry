@@ -50,6 +50,7 @@ The same shape already exists for other devices: GL.iNet routers are upgraded th
 ## Related Documentation
 
 - [QNAP provider](../providers/qnap.md)
+- [Device config collectors](../guides/device-config-collectors.md)
 - [ADR-0005](0005-provider-cli-extensibility.md) provider CLI extensibility
 - [ADR-0036](0036-glinet-firmware-is-upgraded-through-the-vendor-online-upgrade-by-a-provider-command.md) GL.iNet firmware upgrade
 - [ADR-0037](0037-mikrotik-routeros-is-upgraded-to-the-latest-release-of-a-channel-by-a-provider-command.md) MikroTik RouterOS upgrade

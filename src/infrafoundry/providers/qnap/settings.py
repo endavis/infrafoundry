@@ -72,7 +72,12 @@ class QnapSettings:
         return urlparse(self.api_url).port or 443
 
 
-def raw_settings_problems(raw: dict[str, Any], *, require_secret_refs: bool = True) -> list[str]:
+def raw_settings_problems(
+    raw: dict[str, Any],
+    *,
+    require_secret_refs: bool = True,
+    where: str = "provider_settings.qnap",
+) -> list[str]:
     """Return what is wrong with the raw ``provider_settings.qnap`` mapping (empty when valid).
 
     The check is offline and looks at the unresolved mapping. Messages name keys only.
@@ -81,8 +86,8 @@ def raw_settings_problems(raw: dict[str, Any], *, require_secret_refs: bool = Tr
         raw: The ``provider_settings.qnap`` mapping.
         require_secret_refs: Require ``username`` and ``password`` to be ``secret://``
             references (False for a mapping whose secrets are already resolved).
+        where: Prefix of every message, naming the mapping that is checked.
     """
-    where = "provider_settings.qnap"
     problems: list[str] = []
     missing = [key for key in _REQUIRED if not raw.get(key)]
     if missing:
@@ -124,16 +129,19 @@ def raw_settings_problems(raw: dict[str, Any], *, require_secret_refs: bool = Tr
     return problems
 
 
-def settings_from_mapping(resolved: dict[str, Any]) -> QnapSettings:
+def settings_from_mapping(
+    resolved: dict[str, Any], *, where: str = "provider_settings.qnap"
+) -> QnapSettings:
     """Build settings from an already secret-resolved mapping.
 
     Args:
         resolved: The ``provider_settings.qnap`` mapping with secrets resolved.
+        where: Prefix of every error message, naming the mapping that is checked.
 
     Raises:
         QnapSettingsError: On a missing key or an invalid value. Names keys, never values.
     """
-    problems = raw_settings_problems(resolved, require_secret_refs=False)
+    problems = raw_settings_problems(resolved, require_secret_refs=False, where=where)
     if problems:
         raise QnapSettingsError("; ".join(problems))
     return QnapSettings(

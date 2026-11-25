@@ -12,7 +12,7 @@ from infrafoundry.secrets.environment import build_secret_resolver
 
 from .base import CollectorConfigError
 
-HTTP_TYPES = frozenset({"huawei-ont-web", "routeros-rest"})
+HTTP_TYPES = frozenset({"huawei-ont-web", "routeros-rest", "qnap-qsw-rest"})
 SSH_TYPES = frozenset({"openwrt-ssh"})
 KNOWN_TYPES = HTTP_TYPES | SSH_TYPES
 

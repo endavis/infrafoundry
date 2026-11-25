@@ -139,21 +139,22 @@ class QnapClient:
         """Show the target only; credentials and the token are never part of it."""
         return f"QnapClient(host={self._settings.host!r}, port={self._settings.port})"
 
-    def _request(
+    def _exchange(
         self,
         method: str,
-        path: str,
-        body: dict[str, Any] | None = None,
+        endpoint: str,
+        payload: bytes | None,
         *,
-        auth: bool = True,
-        timeout: float | None = None,
-        base: str = API_BASE,
-    ) -> Any:
-        endpoint = f"{base}{path}"
-        headers = {"Content-Type": "application/json;charset=UTF-8"}
+        auth: bool,
+        timeout: float | None,
+        content_json: bool,
+    ) -> tuple[int, bytes]:
+        """Send one request and return ``(HTTP status, body)``; maps transport errors."""
+        headers: dict[str, str] = {}
+        if content_json:
+            headers["Content-Type"] = "application/json;charset=UTF-8"
         if auth and self._token is not None:
             headers["Authorization"] = f"Bearer {self._token}"
-        payload = json.dumps(body).encode() if body is not None else None
         connection = self._factory(
             self._settings, float(timeout if timeout is not None else self._settings.timeout)
         )
@@ -172,6 +173,23 @@ class QnapClient:
             ) from exc
         finally:
             connection.close()
+        return status, raw
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        body: dict[str, Any] | None = None,
+        *,
+        auth: bool = True,
+        timeout: float | None = None,
+        base: str = API_BASE,
+    ) -> Any:
+        endpoint = f"{base}{path}"
+        payload = json.dumps(body).encode() if body is not None else None
+        status, raw = self._exchange(
+            method, endpoint, payload, auth=auth, timeout=timeout, content_json=True
+        )
         try:
             document = json.loads(raw)
         except ValueError as exc:
@@ -247,6 +265,50 @@ class QnapClient:
             timeout: Socket timeout for this call; the settings' ``timeout`` by default.
         """
         return self._request("GET", path, timeout=timeout)
+
+    def get_raw(self, path: str, *, timeout: float | None = None) -> bytes:
+        """Return the body of ``GET /api/v1/<path>`` for a binary download.
+
+        Used for the native configuration export, which is not a JSON envelope.
+
+        Args:
+            path: Path below ``/api/v1/``.
+            timeout: Socket timeout for this call; the settings' ``timeout`` by default.
+
+        Raises:
+            QnapAuthError: If the switch refused the session token.
+            QnapApiError: If the switch answered with a JSON envelope carrying an error code.
+            QnapApiDriftError: If the reply is not a download (JSON success, HTML, empty or
+                a non-200 status).
+        """
+        endpoint = f"{API_BASE}{path}"
+        status, raw = self._exchange(
+            "GET", endpoint, None, auth=True, timeout=timeout, content_json=False
+        )
+        if status == 401:
+            raise QnapAuthError(f"the switch refused '{endpoint}' (HTTP 401)")
+        head = raw.lstrip()[:15].lower()
+        if head.startswith(b"{"):
+            try:
+                document = json.loads(raw)
+            except ValueError:
+                document = None
+            code = document.get("error_code") if isinstance(document, dict) else None
+            if isinstance(code, int) and not isinstance(code, bool):
+                if code == 401:
+                    raise QnapAuthError(f"the switch refused '{endpoint}' (error code 401)")
+                if code != 200:
+                    raise QnapApiError(endpoint, code)
+                raise QnapApiDriftError(
+                    f"the switch's reply to '{endpoint}' is JSON, not a download"
+                )
+        if head.startswith((b"<!doctype html", b"<html")):
+            raise QnapApiDriftError(f"the switch's reply to '{endpoint}' is a web page")
+        if status != 200:
+            raise QnapApiDriftError(f"the switch's reply to '{endpoint}' is HTTP {status}")
+        if not raw:
+            raise QnapApiDriftError(f"the switch's reply to '{endpoint}' is empty")
+        return raw
 
     def post(self, path: str, body: dict[str, Any] | None = None) -> Any:
         """Return the ``result`` of ``POST /api/v1/<path>``.

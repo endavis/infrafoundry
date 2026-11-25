@@ -121,4 +121,4 @@ A login is one `POST users/login`. A refusal is never retried, because the switc
 ## Limitations
 
 - One switch per environment.
-- No VLAN or port management yet (#1671) and no collector (#1670).
+- No VLAN or port management yet (#1671) The configuration backup is the [`qnap-qsw-rest` collector](../guides/device-config-collectors.md#qnap-qsw-rest).
