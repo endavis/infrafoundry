@@ -89,3 +89,17 @@ def test_required_fields(tmp_path: Path) -> None:
     env = make_env([{**DEV, "address": "ftp://x", "password": "p"}])
     with pytest.raises(CollectorConfigError, match="http"):
         resolve_device(env, env.collectors.devices[0])
+
+
+def test_qnap_qsw_rest_requires_credentials_and_https_url() -> None:
+    from infrafoundry.collectors import COLLECTORS
+
+    assert "qnap-qsw-rest" in COLLECTORS
+    qnap = {"name": "switch-core", "type": "qnap-qsw-rest", "address": "https://192.0.2.3",
+            "username": "u", "password": "p"}  # fmt: skip
+    env = make_env([{**qnap, "password": None}])
+    with pytest.raises(CollectorConfigError, match="password"):
+        resolve_device(env, env.collectors.devices[0])
+    env = make_env([{**qnap, "address": "ftp://x"}])
+    with pytest.raises(CollectorConfigError, match="http"):
+        resolve_device(env, env.collectors.devices[0])

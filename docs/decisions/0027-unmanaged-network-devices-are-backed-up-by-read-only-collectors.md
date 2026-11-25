@@ -20,7 +20,7 @@ Some network devices in an environment are never managed by InfraFoundry: an ISP
 Add **collectors**: read-only readers of unmanaged devices that live outside the provider, runner and state model, in `src/infrafoundry/collectors/`. `foundry infra collect --env <env> [--device/-d NAME]` runs them.
 
 - **Configuration.** A `collectors:` section in `envs/<env>/settings.yaml` lists devices (name, type, address, credentials as `secret://env_secrets/...`) and an optional `output_dir`, default `device-configs/<env>`, which must stay inside the config repo and outside `envs/` (every subdirectory of an environment is otherwise discovered as a provider).
-- **Types.** `huawei-ont-web`, `routeros-rest` (reusing the MikroTik REST client) and `openwrt-ssh` (the `ssh` binary, key authentication only, host-key checking left on). A plain in-package registry maps type to factory; entry-point registration is the later extension path.
+- **Types.** `huawei-ont-web`, `routeros-rest` (reusing the MikroTik REST client) and `openwrt-ssh` (the `ssh` binary, key authentication only, host-key checking left on) and `qnap-qsw-rest` (reusing the QNAP provider client, ADR-0038). A plain in-package registry maps type to factory; entry-point registration is the later extension path.
 - **Encrypted at rest.** Secret-bearing artifacts are SOPS-encrypted whole-file (binary input, JSON output) to `<name>.sops.json`. The plaintext exists only in a temp directory removed on every path. OpenWrt UCI exports are both redacted and encrypted.
 - **Change detection.** The previous file is decrypted in memory and the plaintext hashes are compared. Unchanged artifacts are not rewritten, so there is no ciphertext churn in git. Volatile output (the RouterOS export timestamp, `ip addr` lease lifetimes) is normalised first.
 - **Lock-out safety.** The Huawei collector makes exactly one login attempt per run on one session, never retries, and always logs out. A device failure is isolated; the command exits non-zero after printing the summary.
@@ -32,6 +32,7 @@ A provider carries plan, apply and state semantics that a read-only backup does 
 ## Related Issues
 
 - Issue #1481: back up unmanaged network device configs
+- Issue #1670: QNAP QSW-M collector
 
 ## Related Documentation
 

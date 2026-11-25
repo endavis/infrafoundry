@@ -44,6 +44,13 @@ collectors:
       address: http://192.0.2.2
       username: secret://env_secrets/switch-core/username
       password: secret://env_secrets/switch-core/password
+    - name: switch-core-qnap
+      type: qnap-qsw-rest
+      address: https://192.0.2.3
+      username: secret://env_secrets/switch-core-qnap/username
+      password: secret://env_secrets/switch-core-qnap/password
+      options:
+        tls_fingerprint: "AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89"
     - name: travel-router
       type: openwrt-ssh
       address: 198.51.100.7
@@ -92,6 +99,10 @@ download, and its LAN host table carries runtime attributes (`LastStatusChangeTi
 comparison masks those values (the stored file keeps them). A change to only such a value,
 for example a new Wi-Fi key and nothing else, is therefore not reported.
 
+The QNAP native export, `system-config.bin`, is off by default. When enabled with
+`options.native_export: true` it is compared byte for byte, and because the export is not
+byte-stable it is reported as changed on every run.
+
 ## Collectors
 
 ### huawei-ont-web
@@ -111,6 +122,30 @@ Huawei ONT web UI (HG8xxx family). Downloads the plain config export, `config.xm
 MikroTik RouterOS over REST, for devices not managed by the [MikroTik provider](../providers/mikrotik.md).
 Runs `/export terse` and stores `export.rsc` (always encrypted). Plain `http://` URLs are
 accepted.
+
+### qnap-qsw-rest
+
+QNAP QSW-M series switches over the web UI's JSON API, reusing the client of the
+[QNAP provider](../providers/qnap.md). One login per run, never retried, and the session is
+always logged out. The address must be `https://`. Pin the switch's certificate with
+`options.tls_fingerprint` (SHA-256), or, unsafely, set `verify_ssl: false`.
+
+The collector reads the configuration endpoints only (system, firmware, VLANs, ports, link
+aggregation, spanning tree, LLDP, QoS, ACLs, IGMP, mirroring, DNS, IP interfaces and routes,
+time, web and HTTPS settings, syslog, SNMP and users) and stores one JSON document per endpoint,
+for example `vlan.json` and `ip-ipv4-route.json`. Status and statistics endpoints are left out.
+Documents with credentials or the switch MAC address (`system-info.json`, `users.json`,
+`snmp-community.json`, `snmp-security.json`) are encrypted; the others are plaintext so git
+diffs stay readable.
+
+The switch's native export is off by default. Set `options.native_export: true` to store it as
+`system-config.bin` (encrypted). It is opaque and can be restored through the switch's web UI,
+but it is not byte-stable, so it is reported as changed on every run.
+
+Endpoints a firmware does not serve are listed with a reason in `unavailable.json` and do not
+fail the run. A file kept from an earlier run for an endpoint that is now unavailable is not
+deleted; check `unavailable.json`. The run fails if `system/info`, `firmware/info` or `vlan`
+is unavailable, so an API change never writes an empty backup.
 
 ### openwrt-ssh
 

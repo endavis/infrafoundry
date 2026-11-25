@@ -144,3 +144,15 @@ def test_load_settings_without_block_raises(tmp_path: Path) -> None:
         manager.return_value.load_environment.return_value = None
         with pytest.raises(QnapSettingsError, match=r"No provider_settings\.qnap"):
             load_settings(tmp_path, "dev")
+
+
+def test_where_prefixes_every_message_and_default_is_unchanged() -> None:
+    bad = {**RESOLVED, "tls_fingerprint": None}
+    where = "collectors device 'x'"
+    problems = raw_settings_problems(bad, require_secret_refs=False, where=where)
+    assert problems
+    assert all(p.startswith(where) for p in problems)
+    with pytest.raises(QnapSettingsError, match="collectors device 'x'"):
+        settings_from_mapping(bad, where="collectors device 'x'")
+    with pytest.raises(QnapSettingsError, match=r"provider_settings\.qnap"):
+        settings_from_mapping(bad)
