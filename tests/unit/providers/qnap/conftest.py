@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from pathlib import Path
 from typing import Any
+
+import pytest
 
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.qnap.components.firmware import FIRMWARE_TYPE
+from infrafoundry.providers.qnap.components.manager import QnapConfigManager
 from infrafoundry.providers.qnap.settings import QnapSettings
 
 from .qnap_fake import ServedQnap
@@ -56,3 +61,32 @@ def settings_for(served: ServedQnap, **overrides: Any) -> QnapSettings:
     }
     values.update(overrides)
     return QnapSettings(**values)
+
+
+def vlan(name: str = "v10", **config: Any) -> ResourceConfig:
+    """Build a ``vlan`` resource; ``config`` holds ``id``, ``tagged``, ``untagged``, ``absent``."""
+    return ResourceConfig(name=name, type="vlan", provider="qnap", config=config)
+
+
+def lag(name: str = "uplink", **config: Any) -> ResourceConfig:
+    """Build a ``lacp.group`` resource; ``config`` holds ``group``, ``mode``, ``members``."""
+    return ResourceConfig(name=name, type="lacp.group", provider="qnap", config=config)
+
+
+def manager_for(
+    fake: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, **settings: Any
+) -> QnapConfigManager:
+    """Build a manager that talks to ``fake`` with settings that need no environment files."""
+    from .config_fake import FakeClock
+
+    values: dict[str, Any] = {"management_vlan": 1}
+    values.update(settings)
+    monkeypatch.setattr(
+        "infrafoundry.providers.qnap.components.manager.load_settings",
+        lambda _dir, _env: replace(SETTINGS, **values),
+    )
+    clock = fake.clock or FakeClock()
+    fake.clock = clock
+    return QnapConfigManager(
+        tmp_path, client_factory=lambda _s: fake, sleep=clock.sleep, clock=clock.clock
+    )

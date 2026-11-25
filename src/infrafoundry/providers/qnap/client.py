@@ -20,7 +20,7 @@ import json
 import logging
 import struct
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager, suppress
+from contextlib import AbstractContextManager, contextmanager, suppress
 from typing import Any, Protocol
 
 from infrafoundry.core.exceptions import InfraFoundryError
@@ -94,6 +94,26 @@ class QnapReader(Protocol):
 
     def post(self, path: str, body: dict[str, Any] | None = None) -> Any:
         """Return the ``result`` of a POST under ``/api/v1/``."""
+        ...
+
+
+class QnapWriter(QnapReader, Protocol):
+    """What the config manager needs: reads, writes, the liveness probe and a session."""
+
+    def put(self, path: str, body: dict[str, Any]) -> Any:
+        """Return the ``result`` of a PUT under ``/api/v1/``."""
+        ...
+
+    def delete(self, path: str, body: dict[str, Any]) -> Any:
+        """Return the ``result`` of a DELETE under ``/api/v1/``."""
+        ...
+
+    def live(self) -> bool:
+        """Return True when ``/api/live`` answers."""
+        ...
+
+    def session(self) -> AbstractContextManager[None]:
+        """Log in, yield, log out."""
         ...
 
 
@@ -319,6 +339,24 @@ class QnapClient:
         """
         return self._request("POST", path, body if body is not None else {})
 
+    def put(self, path: str, body: dict[str, Any]) -> Any:
+        """Return the ``result`` of ``PUT /api/v1/<path>`` with a JSON body.
+
+        Args:
+            path: Path below ``/api/v1/``.
+            body: JSON body.
+        """
+        return self._request("PUT", path, body)
+
+    def delete(self, path: str, body: dict[str, Any]) -> Any:
+        """Return the ``result`` of ``DELETE /api/v1/<path>`` with a JSON body.
+
+        Args:
+            path: Path below ``/api/v1/``.
+            body: JSON body.
+        """
+        return self._request("DELETE", path, body)
+
     def about(self) -> dict[str, Any]:
         """Return ``/api/about`` (no login needed): hostname, model and product."""
         result = self._request("GET", "about", auth=False, base=PLAIN_BASE)
@@ -364,5 +402,6 @@ __all__ = [
     "QnapTimeoutError",
     "QnapTlsPinError",
     "QnapUnreachableError",
+    "QnapWriter",
     "ez_encode",
 ]

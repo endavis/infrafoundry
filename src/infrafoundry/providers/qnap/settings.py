@@ -8,6 +8,10 @@
         username: secret://env_secrets/qnap/username
         password: secret://env_secrets/qnap/password
         tls_fingerprint: "AB:CD:..."   # SHA-256 of the switch's certificate
+        management_vlan: 1             # optional: the VLAN the management address lives on
+        protected_ports: [1, lag1]     # optional: ports that carry your management traffic
+        allow_lockout_risk: false      # optional: downgrade lock-out refusals to warnings
+        liveness_timeout: 60           # optional: seconds to wait for the switch after a write
 
 One switch per environment. ``username`` and ``password`` must be ``secret://``
 references. Messages name keys, never values.
@@ -36,11 +40,16 @@ MAX_CHECK_TIMEOUT = 600
 DEFAULT_UPGRADE_TIMEOUT = 1200
 MIN_UPGRADE_TIMEOUT = 300
 MAX_UPGRADE_TIMEOUT = 3600
+DEFAULT_LIVENESS_TIMEOUT = 60
+MIN_LIVENESS_TIMEOUT = 10
+MAX_LIVENESS_TIMEOUT = 600
+MAX_MANAGEMENT_VLAN = 4094
 _REQUIRED = ("api_url", "username", "password")
 _TIMEOUTS = (
     ("timeout", MIN_TIMEOUT, MAX_TIMEOUT),
     ("check_timeout", MIN_CHECK_TIMEOUT, MAX_CHECK_TIMEOUT),
     ("upgrade_timeout", MIN_UPGRADE_TIMEOUT, MAX_UPGRADE_TIMEOUT),
+    ("liveness_timeout", MIN_LIVENESS_TIMEOUT, MAX_LIVENESS_TIMEOUT),
 )
 
 
@@ -60,6 +69,10 @@ class QnapSettings:
     timeout: int = DEFAULT_TIMEOUT
     check_timeout: int = DEFAULT_CHECK_TIMEOUT
     upgrade_timeout: int = DEFAULT_UPGRADE_TIMEOUT
+    management_vlan: int | None = None
+    protected_ports: tuple[int | str, ...] = ()
+    allow_lockout_risk: bool = False
+    liveness_timeout: int = DEFAULT_LIVENESS_TIMEOUT
 
     @property
     def host(self) -> str:
@@ -126,6 +139,35 @@ def raw_settings_problems(
             problems.append(f"{where}.{key} must be an integer number of seconds")
         elif not low <= value <= high:
             problems.append(f"{where}.{key} must be within {low}-{high} seconds")
+    problems.extend(_lockout_problems(raw, where))
+    return problems
+
+
+def _lockout_problems(raw: dict[str, Any], where: str) -> list[str]:
+    """Check the lock-out keys (``management_vlan``, ``protected_ports``, the override)."""
+    from .schema import parse_port  # local import: schema imports the client, which imports us
+
+    problems: list[str] = []
+    vlan = raw.get("management_vlan")
+    if vlan is not None and (
+        isinstance(vlan, bool) or not isinstance(vlan, int) or not 1 <= vlan <= MAX_MANAGEMENT_VLAN
+    ):
+        problems.append(
+            f"{where}.management_vlan must be an integer within 1-{MAX_MANAGEMENT_VLAN}"
+        )
+    if "protected_ports" in raw:
+        ports = raw["protected_ports"]
+        if not isinstance(ports, (list, tuple)):
+            problems.append(f"{where}.protected_ports must be a list of ports (N or lagN)")
+        else:
+            for item in ports:
+                try:
+                    parse_port(item)
+                except ValueError:
+                    problems.append(f"{where}.protected_ports has an entry that is not a port")
+                    break
+    if "allow_lockout_risk" in raw and not isinstance(raw["allow_lockout_risk"], bool):
+        problems.append(f"{where}.allow_lockout_risk must be true or false")
     return problems
 
 
@@ -144,6 +186,8 @@ def settings_from_mapping(
     problems = raw_settings_problems(resolved, require_secret_refs=False, where=where)
     if problems:
         raise QnapSettingsError("; ".join(problems))
+    from .schema import parse_port  # local import: schema imports the client
+
     return QnapSettings(
         api_url=str(resolved["api_url"]).rstrip("/"),
         username=str(resolved["username"]),
@@ -153,6 +197,10 @@ def settings_from_mapping(
         timeout=int(resolved.get("timeout", DEFAULT_TIMEOUT)),
         check_timeout=int(resolved.get("check_timeout", DEFAULT_CHECK_TIMEOUT)),
         upgrade_timeout=int(resolved.get("upgrade_timeout", DEFAULT_UPGRADE_TIMEOUT)),
+        management_vlan=resolved.get("management_vlan"),
+        protected_ports=tuple(parse_port(i) for i in resolved.get("protected_ports", ())),
+        allow_lockout_risk=resolved.get("allow_lockout_risk", False) is True,
+        liveness_timeout=int(resolved.get("liveness_timeout", DEFAULT_LIVENESS_TIMEOUT)),
     )
 
 

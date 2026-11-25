@@ -156,3 +156,48 @@ def test_where_prefixes_every_message_and_default_is_unchanged() -> None:
         settings_from_mapping(bad, where="collectors device 'x'")
     with pytest.raises(QnapSettingsError, match=r"provider_settings\.qnap"):
         settings_from_mapping(bad)
+
+
+def test_config_keys_default_off() -> None:
+    settings = settings_from_mapping(dict(RESOLVED))
+    assert settings.management_vlan is None
+    assert settings.protected_ports == ()
+    assert settings.allow_lockout_risk is False
+    assert settings.liveness_timeout == 60
+
+
+def test_config_keys_round_trip() -> None:
+    settings = settings_from_mapping(
+        {
+            **RESOLVED,
+            "management_vlan": 10,
+            "protected_ports": [1, "lag2"],
+            "allow_lockout_risk": True,
+            "liveness_timeout": 120,
+        }
+    )
+    assert settings.management_vlan == 10
+    assert settings.protected_ports == (1, "lag2")
+    assert settings.allow_lockout_risk is True
+    assert settings.liveness_timeout == 120
+
+
+@pytest.mark.parametrize(
+    "key, value",
+    [
+        ("management_vlan", 0),
+        ("management_vlan", 4095),
+        ("management_vlan", True),
+        ("management_vlan", "10"),
+        ("protected_ports", "1,2"),
+        ("protected_ports", [0]),
+        ("protected_ports", ["lagx"]),
+        ("allow_lockout_risk", "yes"),
+        ("liveness_timeout", 5),
+        ("liveness_timeout", 601),
+        ("liveness_timeout", "60"),
+    ],
+)
+def test_bad_config_keys_are_named_by_key_only(key: str, value: Any) -> None:
+    problems = _problems(**{key: value})
+    assert len(problems) == 1 and key in problems[0]

@@ -48,6 +48,7 @@ class FakeQnapState:
             "firmware/update/live": {},
             "dns/server": [{"key": "1", "val": {"IpAddress": "192.0.2.53", "State": "up"}}],
             "system/info": {"hostname": "sw-example", "mac": "02:00:00:00:00:01"},
+            "vlan": [{"key": "1", "val": [{"Port": "1", "Tagged": False}]}],
         }
     )
     raw: dict[str, bytes] = field(default_factory=dict)
@@ -127,6 +128,12 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         self._handle("POST")
+
+    def do_PUT(self) -> None:
+        self._handle("PUT")
+
+    def do_DELETE(self) -> None:
+        self._handle("DELETE")
 
     def log_message(self, format: str, *args: Any) -> None:
         return

@@ -218,3 +218,25 @@ def test_get_raw_errors_leak_nothing(
     secrets = [PASSWORD, ez_encode(PASSWORD), TOKEN]
     haystack = str(caught.value) + repr(client) + caplog.text
     assert not any(secret in haystack for secret in secrets)
+
+
+@pytest.mark.parametrize("verb, method", [("put", "PUT"), ("delete", "DELETE")])
+def test_put_and_delete_send_the_method_a_json_body_and_the_token(
+    served_qnap: ServedQnap, verb: str, method: str
+) -> None:
+    client = QnapClient(settings_for(served_qnap))
+    client.login()
+    body = {"data": [{"key": "10", "val": []}]}
+    assert isinstance(getattr(client, verb)("vlan", body), list)
+    sent = [r for r in served_qnap.state.requests if r[1] == "/api/v1/vlan"]
+    assert sent == [(method, "/api/v1/vlan", f"Bearer {TOKEN}", body)]
+
+
+@pytest.mark.parametrize("verb", ["put", "delete"])
+def test_put_and_delete_raise_on_a_non_200_error_code(served_qnap: ServedQnap, verb: str) -> None:
+    served_qnap.state.envelopes["vlan"] = {"error_code": 400, "error_message": "x", "result": None}
+    client = QnapClient(settings_for(served_qnap))
+    client.login()
+    with pytest.raises(QnapApiError) as excinfo:
+        getattr(client, verb)("vlan", {"idx": "10"})
+    assert excinfo.value.error_code == 400
