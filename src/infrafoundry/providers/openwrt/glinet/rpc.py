@@ -14,16 +14,15 @@ message or a ``repr``.
 from __future__ import annotations
 
 import hashlib
-import hmac
 import http.client
 import json
 import logging
-import ssl
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
 from typing import Any
 
 from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.tls_pin import PinnedHTTPSConnection, make_tls_context
 from infrafoundry.providers.openwrt.glinet.crypt import UnsupportedCryptError, crypt
 from infrafoundry.providers.openwrt.glinet.settings import GlinetWebSettings
 
@@ -54,53 +53,6 @@ class GlinetUnreachableError(GlinetRpcError):
     """The router could not be reached (refused, timed out, or the connection dropped)."""
 
 
-def make_tls_context() -> ssl.SSLContext:
-    """Return the client context: TLS 1.2+, no chain or host-name check (the pin replaces it)."""
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    context.minimum_version = ssl.TLSVersion.TLSv1_2
-    context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE  # nosec B501  # replaced by the fingerprint pin
-    return context
-
-
-class PinnedHTTPSConnection(http.client.HTTPSConnection):
-    """An HTTPS connection that checks the peer certificate's SHA-256 pin on connect."""
-
-    def __init__(self, host: str, port: int, *, fingerprint: str | None, timeout: float) -> None:
-        """Create the connection; nothing is sent until :meth:`connect` succeeds.
-
-        Args:
-            host: Router address.
-            port: Web port.
-            fingerprint: 64 lowercase hex characters, or ``None`` for the unverified opt-out.
-            timeout: Socket timeout in seconds.
-        """
-        super().__init__(host, port, timeout=timeout, context=make_tls_context())
-        self._fingerprint = fingerprint
-
-    def connect(self) -> None:
-        """Connect, then compare the certificate with the pin before anything is sent.
-
-        Raises:
-            GlinetTlsPinError: If the certificate does not match the pin.
-        """
-        super().connect()
-        if self._fingerprint is None:
-            return
-        sock = self.sock
-        if not isinstance(sock, ssl.SSLSocket):  # pragma: no cover  # HTTPSConnection wraps
-            self.close()
-            raise GlinetTlsPinError("the router connection is not TLS")
-        der = sock.getpeercert(binary_form=True)
-        seen = hashlib.sha256(der).hexdigest() if der else ""
-        if not hmac.compare_digest(seen, self._fingerprint):
-            self.close()
-            raise GlinetTlsPinError(
-                "the router's certificate does not match tls_fingerprint; if the router "
-                "was upgraded or reset, re-pin tls_fingerprint"
-            )
-
-
 ConnectionFactory = Callable[[GlinetWebSettings], http.client.HTTPSConnection]
 
 
@@ -112,6 +64,10 @@ def _default_factory(settings: GlinetWebSettings) -> http.client.HTTPSConnection
         settings.port,
         fingerprint=settings.fingerprint,
         timeout=settings.connect_timeout,
+        on_mismatch=lambda: GlinetTlsPinError(
+            "the router's certificate does not match tls_fingerprint; if the router "
+            "was upgraded or reset, re-pin tls_fingerprint"
+        ),
     )
 
 

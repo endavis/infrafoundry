@@ -19,13 +19,13 @@ Messages name keys, never values.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.provider_instances import split_provider_id
+from infrafoundry.core.tls_pin import FINGERPRINT_HEX_LENGTH, normalize_fingerprint
 from infrafoundry.providers.openwrt.devices import (
     device_settings,
     validate_devices_settings,
@@ -43,9 +43,6 @@ DEFAULT_WEB_PORT = 443
 DEFAULT_UPGRADE_TIMEOUT = 1200
 MIN_UPGRADE_TIMEOUT = 300
 MAX_UPGRADE_TIMEOUT = 3600
-FINGERPRINT_HEX_LENGTH = 64
-
-_HEX = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
@@ -60,18 +57,6 @@ class GlinetWebSettings:
     verify_ssl: bool = True
     upgrade_timeout: int = DEFAULT_UPGRADE_TIMEOUT
     connect_timeout: int = 10
-
-
-def normalize_fingerprint(value: object) -> str | None:
-    """Return a SHA-256 fingerprint as 64 lowercase hex characters, or ``None`` if invalid.
-
-    Args:
-        value: The configured pin, with or without ``:`` separators, in any case.
-    """
-    if not isinstance(value, str):
-        return None
-    compact = value.replace(":", "").strip().lower()
-    return compact if _HEX.match(compact) else None
 
 
 def _int_problem(raw: dict[str, Any], key: str, low: int, high: int, where: str) -> str | None:
