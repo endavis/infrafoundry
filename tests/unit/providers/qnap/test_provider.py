@@ -26,22 +26,24 @@ def _provider(tmp_path: Path) -> QnapProvider:
 def test_register_metadata() -> None:
     meta = register()
     assert meta.name == "qnap"
-    assert meta.resource_types == ["vlan", "lacp.group", "firmware.update"]
+    assert meta.resource_types == ["vlan", "lacp.group", "port", "firmware.update"]
     assert meta.provider_class is QnapProvider
     assert callable(meta.cli_registration)
 
 
 def test_resource_types_and_terraform_types(tmp_path: Path) -> None:
     provider = _provider(tmp_path)
-    assert provider.get_resource_types() == ["vlan", "lacp.group", "firmware.update"]
+    assert provider.get_resource_types() == ["vlan", "lacp.group", "port", "firmware.update"]
     assert provider.get_dependencies() == {
         "lacp.group": [],
         "vlan": ["lacp.group"],
+        "port": ["vlan", "lacp.group"],
         "firmware.update": [],
     }
     assert provider.get_terraform_resource_types() == {
         "vlan": ["qnap_vlan"],
         "lacp.group": ["qnap_lacp_group"],
+        "port": ["qnap_port"],
         "firmware.update": ["qnap_firmware_update"],
     }
 

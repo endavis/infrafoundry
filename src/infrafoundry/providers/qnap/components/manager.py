@@ -1,11 +1,12 @@
-"""Planner, applier and destroyer for a QNAP switch's VLANs and LACP groups (ADR-0039).
+"""Planner, applier and destroyer for a QNAP switch's VLANs, LACP groups and ports (ADR-0039).
 
 ``QnapConfigManager.plan`` reads the switch once, diffs the declared objects against it,
 orders the writes into phases and refuses a plan whose end state could cut the management
 connection. ``apply`` runs a plan's steps and stops at the first error. Afterwards, whether
 the steps succeeded or not, it waits for the switch to answer and reads the written
 objects back; a switch that does not answer or a re-read that differs fails the apply.
-``destroy`` deletes the declared objects that exist on the switch.
+``destroy`` deletes the declared VLANs and LACP groups that exist on the switch; a ``port``
+is never deleted, so destroy and a row that leaves the YAML only release it.
 """
 
 from __future__ import annotations
@@ -25,22 +26,30 @@ from ..client import QnapClient, QnapError, QnapWriter
 from ..schema import (
     CONFIG_TYPES,
     DEFAULT_VLAN_ID,
+    DELETABLE_TYPES,
     LACP_ADDRESS_PREFIX,
     LACP_TYPE,
+    PORT_ADDRESS_PREFIX,
+    PORT_TYPE,
     VLAN_ADDRESS_PREFIX,
     VLAN_TYPE,
     DesiredLag,
+    DesiredPort,
     DesiredVlan,
     LacpInfo,
     LiveLag,
+    LivePort,
     LiveVlan,
     count_ports,
     desired_lags,
+    desired_ports,
     desired_vlans,
     member_style,
     parse_lacp_info,
     parse_lags,
+    parse_ports,
     parse_vlans,
+    port_matches,
     resolve_port,
 )
 from ..settings import QnapSettings, load_settings
@@ -53,20 +62,26 @@ from .diff import (
     LagEnd,
     TypeDiff,
     check_end_state,
+    check_port_fec,
     diff_lags,
+    diff_ports,
     diff_vlans,
     end_state,
     label,
     untag_warnings,
 )
 from .executor import execute_steps
-from .lockout import check_lockout, management_vlan
+from .lockout import check_lockout, check_port_lockout, management_vlan, watched_ports
 from .ordering import PHASE_TITLES, Step, order_changes
 
 logger = logging.getLogger(__name__)
 
 ClientFactory = Callable[[QnapSettings], QnapWriter]
-_PREFIX = {VLAN_TYPE: VLAN_ADDRESS_PREFIX, LACP_TYPE: LACP_ADDRESS_PREFIX}
+_PREFIX = {
+    VLAN_TYPE: VLAN_ADDRESS_PREFIX,
+    LACP_TYPE: LACP_ADDRESS_PREFIX,
+    PORT_TYPE: PORT_ADDRESS_PREFIX,
+}
 _LIVE_POLL_SECONDS = 2.0
 _BACKUP_HINT = (
     "Restore from the 'infra collect' backup of this switch, or use physical access if the "
@@ -88,6 +103,10 @@ class QnapPlan:
     managed_resources: Mapping[str, list[ResourceConfig]] | None = None
     end_vlans: dict[int, dict[int, bool]] = field(default_factory=dict)
     end_lags: dict[int, LagEnd] = field(default_factory=dict)
+    end_ports: dict[int, DesiredPort] = field(default_factory=dict)
+    """The declared settings of the ports the plan changes (the read-back compares them)."""
+    live_mtus: dict[int, int] = field(default_factory=dict)
+    """Physical port number to its MTU before the writes (to spot a switch-wide MTU)."""
 
     @property
     def counts(self) -> dict[str, int]:
@@ -198,6 +217,9 @@ class _Live:
     vlans: list[LiveVlan]
     lags: list[LiveLag]
     info: LacpInfo
+    ports_raw: Any = None
+    """The ``GET ports`` reply, when it was read."""
+    ports: list[LivePort] = field(default_factory=list)
 
     @property
     def vlan_members(self) -> dict[int, dict[int, bool]]:
@@ -208,16 +230,21 @@ class _Live:
         return {g.group: LagEnd(g.mode, g.members) for g in self.lags}
 
 
-def _read(client: QnapWriter) -> _Live:
-    return _Live(
+def _read(client: QnapWriter, *, ports: bool = False) -> _Live:
+    """Read the VLANs, LACP groups and limits; ``ports`` also reads ``GET ports``."""
+    live = _Live(
         parse_vlans(client.get("vlan")),
         parse_lags(client.get("lacp/group")),
         parse_lacp_info(client.get("lacp/info")),
     )
+    if ports:
+        live.ports_raw = client.get("ports")
+        live.ports = parse_ports(live.ports_raw)
+    return live
 
 
 class QnapConfigManager:
-    """Plans, applies and destroys VLAN and LACP changes for one QNAP switch."""
+    """Plans, applies and destroys VLAN, LACP and port changes for one QNAP switch."""
 
     def __init__(
         self,
@@ -267,22 +294,24 @@ class QnapConfigManager:
             QnapPlanError: If the declared end state cannot exist on this switch.
         """
         vlans, lags = desired_vlans(resources), desired_lags(resources)
+        ports = desired_ports(resources)
         if target_resources:
             wanted = set(target_resources)
             vlans = [d for d in vlans if d.resource_name in wanted]
             lags = [d for d in lags if d.resource_name in wanted]
+            ports = [d for d in ports if d.resource_name in wanted]
             add_only = True
         plan = QnapPlan(
             resources=list(resources), add_only=add_only, managed_resources=managed_resources
         )
         managed = {t: (managed_resources or {}).get(t) for t in CONFIG_TYPES}
-        removable = not add_only and any(managed.values())
-        if not vlans and not lags and not removable:
+        removable = not add_only and any(managed[t] for t in DELETABLE_TYPES)
+        if not vlans and not lags and not ports and not removable:
             return plan
         settings = load_settings(self.config_dir, env_name)
         client = self._client_factory(settings)
         with client.session():
-            live = _read(client)
+            live = _read(client, ports=bool(ports))
             plan.diffs[VLAN_TYPE] = diff_vlans(
                 vlans,
                 live.vlans,
@@ -297,6 +326,11 @@ class QnapConfigManager:
                 add_only=add_only,
                 managed_keys=managed_keys(managed[LACP_TYPE], LACP_TYPE),
             )
+            if ports:
+                port_diff = diff_ports(ports, live.ports)
+                plan.diffs[PORT_TYPE] = port_diff
+                changed = {c.key[0] for c in port_diff.changes}
+                plan.end_ports = {p.port: p for p in ports if p.port in changed}
             if plan.has_changes:
                 self._finish(plan, client, settings, live, verify_references=True)
         return plan
@@ -315,13 +349,18 @@ class QnapConfigManager:
         live_vlans, live_lags = live.vlan_members, live.lag_ends
         plan.end_vlans, plan.end_lags = end_state(plan.diffs, live_vlans, live_lags)
         if verify_references:
+            ports_raw = live.ports_raw if live.ports_raw is not None else client.get("ports")
             check_end_state(
                 plan.diffs,
                 plan.end_vlans,
                 plan.end_lags,
-                port_count=count_ports(client.get("ports")),
+                port_count=count_ports(ports_raw),
                 info=live.info,
             )
+        port_diff = plan.diffs.get(PORT_TYPE)
+        check_port_fec(port_diff, live.ports)
+        if port_diff is not None and any("mtu" in c.fields for c in port_diff.changes):
+            plan.live_mtus = {row.key: row.mtu for row in live.ports if not row.is_lag}
         for diff in plan.diffs.values():
             plan.warnings.extend(diff.warnings)
         plan.warnings.extend(untag_warnings(plan.end_vlans, live_vlans, start))
@@ -329,6 +368,7 @@ class QnapConfigManager:
             plan.warnings.append(
                 "allow_lockout_risk is set: lock-out refusals are downgraded to warnings"
             )
+        watched: frozenset[int] = frozenset()
         mgmt, notes = management_vlan(settings, client.get("ip/ipv4/interface"))
         plan.warnings.extend(notes)
         if mgmt is None:
@@ -350,6 +390,18 @@ class QnapConfigManager:
             )
             plan.refusals.extend(check.refusals)
             plan.warnings.extend(check.warnings)
+            if port_diff is not None and port_diff.changes:
+                lag_members = {
+                    g: set(lag.members) | set(live_lags[g].members if g in live_lags else ())
+                    for g, lag in plan.end_lags.items()
+                } | {g: set(lag.members) for g, lag in live_lags.items() if g not in plan.end_lags}
+                mgmt_members = set(live_vlans.get(mgmt, {})) | set(plan.end_vlans.get(mgmt, {}))
+                watched = watched_ports(protected, mgmt_members, lag_members, start)
+                port_check = check_port_lockout(
+                    port_diff.changes, watched, settings.allow_lockout_risk
+                )
+                plan.refusals.extend(port_check.refusals)
+                plan.warnings.extend(port_check.warnings)
         plan.steps = order_changes(
             plan.diffs.get(VLAN_TYPE),
             plan.diffs.get(LACP_TYPE),
@@ -357,6 +409,8 @@ class QnapConfigManager:
             plan.end_vlans,
             mgmt,
             member_as_str=member_style(live.lags),
+            port_diff=port_diff,
+            last_ports=watched,
         )
 
     def plan_destroy(
@@ -462,7 +516,9 @@ class QnapConfigManager:
                 executed.failed.type_name,
                 executed.failed.resource_name,
             )
-        messages.extend(self._verify_after_apply(client, settings, plan, executed.completed))
+        messages.extend(
+            self._verify_after_apply(client, settings, plan, executed.completed, result.warnings)
+        )
         if messages:
             result.error = "\n".join(messages)
             return result
@@ -475,8 +531,12 @@ class QnapConfigManager:
         settings: QnapSettings,
         plan: QnapPlan,
         completed: list[Step],
+        warnings: list[str],
     ) -> list[str]:
-        """Wait for the switch, read it back and return the problems found."""
+        """Wait for the switch, read it back and return the problems found.
+
+        Observations that are not failures (a switch-wide MTU) are appended to ``warnings``.
+        """
         if not self._wait_live(client, settings.liveness_timeout):
             return [
                 f"the switch stopped answering on {settings.api_url} after "
@@ -486,12 +546,41 @@ class QnapConfigManager:
             return []
         try:
             with client.session():
-                live = _read(client)
+                live = _read(client, ports=any(s.type_name == PORT_TYPE for s in completed))
         except QnapError as exc:
             return [f"could not read the switch back after the writes: {exc}"]
+        warnings.extend(self._mtu_warnings(plan, completed, live))
         return [
             f"after the writes the switch differs from the plan for {name}"
             for name in self._mismatches(plan, completed, live)
+        ]
+
+    @staticmethod
+    def _mtu_warnings(plan: QnapPlan, completed: list[Step], live: _Live) -> list[str]:
+        """Warn when an MTU write also changed ports the YAML does not declare."""
+        changed = {
+            s.key[0]: plan.end_ports[s.key[0]].mtu
+            for s in completed
+            if s.type_name == PORT_TYPE and s.key[0] in plan.end_ports and plan.live_mtus
+        }
+        wanted = {m for m in changed.values() if m is not None}
+        if not wanted:
+            return []
+        declared = {p.port for p in desired_ports(plan.resources)}
+        spread = [
+            row.key
+            for row in live.ports
+            if not row.is_lag
+            and row.key not in declared
+            and row.mtu in wanted
+            and plan.live_mtus.get(row.key) not in (None, row.mtu)
+        ]
+        if not spread:
+            return []
+        return [
+            "the MTU is switch-wide: undeclared port(s) "
+            + ", ".join(str(k) for k in sorted(spread))
+            + " now show the new MTU too"
         ]
 
     def _wait_live(self, client: QnapWriter, timeout: int) -> bool:
@@ -518,7 +607,11 @@ class QnapConfigManager:
         for ident in sorted(done - pending, key=str):
             type_name, key = ident
             group = key[0]
-            if type_name == VLAN_TYPE:
+            if type_name == PORT_TYPE:
+                desired = plan.end_ports.get(group)
+                row = next((p for p in live.ports if p.key == group), None)
+                ok = desired is not None and row is not None and port_matches(row, desired)
+            elif type_name == VLAN_TYPE:
                 want = plan.end_vlans.get(group)
                 ok = live_vlans.get(group) == want
             else:
@@ -589,18 +682,22 @@ class QnapConfigManager:
             env_name: Environment name (for the settings).
             resources: The provider's resources.
         """
-        desired: list[DesiredVlan | DesiredLag] = [
+        desired: list[DesiredVlan | DesiredLag | DesiredPort] = [
             *(d for d in desired_vlans(resources) if not d.absent),
             *(d for d in desired_lags(resources) if not d.absent),
+            *desired_ports(resources),
         ]
         if not desired:
             return {}
+        has_ports = any(d.type_name == PORT_TYPE for d in desired)
         client = self._client_factory(load_settings(self.config_dir, env_name))
         with client.session():
-            live = _read(client)
-        present = {(VLAN_TYPE, v.id) for v in live.vlans} | {
-            (LACP_TYPE, g.group) for g in live.lags
-        }
+            live = _read(client, ports=has_ports)
+        present = (
+            {(VLAN_TYPE, v.id) for v in live.vlans}
+            | {(LACP_TYPE, g.group) for g in live.lags}
+            | {(PORT_TYPE, p.key) for p in live.ports if not p.is_lag}
+        )
         return {
             d.resource_name: str(d.key[0]) for d in desired if (d.type_name, d.key[0]) in present
         }

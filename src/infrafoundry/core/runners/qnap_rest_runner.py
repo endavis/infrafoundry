@@ -1,10 +1,11 @@
 """Runner for QNAP QSW-M switches over their web API (ADR-0038, ADR-0039).
 
 ``QnapRestRunner`` acts only for ``provider.name == "qnap"``. ``plan`` reads the switch,
-diffs the ``vlan`` and ``lacp.group`` resources against it and refuses a plan whose end
+diffs the ``vlan``, ``lacp.group`` and ``port`` resources against it and refuses a plan whose end
 state could cut the management connection; it then prints the firmware lines, which never
 change the outcome. ``apply`` runs the planned writes in order, stops at the first error and
-reads the result back; ``destroy`` deletes the declared objects that exist on the switch.
+reads the result back; ``destroy`` deletes the declared VLANs and LACP groups that exist on
+the switch (a ``port`` is never deleted).
 The ``firmware.update`` resource is never applied: the upgrade is
 ``foundry provider qnap upgrade``. A firmware-only environment plans no changes and makes no
 configuration call.

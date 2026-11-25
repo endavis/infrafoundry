@@ -5,16 +5,22 @@ checks work from the management VLAN and an operator-declared list of protected 
 plan that could cut the connection is refused (fail closed). ``allow_lockout_risk`` turns
 the refusals about the management VLAN and protected ports into warnings; deleting a LACP
 group that a remaining VLAN still lists is never overridable.
+
+Port settings are checked against the *watched* ports: ``protected_ports`` (a ``lagN``
+expands to its members) or, without it, the members of the management VLAN. Shutting a
+watched port down, or changing its speed, duplex or FEC, is refused; so is any MTU change,
+because the MTU looks switch-wide. Alias, flow control and enabling a port are safe.
 """
 
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 from ..schema import port_label
 from ..settings import QnapSettings
+from .diff import Change
 
 MAX_MANAGEMENT_VLAN = 4094
 
@@ -140,4 +146,67 @@ def check_lockout(
         result.warnings.extend(f"lock-out risk allowed: {r}" for r in risks)
     else:
         result.refusals = [*risks, *result.refusals]
+    return result
+
+
+def watched_ports(
+    protected: Collection[int],
+    mgmt_members: Collection[int],
+    lags: Mapping[int, Collection[int]],
+    start_index: int,
+) -> frozenset[int]:
+    """Return the physical ports whose settings could cut the management connection.
+
+    Args:
+        protected: Interface numbers from ``protected_ports`` (may be empty).
+        mgmt_members: Interface numbers in the management VLAN (live and end state).
+        lags: LACP group to its member ports (live and end state).
+        start_index: ``lacp/info.StartIndex``.
+
+    Returns:
+        ``protected`` when given, else the management VLAN members; a LAG interface
+        expands to its member ports.
+    """
+    chosen = protected if protected else mgmt_members
+    watched: set[int] = set()
+    for interface in chosen:
+        if interface > start_index:
+            watched.update(lags.get(interface - start_index, ()))
+        else:
+            watched.add(interface)
+    return frozenset(watched)
+
+
+def check_port_lockout(
+    changes: Iterable[Change], watched: Collection[int], allow_risk: bool
+) -> LockoutCheck:
+    """Check planned port changes against the watched ports and the switch-wide MTU.
+
+    Args:
+        changes: The port changes (``Change.fields`` names the changed fields).
+        watched: Physical ports from :func:`watched_ports`.
+        allow_risk: Downgrade the refusals to warnings.
+    """
+    risks: list[str] = []
+    for change in changes:
+        port = change.key[0]
+        if port in watched:
+            if change.after.get("Shutdown") is True and "shutdown" in change.fields:
+                risks.append(f"the plan shuts down port {port}, which may carry management traffic")
+            for name in ("speed", "duplex", "fec"):
+                if name in change.fields:
+                    risks.append(
+                        f"the plan changes the {name} of port {port}, which may carry "
+                        "management traffic"
+                    )
+        if "mtu" in change.fields:
+            risks.append(
+                f"the plan changes the MTU on port {port}; the MTU looks switch-wide "
+                "(unverified), so it may affect every port"
+            )
+    result = LockoutCheck()
+    if allow_risk:
+        result.warnings = [f"lock-out risk allowed: {r}" for r in risks]
+    else:
+        result.refusals = risks
     return result

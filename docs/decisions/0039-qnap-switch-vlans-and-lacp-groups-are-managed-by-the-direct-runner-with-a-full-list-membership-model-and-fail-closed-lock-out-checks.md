@@ -14,6 +14,8 @@ tags:
 
 Accepted
 
+**Amended:** 2026-11-25 (#1675) - the direct runner also manages `port` settings (decision 10), and decision 11 records their verification state.
+
 ## Context
 
 ADR-0038 added the `qnap` provider with a report-only runner and left the diff and apply of VLANs and LACP groups to issue #1671. The switch is managed over the web UI's JSON API, which the vendor does not document. A static read of the UI's code and of the shapes the `qnap-qsw-rest` collector stored showed:
@@ -36,8 +38,8 @@ MikroTik solved the same problem with a diff, ordered phases and a fail-closed m
 7. **An explicit override.** `allow_lockout_risk: true` turns the refusals about the management VLAN and protected ports into warnings; the plan prints a warning line while it is set and `infra doctor` warns. It is a settings key, not a core CLI flag, so no public CLI signature changes. MikroTik has none.
 8. **Liveness and read-back after the writes.** Whether the steps succeeded or failed, apply polls the unauthenticated `/api/live` until `liveness_timeout` (default 60 s, range 10-600) runs out, then logs in again and reads `vlan` and `lacp/group`. A switch that does not answer fails the apply naming the completed steps; a re-read that differs from the planned end state fails it naming the object. This also verifies the write bodies on first use.
 9. **No automatic backup.** The collector writes into the config repo under its own git flow; coupling apply to it would give apply a side effect there. The docs say to run `infra collect` before the first apply, and every failure message names it.
-10. **Port settings are deferred.** `PUT portlist` (alias, shutdown, speed, MTU) has an untraced body and changes link state. It is a follow-up issue.
-11. **Writes verified only in part.** Every VLAN and LACP write and the LAG numbering are taken from the UI's code, and are written as bodies in one place so a live check can correct them. A maintainer-approved live check created an empty VLAN and deleted it: `POST vlan` worked as written; `DELETE vlan` needed `{"idx": ["<id>"]}` (a list of string keys, as the UI sends) instead of a scalar, and an empty VLAN reads back as `"val": null`. Both were corrected. `PUT vlan`, the `lacp/group` writes and the LAG numbering remain unverified.
+10. **Port settings are a third config type.** `port` (key `port`, a physical port number; fields `alias`, `shutdown`, `speed`, `duplex`, `flow_control`, `fec`, `mtu`) is a settings resource: it only ever updates, has no `absent`, and a row that leaves the YAML is released, never deleted. Only declared fields are compared and written; the write is `PUT portlist`, an array `[{"idx", "data"}]` where `data` is the port's whole live row with the edits applied, one step per port with the web UI's 60 s timeout, in phases H (settings) and I (a change that includes `mtu`) after everything else. The lock-out rules extend to the *watched* ports (`protected_ports` with `lagN` expanded, else the management VLAN's members): shutting one down, or changing its speed, duplex or FEC, is refused; any MTU change is refused because the MTU looks switch-wide. All are overridable with `allow_lockout_risk`. The web UI's FEC rule (at least two FEC-enabled ports) is a plan error. The read-back also reads `ports`, compares declared fields only and warns when an MTU write spread to undeclared ports. The same change makes `count_ports` ignore the LACP interface rows (`Type` `ieee8023ad`) that `GET ports` returns, which had let VLAN validation accept port numbers that do not exist.
+11. **Writes verified only in part.** Every VLAN and LACP write and the LAG numbering are taken from the UI's code, and are written as bodies in one place so a live check can correct them. A maintainer-approved live check created an empty VLAN and deleted it: `POST vlan` worked as written; `DELETE vlan` needed `{"idx": ["<id>"]}` (a list of string keys, as the UI sends) instead of a scalar, and an empty VLAN reads back as `"val": null`. Both were corrected. `PUT vlan`, the `lacp/group` writes and the LAG numbering remain unverified. The `PUT portlist` body was traced from the UI's code and verified by a maintainer-approved live check that changed one port's `alias` and changed it back: the switch accepted it, the read-back passed and no other field changed. `shutdown`, `speed`/`duplex`, `flow_control` and `fec` are fields the UI edits but are unverified on a device; `mtu` is never edited by the UI, so whether the switch accepts it is unverified until the first apply.
 
 ## Rationale
 
@@ -47,6 +49,7 @@ MikroTik solved the same problem with a diff, ordered phases and a fail-closed m
 
 ## Related Issues
 
+- [#1675](https://github.com/endavis/infrafoundry/issues/1675) QNAP port settings
 - [#1671](https://github.com/endavis/infrafoundry/issues/1671) QNAP VLAN, port and LACP management
 - [#1669](https://github.com/endavis/infrafoundry/issues/1669) QNAP provider with firmware tracking
 - [#1670](https://github.com/endavis/infrafoundry/issues/1670) QNAP collector
