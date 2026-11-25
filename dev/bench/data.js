@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795602384900,
+  "lastUpdate": 1795605253922,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6996,6 +6996,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004510069631405445",
             "extra": "mean: 71.73793368222779 usec\nrounds: 15667"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4d45848079c4b524f8058f6251948493ff23cd4e",
+          "message": "feat: manage qnap switch vlans and lacp groups (merges PR #1676, addresses #1671)\n\nAdd vlan and lacp.group resources to the QNAP provider, planned and\napplied by the qnap_rest direct runner (ADR-0039):\n\n- full-list VLAN membership: a declared tagged/untagged list replaces,\n  an omitted one is kept, and a port is untagged in at most one VLAN\n- deletes limited to the managed set or absent: true (ADR-0018);\n  undeclared objects are reported as unmanaged (kept)\n- fail-closed lock-out checks around the management VLAN and\n  protected_ports, with an allow_lockout_risk override\n- ordered write phases, then a liveness poll and a read-back that\n  fails the apply when the switch differs from the planned end state\n- drift (add-only) runs report changes and never delete\n\nVerified on a switch by creating an unused empty VLAN and deleting it.\nThat check corrected two web-UI-derived assumptions: DELETE vlan takes\na list of string keys, and an empty VLAN reads back as \"val\": null.\nPort settings are deferred to #1675.\n\nAddresses #1671\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-25T11:12:56Z",
+          "tree_id": "1f0d42842550294932215d4bf9599a5e7cc973f1",
+          "url": "https://github.com/endavis/infrafoundry/commit/4d45848079c4b524f8058f6251948493ff23cd4e"
+        },
+        "date": 1795605253081,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 60.04320238342125,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00039611655355649373",
+            "extra": "mean: 16.65467463934125 msec\nrounds: 61"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 11117.268483377393,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005030700886857292",
+            "extra": "mean: 89.95015290808223 usec\nrounds: 12138"
           }
         ]
       }
