@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795598098403,
+  "lastUpdate": 1795601085668,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6920,6 +6920,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008348305699553769",
             "extra": "mean: 76.9034692184401 usec\nrounds: 15545"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "66fcfd15bc98ac8aeaf974b26b38657170e5e2d1",
+          "message": "feat: qnap switch provider with firmware tracking (merges PR #1672, addresses #1669)\n\nAdd a qnap provider for QNAP QSW-M managed switches, one per\nenvironment, over the JSON API the switch's web UI uses (/api/v1; no\nofficial API documentation exists, so the client checks every reply's\nenvelope and shape and reports drift by endpoint).\n\n- Client: session login with a base64 password and a Bearer token,\n  one attempt only (lockout behaviour is unknown), logout in a\n  finally; the password, encoded password and token never reach a log,\n  an error or a repr. TLS is pinned by tls_fingerprint through a new\n  shared core/tls_pin.py; verify_ssl: false is the logged opt-out.\n- Resource firmware.update: infra plan checks read-only and reports\n  up to date or current -> new available. The check is skipped with a\n  warning when the switch has no DNS server, and a slow or failed\n  check is a warning bounded by check_timeout (default 90 s).\n- Runner qnap_rest: report-only; apply, destroy and drift never write.\n- foundry provider qnap upgrade --env <env> [--yes] [--lock-timeout]:\n  lock, check, one prompt, refuse on a firmware anomaly, start the\n  online install, follow firmware/status, wait for the reboot via the\n  unauthenticated /api/live, log in again and verify the version.\n- Plugin entry point and register_cli; ADR-0038; provider docs.\n\nVerified against a real switch, read-only: infra doctor logs in,\nreads firmware/info and logs out; infra plan runs the check and turns\nits timeout into a warning. The install path, the update check's reply\nand the progress values are unverified until a maintenance window.\n\nAddresses #1669\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-25T10:02:47Z",
+          "tree_id": "9bf7ecc0fc57a901e8dd313611daeb94ee0bde42",
+          "url": "https://github.com/endavis/infrafoundry/commit/66fcfd15bc98ac8aeaf974b26b38657170e5e2d1"
+        },
+        "date": 1795601084412,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 73.49239308929398,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00043171603353271324",
+            "extra": "mean: 13.606850423076985 msec\nrounds: 78"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13678.44366478184,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000061817127223630746",
+            "extra": "mean: 73.10773246628342 usec\nrounds: 15456"
           }
         ]
       }
