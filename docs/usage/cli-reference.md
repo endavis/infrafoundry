@@ -57,6 +57,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | Dump raw Proxmox API state | `foundry provider proxmox dump --env <env> --output <file>.json` |
 | Install the vendor's latest GL.iNet firmware | `foundry provider openwrt upgrade --env <env> [--device <name>] [--yes]` |
 | Install the latest MikroTik RouterOS of the declared channel | `foundry provider mikrotik upgrade --env <env> [--yes]` |
+| Install the vendor's latest QNAP switch firmware | `foundry provider qnap upgrade --env <env> [--yes]` |
 | Generate JSON schemas for IDE | `foundry config schema export` |
 | Migrate existing infra to config | `foundry config migrate --env <env> --provider opnsense --component <comp>` |
 | Plan changes | `foundry infra plan --env <env>` |
@@ -377,6 +378,22 @@ MikroTik has one device per environment. See
 ```bash
 foundry provider mikrotik upgrade --env lab
 foundry provider mikrotik upgrade --env lab --yes
+```
+
+**Options:** `-e/--env TEXT` (required), `-y/--yes` (do not ask before
+upgrading), `--lock-timeout INTEGER` (default: 0, fail fast).
+
+### `provider qnap upgrade`
+
+Install the vendor's latest firmware on the QNAP switch a `firmware.update`
+resource declares. Holds the environment lock, checks read-only, asks once, then
+installs, waits for the reboot (which interrupts traffic through the switch),
+verifies the version and re-plans. There is no `--device`: QNAP has one switch
+per environment. See [The upgrade command](../providers/qnap.md#the-upgrade-command).
+
+```bash
+foundry provider qnap upgrade --env lab
+foundry provider qnap upgrade --env lab --yes
 ```
 
 **Options:** `-e/--env TEXT` (required), `-y/--yes` (do not ask before

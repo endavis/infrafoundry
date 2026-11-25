@@ -9,6 +9,7 @@ from infrafoundry.providers.oci import OCIProvider
 from infrafoundry.providers.openwrt import OpenWrtProvider
 from infrafoundry.providers.opnsense import OPNsenseProvider
 from infrafoundry.providers.proxmox import ProxmoxProvider
+from infrafoundry.providers.qnap import QnapProvider
 from infrafoundry.providers.tailscale import TailscaleProvider
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     "OPNsenseProvider",
     "OpenWrtProvider",
     "ProxmoxProvider",
+    "QnapProvider",
     "TailscaleProvider",
 ]

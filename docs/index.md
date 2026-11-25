@@ -44,6 +44,7 @@ This index provides a structured overview of the available documentation.
 - **[OpenWrt](providers/openwrt.md)**: One OpenWrt device over SSH, with a check-mode plan and rollback-protected apply.
 - **[OPNsense](providers/opnsense.md)**: Firewall configuration through the direct API.
 - **[Proxmox](providers/proxmox.md)**: Proxmox VE virtual machines, containers and SDN.
+- **[QNAP](providers/qnap.md)**: QNAP QSW-M series switches over the web JSON API (firmware tracking).
 - **[Tailscale](providers/tailscale.md)**: Tailnet ACL, keys, routes and DNS.
 
 ## Architecture
