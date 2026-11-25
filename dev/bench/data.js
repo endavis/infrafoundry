@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795601085668,
+  "lastUpdate": 1795602384900,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6958,6 +6958,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000061817127223630746",
             "extra": "mean: 73.10773246628342 usec\nrounds: 15456"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1857f581740a20381d129f46622c82cc1cfcb501",
+          "message": "feat: back up qnap switch config with infra collect (merges PR #1674, addresses #1670)\n\nAdd a read-only qnap-qsw-rest collector for QNAP QSW-M switches that\nreuses the QNAP provider's client (ADR-0038). One run logs in once,\nreads the configuration endpoints the web UI uses (VLANs, ports, LACP,\nRSTP, LLDP, QoS, ACLs, IGMP, mirroring, IP, DNS, SNTP, HTTPS, SNMP,\nusers) and always logs out. Each endpoint becomes one normalized JSON\ndocument; status and statistics endpoints (ports/group counters,\nlacp/info, */status) are excluded so change detection only flags real\nconfiguration changes.\n\n- Endpoints the firmware does not serve (an HTML fall-through or an\n  API error) are listed in unavailable.json and do not fail the run;\n  system/info, firmware/info and vlan are required, so an API change\n  cannot silently write an empty backup.\n- system-info, users, snmp-community and snmp-security are stored\n  SOPS-encrypted, as the other collectors store full exports.\n- The native system/config export is opt-in (options.native_export):\n  it is not byte-stable between runs, so it would report a change on\n  every collect. QnapClient gains get_raw for it.\n- settings_from_mapping takes an optional `where` so collector errors\n  name the device; codespell ignores the vendor path `vlan/indexs`.\n\nVerified live, read-only, on a QSW-M switch: two consecutive collects\nreport no changes, and unavailable.json lists the four endpoints this\nfirmware does not serve.\n\nAddresses #1670\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-25T10:25:18Z",
+          "tree_id": "45429c889473a6f129ce9dad0e42dc7f5e1c6380",
+          "url": "https://github.com/endavis/infrafoundry/commit/1857f581740a20381d129f46622c82cc1cfcb501"
+        },
+        "date": 1795602384363,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 73.09598232489056,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005348849701170375",
+            "extra": "mean: 13.68064246753383 msec\nrounds: 77"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13939.6264803169,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004510069631405445",
+            "extra": "mean: 71.73793368222779 usec\nrounds: 15667"
           }
         ]
       }
