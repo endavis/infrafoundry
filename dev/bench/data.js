@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795556368256,
+  "lastUpdate": 1795597381771,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6844,6 +6844,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010793654994219063",
             "extra": "mean: 126.86739854202308 usec\nrounds: 8368"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b2c0bab461aa8ed1fad5169645fe06125c0218b0",
+          "message": "fix: routeros-chr blueprint sets no dns server (merges PR #1667, addresses #1666)\n\nA CHR built with a static mgmt_ip had a route but no DNS server, so\nanything needing name resolution on the router failed, including the\nRouterOS update check.\n\nThe blueprint takes an optional mgmt_dns (a comma-separated list sets\nseveral), copied from openwrt-vm. With mgmt_ip set, the bootstrap runs\n/ip dns set servers=<list>. Setting mgmt_dns without mgmt_ip fails the\ninput check, since DHCP supplies DNS in that case.\n\nAddresses #1666\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-25T09:01:48Z",
+          "tree_id": "f79afa4bfef0f899c3895f36cc1f6f1ea689eedc",
+          "url": "https://github.com/endavis/infrafoundry/commit/b2c0bab461aa8ed1fad5169645fe06125c0218b0"
+        },
+        "date": 1795597380935,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 104.64110621333373,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00006817614808269432",
+            "extra": "mean: 9.556473896226612 msec\nrounds: 106"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 17042.004329766336,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000024417977048763875",
+            "extra": "mean: 58.67854394646261 usec\nrounds: 17783"
           }
         ]
       }
