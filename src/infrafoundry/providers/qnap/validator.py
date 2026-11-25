@@ -13,6 +13,7 @@ from infrafoundry.core.validation import ValidationLevel, ValidationReport
 
 from .client import QnapClient
 from .components.firmware import FirmwareClient, check_firmware_resources, read_firmware
+from .schema import check_resources
 from .settings import PROVIDER_NAME, QnapSettings, load_settings, raw_settings_problems
 
 _SECRET_PREFIX = "secret://env_secrets/"  # nosec B105  # URI scheme, not a password
@@ -47,9 +48,10 @@ class QnapValidator:
         """Check resources, settings and secret references; no network.
 
         Args:
-            resources: Resources to validate; only ``firmware.update`` is checked.
+            resources: Resources to validate; ``firmware.update``, ``vlan`` and
+                ``lacp.group`` are checked.
         """
-        for finding in check_firmware_resources(resources):
+        for finding in [*check_firmware_resources(resources), *check_resources(resources)]:
             self.report.add_check(
                 check_name=f"qnap_schema_{finding.resource}",
                 passed=False,
@@ -91,6 +93,14 @@ class QnapValidator:
                 "qnap_verify_ssl",
                 False,
                 "verify_ssl is false: the switch's certificate is not checked",
+                level=ValidationLevel.WARNING,
+            )
+        if settings.allow_lockout_risk:
+            self.report.add_check(
+                "qnap_allow_lockout_risk",
+                False,
+                "allow_lockout_risk is true: plans that could cut the management connection "
+                "are written anyway",
                 level=ValidationLevel.WARNING,
             )
 

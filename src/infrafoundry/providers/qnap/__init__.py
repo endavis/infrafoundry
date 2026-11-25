@@ -1,12 +1,14 @@
-"""QNAP provider: tracks a QNAP QSW-M series switch's firmware over its web API.
+"""QNAP provider: manages a QNAP QSW-M series switch over its web API.
 
-One switch per environment. The ``firmware.update`` resource is never applied: it only
-drives the plan's update report and ``foundry provider qnap upgrade`` (ADR-0038).
-``QnapRestRunner`` is report-only for now; Terraform has nothing to do here.
+One switch per environment. ``vlan`` and ``lacp.group`` resources are diffed against the
+switch and written by ``QnapRestRunner`` through :class:`QnapConfigManager` (ADR-0039).
+The ``firmware.update`` resource is never applied: it only drives the plan's update report
+and ``foundry provider qnap upgrade`` (ADR-0038). Terraform has nothing to do here.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, override
 
@@ -26,6 +28,14 @@ from .components.firmware import (
     FIRMWARE_TYPE,
     check_firmware,
     plan_line,
+)
+from .components.manager import QnapApplyResult, QnapConfigManager, QnapPlan
+from .schema import (
+    CONFIG_TYPES,
+    LACP_ADDRESS_PREFIX,
+    LACP_TYPE,
+    VLAN_ADDRESS_PREFIX,
+    VLAN_TYPE,
 )
 from .settings import load_settings
 from .validator import QnapValidator
@@ -54,17 +64,21 @@ class QnapProvider(
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return [FIRMWARE_TYPE]
+        return [VLAN_TYPE, LACP_TYPE, FIRMWARE_TYPE]
 
     @override
     def get_dependencies(self) -> dict[str, list[str]]:
-        """Get resource dependencies."""
-        return {FIRMWARE_TYPE: []}
+        """Get resource dependencies (a VLAN may list a LAG, so groups come first)."""
+        return {LACP_TYPE: [], VLAN_TYPE: [LACP_TYPE], FIRMWARE_TYPE: []}
 
     @override
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
         """Map each type to the pseudo prefix of the runner's outcome addresses."""
-        return {FIRMWARE_TYPE: [FIRMWARE_ADDRESS_PREFIX]}
+        return {
+            VLAN_TYPE: [VLAN_ADDRESS_PREFIX],
+            LACP_TYPE: [LACP_ADDRESS_PREFIX],
+            FIRMWARE_TYPE: [FIRMWARE_ADDRESS_PREFIX],
+        }
 
     @override
     def validate_connectivity(
@@ -116,6 +130,92 @@ class QnapProvider(
 
     def generate_qnap_rest(self, resources: list[ResourceConfig]) -> None:
         """Dispatch hook for ``QnapRestRunner``; the runner reads the switch itself."""
+
+    def rest_plan(
+        self,
+        env_name: str,
+        resources: list[ResourceConfig],
+        *,
+        add_only: bool = False,
+        managed_resources: Mapping[str, list[ResourceConfig]] | None = None,
+        target_resources: list[str] | None = None,
+    ) -> QnapPlan:
+        """Plan the VLAN and LACP changes for the switch; called by ``QnapRestRunner``.
+
+        Args:
+            env_name: Environment name.
+            resources: This provider's resources.
+            add_only: Suppress deletes.
+            managed_resources: Managed rows by type (ADR-0018).
+            target_resources: Restrict to these resource names.
+        """
+        return QnapConfigManager(self.config_dir).plan(
+            env_name,
+            resources,
+            add_only=add_only,
+            managed_resources=managed_resources,
+            target_resources=target_resources,
+        )
+
+    def rest_apply(
+        self,
+        env_name: str,
+        resources: list[ResourceConfig],
+        *,
+        add_only: bool = False,
+        managed_resources: Mapping[str, list[ResourceConfig]] | None = None,
+        target_resources: list[str] | None = None,
+    ) -> QnapApplyResult:
+        """Plan against the switch, then apply the plan; called by ``QnapRestRunner``.
+
+        Args:
+            env_name: Environment name.
+            resources: This provider's resources.
+            add_only: Suppress deletes.
+            managed_resources: Managed rows by type (ADR-0018).
+            target_resources: Restrict to these resource names.
+        """
+        manager = QnapConfigManager(self.config_dir)
+        plan = manager.plan(
+            env_name,
+            resources,
+            add_only=add_only,
+            managed_resources=managed_resources,
+            target_resources=target_resources,
+        )
+        return manager.apply(env_name, plan)
+
+    def rest_destroy(
+        self,
+        env_name: str,
+        resources: list[ResourceConfig],
+        *,
+        target_resources: list[str] | None = None,
+    ) -> QnapApplyResult:
+        """Delete the declared VLANs and LACP groups that exist on the switch.
+
+        Args:
+            env_name: Environment name.
+            resources: This provider's resources.
+            target_resources: Restrict to these resource names.
+        """
+        return QnapConfigManager(self.config_dir).destroy(
+            env_name, resources, target_resources=target_resources
+        )
+
+    def rest_resource_ids(self, env_name: str, resources: list[ResourceConfig]) -> dict[str, str]:
+        """Return ``{resource_name: id}`` for the declared objects that exist on the switch.
+
+        Args:
+            env_name: Environment name.
+            resources: This provider's resources.
+        """
+        return QnapConfigManager(self.config_dir).resource_ids(env_name, resources)
+
+    @staticmethod
+    def deletable_types() -> set[str]:
+        """Return the resource types the provider can delete."""
+        return set(CONFIG_TYPES)
 
     def firmware_plan_lines(
         self, env_name: str, resources: list[ResourceConfig]
@@ -172,6 +272,6 @@ def register() -> Any:
         version="0.1.0",
         description="QNAP QSW-M switch provider",
         provider_class=QnapProvider,
-        resource_types=[FIRMWARE_TYPE],
+        resource_types=[VLAN_TYPE, LACP_TYPE, FIRMWARE_TYPE],
         cli_registration=register_cli,
     )

@@ -1,6 +1,6 @@
 ---
 title: "QNAP Provider"
-description: "Track the firmware of a QNAP QSW-M series switch over its web JSON API, with a pinned certificate and a provider upgrade command"
+description: "Manage the VLANs and LACP groups of a QNAP QSW-M series switch and track its firmware over its web JSON API, with a pinned certificate, lock-out checks and a provider upgrade command"
 audience:
   - users
 tags:
@@ -9,7 +9,7 @@ tags:
 
 # QNAP Provider
 
-The QNAP provider manages one QNAP QSW-M series switch per environment over the JSON API of its web UI. For now it tracks the switch's firmware: `infra plan` reports whether the vendor offers a newer release, and `foundry provider qnap upgrade` installs it. It does not generate Terraform. The decision and the rejected alternatives are in [ADR-0038](../decisions/0038-qnap-switches-are-managed-over-the-web-uis-json-api-with-firmware-upgraded-by-a-provider-command.md).
+The QNAP provider manages one QNAP QSW-M series switch per environment over the JSON API of its web UI. It manages the switch's VLANs (with their tagged and untagged member ports) and LACP groups, and it tracks the firmware: `infra plan` reports whether the vendor offers a newer release, and `foundry provider qnap upgrade` installs it. It does not generate Terraform. The decisions and the rejected alternatives are in [ADR-0038](../decisions/0038-qnap-switches-are-managed-over-the-web-uis-json-api-with-firmware-upgraded-by-a-provider-command.md) (provider and firmware) and [ADR-0039](../decisions/0039-qnap-switch-vlans-and-lacp-groups-are-managed-by-the-direct-runner-with-a-full-list-membership-model-and-fail-closed-lock-out-checks.md) (VLANs, LACP groups and the lock-out checks).
 
 The API is not documented by the vendor. It was read from the web UI's JavaScript and from read-only probes, so the provider treats every reply defensively and reports a changed shape as an error that names the endpoint. See [Verification status](#verification-status).
 
@@ -26,6 +26,10 @@ provider_settings:
     # timeout: 10
     # check_timeout: 90
     # upgrade_timeout: 1200
+    # management_vlan: 1              # the VLAN the management address lives on
+    # protected_ports: [1, lag1]      # ports that carry your management traffic
+    # allow_lockout_risk: false       # unsafe: turn lock-out refusals into warnings
+    # liveness_timeout: 60
 ```
 
 | Key | Meaning |
@@ -37,6 +41,10 @@ provider_settings:
 | `timeout` | Seconds for every request. Default 10, range 1-120. |
 | `check_timeout` | Seconds for the vendor update check only. Default 90, range 10-600. |
 | `upgrade_timeout` | Seconds from the install request until the switch is back. Default 1200, range 300-3600. |
+| `management_vlan` | The VLAN the management address lives on, 1-4094. Without it the provider infers it from the switch's IP interface (see [The lock-out hazard](#the-lock-out-hazard)). |
+| `protected_ports` | Ports that carry your management traffic: integers, or `lagN` for LACP group `N`. The API cannot tell which ports these are, so you say. |
+| `allow_lockout_risk` | `true` turns the lock-out refusals about the management VLAN and protected ports into warnings. Default `false`. Doctor warns while it is set. |
+| `liveness_timeout` | Seconds apply waits for the switch to answer after its writes. Default 60, range 10-600. |
 
 Read the fingerprint with:
 
@@ -50,7 +58,41 @@ The pin is checked during the TLS handshake, before any request byte is sent. Af
 
 | Type | Purpose |
 | :-- | :-- |
+| `vlan` | A VLAN and its member ports. Key `id` (1-4000); fields `tagged`, `untagged` (lists of ports) and `absent`. |
+| `lacp.group` | A link aggregation group. Key `group`; fields `mode` (the switch's `AggrMode`, verbatim), `members` (physical ports) and `absent`. |
 | `firmware.update` | Marks the switch whose firmware follows the vendor's latest release. No fields; at most one per environment; no version pinning. |
+
+A port is an integer (a physical port) or `lagN`, the interface of LACP group `N`. The provider maps `lagN` to interface number `N + StartIndex`, where `StartIndex` is `lacp/info.StartIndex`; this numbering comes from the web UI's code and is unverified on a device.
+
+```yaml
+# envs/lab/resources/switch-vlans.yaml
+resources:
+  - name: uplink
+    provider: qnap
+    type: lacp.group
+    config:
+      group: 1
+      mode: lacp
+      members: [7, 8]
+
+  - name: servers
+    provider: qnap
+    type: vlan
+    config:
+      id: 10
+      tagged: [lag1]
+      untagged: [1, 2, 3]
+
+  - name: guests
+    provider: qnap
+    type: vlan
+    config:
+      id: 20
+      tagged: [lag1]
+      untagged: [4]
+```
+
+In a `resources/` file the fields go under `config:`; fields placed directly on the entry are not read.
 
 ```yaml
 # envs/lab/resources/switch-firmware.yaml
@@ -60,11 +102,74 @@ resources:
     type: firmware.update
 ```
 
-The resource is never applied. Apply succeeds with no changes; the install is a separate command because it reboots the switch.
+The `firmware.update` resource is never applied. Apply succeeds with no changes for it; the install is a separate command because it reboots the switch.
+
+The switch has no VLAN name, so the YAML resource name is only a label and is never written. It also has no separate PVID: a port's untagged VLAN is its PVID.
+
+## Membership semantics
+
+A VLAN declares its own member lists, and every write to the switch carries the complete list of that VLAN.
+
+- **A declared list replaces.** When `tagged` is declared, the VLAN's tagged ports become exactly that set; tagged ports not in it are removed. The same holds for `untagged`.
+- **An omitted list is kept.** A field you leave out keeps its live value. A port that `tagged` names and that is live-untagged moves to tagged when `untagged` is omitted, and the other way round.
+- **A port is untagged in at most one VLAN.** When a port becomes untagged in VLAN X, the provider removes it from every other VLAN that holds it untagged, VLANs you do not declare included. The plan says so, for example `vlan 30 (unmanaged): untag port 5 (moves to vlan 10)`.
+- **Losing the last untagged VLAN warns.** A port that ends untagged in no VLAN produces `port N will have no untagged VLAN`.
+- **VLANs and ports you do not declare are untouched**, apart from that untag strip.
+- **VLAN 1** can be declared to manage its membership. It is never created or deleted, and `absent: true` on it is a schema error.
+
+## Existing Objects, Deletes and Unmanaged Objects
+
+A declared VLAN or LACP group that already exists is compared field by field and updated only when it differs. Objects that exist on the switch but are not declared are listed in the plan as `unmanaged (kept)`.
+
+Deletes follow [ADR-0018](../decisions/0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md): the provider deletes an undeclared object only when InfraFoundry applied it earlier and its YAML has since gone, or when you declare it with `absent: true` (key fields only). Add-only runs, which means drift detection and any run with `--target`, never delete: an `absent: true` entry is shown as `skipped: add-only`.
+
+## The lock-out hazard
+
+A wrong VLAN or LACP change can cut the connection you manage the switch over, and the API cannot tell which ports carry that connection. The provider therefore refuses an end state that could cut it (fail closed) and prints the refusal instead of writing.
+
+**Management VLAN.** `management_vlan` wins when set. Otherwise the provider infers it from `ip/ipv4/interface`, only when exactly one interface is enabled and its key is a VLAN id; that is an inference and the plan warns `inferred ... unverified; set management_vlan to confirm`. When it cannot be determined and the plan has a write, the plan is refused.
+
+**Refusals.** The plan is refused when its end state would:
+
+1. delete the management VLAN;
+2. with `protected_ports` set, drop a protected port from the management VLAN or flip its Tagged flag (checked for ports that are live members);
+3. without `protected_ports`, remove any live member of the management VLAN or flip its Tagged flag;
+4. put a protected physical port into a LACP group;
+5. delete a LACP group whose interface is protected, or remove members from it;
+6. delete a LACP group that a remaining VLAN still lists. This one is never overridable.
+
+Adding members to the management VLAN is always allowed. A protected port that is not a member of the management VLAN only warns.
+
+**Override.** `allow_lockout_risk: true` turns refusals 1 to 5 into warnings. Every plan prints a warning while it is set and `infra doctor` warns too. Use it only when you can reach the switch another way.
+
+**Write order.** The writes run in seven phases:
+
+| Phase | What runs | Why |
+| :-- | :-- | :-- |
+| A | `lacp.group` creates | A LAG interface must exist before a VLAN lists it. |
+| B | Remove an untagged port from the VLAN that gives it away | Lets a port move, and two VLANs swap ports. |
+| C | `vlan` creates | |
+| D | `vlan` updates, the management VLAN last | |
+| E | `lacp.group` updates | Ports joining or leaving a LAG take the membership set in D. |
+| F | `vlan` deletes | |
+| G | `lacp.group` deletes | |
+
+**After the writes** the provider polls the switch's unauthenticated `/api/live` until `liveness_timeout` runs out, then logs in again and reads `vlan` and `lacp/group` back. If the switch does not answer, the apply fails, names the steps that completed and says the switch stopped answering. If the read-back differs from the plan for an object that was written, the apply fails and names the object.
+
+!!! tip "Before the first apply"
+    Run `foundry infra collect --env <env>` first: the [`qnap-qsw-rest` collector](../guides/device-config-collectors.md#qnap-qsw-rest) stores the VLAN and LACP configuration and is your restore point. Apply from a machine whose path to the switch does not cross the ports you change, and keep physical access in mind.
+
+## Apply and Destroy
+
+`infra apply` plans against the switch, then runs the steps in order and stops at the first error. A failure names the step, the switch's error code and the steps that already ran. `infra destroy` deletes the VLANs and LACP groups you declare that exist on the switch, with the same lock-out checks on the end state; it never deletes VLAN 1, `absent: true` entries or undeclared objects.
+
+## Drift Detection
+
+`infra drift detect` runs the plan add-only: it reports declared objects that are missing or differ and never deletes. A firmware-only environment reports no drift.
 
 ## Plan output
 
-`infra plan` prints one line per run and never fails because of it:
+`infra plan` prints a summary per type (`vlan: 1 to create, 2 to update, 0 to delete, 3 unmanaged (kept)`), one line per untag move, the phases and any warnings. A refused plan fails with the reasons. For the firmware it prints one line per run and never fails because of it:
 
 ```text
 qnap_rest: firmware.update 'sw-firmware': 2.5.0 → 2.6.0 available (run foundry provider qnap upgrade --env lab)
@@ -112,13 +217,16 @@ A login is one `POST users/login`. A refusal is never retried, because the switc
 
 - **Verified on a switch (read-only):** login and logout, token renewal, `firmware/info`, `firmware/condition`, `dns/server`, `/api/about`, `/api/live`.
 - **Unverified:** `firmware/update/check` (it timed out in the probe; the cause is unknown), `POST firmware/update/live` and the `firmware/status` progress values during an install. They come from the web UI's code. The install path awaits a run in a maintenance window; treat the first upgrade as a test.
+- **Verified on a switch (write):** `POST vlan` creating an unused VLAN with no members, and `DELETE vlan` removing it. `DELETE vlan` takes `{"idx": ["<id>"]}`, a list of string keys; a scalar id is refused with 400. A VLAN with no members reads back as `"val": null`, which the provider reads as no members.
+- **Unverified:** `PUT vlan` (changing members), every `lacp/group` write, and the numbering of LAG interfaces. They come from the web UI's code. The post-apply read-back checks each write on the first use.
 - **Out of scope:** the UI's offline upload paths (`firmware/update/local` and chunked upload).
 
 ## Doctor
 
-`foundry infra doctor --env <env> -P qnap` checks the settings offline (secret references, pin, ranges, resource schema) and then, online, that the switch answers, the pin matches and a login works. It reports the installed firmware and warns when `verify_ssl` is false.
+`foundry infra doctor --env <env> -P qnap` checks the settings offline (secret references, pin, ranges, the `vlan` and `lacp.group` schema) and then, online, that the switch answers, the pin matches and a login works. It reports the installed firmware and warns when `verify_ssl` or `allow_lockout_risk` is set.
 
 ## Limitations
 
 - One switch per environment.
-- No VLAN or port management yet (#1671) The configuration backup is the [`qnap-qsw-rest` collector](../guides/device-config-collectors.md#qnap-qsw-rest).
+- Port settings (alias, shutdown, speed, MTU through `PUT portlist`) are not managed; a follow-up issue tracks them.
+- The configuration backup is the [`qnap-qsw-rest` collector](../guides/device-config-collectors.md#qnap-qsw-rest).

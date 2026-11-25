@@ -161,6 +161,12 @@ def test_mikrotik_rest_runner_is_drift_detectable() -> None:
     assert isinstance(_as_drift_detectable(MikroTikRestRunner()), DriftDetectable)
 
 
+def test_qnap_rest_runner_dispatches_managed_set_and_is_state_aware() -> None:
+    runner = QnapRestRunner()
+    assert isinstance(runner, DispatchesManagedSet)
+    assert isinstance(runner, StateAware)
+
+
 def test_qnap_rest_runner_is_drift_detectable() -> None:
     assert isinstance(_as_drift_detectable(QnapRestRunner()), DriftDetectable)
 

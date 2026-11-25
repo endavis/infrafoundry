@@ -147,6 +147,10 @@ fail the run. A file kept from an earlier run for an endpoint that is now unavai
 deleted; check `unavailable.json`. The run fails if `system/info`, `firmware/info` or `vlan`
 is unavailable, so an API change never writes an empty backup.
 
+Run this collector before the first `infra apply` that changes the switch's VLANs or LACP
+groups: it is the restore point if a change cuts the management connection (see
+[The lock-out hazard](../providers/qnap.md#the-lock-out-hazard)).
+
 ### openwrt-ssh
 
 OpenWrt and GL.iNet routers over SSH, with **key authentication only** (`ssh -o BatchMode=yes`).

@@ -13,7 +13,7 @@ from infrafoundry.providers.qnap import validator as qnap_validator
 from infrafoundry.providers.qnap.client import QnapAuthError, QnapTlsPinError
 from infrafoundry.providers.qnap.validator import QnapValidator
 
-from .conftest import RAW_SETTINGS, SETTINGS, firmware, make_env
+from .conftest import RAW_SETTINGS, SETTINGS, firmware, lag, make_env, vlan
 from .update_fake import FakeQnapSwitch
 
 pytestmark = pytest.mark.unit
@@ -95,3 +95,31 @@ def test_connectivity_auth_failure() -> None:
 def test_verify_ssl_false_warns() -> None:
     report = _connect(lambda settings: FakeQnapSwitch(), verify_ssl=False)
     assert any(c.check_name == "qnap_verify_ssl" for c in report.results)
+
+
+def test_vlan_and_lag_schema_findings_surface() -> None:
+    report = ValidationReport()
+    env = make_env(dict(RAW_SETTINGS), SECRETS)
+    QnapValidator(env, report).validate_offline(
+        [vlan("bad", id=5000), lag("lag", group=1, mode="lacp", members=["lag2"])]
+    )
+    assert _names(report) == ["qnap_schema_bad", "qnap_schema_lag"]
+
+
+def test_valid_vlan_and_lag_have_no_findings() -> None:
+    report = ValidationReport()
+    env = make_env(dict(RAW_SETTINGS), SECRETS)
+    QnapValidator(env, report).validate_offline(
+        [vlan(id=10, tagged=[1]), lag(group=1, mode="lacp", members=[5, 6])]
+    )
+    assert _names(report) == []
+
+
+def test_doctor_warns_when_the_lockout_override_is_set() -> None:
+    report = _connect(lambda settings: FakeQnapSwitch(), allow_lockout_risk=True)
+    [warning] = [c for c in report.results if c.check_name == "qnap_allow_lockout_risk"]
+    assert not warning.passed and "allow_lockout_risk" in warning.message
+    assert not any(
+        c.check_name == "qnap_allow_lockout_risk"
+        for c in _connect(lambda settings: FakeQnapSwitch()).results
+    )
