@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795597381771,
+  "lastUpdate": 1795598098403,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -6882,6 +6882,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000024417977048763875",
             "extra": "mean: 58.67854394646261 usec\nrounds: 17783"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "585e760fc482eeb0541f42931317c95b0059aade",
+          "message": "feat: keep mikrotik routeros at the latest release of a channel (merges PR #1668, addresses #1665)\n\nA system.package.update resource marks the device whose RouterOS\nfollows the latest release of an update channel (stable by default;\nno version pinning). infra plan checks for updates read-only and\nreports \"up to date\" or \"current -> new available\", plus pending\nRouterBOARD firmware; a failed check is a warning. apply, destroy and\ndrift never install, flash or reboot.\n\nfoundry provider mikrotik upgrade --env <env> [--yes] [--lock-timeout]\nholds the environment lock, checks read-only, asks once and runs two\nstages, each with its own upgrade_timeout deadline: RouterOS install,\nwait for the reboot and verify the version; then, when the RouterBOARD\nfirmware lags, routerboard/upgrade, reboot, wait and verify. A device\nwithout RouterBOARD firmware (a CHR) skips the second stage. Success\nis proven by polling and re-reading versions, not by write replies.\nNothing is written before the prompt; a channel mismatch is switched\nonly after confirmation. The provider gets its plugin entry point and\nregister_cli so the command exists.\n\nVerified live on a RouterOS 7.25.1 CHR: upgraded to 7.25.2 with one\nreboot, the RouterBOARD stage skipped (API 400 on a CHR), the channel\nset endpoint and the up-to-date status string confirmed. The\nRouterBOARD upgrade and reboot calls need hardware and are marked\nunverified in the docs and ADR-0037.\n\nAddresses #1665\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-25T09:13:49Z",
+          "tree_id": "3debb665f986a9c1c99fe70efa5ba1284d413e5e",
+          "url": "https://github.com/endavis/infrafoundry/commit/585e760fc482eeb0541f42931317c95b0059aade"
+        },
+        "date": 1795598097272,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 72.47106064429339,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0010126692693775568",
+            "extra": "mean: 13.79861135065012 msec\nrounds: 77"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13003.314546962176,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008348305699553769",
+            "extra": "mean: 76.9034692184401 usec\nrounds: 15545"
           }
         ]
       }
