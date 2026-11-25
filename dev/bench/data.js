@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795613747572,
+  "lastUpdate": 1795619048271,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7072,6 +7072,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004640061345803302",
             "extra": "mean: 75.90512006055897 usec\nrounds: 13893"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8799b5b97d5759390706bdce4a702d97ec9504de",
+          "message": "feat: manage qnap switch port settings (merges PR #1678, addresses #1675)\n\nAdd a port resource to the QNAP provider, following the ADR-0039 model.\n\n- Fields: alias, shutdown, speed (auto or fixed), duplex, flow_control,\n  fec and mtu. Only declared fields are compared and written; physical\n  ports only. A port is never created or deleted, and a row that\n  leaves the YAML is released.\n- Write: PUT portlist with the body traced from the web UI, an array\n  of {idx, data} where data is the port's whole live row with the\n  edits applied. It runs in new phases H (settings) and I (MTU) after\n  the VLAN and LACP writes.\n- Lock-out: shutting down a watched port (protected_ports, else the\n  management VLAN's members), or changing its speed, duplex or FEC, is\n  refused, and so is any MTU change. allow_lockout_risk overrides.\n- Read-back compares the declared fields and warns when an MTU write\n  spread to undeclared ports.\n\ncount_ports no longer counts the LACP interface rows that GET ports\nreturns. They had let VLAN validation accept port numbers that do not\nexist.\n\nVerified on a switch by changing one port's alias and changing it\nback.\n\nAddresses #1675\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-25T15:02:37Z",
+          "tree_id": "17a90e76217a9f552f4d25b1ef7af087a5ba6b36",
+          "url": "https://github.com/endavis/infrafoundry/commit/8799b5b97d5759390706bdce4a702d97ec9504de"
+        },
+        "date": 1795619047651,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 55.7168556427876,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006524700170335591",
+            "extra": "mean: 17.9478900677958 msec\nrounds: 59"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10816.032723770599,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000068964656059640535",
+            "extra": "mean: 92.45534157845891 usec\nrounds: 12088"
           }
         ]
       }
