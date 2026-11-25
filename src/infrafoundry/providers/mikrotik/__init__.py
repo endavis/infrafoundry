@@ -2,7 +2,9 @@
 
 InfraFoundry reads the device through ``/rest``, diffs the declared objects against
 it and applies them in a lock-out-safe order, stopping at the first error. Terraform has
-nothing to do here; ``MikroTikRestRunner`` plans, applies and destroys (ADR-0026).
+nothing to do here; ``MikroTikRestRunner`` plans, applies and destroys (ADR-0026). The
+``system.package.update`` resource is never applied: it only drives the plan's update
+report and ``foundry provider mikrotik upgrade`` (ADR-0037).
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from pathlib import Path
 from typing import Any, override
 
 from infrafoundry.core.config.models import EnvironmentConfig
+from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
@@ -20,8 +23,17 @@ from infrafoundry.core.provider_mixins import (
 )
 from infrafoundry.core.validation import ValidationReport
 
+from .client import RouterOSClient
 from .components.manager import MikroTikApplyResult, MikroTikManager, MikroTikPlan
+from .components.update import (
+    UPDATE_ADDRESS_PREFIX,
+    UPDATE_TYPE,
+    check_update,
+    declared_channel,
+    plan_line,
+)
 from .schema import SPECS
+from .settings import load_settings
 from .validator import MikroTikValidator
 
 
@@ -48,7 +60,7 @@ class MikroTikProvider(
     @override
     def get_resource_types(self) -> list[str]:
         """Get supported resource types."""
-        return list(SPECS)
+        return [*SPECS, UPDATE_TYPE]
 
     @override
     def get_dependencies(self) -> dict[str, list[str]]:
@@ -61,12 +73,15 @@ class MikroTikProvider(
             "ip.address": ["interface.vlan"],
             "ip.dhcp-client": ["interface.vlan"],
             "ip.service": [],
+            UPDATE_TYPE: [],
         }
 
     @override
     def get_terraform_resource_types(self) -> dict[str, list[str]]:
         """Map each type to the pseudo prefix of the runner's outcome addresses."""
-        return {name: [f"mikrotik_{spec.slug}"] for name, spec in SPECS.items()}
+        types = {name: [f"mikrotik_{spec.slug}"] for name, spec in SPECS.items()}
+        types[UPDATE_TYPE] = [UPDATE_ADDRESS_PREFIX]
+        return types
 
     @override
     def validate_connectivity(
@@ -193,6 +208,32 @@ class MikroTikProvider(
             env_name, resources, target_resources=target_resources
         )
 
+    def update_plan_lines(
+        self, env_name: str, resources: list[ResourceConfig]
+    ) -> list[tuple[str, bool]]:
+        """Check the device's update offer and return plan lines (ADR-0037).
+
+        Duck-typed hook read by ``MikroTikRestRunner.plan``. It only reads: a failure
+        becomes a warning line so an unreachable update server cannot block planning.
+
+        Args:
+            env_name: Environment name.
+            resources: This provider's resources.
+
+        Returns:
+            ``(line, is_warning)`` pairs; empty when no ``system.package.update`` exists.
+        """
+        updates = [r for r in resources if r.type == UPDATE_TYPE]
+        if not updates:
+            return []
+        name = updates[0].name
+        try:
+            settings = load_settings(self.config_dir, env_name)
+            state = check_update(RouterOSClient(settings), declared_channel(updates[0]))
+        except (InfraFoundryError, OSError) as exc:
+            return [(f"{UPDATE_TYPE} '{name}': update check failed: {exc}", True)]
+        return [plan_line(name, state, env_name)]
+
     def rest_resource_ids(self, env_name: str, resources: list[ResourceConfig]) -> dict[str, str]:
         """Return ``{resource_name: .id}`` for the declared objects that exist live.
 
@@ -206,3 +247,34 @@ class MikroTikProvider(
     def deletable_types() -> set[str]:
         """Return the resource types the provider can delete."""
         return {name for name, spec in SPECS.items() if spec.deletable}
+
+
+def register_cli(provider_group: Any) -> None:
+    """Attach the MikroTik subcommands to the ``foundry provider mikrotik`` group.
+
+    Args:
+        provider_group: The Click group created for this provider.
+    """
+    # Imported here so that importing the provider does not pull in the CLI code.
+    from .cli import mikrotik as mikrotik_cli_group
+
+    for name, command in mikrotik_cli_group.commands.items():
+        provider_group.add_command(command, name=name)
+
+
+def register() -> Any:
+    """Return provider metadata for plugin discovery (the ``infrafoundry.providers`` entry point).
+
+    Returns:
+        A ``ProviderMetadata`` describing the MikroTik provider.
+    """
+    from infrafoundry.providers.plugin_type import ProviderMetadata
+
+    return ProviderMetadata(
+        name="mikrotik",
+        version="0.1.0",
+        description="MikroTik RouterOS provider",
+        provider_class=MikroTikProvider,
+        resource_types=[*SPECS, UPDATE_TYPE],
+        cli_registration=register_cli,
+    )

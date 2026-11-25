@@ -13,8 +13,9 @@ from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 
 from .client import RouterOSClient, RouterOSReader
+from .components.update import check_update_resources
 from .schema import SPECS, check_resources, desired_from_resources
-from .settings import PROVIDER_NAME, MikroTikSettings, load_settings
+from .settings import PROVIDER_NAME, MikroTikSettings, load_settings, upgrade_timeout_problem
 
 MIN_MAJOR_VERSION = 7
 _SECRET_PREFIX = "secret://env_secrets/"  # nosec B105  # URI scheme, not a password
@@ -59,7 +60,7 @@ class MikroTikValidator:
         Args:
             resources: Resources to validate; only MikroTik types are checked.
         """
-        for finding in check_resources(resources):
+        for finding in [*check_resources(resources), *check_update_resources(resources)]:
             self.report.add_check(
                 check_name=f"mikrotik_schema_{finding.resource}",
                 passed=False,
@@ -77,6 +78,9 @@ class MikroTikValidator:
                 False,
                 "provider_settings.mikrotik is missing: " + ", ".join(missing),
             )
+        timeout_problem = upgrade_timeout_problem(raw.get("upgrade_timeout"))
+        if timeout_problem:
+            self.report.add_check("mikrotik_upgrade_timeout", False, timeout_problem)
         flat = _flatten(self.env_config.secrets or {})
         for key, value in raw.items():
             if isinstance(value, str) and value.startswith(_SECRET_PREFIX):

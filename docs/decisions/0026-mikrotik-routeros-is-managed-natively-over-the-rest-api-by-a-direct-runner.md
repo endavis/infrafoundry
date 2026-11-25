@@ -47,3 +47,4 @@ Cost: drift detection needed a small additive dispatch in `DriftDetector`, since
 
 - [MikroTik provider](../providers/mikrotik.md)
 - [ADR-0014](0014-opnsense-direct-api-apply-mechanism.md), [ADR-0018](0018-opnsense-direct-api-deletes-are-limited-to-the-managed-set.md), [ADR-0022](0022-existing-hosts-are-configured-through-a-host-provider-and-runner-that-never-create-or-delete-the-machine.md), [ADR-0023](0023-infra-plan-runs-providers-offline-validation-live-checks-stay-in-infra-doctor.md), [ADR-0024](0024-opnsense-firewalls-are-provider-instances-several-per-environment.md)
+- [ADR-0037: MikroTik RouterOS is upgraded to the latest release of a channel by a provider command](0037-mikrotik-routeros-is-upgraded-to-the-latest-release-of-a-channel-by-a-provider-command.md)

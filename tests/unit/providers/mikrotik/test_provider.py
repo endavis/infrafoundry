@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from infrafoundry.core.protocols import ValidatesOffline
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.mikrotik import MikroTikProvider
+from infrafoundry.providers.mikrotik.components.update import UPDATE_TYPE
 from infrafoundry.providers.mikrotik.schema import SPECS
 
 from .conftest import make_env, resource
@@ -26,12 +27,13 @@ def test_resource_types(tmp_path: Path) -> None:
         "ip.address",
         "ip.dhcp-client",
         "ip.service",
+        "system.package.update",
     ]
 
 
 def test_dependencies_cover_every_type(tmp_path: Path) -> None:
     deps = _provider(tmp_path).get_dependencies()
-    assert set(deps) == set(SPECS)
+    assert set(deps) == {*SPECS, UPDATE_TYPE}
     assert deps["interface.bridge.port"] == ["interface.bridge"]
 
 
@@ -97,3 +99,44 @@ def test_rest_destroy_and_resource_ids_delegate(tmp_path: Path) -> None:
 
     manager.destroy.assert_called_once_with("test", resources, target_resources=["a"])
     manager.resource_ids.assert_called_once_with("test", resources)
+
+
+def test_terraform_prefix_for_update_type(tmp_path: Path) -> None:
+    prefixes = _provider(tmp_path).get_terraform_resource_types()
+    assert prefixes[UPDATE_TYPE] == ["mikrotik_system_package_update"]
+
+
+def test_update_plan_lines(tmp_path: Path) -> None:
+    from infrafoundry.core.exceptions import InfraFoundryError
+    from infrafoundry.providers.mikrotik.settings import MikroTikSettingsError
+
+    from .conftest import SETTINGS
+    from .update_fake import FakeUpdateDevice
+
+    provider = _provider(tmp_path)
+    update = resource(UPDATE_TYPE, "ros")
+    assert provider.update_plan_lines("test", [resource("ip.service", "x")]) == []
+    with (
+        patch("infrafoundry.providers.mikrotik.load_settings", return_value=SETTINGS),
+        patch("infrafoundry.providers.mikrotik.RouterOSClient", return_value=FakeUpdateDevice()),
+    ):
+        [(line, warning)] = provider.update_plan_lines("test", [update])
+    assert "7.24 → 7.25 available" in line and not warning
+    with patch(
+        "infrafoundry.providers.mikrotik.load_settings", side_effect=MikroTikSettingsError("no")
+    ):
+        [(line, warning)] = provider.update_plan_lines("test", [update])
+    assert warning and "update check failed" in line
+    with (
+        patch("infrafoundry.providers.mikrotik.load_settings", return_value=SETTINGS),
+        patch("infrafoundry.providers.mikrotik.check_update", side_effect=InfraFoundryError("x")),
+    ):
+        assert provider.update_plan_lines("test", [update])[0][1]
+
+
+def test_register_exposes_cli_hook() -> None:
+    from infrafoundry.providers.mikrotik import register, register_cli
+
+    metadata = register()
+    assert metadata.name == "mikrotik" and metadata.cli_registration is register_cli
+    assert UPDATE_TYPE in metadata.resource_types

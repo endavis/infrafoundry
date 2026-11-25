@@ -99,3 +99,21 @@ def test_management_host_without_host_raises() -> None:
 def test_scheme_and_port(url: str, scheme: str, port: int) -> None:
     settings = settings_from_mapping({"api_url": url, "username": "a", "password": "b"})
     assert (settings.scheme, settings.port) == (scheme, port)
+
+
+def _mapping(**extra: object) -> dict[str, object]:
+    return {"api_url": "https://192.0.2.2", "username": "admin", "password": PASSWORD, **extra}
+
+
+def test_upgrade_timeout_default_and_valid() -> None:
+    assert settings_from_mapping(_mapping()).upgrade_timeout == 900
+    assert settings_from_mapping(_mapping(upgrade_timeout=120)).upgrade_timeout == 120
+    assert settings_from_mapping(_mapping(upgrade_timeout=3600)).upgrade_timeout == 3600
+
+
+@pytest.mark.parametrize("value", [119, 3601, "900", True, 1.5])
+def test_upgrade_timeout_rejected_without_the_value(value: object) -> None:
+    with pytest.raises(MikroTikSettingsError) as caught:
+        settings_from_mapping(_mapping(upgrade_timeout=value))
+    assert "upgrade_timeout" in str(caught.value)
+    assert str(value) not in str(caught.value) or str(value) in ("1", "True")

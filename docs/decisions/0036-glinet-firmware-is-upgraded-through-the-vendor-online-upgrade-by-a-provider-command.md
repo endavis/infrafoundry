@@ -57,3 +57,4 @@ Alternatives rejected:
 - [ADR-0005: Provider CLI extensibility](0005-provider-cli-extensibility.md)
 - [ADR-0028: OpenWrt devices are managed through generated playbooks](0028-openwrt-devices-are-managed-through-generated-communityopenwrt-playbooks-with-ubus-apply-rollback.md)
 - [ADR-0035: OpenWrt devices are provider instances](0035-openwrt-devices-are-provider-instances-several-per-environment.md)
+- [ADR-0037: MikroTik RouterOS is upgraded to the latest release of a channel by a provider command](0037-mikrotik-routeros-is-upgraded-to-the-latest-release-of-a-channel-by-a-provider-command.md)
