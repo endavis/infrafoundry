@@ -34,6 +34,7 @@ from infrafoundry.core.runners.openwrt_ansible_runner import OpenWrtAnsibleRunne
 from infrafoundry.core.runners.opnsense_direct_runner import OPNsenseDirectRunner
 from infrafoundry.core.runners.pulumi_runner import PulumiRunner
 from infrafoundry.core.runners.pyinfra_runner import PyInfraRunner
+from infrafoundry.core.runners.qnap_rest_runner import QnapRestRunner
 from infrafoundry.core.runners.terraform_runner import TerraformRunner
 
 PlanCapable = (
@@ -46,6 +47,7 @@ PlanCapable = (
     | HostRunner
     | MikroTikRestRunner
     | OpenWrtAnsibleRunner
+    | QnapRestRunner
 )
 DestroyCapable = (
     TerraformRunner
@@ -54,6 +56,7 @@ DestroyCapable = (
     | OPNsenseDirectRunner
     | HostRunner
     | OpenWrtAnsibleRunner
+    | QnapRestRunner
 )
 
 
@@ -83,7 +86,11 @@ def _as_state_aware(runner: TerraformRunner | OpenTofuRunner) -> StateAware:
 
 
 def _as_drift_detectable(
-    runner: TerraformRunner | OpenTofuRunner | MikroTikRestRunner | OpenWrtAnsibleRunner,
+    runner: TerraformRunner
+    | OpenTofuRunner
+    | MikroTikRestRunner
+    | OpenWrtAnsibleRunner
+    | QnapRestRunner,
 ) -> DriftDetectable:
     """Return the runner typed as ``DriftDetectable``; mypy rejects this if one drifts."""
     return runner
@@ -99,6 +106,7 @@ ALL_RUNNERS = [
     HostRunner,
     MikroTikRestRunner,
     OpenWrtAnsibleRunner,
+    QnapRestRunner,
 ]
 DESTROY_RUNNERS = [
     TerraformRunner,
@@ -107,6 +115,7 @@ DESTROY_RUNNERS = [
     OPNsenseDirectRunner,
     HostRunner,
     OpenWrtAnsibleRunner,
+    QnapRestRunner,
 ]
 
 
@@ -150,6 +159,10 @@ def test_terraform_runner_is_drift_detectable(cls: type[TerraformRunner]) -> Non
 
 def test_mikrotik_rest_runner_is_drift_detectable() -> None:
     assert isinstance(_as_drift_detectable(MikroTikRestRunner()), DriftDetectable)
+
+
+def test_qnap_rest_runner_is_drift_detectable() -> None:
+    assert isinstance(_as_drift_detectable(QnapRestRunner()), DriftDetectable)
 
 
 def test_openwrt_ansible_runner_dispatches_managed_set_and_is_drift_detectable() -> None:

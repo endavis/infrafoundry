@@ -82,6 +82,7 @@ secret_backend = "infrafoundry.secrets.plugin_type:SecretBackendPluginType"
 proxmox = "infrafoundry.providers.proxmox:register"
 openwrt = "infrafoundry.providers.openwrt:register"
 mikrotik = "infrafoundry.providers.mikrotik:register"
+qnap = "infrafoundry.providers.qnap:register"
 
 [project.entry-points."infrafoundry.secrets"]
 env = "infrafoundry.secrets.backends.env:register"

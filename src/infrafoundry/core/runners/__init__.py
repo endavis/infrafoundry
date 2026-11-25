@@ -9,6 +9,7 @@ from infrafoundry.core.runners.openwrt_ansible_runner import OpenWrtAnsibleRunne
 from infrafoundry.core.runners.opnsense_direct_runner import OPNsenseDirectRunner
 from infrafoundry.core.runners.pulumi_runner import PulumiRunner
 from infrafoundry.core.runners.pyinfra_runner import PyInfraRunner
+from infrafoundry.core.runners.qnap_rest_runner import QnapRestRunner
 from infrafoundry.core.runners.runner_registry import (
     RunnerRegistry,
     create_runner,
@@ -28,6 +29,7 @@ __all__ = [
     "OpenWrtAnsibleRunner",
     "PulumiRunner",
     "PyInfraRunner",
+    "QnapRestRunner",
     "RunnerRegistry",
     "TerraformRunner",
     "create_runner",

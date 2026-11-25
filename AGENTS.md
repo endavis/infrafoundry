@@ -213,6 +213,7 @@ Key commands (`foundry` via `uv run foundry ...`):
 - `provider proxmox dump --env <name> --output <file>` – dump raw Proxmox API state as a JSON snapshot
 - `provider openwrt upgrade --env <name> [--device <d>] [--yes]` – install the vendor's latest firmware on GL.iNet devices
 - `provider mikrotik upgrade --env <name> [--yes]` – install the latest RouterOS (and RouterBOARD firmware) of the declared channel
+- `provider qnap upgrade --env <name> [--yes]` – install the vendor's latest firmware on a QNAP QSW-M switch
 
 Generated artifacts should be reviewed (and optionally validated with native Terraform/Ansible tools) from the `generated/` directory hierarchy.
 

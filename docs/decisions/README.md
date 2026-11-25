@@ -172,3 +172,4 @@ The Issue contains the full discussion; the ADR summarizes the outcome.
 | [0035](0035-openwrt-devices-are-provider-instances-several-per-environment.md) | OpenWrt devices are provider instances, several per environment | Accepted |
 | [0036](0036-glinet-firmware-is-upgraded-through-the-vendor-online-upgrade-by-a-provider-command.md) | GL.iNet firmware is upgraded through the vendor online upgrade by a provider command | Accepted |
 | [0037](0037-mikrotik-routeros-is-upgraded-to-the-latest-release-of-a-channel-by-a-provider-command.md) | MikroTik RouterOS is upgraded to the latest release of a channel by a provider command | Accepted |
+| [0038](0038-qnap-switches-are-managed-over-the-web-uis-json-api-with-firmware-upgraded-by-a-provider-command.md) | QNAP switches are managed over the web UI's JSON API, with firmware upgraded by a provider command | Accepted |

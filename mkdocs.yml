@@ -186,6 +186,7 @@ nav:
     - "ADR-0035 OpenWrt devices are provider instances, several per environment": decisions/0035-openwrt-devices-are-provider-instances-several-per-environment.md
     - ADR-0036 GL.iNet firmware is upgraded through the vendor online upgrade by a provider command: decisions/0036-glinet-firmware-is-upgraded-through-the-vendor-online-upgrade-by-a-provider-command.md
     - ADR-0037 MikroTik RouterOS is upgraded to the latest release of a channel by a provider command: decisions/0037-mikrotik-routeros-is-upgraded-to-the-latest-release-of-a-channel-by-a-provider-command.md
+    - "ADR-0038 QNAP switches are managed over the web UI's JSON API, with firmware upgraded by a provider command": decisions/0038-qnap-switches-are-managed-over-the-web-uis-json-api-with-firmware-upgraded-by-a-provider-command.md
     - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
     - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
     - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md
@@ -228,6 +229,7 @@ nav:
     - OpenWrt: providers/openwrt.md
     - OPNsense: providers/opnsense.md
     - Proxmox: providers/proxmox.md
+    - QNAP: providers/qnap.md
     - Tailscale: providers/tailscale.md
     - OPNsense Resource Coverage: development/opnsense-resource-coverage.md
 

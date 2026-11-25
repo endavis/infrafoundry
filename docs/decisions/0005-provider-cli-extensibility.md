@@ -19,6 +19,8 @@ Second provider CLI: [#1655](https://github.com/endavis/infrafoundry/issues/1655
 
 Third provider CLI: [#1665](https://github.com/endavis/infrafoundry/issues/1665) adds `foundry provider mikrotik upgrade` ([ADR-0037](../decisions/0037-mikrotik-routeros-is-upgraded-to-the-latest-release-of-a-channel-by-a-provider-command.md)).
 
+Fourth provider CLI: [#1669](https://github.com/endavis/infrafoundry/issues/1669) adds `foundry provider qnap upgrade` ([ADR-0038](../decisions/0038-qnap-switches-are-managed-over-the-web-uis-json-api-with-firmware-upgraded-by-a-provider-command.md)).
+
 ## Context
 
 Provider-specific operations were starting to accumulate as flags and

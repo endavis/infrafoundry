@@ -17,6 +17,7 @@ from infrafoundry.core.runners import (
     OPNsenseDirectRunner,
     PulumiRunner,
     PyInfraRunner,
+    QnapRestRunner,
     RunnerRegistry,
     TerraformRunner,
 )
@@ -72,6 +73,7 @@ class ProviderRegistryService:
         self.runner_registry.register(OPNsenseDirectRunner)
         self.runner_registry.register(HostRunner)
         self.runner_registry.register(MikroTikRestRunner)
+        self.runner_registry.register(QnapRestRunner)
         self.runner_registry.register(OpenWrtAnsibleRunner)
         self.runner_registry.register(TerraformRunner)
         self.runner_registry.register(OpenTofuRunner)
