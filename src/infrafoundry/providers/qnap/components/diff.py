@@ -1,4 +1,4 @@
-"""Pure diff of declared QNAP VLANs and LACP groups against the switch (ADR-0039).
+"""Pure diff of declared QNAP VLANs, LACP groups and ports against the switch (ADR-0039).
 
 Membership model: a ``vlan`` resource owns the member lists it declares. A declared
 ``tagged`` or ``untagged`` list is authoritative and replaces the live set; an omitted list
@@ -6,6 +6,9 @@ keeps the live set. A port that becomes untagged in one VLAN is stripped from ev
 VLAN that holds it untagged (a port is untagged in at most one VLAN), unmanaged VLANs
 included, and the plan says so. Every write is a full member list, so a change carries the
 complete end-state membership.
+
+A ``port`` only ever updates: it compares the declared fields and keeps the rest. Its
+change carries the whole row to write (``Change.after``) and the names of the changed fields.
 """
 
 from __future__ import annotations
@@ -18,15 +21,22 @@ from infrafoundry.core.exceptions import InfraFoundryError
 
 from ..schema import (
     DEFAULT_VLAN_ID,
+    FEC_ENABLED_WIRE,
+    FEC_NOT_AVAILABLE,
     LACP_TYPE,
+    PORT_TYPE,
     VLAN_TYPE,
     DesiredLag,
+    DesiredPort,
     DesiredVlan,
     LacpInfo,
     LiveLag,
+    LivePort,
     LiveVlan,
     Port,
+    port_changed_fields,
     port_label,
+    port_write_data,
     resolve_port,
 )
 
@@ -60,6 +70,8 @@ class Change:
     notes: tuple[str, ...] = ()
     incidental: bool = False
     """True for a strip of an undeclared VLAN: written, but not a managed object."""
+    fields: tuple[str, ...] = ()
+    """For a ``port`` change: the declared fields that differ (never their values)."""
 
 
 @dataclass
@@ -302,6 +314,72 @@ def diff_lags(
         else:
             diff.unmanaged.append(str(lag.group))
     return diff
+
+
+def diff_ports(desired: list[DesiredPort], live: list[LivePort]) -> TypeDiff:
+    """Diff the declared port settings against the live rows.
+
+    Only declared fields are compared; undeclared ports and fields keep their live values
+    and are not reported. A port is never created or deleted, so every change is an update.
+
+    Args:
+        desired: Declared ports.
+        live: Rows of ``GET ports`` (LACP interface rows included).
+
+    Raises:
+        QnapPlanError: If a declared port is not on the switch or is a LACP interface row, or
+            declares ``fec`` on a port that has none.
+    """
+    diff = TypeDiff(PORT_TYPE)
+    by_key = {row.key: row for row in live}
+    for obj in desired:
+        row = by_key.get(obj.port)
+        if row is None:
+            raise QnapPlanError(f"port '{obj.resource_name}': port {obj.port} does not exist")
+        if row.is_lag:
+            raise QnapPlanError(
+                f"port '{obj.resource_name}': {obj.port} is a LACP interface, not a physical port"
+            )
+        if obj.fec is not None and row.fec == FEC_NOT_AVAILABLE:
+            raise QnapPlanError(f"port '{obj.resource_name}': port {obj.port} has no FEC setting")
+        fields = port_changed_fields(row, obj)
+        if not fields:
+            continue
+        diff.changes.append(
+            Change(
+                UPDATE,
+                PORT_TYPE,
+                obj.key,
+                obj.resource_name,
+                before=dict(row.raw),
+                after=port_write_data(row, obj),
+                notes=("set " + ", ".join(fields),),
+                fields=fields,
+            )
+        )
+    return diff
+
+
+def check_port_fec(diff: TypeDiff | None, live: list[LivePort]) -> None:
+    """Apply the web UI's FEC rule: a plan that changes FEC leaves at least two FEC ports on.
+
+    The rule applies only when the switch has FEC-capable ports. FEC ``auto``, ``RS_FEC``
+    and ``FC_FEC`` count as on.
+
+    Raises:
+        QnapPlanError: If the end state has fewer than two FEC-enabled ports.
+    """
+    if diff is None:
+        return
+    changed = {c.key[0]: c.after["FEC"] for c in diff.changes if "fec" in c.fields}
+    physical = [row for row in live if not row.is_lag]
+    if not changed or all(row.fec == FEC_NOT_AVAILABLE for row in physical):
+        return
+    enabled = sum(1 for row in physical if changed.get(row.key, row.fec) in FEC_ENABLED_WIRE)
+    if enabled < 2:
+        raise QnapPlanError(
+            f"the plan leaves {enabled} port(s) with FEC enabled; the switch needs at least two"
+        )
 
 
 def end_state(

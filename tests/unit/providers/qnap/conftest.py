@@ -73,6 +73,11 @@ def lag(name: str = "uplink", **config: Any) -> ResourceConfig:
     return ResourceConfig(name=name, type="lacp.group", provider="qnap", config=config)
 
 
+def port(name: str = "p5", **config: Any) -> ResourceConfig:
+    """Build a ``port`` resource; ``config`` holds ``port`` and the settings to manage."""
+    return ResourceConfig(name=name, type="port", provider="qnap", config=config)
+
+
 def manager_for(
     fake: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, **settings: Any
 ) -> QnapConfigManager:

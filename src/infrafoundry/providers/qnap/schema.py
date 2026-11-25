@@ -6,6 +6,9 @@ Two config types are managed over the switch's JSON API:
   The switch has no VLAN name and no separate PVID: a port's untagged VLAN is its PVID.
 * ``lacp.group``: key ``group``; fields ``mode`` (the switch's ``AggrMode``, verbatim),
   ``members`` (physical ports) and ``absent``.
+* ``port``: key ``port`` (a physical port number); fields ``alias``, ``shutdown``, ``speed``,
+  ``duplex``, ``flow_control``, ``fec`` and ``mtu``. A port is never created or deleted, so
+  there is no ``absent``; undeclared fields and ports keep their live values.
 
 A port is an integer (a physical port) or ``"lagN"``, the interface of LACP group ``N``,
 numbered ``N + StartIndex`` (``lacp/info``). That numbering is taken from the web UI's
@@ -28,9 +31,31 @@ from .components.firmware import SchemaFinding
 
 VLAN_TYPE = "vlan"
 LACP_TYPE = "lacp.group"
-CONFIG_TYPES = (VLAN_TYPE, LACP_TYPE)
+PORT_TYPE = "port"
+CONFIG_TYPES = (VLAN_TYPE, LACP_TYPE, PORT_TYPE)
+DELETABLE_TYPES = (VLAN_TYPE, LACP_TYPE)
+"""Types InfraFoundry can delete; a ``port`` row is released, never deleted."""
 VLAN_ADDRESS_PREFIX = "qnap_vlan"
 LACP_ADDRESS_PREFIX = "qnap_lacp_group"
+PORT_ADDRESS_PREFIX = "qnap_port"
+PORTLIST_TIMEOUT = 60
+"""Socket timeout of ``PUT portlist``, as the web UI uses."""
+LAG_ROW_TYPE = "ieee8023ad"
+"""``Type`` of the LACP interface rows ``GET ports`` returns next to the physical ports."""
+AUTO_SPEED_WIRE = "autoNegMode"
+SPEED_WIRE = {
+    "10M": "tenMBPS",
+    "100M": "hundredMBPS",
+    "1G": "oneGB",
+    "2.5G": "twothousandfivehundredMBPS",
+    "5G": "fivethousandMBPS",
+    "10G": "tenGB",
+}
+HALF_DUPLEX_SPEEDS = frozenset({"10M", "100M"})
+FEC_WIRE = {"auto": "auto", "rs": "RS_FEC", "fc": "FC_FEC", "none": "none"}
+FEC_ENABLED_WIRE = frozenset({"auto", "RS_FEC", "FC_FEC"})
+FEC_NOT_AVAILABLE = "N/A"
+PORT_FIELD_ORDER = ("alias", "shutdown", "speed", "duplex", "flow_control", "fec", "mtu")
 VLAN_MIN = 1
 VLAN_MAX = 4000
 DEFAULT_VLAN_ID = 1
@@ -41,6 +66,7 @@ Port = int | str
 _LAG_RE = re.compile(r"^lag([1-9][0-9]*)$")
 _VLAN_FIELDS = {"id", "tagged", "untagged"}
 _LAG_FIELDS = {"group", "mode", "members"}
+_PORT_FIELDS = {"port", *PORT_FIELD_ORDER}
 
 
 def parse_port(value: Any) -> Port:
@@ -130,6 +156,31 @@ class DesiredLag:
         return LACP_TYPE
 
 
+@dataclass(frozen=True)
+class DesiredPort:
+    """Declared settings of a physical port. A ``None`` field is undeclared (kept live)."""
+
+    port: int
+    resource_name: str
+    alias: str | None = None
+    shutdown: bool | None = None
+    speed: str | None = None
+    duplex: str | None = None
+    flow_control: bool | None = None
+    fec: str | None = None
+    mtu: int | None = None
+
+    @property
+    def key(self) -> tuple[Any, ...]:
+        """Identity key of the object."""
+        return (self.port,)
+
+    @property
+    def type_name(self) -> str:
+        """The resource type."""
+        return PORT_TYPE
+
+
 def _config(resource: ResourceConfig) -> dict[str, Any]:
     config = dict(resource.config or {})
     config.pop("name", None)  # the loaders copy the resource name into the config
@@ -186,13 +237,47 @@ def desired_lags(resources: Iterable[ResourceConfig]) -> list[DesiredLag]:
     return out
 
 
-def desired_from_resources(resources: list[ResourceConfig]) -> list[DesiredVlan | DesiredLag]:
-    """Return the declared VLANs and LACP groups; other types are skipped.
+def desired_ports(resources: Iterable[ResourceConfig]) -> list[DesiredPort]:
+    """Return the declared port settings.
 
     Raises:
         ValueError: If a resource has no usable key (run ``check_resources`` first).
     """
-    return [*desired_vlans(resources), *desired_lags(resources)]
+    out: list[DesiredPort] = []
+    for resource in resources:
+        if resource.type != PORT_TYPE:
+            continue
+        config = _config(resource)
+        port = config.get("port")
+        if isinstance(port, bool) or not isinstance(port, int) or port < 1:
+            raise ValueError(f"{PORT_TYPE} '{resource.name}' has no usable port")
+        alias, shutdown = config.get("alias"), config.get("shutdown")
+        flow, mtu = config.get("flow_control"), config.get("mtu")
+        out.append(
+            DesiredPort(
+                port,
+                resource.name,
+                str(alias) if alias is not None else None,
+                shutdown if isinstance(shutdown, bool) else None,
+                str(config["speed"]) if config.get("speed") is not None else None,
+                str(config["duplex"]) if config.get("duplex") is not None else None,
+                flow if isinstance(flow, bool) else None,
+                str(config["fec"]) if config.get("fec") is not None else None,
+                mtu if _is_int(mtu) else None,
+            )
+        )
+    return out
+
+
+def desired_from_resources(
+    resources: list[ResourceConfig],
+) -> list[DesiredVlan | DesiredLag | DesiredPort]:
+    """Return the declared VLANs, LACP groups and ports; other types are skipped.
+
+    Raises:
+        ValueError: If a resource has no usable key (run ``check_resources`` first).
+    """
+    return [*desired_vlans(resources), *desired_lags(resources), *desired_ports(resources)]
 
 
 def _is_int(value: Any) -> bool:
@@ -200,10 +285,10 @@ def _is_int(value: Any) -> bool:
 
 
 def check_resources(resources: list[ResourceConfig]) -> list[SchemaFinding]:
-    """Check each ``vlan`` and ``lacp.group`` resource.
+    """Check each ``vlan``, ``lacp.group`` and ``port`` resource.
 
     Args:
-        resources: Resources of any type; only the two config types are checked.
+        resources: Resources of any type; only the config types are checked.
 
     Returns:
         Findings; all at ERROR level.
@@ -211,6 +296,8 @@ def check_resources(resources: list[ResourceConfig]) -> list[SchemaFinding]:
     findings: list[SchemaFinding] = []
     vlan_keys: Counter[int] = Counter()
     lag_keys: Counter[int] = Counter()
+    port_keys: Counter[int] = Counter()
+    port_mtus: list[int] = []
     untagged_in: dict[Port, int] = {}
     member_of: dict[Port, int] = {}
 
@@ -236,6 +323,9 @@ def check_resources(resources: list[ResourceConfig]) -> list[SchemaFinding]:
         if resource.type not in CONFIG_TYPES:
             continue
         config = _config(resource)
+        if resource.type == PORT_TYPE:
+            _check_port(resource, config, error, port_keys, port_mtus)
+            continue
         absent = config.pop("absent", False)
         if not isinstance(absent, bool):
             error(resource, "'absent' must be true or false")
@@ -333,6 +423,61 @@ def _check_lag(
             error(resource, f"port {port} is a member of group {other} and group {group}")
 
 
+def _check_port(
+    resource: ResourceConfig,
+    config: dict[str, Any],
+    error: Any,
+    keys: Counter[int],
+    mtus: list[int],
+) -> None:
+    unknown = sorted(set(config) - _PORT_FIELDS)
+    if "absent" in unknown:
+        error(resource, "'absent' is not allowed: a port is never created or deleted")
+        unknown.remove("absent")
+    if unknown:
+        error(resource, "unknown field(s): " + ", ".join(unknown))
+    port = config.get("port")
+    if port is None:
+        error(resource, "missing required field(s): port")
+        return
+    if not _is_int(port) or port < 1:
+        error(
+            resource, "'port' must be a physical port number of 1 or more (lagN is not supported)"
+        )
+        return
+    keys[port] += 1
+    if keys[port] == 2:
+        error(resource, f"duplicate identity key ({port},)")
+    alias = config.get("alias")
+    if alias is not None and not isinstance(alias, str):
+        error(resource, "'alias' must be a string")
+    for name in ("shutdown", "flow_control"):
+        if config.get(name) is not None and not isinstance(config[name], bool):
+            error(resource, f"'{name}' must be true or false")
+    speed, duplex = config.get("speed"), config.get("duplex")
+    speeds = ["auto", *SPEED_WIRE]
+    if speed is not None and speed not in speeds:
+        error(resource, "'speed' must be one of " + ", ".join(speeds))
+    if duplex is not None:
+        if duplex not in ("full", "half"):
+            error(resource, "'duplex' must be 'full' or 'half'")
+        elif speed is None or speed == "auto":
+            error(resource, "'duplex' needs a fixed 'speed' (not auto)")
+        elif duplex == "half" and speed not in HALF_DUPLEX_SPEEDS:
+            error(resource, "'duplex: half' is allowed only at speed 10M or 100M")
+    fec = config.get("fec")
+    if fec is not None and fec not in FEC_WIRE:
+        error(resource, "'fec' must be one of " + ", ".join(FEC_WIRE))
+    mtu = config.get("mtu")
+    if mtu is not None:
+        if not _is_int(mtu) or mtu < 1:
+            error(resource, "'mtu' must be a positive integer")
+        else:
+            if mtus and mtu != mtus[0]:
+                error(resource, f"'mtu' {mtu} differs from {mtus[0]}: the MTU is switch-wide")
+            mtus.append(mtu)
+
+
 # -- live parsers
 
 
@@ -353,6 +498,44 @@ class LiveLag:
     members: frozenset[int]
     member_as_str: bool | None
     """Whether ``PortMembers`` holds strings; ``None`` when the group has no members."""
+
+
+@dataclass(frozen=True)
+class LivePort:
+    """One row of ``GET ports``. ``raw`` is the whole ``val``, which a write echoes back."""
+
+    key: int
+    raw: Mapping[str, Any]
+
+    @property
+    def is_lag(self) -> bool:
+        """True for a LACP interface row (not a physical port)."""
+        return self.raw.get("Type") == LAG_ROW_TYPE
+
+    @property
+    def auto_mode(self) -> bool:
+        """Whether the port negotiates its speed."""
+        return bool(self.raw.get("AutoMode"))
+
+    @property
+    def speed(self) -> str:
+        """``Speed``: the negotiated speed while ``auto_mode`` is on."""
+        return str(self.raw.get("Speed", ""))
+
+    @property
+    def fdx(self) -> bool:
+        """Whether the port runs full duplex."""
+        return bool(self.raw.get("Fdx"))
+
+    @property
+    def fec(self) -> str:
+        """``FEC`` (``N/A`` when the port has none)."""
+        return str(self.raw.get("FEC", ""))
+
+    @property
+    def mtu(self) -> int:
+        """``MTU``."""
+        return int(self.raw.get("MTU", 0))
 
 
 @dataclass(frozen=True)
@@ -448,15 +631,60 @@ def parse_lacp_info(result: Any) -> LacpInfo:
     )
 
 
+_PORT_TYPES: dict[str, type] = {
+    "Alias": str,
+    "AutoMode": bool,
+    "FC": bool,
+    "FEC": str,
+    "Fdx": bool,
+    "Shutdown": bool,
+    "Speed": str,
+}
+
+
+def _is_lag_row(item: Any) -> bool:
+    val = item.get("val") if isinstance(item, dict) else None
+    return isinstance(val, dict) and val.get("Type") == LAG_ROW_TYPE
+
+
 def count_ports(result: Any) -> int:
     """Return the number of physical ports in ``GET ports``.
+
+    The reply also holds one row per LACP group interface (``Type`` ``ieee8023ad``); those
+    are not physical ports and are not counted.
 
     Raises:
         QnapApiDriftError: If the reply is not a list.
     """
     if not isinstance(result, list):
         raise _drift("ports")
-    return len(result)
+    return sum(1 for item in result if not _is_lag_row(item))
+
+
+def parse_ports(result: Any) -> list[LivePort]:
+    """Parse ``GET ports``, type-checking every physical row (a write echoes the whole row).
+
+    Raises:
+        QnapApiDriftError: If the reply is not a list of ``{key, val: {...}}`` or a
+            physical row lacks a field this provider reads.
+    """
+    if not isinstance(result, list):
+        raise _drift("ports")
+    rows: list[LivePort] = []
+    for item in result:
+        val = item.get("val") if isinstance(item, dict) else None
+        if not isinstance(val, dict):
+            raise _drift("ports")
+        key = _int(item.get("key"), "ports")
+        if val.get("Type") != LAG_ROW_TYPE:
+            for name, kind in _PORT_TYPES.items():
+                if not isinstance(val.get(name), kind):
+                    raise _drift("ports")
+            mtu = val.get("MTU")
+            if isinstance(mtu, bool) or not isinstance(mtu, int):
+                raise _drift("ports")
+        rows.append(LivePort(key, dict(val)))
+    return rows
 
 
 # -- write bodies (unverified on a device)
@@ -496,6 +724,79 @@ def lag_delete_body(group: int) -> dict[str, Any]:
     return {"idx": [str(group)]}
 
 
+def port_changed_fields(live: LivePort, desired: DesiredPort) -> tuple[str, ...]:
+    """Return the declared fields of ``desired`` that differ from ``live``, in a fixed order.
+
+    ``speed: auto`` is compared against ``AutoMode``, never against ``Speed`` (which holds
+    the negotiated speed); a fixed speed matches only with ``AutoMode`` off.
+    """
+    changed: list[str] = []
+    if desired.alias is not None and live.raw.get("Alias") != desired.alias:
+        changed.append("alias")
+    if desired.shutdown is not None and live.raw.get("Shutdown") is not desired.shutdown:
+        changed.append("shutdown")
+    if desired.speed == "auto":
+        speed_differs = not live.auto_mode
+    elif desired.speed is not None:
+        speed_differs = live.auto_mode or live.speed != SPEED_WIRE[desired.speed]
+    else:
+        speed_differs = False
+    if speed_differs:
+        changed.append("speed")
+    if desired.duplex is not None and live.fdx is not (desired.duplex == "full"):
+        changed.append("duplex")
+    if desired.flow_control is not None and live.raw.get("FC") is not desired.flow_control:
+        changed.append("flow_control")
+    if desired.fec is not None and live.fec != FEC_WIRE[desired.fec]:
+        changed.append("fec")
+    if desired.mtu is not None and live.mtu != desired.mtu:
+        changed.append("mtu")
+    return tuple(changed)
+
+
+def port_matches(live: LivePort, desired: DesiredPort) -> bool:
+    """Return whether every declared field of ``desired`` already holds on ``live``."""
+    return not port_changed_fields(live, desired)
+
+
+def port_write_data(live: LivePort, desired: DesiredPort) -> dict[str, Any]:
+    """Return the ``data`` of a ``PUT portlist`` entry: the live ``val`` with the edits applied.
+
+    The web UI sends the whole ``val`` of each changed port. A port in auto mode is sent
+    with ``Speed`` ``autoNegMode`` and ``AutoMode`` true. Moving to a fixed speed keeps the
+    live duplex unless one is declared; a change from auto, or to a speed without half
+    duplex, writes full duplex.
+    """
+    data = dict(live.raw)
+    if desired.alias is not None:
+        data["Alias"] = desired.alias
+    if desired.shutdown is not None:
+        data["Shutdown"] = desired.shutdown
+    if desired.flow_control is not None:
+        data["FC"] = desired.flow_control
+    if desired.fec is not None:
+        data["FEC"] = FEC_WIRE[desired.fec]
+    if desired.mtu is not None:
+        data["MTU"] = desired.mtu
+    if desired.speed == "auto" or (desired.speed is None and live.auto_mode):
+        data["Speed"], data["AutoMode"] = AUTO_SPEED_WIRE, True
+        return data
+    data["AutoMode"] = False
+    if desired.speed is None:
+        return data
+    data["Speed"] = SPEED_WIRE[desired.speed]
+    if desired.duplex is not None:
+        data["Fdx"] = desired.duplex == "full"
+    elif live.auto_mode or desired.speed not in HALF_DUPLEX_SPEEDS:
+        data["Fdx"] = True
+    return data
+
+
+def port_body(entries: Iterable[tuple[int, Mapping[str, Any]]]) -> list[dict[str, Any]]:
+    """Return the body of ``PUT portlist``: an array of ``{"idx", "data"}``, one per port."""
+    return [{"idx": str(port), "data": dict(data)} for port, data in entries]
+
+
 def member_style(lags: Iterable[LiveLag]) -> bool:
     """Return whether ``PortMembers`` holds strings: the live groups' type, else strings."""
     for lag in lags:
@@ -507,20 +808,33 @@ def member_style(lags: Iterable[LiveLag]) -> bool:
 __all__ = [
     "CONFIG_TYPES",
     "DEFAULT_VLAN_ID",
+    "DELETABLE_TYPES",
+    "FEC_ENABLED_WIRE",
+    "FEC_NOT_AVAILABLE",
+    "FEC_WIRE",
     "LACP_ADDRESS_PREFIX",
     "LACP_TYPE",
+    "LAG_ROW_TYPE",
+    "PORTLIST_TIMEOUT",
+    "PORT_ADDRESS_PREFIX",
+    "PORT_FIELD_ORDER",
+    "PORT_TYPE",
+    "SPEED_WIRE",
     "VLAN_ADDRESS_PREFIX",
     "VLAN_TYPE",
     "DesiredLag",
+    "DesiredPort",
     "DesiredVlan",
     "LacpInfo",
     "LiveLag",
+    "LivePort",
     "LiveVlan",
     "Port",
     "check_resources",
     "count_ports",
     "desired_from_resources",
     "desired_lags",
+    "desired_ports",
     "desired_vlans",
     "lag_body",
     "lag_delete_body",
@@ -528,8 +842,13 @@ __all__ = [
     "parse_lacp_info",
     "parse_lags",
     "parse_port",
+    "parse_ports",
     "parse_vlans",
+    "port_body",
+    "port_changed_fields",
     "port_label",
+    "port_matches",
+    "port_write_data",
     "resolve_port",
     "vlan_body",
     "vlan_delete_body",

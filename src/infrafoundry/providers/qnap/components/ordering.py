@@ -8,19 +8,26 @@ things true on the switch at every step:
 * a LAG interface exists before a VLAN lists it (phase A) and is deleted only after the
   VLANs stop listing it (phases F, G);
 * the management VLAN is written last among the updates.
+
+Port settings are written last (phases H and I), one ``PUT portlist`` per port. A port whose
+change includes ``mtu`` goes to phase I with all of its changes. Watched ports (those that
+may carry the management connection) come last within each phase.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from ..schema import (
     LACP_TYPE,
+    PORT_TYPE,
+    PORTLIST_TIMEOUT,
     VLAN_TYPE,
     lag_body,
     lag_delete_body,
+    port_body,
     vlan_body,
     vlan_delete_body,
 )
@@ -34,10 +41,13 @@ PHASE_TITLES = {
     "E": "update LACP groups",
     "F": "delete VLANs",
     "G": "delete LACP groups",
+    "H": "update port settings",
+    "I": "change port MTU",
 }
 
 _VLAN_PATH = "vlan"
 _LAG_PATH = "lacp/group"
+_PORT_PATH = "portlist"
 
 
 @dataclass(frozen=True)
@@ -51,8 +61,10 @@ class Step:
     resource_name: str
     method: str
     path: str
-    body: dict[str, Any]
+    body: Any
+    """The JSON body: an object, or the array ``PUT portlist`` takes."""
     incidental: bool = False
+    timeout: float | None = None
 
 
 def _vlan_step(phase: str, change: Change, method: str, body: dict[str, Any], kind: str) -> Step:
@@ -79,6 +91,20 @@ def _lag_write(change: Change, member_as_str: bool) -> dict[str, Any]:
     return lag_body(change.key[0], change.after.mode, change.after.members, member_as_str)
 
 
+def _port_step(phase: str, change: Change) -> Step:
+    return Step(
+        phase,
+        UPDATE,
+        PORT_TYPE,
+        change.key,
+        change.resource_name,
+        "PUT",
+        _PORT_PATH,
+        port_body([(change.key[0], change.after)]),
+        timeout=PORTLIST_TIMEOUT,
+    )
+
+
 def _freed_ports(
     vlan_id: int, live: Mapping[int, bool], end_vlans: Mapping[int, Mapping[int, bool]]
 ) -> set[int]:
@@ -101,6 +127,8 @@ def order_changes(
     mgmt_vlan: int | None,
     *,
     member_as_str: bool = True,
+    port_diff: TypeDiff | None = None,
+    last_ports: Collection[int] = (),
 ) -> list[Step]:
     """Turn the diffs into steps in phase order.
 
@@ -111,6 +139,8 @@ def order_changes(
         end_vlans: The same after every change.
         mgmt_vlan: The management VLAN; its update is written last in phase D.
         member_as_str: Whether ``PortMembers`` holds strings.
+        port_diff: The port diff, if any; written after everything else (phases H, I).
+        last_ports: Watched ports, written last within their phase.
     """
     vlans = vlan_diff.changes if vlan_diff else []
     lags = lag_diff.changes if lag_diff else []
@@ -148,4 +178,9 @@ def order_changes(
     steps += [
         _lag_step("G", c, "DELETE", lag_delete_body(c.key[0])) for c in lags if c.kind == DELETE
     ]
+    ports = sorted(
+        port_diff.changes if port_diff else [], key=lambda c: (c.key[0] in last_ports, c.key[0])
+    )
+    steps += [_port_step("H", c) for c in ports if "mtu" not in c.fields]
+    steps += [_port_step("I", c) for c in ports if "mtu" in c.fields]
     return steps

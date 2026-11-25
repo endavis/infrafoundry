@@ -9,11 +9,19 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 
 from ..client import QnapError, QnapUnreachableError, QnapWriter
 from .ordering import Step
 
 logger = logging.getLogger(__name__)
+
+
+def _object(step: Step) -> dict[str, Any]:
+    """Return the step's body as an object; only ``PUT portlist`` takes an array."""
+    if not isinstance(step.body, dict):
+        raise ValueError(f"a {step.method} step needs an object body")
+    return step.body
 
 
 @dataclass
@@ -48,11 +56,11 @@ def execute_steps(client: QnapWriter, steps: list[Step]) -> ExecutionResult:
         )
         try:
             if step.method == "POST":
-                client.post(step.path, step.body)
+                client.post(step.path, _object(step))
             elif step.method == "PUT":
-                client.put(step.path, step.body)
+                client.put(step.path, step.body, timeout=step.timeout)
             elif step.method == "DELETE":
-                client.delete(step.path, step.body)
+                client.delete(step.path, _object(step))
             else:
                 raise ValueError(f"unknown method '{step.method}'")
         except QnapUnreachableError as exc:

@@ -100,7 +100,9 @@ class QnapReader(Protocol):
 class QnapWriter(QnapReader, Protocol):
     """What the config manager needs: reads, writes, the liveness probe and a session."""
 
-    def put(self, path: str, body: dict[str, Any]) -> Any:
+    def put(
+        self, path: str, body: dict[str, Any] | list[Any], *, timeout: float | None = None
+    ) -> Any:
         """Return the ``result`` of a PUT under ``/api/v1/``."""
         ...
 
@@ -199,7 +201,7 @@ class QnapClient:
         self,
         method: str,
         path: str,
-        body: dict[str, Any] | None = None,
+        body: dict[str, Any] | list[Any] | None = None,
         *,
         auth: bool = True,
         timeout: float | None = None,
@@ -339,14 +341,17 @@ class QnapClient:
         """
         return self._request("POST", path, body if body is not None else {})
 
-    def put(self, path: str, body: dict[str, Any]) -> Any:
+    def put(
+        self, path: str, body: dict[str, Any] | list[Any], *, timeout: float | None = None
+    ) -> Any:
         """Return the ``result`` of ``PUT /api/v1/<path>`` with a JSON body.
 
         Args:
             path: Path below ``/api/v1/``.
-            body: JSON body.
+            body: JSON body (an object, or an array as ``portlist`` takes).
+            timeout: Socket timeout for this call; the settings' ``timeout`` by default.
         """
-        return self._request("PUT", path, body)
+        return self._request("PUT", path, body, timeout=timeout)
 
     def delete(self, path: str, body: dict[str, Any]) -> Any:
         """Return the ``result`` of ``DELETE /api/v1/<path>`` with a JSON body.
