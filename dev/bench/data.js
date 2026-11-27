@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795781025757,
+  "lastUpdate": 1795784222653,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7148,6 +7148,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005656941803857316",
             "extra": "mean: 92.48517432722811 usec\nrounds: 11335"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1f6274f5d0e329ff1c8d0b12592a6cbc419e287a",
+          "message": "feat: renew acme certificates unattended (merges PR #1691, addresses #1682)\n\n- Add `foundry certs renew [NAME...] [--dry-run]` for timers and cron: it\n  processes certificates that are due, never issued, declared differently or\n  stored but not installed; it is silent and takes no lock when nothing is\n  due, and --dry-run takes no lock and contacts nothing. Exit codes 0/1/2/75.\n- Warn in `infra plan` about certificates that are due, expired, never issued\n  or not installed (offline, never raises).\n- Check in `infra doctor` that the Cloudflare token can read the zone, with\n  the token and zone id scrubbed from every message.\n- Emit CERTIFICATE_ISSUED, CERTIFICATE_INSTALLED and CERTIFICATE_FAILED\n  events; payloads carry no key material.\n- Document renewal, the systemd timer and cron examples, plan notes, the\n  doctor check and the events; update ADR-0040.\n\nAddresses #1682\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T12:55:26Z",
+          "tree_id": "df6cc4c943a7e34a80155e4ed093d69d7c34c373",
+          "url": "https://github.com/endavis/infrafoundry/commit/1f6274f5d0e329ff1c8d0b12592a6cbc419e287a"
+        },
+        "date": 1795784221800,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 65.89093638477449,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0012026375535810609",
+            "extra": "mean: 15.176594154929502 msec\nrounds: 71"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13060.50754591318,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000008158556113697546",
+            "extra": "mean: 76.56670282411147 usec\nrounds: 14022"
           }
         ]
       }
