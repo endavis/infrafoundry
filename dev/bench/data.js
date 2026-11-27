@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795813759580,
+  "lastUpdate": 1795817633610,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7718,6 +7718,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000057309671342345335",
             "extra": "mean: 91.12146996848661 usec\nrounds: 12054"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e02d409dd90c7afd1a7c81084d8add2c12fd7873",
+          "message": "feat: add a native ontap provider backed by pynetappfoundry (merges PR #1718, addresses #1373)\n\n* feat: add a native ontap provider backed by pynetappfoundry\n\nA first increment of native ONTAP management: data LIFs\n(network/ip/interfaces) over REST, with plan, apply, destroy and drift,\ninstead of the ontap-post-cluster Ansible role that only ran when the\ncluster was created.\n\n- providers/ontap: the provider, settings (secret:// credentials, TLS by\n  tls_fingerprint pin, CA bundle or an unsafe verify_ssl: false opt-out),\n  the network.ip.interface schema (svm, name, address, netmask,\n  home_node, home_port, service_policy or protocols, auto_revert, absent),\n  a read-first diff and manager, and a validator. Only svm-scope LIFs in\n  declared SVMs are considered; the LIF carrying the management address\n  is never changed or deleted.\n- providers/_netapp: the shared pynetappfoundry service layer for the\n  NetApp sibling providers. Credentials reach pynetappfoundry in memory\n  through a Config subclass; nothing is written to its config directory,\n  and the TLS pin is never persisted. pynetappfoundry is imported lazily,\n  so a core install without the extra fails with an install hint.\n- core/runners/ontap_rest_runner.py: the direct runner, registered with\n  the provider.\n- The netapp optional extra (infrafoundry[netapp]) carries\n  pynetappfoundry>=0.2.0, as the maintainer chose over the issue's\n  infrafoundry[ontap].\n- ADR-0042 records sibling providers over a shared service layer, the one\n  extra, in-memory credentials and TLS handling. docs/providers/ontap.md\n  documents settings, the spec download and the resource type.\n\nAddresses #1373\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* test: run the orchestrator default-root test in a clean cwd\n\ntest_init_with_defaults asserted Path.cwd() / \"generated\". Since the\ndefault root resolves symlinks, the test failed in every worktree made by\ndoit worktree, where generated links to the main checkout's directory. It\nnow chdirs into tmp_path, unsets INFRAFOUNDRY_OUTPUT_DIR and asserts\ntmp_path.resolve() / \"generated\". The behaviour under test is unchanged.\n\nAddresses #1373\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* test: parse the spec url host in the ontap validator test\n\nAddresses #1373\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* docs: record the live ontap provider run\n\nAddresses #1373\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T22:12:47Z",
+          "tree_id": "7055676ff5b567b80def456a2010fac99bd74c8f",
+          "url": "https://github.com/endavis/infrafoundry/commit/e02d409dd90c7afd1a7c81084d8add2c12fd7873"
+        },
+        "date": 1795817633158,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 55.289756040513495,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0007713508060020074",
+            "extra": "mean: 18.08653305084673 msec\nrounds: 59"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10718.186501167891,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009433588801037231",
+            "extra": "mean: 93.2993655121635 usec\nrounds: 12213"
           }
         ]
       }
