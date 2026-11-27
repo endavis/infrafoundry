@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795798129793,
+  "lastUpdate": 1795798693576,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7376,6 +7376,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010175076532861718",
             "extra": "mean: 128.68055602605952 usec\nrounds: 8264"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a00763cd4b59527d9e9ee76f2f2387ba7ace9fb3",
+          "message": "fix: tag proxmox vms with their known ip addresses (merges PR #1704, addresses #1699)\n\n* fix: tag proxmox vms with their static ip addresses\n\nTags added by an external IP-tagging script showed up as drift on every\nplan. InfraFoundry now adds a regular VM's static IPv4 address (from its\nipconfig) to the generated tags, so the external script can be disabled\nand the plan shows no tag change. OVA and disk-image VMs, DHCP guests and\nIPv6 are not tagged. ip_tags: false opts a VM out.\n\nAddresses #1699\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: tag dhcp-reserved proxmox vms with their known ip\n\nVMs whose address comes from a DHCP reservation render dhcp in their\nip_config but still have a known IPv4. Add an optional ip_addresses key\non regular VMs, validate it, and set it in the service-vm, reverse-proxy,\naiqum, console-connector and k3s-cluster blueprints so these VMs keep\ntheir IP tags once the external tagging script is off.\n\nAddresses #1699\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T16:56:50Z",
+          "tree_id": "9ce3b28301160e3c7fd200a4caca4f283748269f",
+          "url": "https://github.com/endavis/infrafoundry/commit/a00763cd4b59527d9e9ee76f2f2387ba7ace9fb3"
+        },
+        "date": 1795798692760,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 68.39655104622268,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003942015935512686",
+            "extra": "mean: 14.620620260869522 msec\nrounds: 69"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 13150.329896123414,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000049269862192476314",
+            "extra": "mean: 76.04371965564073 usec\nrounds: 13940"
           }
         ]
       }
