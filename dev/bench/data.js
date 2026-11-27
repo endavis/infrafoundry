@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795799991424,
+  "lastUpdate": 1795800515348,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7452,6 +7452,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000004365306081400161",
             "extra": "mean: 71.15102329915068 usec\nrounds: 15580"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0afc1725a4c0c9823346e6f5a99293f23e024e4f",
+          "message": "fix: render proxmox vm ipconfig in a single ip_config block (merges PR #1707, addresses #1703)\n\nThe initialization block rendered ip_config twice. The second copy only\nhandled dhcp, so a static ipconfig combined with cloud_init_user_data\nproduced an empty ip_config, and tailscale_module_config alone produced\na second, empty ip_config block. Render one block whenever ipconfig is\nset, with both the dhcp and static branches.\n\nA DHCP ipconfig with tailscale_module_config and no cloud_init_user_data\nused to render two dhcp blocks and now renders one, which shows as a\nplan change on existing VMs of that shape.\n\nAddresses #1703\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T17:27:19Z",
+          "tree_id": "00e93724a582a1f52298d5bbe5f0159bf55277f4",
+          "url": "https://github.com/endavis/infrafoundry/commit/0afc1725a4c0c9823346e6f5a99293f23e024e4f"
+        },
+        "date": 1795800514754,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 85.59313707690478,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00017934516999643763",
+            "extra": "mean: 11.683179681818505 msec\nrounds: 88"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15334.15769024659,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000016014256608748183",
+            "extra": "mean: 65.21388524888184 usec\nrounds: 16819"
           }
         ]
       }
