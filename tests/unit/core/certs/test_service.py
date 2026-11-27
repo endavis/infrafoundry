@@ -325,12 +325,12 @@ def test_the_state_row_target_carries_kind_only_when_set() -> None:
     resource = certificate_resource()
     entry = {"not_after": "x", "sha256": "y"}
     node = SimpleNamespace(
-        names=["a.example.com"], target={"provider": "proxmox", "kind": "node", "resource": "pve1"}
+        names=["a.example.com"], target={"provider": "proxmox", "kind": "node", "resource": "node1"}
     )
     rig.service()._record(resource, node, entry)  # type: ignore[arg-type]
     assert rig.states[-1][1]["target"] == {
         "provider": "proxmox",
-        "resource": "pve1",
+        "resource": "node1",
         "kind": "node",
     }
     plain = SimpleNamespace(names=["a.example.com"], target={"provider": "host", "resource": "h"})

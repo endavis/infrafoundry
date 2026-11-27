@@ -537,9 +537,9 @@ A Proxmox node itself (its web UI and API on port 8006) can receive a certificat
 target:
   provider: proxmox
   kind: node
-  resource: pve1                 # the Proxmox node name
-  address: pve1.example.com      # optional: where to verify; defaults to verify.server_name
-  verify: {server_name: pve1.example.com}   # optional: the port defaults to 8006
+  resource: node1                 # the Proxmox node name
+  address: node1.example.com      # optional: where to verify; defaults to verify.server_name
+  verify: {server_name: node1.example.com}   # optional: the port defaults to 8006
 ```
 
 - The node does not have to be declared as a resource; the name is checked against the cluster (`GET /nodes`) before anything is written.

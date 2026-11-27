@@ -189,17 +189,17 @@ def test_doh_is_off_by_default() -> None:
 
 
 def test_a_proxmox_node_target_is_valid_without_file_keys() -> None:
-    resource = certificate_resource(names=["pve1.example.com"])
-    resource.config["target"] = {"provider": "proxmox", "kind": "node", "resource": "pve1"}
+    resource = certificate_resource(names=["node1.example.com"])
+    resource.config["target"] = {"provider": "proxmox", "kind": "node", "resource": "node1"}
     assert check_certificates([resource]) == []
 
 
 def test_a_proxmox_node_target_rejects_a_key_path() -> None:
-    resource = certificate_resource(names=["pve1.example.com"])
+    resource = certificate_resource(names=["node1.example.com"])
     resource.config["target"] = {
         "provider": "proxmox",
         "kind": "node",
-        "resource": "pve1",
+        "resource": "node1",
         "key_path": "/etc/ssl/a.key",
     }
     assert any("do not apply" in f.message for f in check_certificates([resource]))

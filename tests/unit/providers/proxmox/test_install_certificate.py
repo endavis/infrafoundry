@@ -49,7 +49,7 @@ def test_a_failure_surfaces_as_a_certificate_install_error(provider: ProxmoxProv
 
 def node_target() -> CertificateTarget:
     return resolve_target(
-        {"provider": "proxmox", "kind": "node", "resource": "pve1"}, ["pve1.example.com"], []
+        {"provider": "proxmox", "kind": "node", "resource": "node1"}, ["node1.example.com"], []
     )
 
 
@@ -61,12 +61,12 @@ def test_a_node_target_uses_the_api_and_never_ssh(
     run = FakeRun()
     provider._certificate_installer = SshCertificateInstaller(run)
     api = MagicMock()
-    api.get_json.return_value = {"data": [{"node": "pve1"}]}
+    api.get_json.return_value = {"data": [{"node": "node1"}]}
     monkeypatch.setattr(provider, "_api_client", lambda: api)
     provider.install_certificate(node_target(), "CERT\n", "CHAIN\n", KEY)
     assert run.calls == []
     endpoint, data = api.post_json.call_args.args
-    assert endpoint == "nodes/pve1/certificates/custom"
+    assert endpoint == "nodes/node1/certificates/custom"
     assert data["key"] == KEY
 
 

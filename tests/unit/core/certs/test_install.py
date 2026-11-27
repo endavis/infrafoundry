@@ -404,37 +404,37 @@ def test_verify_uses_the_jump_fetch_only_with_a_jumphost() -> None:
 
 
 def node_target(**over: Any) -> dict[str, Any]:
-    raw: dict[str, Any] = {"provider": "proxmox", "kind": "node", "resource": "pve1"}
+    raw: dict[str, Any] = {"provider": "proxmox", "kind": "node", "resource": "node1"}
     raw.update(over)
     return raw
 
 
 def test_a_node_target_defaults_to_port_8006_and_the_first_plain_name() -> None:
-    target = parse_target(node_target(), ["*.example.com", "pve1.example.com"])
+    target = parse_target(node_target(), ["*.example.com", "node1.example.com"])
     assert target.kind == "node"
     assert target.verify_port == 8006
-    assert target.verify_server_name == "pve1.example.com"
+    assert target.verify_server_name == "node1.example.com"
 
 
 def test_a_node_target_takes_an_explicit_verify_block() -> None:
     raw = node_target(verify={"port": 8443, "server_name": "pve.example.net"})
-    target = parse_target(raw, ["pve1.example.com"])
+    target = parse_target(raw, ["node1.example.com"])
     assert (target.verify_port, target.verify_server_name) == (8443, "pve.example.net")
 
 
 def test_a_node_needs_no_declared_resource_and_verifies_the_address() -> None:
-    raw = node_target(address="pve1.example.com")
+    raw = node_target(address="node1.example.com")
     target = resolve_target(raw, ["*.example.com"], [])
     assert target.endpoint is not None
-    assert target.endpoint.address == "pve1.example.com"
+    assert target.endpoint.address == "node1.example.com"
     assert target.endpoint.jumphost is None
-    assert target.verify_server_name == "pve1.example.com"
+    assert target.verify_server_name == "node1.example.com"
 
 
 def test_a_node_without_address_verifies_the_server_name() -> None:
-    target = resolve_target(node_target(), ["pve1.example.com"], [])
+    target = resolve_target(node_target(), ["node1.example.com"], [])
     assert target.endpoint is not None
-    assert target.endpoint.address == "pve1.example.com"
+    assert target.endpoint.address == "node1.example.com"
 
 
 @pytest.mark.parametrize(
@@ -450,26 +450,28 @@ def test_a_node_without_address_verifies_the_server_name() -> None:
     ],
 )
 def test_a_node_rejects_ssh_and_file_keys(extra: dict[str, Any]) -> None:
-    problems = target_problems(node_target(**extra), ["pve1.example.com"], "target")
+    problems = target_problems(node_target(**extra), ["node1.example.com"], "target")
     assert any("do not apply to a Proxmox node" in p for p in problems)
 
 
-@pytest.mark.parametrize("name", ["pve1.example.com", "-pve", "pve 1", "", "a;b"])
+@pytest.mark.parametrize("name", ["node1.example.com", "-pve", "pve 1", "", "a;b"])
 def test_a_node_name_must_be_one_host_label(name: str) -> None:
-    problems = target_problems(node_target(resource=name), ["pve1.example.com"], "target")
+    problems = target_problems(node_target(resource=name), ["node1.example.com"], "target")
     assert any("node name" in p for p in problems)
 
 
 @pytest.mark.parametrize("address", ["-oProxyCommand=x", "a b", "pve;1", 5])
 def test_a_node_address_must_be_safe(address: Any) -> None:
-    problems = target_problems(node_target(address=address), ["pve1.example.com"], "target")
+    problems = target_problems(node_target(address=address), ["node1.example.com"], "target")
     assert any("address" in p for p in problems)
 
 
 def test_a_wildcard_only_node_needs_a_server_name_or_address() -> None:
     assert any("wildcard" in p for p in target_problems(node_target(), ["*.example.com"], "target"))
-    assert not target_problems(node_target(address="pve1.example.com"), ["*.example.com"], "target")
-    raw = node_target(verify={"server_name": "pve1.example.com"})
+    assert not target_problems(
+        node_target(address="node1.example.com"), ["*.example.com"], "target"
+    )
+    raw = node_target(verify={"server_name": "node1.example.com"})
     assert not target_problems(raw, ["*.example.com"], "target")
 
 
@@ -499,7 +501,7 @@ def test_a_vm_still_needs_its_declared_resource() -> None:
 
 
 def test_verify_served_fetches_a_node_on_port_8006() -> None:
-    target = resolve_target(node_target(), ["pve1.example.com"], [])
+    target = resolve_target(node_target(), ["node1.example.com"], [])
     der = b"node-certificate"
     seen: list[tuple[str, int, str]] = []
 
@@ -508,4 +510,4 @@ def test_verify_served_fetches_a_node_on_port_8006() -> None:
         return der
 
     verify_served(target, der_sha256(der), fetch=fetch)
-    assert seen == [("pve1.example.com", 8006, "pve1.example.com")]
+    assert seen == [("node1.example.com", 8006, "node1.example.com")]

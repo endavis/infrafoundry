@@ -213,11 +213,11 @@ class TestPostJson:
         mock_response.json.return_value = {"data": None}
         mock_post.return_value = mock_response
 
-        result = client.post_json("nodes/pve1/certificates/custom", {"key": "k"})
+        result = client.post_json("nodes/node1/certificates/custom", {"key": "k"})
 
         assert result == {"data": None}
         mock_post.assert_called_once_with(
-            "https://proxmox.example.com:8006/api2/json/nodes/pve1/certificates/custom",
+            "https://proxmox.example.com:8006/api2/json/nodes/node1/certificates/custom",
             headers={"Authorization": "PVEAPIToken=user@pam!token=secret-value"},
             data={"key": "k"},
             verify=False,
