@@ -53,7 +53,9 @@ class CloudflareDns:
         return scrubbed.replace(self._zone, "<zone>") if self._zone else scrubbed
 
     def _call(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
-        url = f"{API_BASE}/zones/{self._zone}/dns_records{path}"
+        return self._request(method, f"{API_BASE}/zones/{self._zone}/dns_records{path}", **kwargs)
+
+    def _request(self, method: str, url: str, **kwargs: Any) -> dict[str, Any]:
         try:
             response = self._session.request(
                 method,
@@ -77,6 +79,30 @@ class CloudflareDns:
                 detail = f": {errors[0].get('message', '')}"
             raise DnsError(self._scrub(f"Cloudflare {method} failed (HTTP {status}){detail}"))
         return body
+
+    def name_servers(self) -> list[str]:
+        """Return the zone's authoritative nameservers (a read-only ``GET /zones/<id>``).
+
+        Raises:
+            DnsError: If Cloudflare refuses the lookup (the token needs Zone:Read) or returns
+                no nameservers. The message never carries the token or the zone id.
+        """
+        try:
+            body = self._request("GET", f"{API_BASE}/zones/{self._zone}")
+        except DnsError as exc:
+            raise DnsError(
+                f"{exc}; the API token must be able to read the zone (Zone:Read)"
+            ) from None
+        result = body.get("result")
+        servers = result.get("name_servers") if isinstance(result, dict) else None
+        hosts = (
+            [str(h) for h in servers if isinstance(h, str) and h]
+            if isinstance(servers, list)
+            else []
+        )
+        if not hosts:
+            raise DnsError("Cloudflare returned no nameservers for the zone")
+        return hosts
 
     def verify_access(self) -> None:
         """Check that the token can read this zone's DNS records (a read-only call).

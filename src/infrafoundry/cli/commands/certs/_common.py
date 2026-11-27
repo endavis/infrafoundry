@@ -20,7 +20,12 @@ from infrafoundry.core.certs.models import (
     AcmeSettings,
     CertificateSchemaError,
 )
-from infrafoundry.core.certs.propagation import doh_resolver
+from infrafoundry.core.certs.propagation import (
+    NameserverQuery,
+    authoritative_resolver,
+    doh_resolver,
+    query_nameserver,
+)
 from infrafoundry.core.certs.schema import raw_settings_problems, settings_from_mapping
 from infrafoundry.core.certs.service import CertificateService
 from infrafoundry.core.certs.store import SecretsWriter
@@ -48,6 +53,7 @@ class CertsDeps:
     session: Callable[[], HttpSession] = _requests_session
     writer: Callable[[], SecretsWriter] = SecretsWriter
     verify: Callable[[CertificateTarget, str], None] | None = None
+    nameserver_query: NameserverQuery = query_nameserver
     sleep: Callable[[float], None] = time.sleep
     monotonic: Callable[[], float] = time.monotonic
     now: Callable[[], datetime] = lambda: datetime.now(UTC)
@@ -91,11 +97,13 @@ def stored_account(env_config: EnvironmentConfig, settings: AcmeSettings) -> Acc
 def build_issuer(settings: AcmeSettings, deps: CertsDeps) -> CertificateIssuer:
     """Build the issuer from the settings and the seams."""
     session = deps.session()
+    dns = CloudflareDns(settings.api_token, settings.zone_id, session)
     return CertificateIssuer(
         deps.acme_client(settings),
-        CloudflareDns(settings.api_token, settings.zone_id, session),
-        [doh_resolver(url, session) for url in settings.doh_urls],
+        dns,
+        [authoritative_resolver(dns.name_servers, deps.nameserver_query)],
         settings,
+        extra_resolvers=[doh_resolver(url, session) for url in settings.doh_urls],
         sleep=deps.sleep,
         monotonic=deps.monotonic,
         now=deps.now,

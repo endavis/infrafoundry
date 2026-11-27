@@ -176,3 +176,13 @@ def test_directory_id_is_stable_for_custom_urls() -> None:
     )
     assert directory_id("https://ca.example.test/dir").startswith("custom-")
     assert settings().directory_id == "staging"
+
+
+def test_doh_is_off_by_default() -> None:
+    from infrafoundry.core.certs.schema import settings_from_mapping
+
+    resolved = {
+        "agree_tos": True,
+        "cloudflare": {"api_token": "tok", "zone_id": "zone"},
+    }
+    assert settings_from_mapping(resolved).doh_urls == ()

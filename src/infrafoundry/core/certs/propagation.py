@@ -1,12 +1,26 @@
-"""Wait until DNS-over-HTTPS resolvers see the DNS-01 TXT records. No fixed sleep."""
+"""Wait until resolvers see the DNS-01 TXT records. No fixed sleep.
+
+The primary check asks the zone's authoritative nameservers directly (recursion off), so a
+query made too early cannot poison a public resolver's negative cache. DNS-over-HTTPS resolvers
+are an optional later stage.
+"""
 
 from __future__ import annotations
 
+import secrets
+import socket
 import time
 from collections.abc import Callable, Collection, Sequence
 from typing import Any
 
 from infrafoundry.core.certs.dns_cloudflare import HttpSession
+from infrafoundry.core.certs.dns_wire import (
+    DNS_PORT,
+    Exchange,
+    query_txt,
+    tcp_exchange,
+    udp_exchange,
+)
 from infrafoundry.core.certs.models import DnsError
 
 Resolver = Callable[[str], set[str]]
@@ -14,6 +28,84 @@ Resolver = Callable[[str], set[str]]
 
 TXT_TYPE = 16
 HTTP_TIMEOUT = 10
+QUERY_TIMEOUT = 5.0
+RCODE_NOERROR = 0
+RCODE_NXDOMAIN = 3
+
+NameserverQuery = Callable[[str, str], set[str]]
+"""``(nameserver host, name) -> the TXT values it serves``; raises ``OSError`` if not visible."""
+
+GetAddrInfo = Callable[..., list[tuple[Any, ...]]]
+
+
+def query_nameserver(
+    host: str,
+    name: str,
+    *,
+    getaddrinfo: GetAddrInfo = socket.getaddrinfo,
+    udp: Exchange = udp_exchange,
+    tcp: Exchange = tcp_exchange,
+    timeout: float = QUERY_TIMEOUT,
+) -> set[str]:
+    """Return the TXT values one authoritative nameserver serves for ``name``.
+
+    Every address of the host (IPv4 and IPv6) is queried and the values are united, so one
+    unreachable address family never hides a value another one serves.
+
+    Raises:
+        OSError: If no address gave a valid authoritative answer.
+    """
+    infos = getaddrinfo(host, DNS_PORT, type=socket.SOCK_DGRAM)
+    addresses = list(dict.fromkeys(str(info[4][0]) for info in infos))
+    values: set[str] = set()
+    answered = False
+    for address in addresses:
+        try:
+            response = query_txt(
+                address, name, secrets.randbelow(1 << 16), timeout, udp=udp, tcp=tcp
+            )
+        except (OSError, ValueError):
+            continue
+        if not response.authoritative:
+            continue
+        if response.rcode not in (RCODE_NOERROR, RCODE_NXDOMAIN):
+            continue
+        answered = True
+        values |= response.values
+    if not answered:
+        raise OSError(f"no valid authoritative answer from {host}")
+    return values
+
+
+def authoritative_resolver(
+    name_servers: Callable[[], list[str]], query: NameserverQuery
+) -> Resolver:
+    """Build a resolver that needs every authoritative nameserver to serve a value.
+
+    The nameserver list is fetched on the first poll and kept for the run.
+
+    Raises:
+        DnsError: (from the returned resolver) If the list is empty or cannot be fetched.
+    """
+    cached: list[str] | None = None
+
+    def resolve(name: str) -> set[str]:
+        nonlocal cached
+        if cached is None:
+            fetched = name_servers()
+            if not fetched:
+                raise DnsError("the zone has no authoritative nameservers to query")
+            cached = fetched
+        common: set[str] | None = None
+        for host in cached:
+            try:
+                seen = query(host, name)
+            except OSError:
+                seen = set()
+            common = seen if common is None else common & seen
+        return common or set()
+
+    return resolve
 
 
 def doh_resolver(url: str, session: HttpSession) -> Resolver:

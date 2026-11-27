@@ -98,3 +98,28 @@ def test_purge_stale_deletes_only_infrafoundry_records() -> None:
     assert [c[0] for c in session.calls] == ["GET", "DELETE"]
     assert session.calls[0][2]["params"]["comment.startswith"] == "infrafoundry-acme"
     assert session.calls[1][1].endswith("/a")
+
+
+def test_name_servers_reads_the_zone_with_a_bearer_token() -> None:
+    body = {"success": True, "result": {"name_servers": ["a.ns.example.com", "b.ns.example.com"]}}
+    session = Session(Response(body=body))
+    assert dns(session).name_servers() == ["a.ns.example.com", "b.ns.example.com"]
+    method, url, kwargs = session.calls[0]
+    assert method == "GET"
+    assert url.endswith(f"/zones/{ZONE}")
+    assert kwargs["headers"] == {"Authorization": f"Bearer {TOKEN}"}
+
+
+def test_a_refused_name_server_lookup_names_zone_read_and_leaks_nothing() -> None:
+    body = {"success": False, "errors": [{"message": f"no {TOKEN} {ZONE}"}]}
+    with pytest.raises(DnsError) as caught:
+        dns(Session(Response(403, body))).name_servers()
+    assert "Zone:Read" in str(caught.value)
+    assert TOKEN not in str(caught.value)
+    assert ZONE not in str(caught.value)
+
+
+def test_an_empty_name_server_list_raises() -> None:
+    body = {"success": True, "result": {"name_servers": []}}
+    with pytest.raises(DnsError):
+        dns(Session(Response(body=body))).name_servers()

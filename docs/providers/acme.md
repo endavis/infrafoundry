@@ -32,7 +32,7 @@ provider_settings:
     propagation:                     # optional
       timeout: 180                   # seconds to wait for the TXT records to be visible
       interval: 5
-    # doh:                           # optional: DNS-over-HTTPS JSON resolvers
+    # doh:                           # optional, off by default: DNS-over-HTTPS JSON resolvers
     #   - https://cloudflare-dns.com/dns-query
     #   - https://dns.google/resolve
 ```
@@ -43,9 +43,10 @@ provider_settings:
 | `directory` | `staging` is the default so a first run cannot spend production rate limits. Set `production` when the staging run works. A URL selects another ACME CA. |
 | `cloudflare.api_token`, `cloudflare.zone_id` | Required, and must be `secret://` references. No secret name is hard-coded: point them at any secret path, including one an existing OPNsense validation already uses. |
 | `renew_before_days` | A certificate with this many days or fewer left is issued again. Default 30. |
-| `propagation` | `foundry certs` polls DNS-over-HTTPS until every resolver sees every TXT value, then asks the CA. There is no fixed sleep. |
+| `propagation` | `foundry certs` queries the zone's authoritative nameservers directly (recursion off, UDP with a TCP retry) until every one of them serves every TXT value, then asks the CA. There is no fixed sleep. |
+| `doh` | Optional and off by default. When set, these DNS-over-HTTPS resolvers are polled only after the authoritative nameservers all serve the value, each stage with its own `propagation.timeout`. Public resolvers are not the default because one queried before the record exists can cache the negative answer and keep failing the check. |
 
-Create a dedicated Cloudflare API token with the single permission Zone.DNS:Edit on the one zone that holds your names. One zone per environment is supported. Validation messages name keys, never values, and the token is scrubbed from every error.
+Create a dedicated Cloudflare API token with the permission Zone.DNS:Edit on the one zone that holds your names. The token must also be able to read the zone itself, because the zone's nameservers are looked up with it; add Zone:Read if Cloudflare refuses the lookup. The host running `foundry certs` needs outbound DNS (UDP and TCP port 53) to the zone's nameservers. One zone per environment is supported. Validation messages name keys, never values, and the token is scrubbed from every error.
 
 Every TXT record InfraFoundry creates carries the comment `infrafoundry-acme <certificate name>` and is deleted again whatever happens. Records left by a crashed run are removed when the next order starts.
 
