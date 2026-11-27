@@ -225,6 +225,7 @@ def fetch_served_der(address: str, port: int, server_name: str) -> bytes:
     compares the SHA-256 of what was served with what was installed.
     """
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
     with (

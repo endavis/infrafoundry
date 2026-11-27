@@ -22,7 +22,7 @@ from infrafoundry.core.certs.acme_client import AcmeOrder, DnsChallenge
 from infrafoundry.core.certs.models import AcmeError, AcmeSettings, DnsError
 from infrafoundry.core.provider import ResourceConfig
 
-TOKEN = "cf-token-SENTINEL-0123456789"  # nosec B105  # a fake
+TOKEN = "cf-token-SENTINEL-0123456789"  # a fake
 ZONE = "zone-id-SENTINEL-abcdef"
 NOW = dt.datetime(2026, 1, 1, tzinfo=dt.UTC)
 KEY_ARMOUR = "PRIVATE " + "KEY"

@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlsplit
 
 import pytest
 from click.testing import CliRunner, Result
@@ -61,7 +62,7 @@ class FakeSession:
 
     def request(self, method: str, url: str, **kwargs: Any) -> Reply:
         self.requests.append((method, url))
-        if "api.cloudflare.com" in url:
+        if urlsplit(url).hostname == "api.cloudflare.com":
             self.tokens.add(kwargs["headers"]["Authorization"])
             return self._cloudflare(method, url, kwargs)
         name = kwargs["params"]["name"]

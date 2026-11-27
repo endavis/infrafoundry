@@ -259,7 +259,7 @@ class CertificateService:
             entry = _entry_from(issued)
             self._write_entry(resource, entry)
             action = "issued"
-        assert entry is not None  # nosec B101  # set above or present
+        assert entry is not None  # set above or present
         sha = str(entry.get("sha256", ""))
         if entry.get("installed_sha256") != sha:
             try:

@@ -230,7 +230,7 @@ def settings_from_mapping(resolved: dict[str, Any]) -> AcmeSettings:
         raise CertificateSchemaError("; ".join(problems))
     raw_directory = str(resolved.get("directory", DEFAULT_DIRECTORY))
     url = directory_url(raw_directory)
-    assert url is not None  # nosec B101  # checked by raw_settings_problems
+    assert url is not None  # checked by raw_settings_problems
     cloudflare = resolved["cloudflare"]
     propagation = resolved.get("propagation") or {}
     return AcmeSettings(

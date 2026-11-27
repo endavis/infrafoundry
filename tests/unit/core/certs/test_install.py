@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import socket
 import ssl
 import threading
 from pathlib import Path
@@ -208,3 +209,23 @@ def test_fetch_served_der_reads_a_self_signed_loopback_server(tmp_path: Path) ->
         server.close()
         thread.join(timeout=5)
     assert der_sha256(der) == der_sha256(cert.public_bytes(serialization.Encoding.DER))
+
+
+def test_fetch_served_der_refuses_tls_older_than_1_2(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The verify probe never negotiates TLS 1.0 or 1.1."""
+    built: list[ssl.SSLContext] = []
+
+    def wrap_socket(self: ssl.SSLContext, *args: Any, **kwargs: Any) -> Any:
+        built.append(self)
+        raise OSError("stop before the handshake")
+
+    monkeypatch.setattr(ssl.SSLContext, "wrap_socket", wrap_socket)
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    try:
+        with pytest.raises(OSError, match="stop before"):
+            fetch_served_der("127.0.0.1", server.getsockname()[1], "loopback.example.com")
+    finally:
+        server.close()
+    assert built[0].minimum_version == ssl.TLSVersion.TLSv1_2
