@@ -16,7 +16,7 @@ from typing import Any
 
 from ..client import RouterOSAPIError, RouterOSConnectionError, RouterOSWriter
 from ..schema import SPECS, key_of
-from .diff import CREATE, DELETE, UPDATE
+from .diff import CREATE, DELETE, SIGN, UPDATE
 from .ordering import Step
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,15 @@ class ExecutionResult:
     def success(self) -> bool:
         """True when every step ran."""
         return self.failed is None
+
+
+SIGN_PATH_SUFFIX = "sign"
+"""The action under the certificate path that signs a row (not live-probed)."""
+
+
+def _sign_body(row_id: str) -> dict[str, Any]:
+    """Return the body of the sign call; ``number`` is the console's positional argument."""
+    return {"number": row_id}
 
 
 def _resolve_id(
@@ -91,6 +100,8 @@ def execute_steps(client: RouterOSWriter, steps: list[Step]) -> ExecutionResult:
                     client.patch(spec.path, row_id, step.body)
                 elif step.kind == DELETE:
                     client.delete(spec.path, row_id)
+                elif step.kind == SIGN:
+                    client.post(f"{spec.path}/{SIGN_PATH_SUFFIX}", _sign_body(row_id))
                 else:
                     raise ValueError(f"unknown step kind '{step.kind}'")
         except RouterOSConnectionError as exc:

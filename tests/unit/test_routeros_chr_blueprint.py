@@ -228,6 +228,43 @@ def test_expect_script_sets_a_static_address_before_enabling_www() -> None:
     assert "ip route add" not in script
 
 
+def test_expect_script_has_no_https_bootstrap_by_default() -> None:
+    script = _expect_script()
+
+    assert "/certificate" not in script
+    assert "www-ssl" not in script
+
+
+def test_expect_script_bootstraps_https_after_enabling_www() -> None:
+    script = _expect_script(routeros_https_bootstrap=True)
+
+    www = script.index("/ip service set www disabled=no")
+    added = script.index("/certificate add name=bootstrap-https")
+    signed = script.index("/certificate sign bootstrap-https")
+    www_ssl = script.index("/ip service set www-ssl certificate=bootstrap-https disabled=no")
+    api_ssl = script.index("/ip service set api-ssl certificate=bootstrap-https disabled=no")
+    assert www < added < signed < www_ssl < api_ssl
+    assert 'common-name=\\"chr-test\\"' in script
+    assert "/ip service set www disabled=yes" not in script
+
+
+def test_https_bootstrap_input_defaults_to_off(loaded: Any) -> None:
+    _resources, _events, variables = loaded
+    assert variables["https_bootstrap"] is False
+
+
+def test_https_probe_is_opt_in_unverified_and_sends_no_credentials() -> None:
+    script = (BLUEPRINT_DIR / "scripts" / "routeros-post-terraform.sh").read_text()
+    guard = script.index('"${INFRAFOUNDRY_VAR_https_bootstrap:-}" = "true"')
+    probe = script[guard:]
+
+    assert "https://${MGMT_IP}/rest/system/resource" in probe
+    assert "curl -sk " in probe
+    assert " -u " not in probe and "--user" not in probe
+    assert '[ "$code" = "401" ]' in probe
+    assert "https://" not in script[:guard]
+
+
 def test_expect_script_adds_the_default_route_with_a_gateway() -> None:
     script = _expect_script(routeros_mgmt_ip="192.0.2.241", routeros_mgmt_gateway="192.0.2.1")
 

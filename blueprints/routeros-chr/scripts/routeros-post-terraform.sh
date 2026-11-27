@@ -71,7 +71,7 @@ while :; do
     code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL" || true)
     if [ "$code" = "401" ]; then
         echo "RouterOS REST API is up at http://${MGMT_IP}"
-        exit 0
+        break
     fi
     if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
         echo "ERROR: REST API did not answer within ${TIMEOUT}s (last status: ${code:-none})" >&2
@@ -80,3 +80,25 @@ while :; do
     sleep 10
     ELAPSED=$((ELAPSED + 10))
 done
+
+# With https_bootstrap, also wait for TLS to answer. The certificate is
+# self-signed, so -k is deliberate: the probe checks that www-ssl serves, not
+# who signed it. It sends no credentials either.
+if [ "${INFRAFOUNDRY_VAR_https_bootstrap:-}" = "true" ]; then
+    SSL_URL="https://${MGMT_IP}/rest/system/resource"
+    echo "Waiting up to ${TIMEOUT}s for ${SSL_URL}..."
+    ELAPSED=0
+    while :; do
+        code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "$SSL_URL" || true)
+        if [ "$code" = "401" ]; then
+            echo "RouterOS REST API is up at https://${MGMT_IP}"
+            break
+        fi
+        if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+            echo "ERROR: HTTPS REST API did not answer within ${TIMEOUT}s (last status: ${code:-none})" >&2
+            exit 1
+        fi
+        sleep 10
+        ELAPSED=$((ELAPSED + 10))
+    done
+fi

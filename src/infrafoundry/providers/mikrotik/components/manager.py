@@ -30,7 +30,8 @@ from ..schema import (
 )
 from ..settings import MikroTikSettings, load_settings, management_host
 from ._managed import managed_index, managed_keys
-from .diff import CREATE, DELETE, UPDATE, Change, TypeDiff, _label, compute_type_diff
+from .certificate_bootstrap import check_certificate_changes
+from .diff import CREATE, DELETE, SIGN, UPDATE, Change, TypeDiff, _label, compute_type_diff
 from .executor import execute_steps
 from .ordering import (
     PHASE_TITLES,
@@ -87,10 +88,12 @@ class MikroTikPlan:
     @property
     def counts(self) -> dict[str, int]:
         """Number of creates, updates and deletes across all types."""
-        return {
+        counts = {
             kind: sum(d.count(kind) for d in self.diffs.values())
             for kind in (CREATE, UPDATE, DELETE)
         }
+        counts[UPDATE] += sum(d.count(SIGN) for d in self.diffs.values())
+        return counts
 
     @property
     def has_changes(self) -> bool:
@@ -112,6 +115,8 @@ class MikroTikPlan:
                 f"{type_name}: {diff.count(CREATE)} to create, {diff.count(UPDATE)} to update, "
                 f"{diff.count(DELETE)} to delete"
             )
+            if diff.count(SIGN):
+                text += f", {diff.count(SIGN)} to sign"
             if diff.unmanaged:
                 text += f", {len(diff.unmanaged)} unmanaged (kept)"
             lines.append(text)
@@ -164,7 +169,7 @@ def _failure_message(
     return "\n".join(lines)
 
 
-_ACTION_RANK = {CREATE: 0, DELETE: 1, UPDATE: 2}
+_ACTION_RANK = {CREATE: 0, DELETE: 1, UPDATE: 2, SIGN: 3}
 
 
 def _outcomes(
@@ -183,7 +188,8 @@ def _outcomes(
         if step.kind == DELETE and name == _label(key):
             name = names.get(type_name, {}).get(key, name)
         address = f"mikrotik_{SPECS[type_name].slug}.{name}"
-        outcomes.append(ResourceOutcome(address=address, action=step.kind, resource_name=name))
+        action = UPDATE if step.kind == SIGN else step.kind
+        outcomes.append(ResourceOutcome(address=address, action=action, resource_name=name))
     return outcomes
 
 
@@ -290,6 +296,14 @@ class MikroTikManager:
         )
         plan.refusals.extend(service.refusals)
         plan.warnings.extend(service.warnings)
+        if "certificate" in plan.diffs or "ip.service" in plan.diffs:
+            read("certificate")
+            read("ip.service")
+            certs = check_certificate_changes(
+                plan.diffs, live, scheme=settings.scheme, verify_ssl=settings.verify_ssl
+            )
+            plan.refusals.extend(certs.refusals)
+            plan.warnings.extend(certs.warnings)
         for diff in plan.diffs.values():
             plan.warnings.extend(diff.warnings)
         if structural:

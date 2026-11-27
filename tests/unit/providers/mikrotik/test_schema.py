@@ -28,6 +28,7 @@ VALID: list[ResourceConfig] = [
     resource("interface.vlan", "vlan99", interface="bridge", **{"vlan-id": 99}),
     resource("ip.address", "mgmt", address="192.0.2.2/24", interface="vlan99"),
     resource("ip.dhcp-client", "wan", interface="ether1"),
+    resource("certificate", "bootstrap-https", **{"common-name": "router.example.com"}),
     resource("ip.service", "www-ssl", port=443),
 ]
 
@@ -149,3 +150,30 @@ def test_loader_copied_name_is_not_an_unknown_field() -> None:
     assert check_resources([port]) == []
     (obj,) = desired_from_resources([port])
     assert "name" not in obj.fields
+
+
+def test_certificate_requires_a_common_name() -> None:
+    assert "common-name" in _messages([resource("certificate", "c")])
+
+
+def test_certificate_rejects_unknown_fields_and_disabled() -> None:
+    text = _messages([resource("certificate", "c", **{"common-name": "x", "disabled": False})])
+    assert "unknown field(s): disabled" in text
+
+
+@pytest.mark.parametrize("days", [0, 40000])
+def test_certificate_days_valid_out_of_range(days: int) -> None:
+    res = resource("certificate", "c", **{"common-name": "x", "days-valid": days})
+    assert "'days-valid' must be within 1-36500" in _messages([res])
+
+
+def test_certificate_key_usage_normalizes_text_and_list_alike() -> None:
+    kind = SPECS["certificate"].fields["key-usage"]
+    assert normalize_value(kind, "tls-server,digital-signature") == normalize_value(
+        kind, ["digital-signature", "tls-server"]
+    )
+
+
+def test_certificate_path_and_slug() -> None:
+    spec = SPECS["certificate"]
+    assert (spec.path, spec.slug) == ("certificate", "certificate")

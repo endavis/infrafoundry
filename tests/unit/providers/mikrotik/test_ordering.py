@@ -19,7 +19,7 @@ from infrafoundry.providers.mikrotik.schema import (
     desired_from_resources,
 )
 
-from .conftest import MGMT_IP, FakeRouterOS, resource
+from .conftest import MGMT_IP, FakeRouterOS, bootstrap_https, resource, with_https_services
 
 MGMT = ipaddress.ip_address(MGMT_IP)
 
@@ -357,3 +357,26 @@ def test_other_services_may_change_freely(wan_edge: FakeRouterOS) -> None:
     diffs = _diffs(wan_edge, [resource("ip.service", "www", disabled=False)])
     check = check_service_changes(diffs["ip.service"], "https", 443)
     assert check.refusals == []
+
+
+def test_certificate_create_is_followed_by_its_sign_before_services(
+    factory: FakeRouterOS,
+) -> None:
+    steps = _steps(with_https_services(factory), bootstrap_https())
+    assert [(s.phase, s.kind, s.type_name) for s in steps] == [
+        ("B", "create", "certificate"),
+        ("B", "sign", "certificate"),
+        ("F", "update", "ip.service"),
+        ("F", "update", "ip.service"),
+    ]
+    assert steps[0].key == steps[1].key
+
+
+def test_sign_only_change_is_one_b_step(factory: FakeRouterOS) -> None:
+    factory.tables["certificate"] = [{".id": "*9", "name": "c1", "common-name": "x"}]
+    steps = _steps(factory, [resource("certificate", "c1", **{"common-name": "x"})])
+    assert [(s.phase, s.kind, s.live_id) for s in steps] == [("B", "sign", "*9")]
+
+
+def test_certificate_precedes_services_in_dependency_order() -> None:
+    assert DEPENDENCY_ORDER.index("certificate") < DEPENDENCY_ORDER.index("ip.service")

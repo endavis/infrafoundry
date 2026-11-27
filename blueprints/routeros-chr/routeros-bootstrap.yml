@@ -29,5 +29,6 @@
         routeros_mgmt_prefix: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_prefix') | default('24', true) }}"
         routeros_mgmt_gateway: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_gateway') | default('', true) }}"
         routeros_mgmt_dns: "{{ lookup('env', 'INFRAFOUNDRY_VAR_mgmt_dns') | default('', true) }}"
+        routeros_https_bootstrap: "{{ lookup('env', 'INFRAFOUNDRY_VAR_https_bootstrap') | default('false', true) | bool }}"
         routeros_boot_timeout: "{{ lookup('env', 'INFRAFOUNDRY_VAR_boot_timeout') | default('300', true) }}"
         routeros_admin_password: "{{ lookup('env', 'INFRAFOUNDRY_VAR_routeros_admin_password') }}"

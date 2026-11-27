@@ -53,6 +53,18 @@ class FakeRouterOS:
         self.tables.setdefault(path, []).append(row)
         return dict(row) if self.put_returns_id else {}
 
+    def post(self, path: str, body: dict[str, Any] | None = None) -> Any:
+        body = dict(body or {})
+        self.calls.append(("POST", path, body))
+        self._fail("POST", path)
+        if path == "certificate/sign":
+            rows = [r for r in self.tables.get("certificate", []) if r.get(".id") == body["number"]]
+            if not rows:
+                raise RouterOSAPIError("no such item")
+            rows[0]["fingerprint"] = "AA:" * 31 + "AA"
+            rows[0]["private-key"] = "true"
+        return None
+
     def _row(self, path: str, row_id: str) -> dict[str, str]:
         return next(r for r in self.tables.get(path, []) if r.get(".id") == row_id)
 
@@ -69,8 +81,8 @@ class FakeRouterOS:
         self.tables[path].remove(self._row(path, row_id))
 
     def writes(self) -> list[tuple[Any, ...]]:
-        """The PUT, PATCH and DELETE calls, in order."""
-        return [c for c in self.calls if c[0] in ("PUT", "PATCH", "DELETE")]
+        """The PUT, POST, PATCH and DELETE calls, in order."""
+        return [c for c in self.calls if c[0] in ("PUT", "POST", "PATCH", "DELETE")]
 
     def execute(self, script: str) -> str:
         self.calls.append(("EXECUTE", script))
@@ -80,6 +92,43 @@ class FakeRouterOS:
 def resource(type_name: str, name: str, **config: Any) -> ResourceConfig:
     """Build a MikroTik resource."""
     return ResourceConfig(name=name, type=type_name, provider="mikrotik", config=config)
+
+
+def bootstrap_https(name: str = "bootstrap-https") -> list[ResourceConfig]:
+    """A self-signed certificate plus ``www-ssl`` and ``api-ssl`` serving with it."""
+    return [
+        resource(
+            "certificate",
+            name,
+            **{
+                "common-name": "router.example.com",
+                "key-usage": ["digital-signature", "key-encipherment", "tls-server"],
+                "days-valid": 365,
+            },
+        ),
+        resource("ip.service", "www-ssl", certificate=name, disabled=False),
+        resource("ip.service", "api-ssl", certificate=name, disabled=False),
+    ]
+
+
+def with_https_services(fake: FakeRouterOS) -> FakeRouterOS:
+    """Add the disabled ``api-ssl`` service and an empty certificate table to ``fake``."""
+    services = fake.tables.setdefault("ip/service", [])
+    if not any(r["name"] == "api-ssl" for r in services):
+        services.append(
+            {
+                ".id": "*42",
+                "name": "api-ssl",
+                "port": "8729",
+                "disabled": "true",
+                "dynamic": "false",
+            }
+        )
+    for row in services:
+        if row["name"] == "www-ssl":
+            row["disabled"] = "true"
+    fake.tables.setdefault("certificate", [])
+    return fake
 
 
 def make_env(

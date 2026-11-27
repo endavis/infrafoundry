@@ -42,6 +42,7 @@ Cost: drift detection needed a small additive dispatch in `DriftDetector`, since
 - Issue #1483: apply and destroy for the MikroTik provider
 - Issue #1485: RouterOS CHR test blueprint, the live verification target
 - Issue #1489: record the live verification in the docs
+- Issue #1710: bootstrap https with a self-signed certificate resource
 
 ## Related Documentation
 

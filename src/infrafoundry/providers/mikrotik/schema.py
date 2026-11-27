@@ -26,6 +26,10 @@ KIND_VLANS = "vlans"
 
 VLAN_MIN = 1
 VLAN_MAX = 4094
+DAYS_VALID_MAX = 36500
+
+SIGN_FIELD = "fingerprint"
+"""The live field that is non-empty only on a signed certificate (not live-probed)."""
 
 _TRUE = {"true", "yes"}
 _FALSE = {"false", "no"}
@@ -42,6 +46,8 @@ class ResourceSpec:
     required: tuple[str, ...] = ()
     creatable: bool = True
     deletable: bool = True
+    updatable: tuple[str, ...] | None = None
+    """Fields that may change on an existing row; ``None`` means every field."""
 
     @property
     def path(self) -> str:
@@ -129,6 +135,21 @@ SPECS: dict[str, ResourceSpec] = {
         },
         required=("interface",),
     ),
+    "certificate": ResourceSpec(
+        "certificate",
+        ("name",),
+        {
+            "name": KIND_STR,
+            "common-name": KIND_STR,
+            "subject-alt-name": KIND_STR,
+            "key-size": KIND_STR,
+            "days-valid": KIND_INT,
+            "key-usage": KIND_LIST,
+            "comment": KIND_STR,
+        },
+        required=("name", "common-name"),
+        updatable=("comment",),
+    ),
     "ip.service": ResourceSpec(
         "ip.service",
         ("name",),
@@ -152,6 +173,7 @@ DEPENDENCY_ORDER: tuple[str, ...] = (
     "interface.bridge.port",
     "ip.address",
     "ip.dhcp-client",
+    "certificate",
     "ip.service",
 )
 """Types in creation order; deletes run in reverse."""
@@ -363,6 +385,8 @@ def check_resources(resources: list[ResourceConfig]) -> list[SchemaFinding]:
                 error(resource, f"'{name}' must be within {VLAN_MIN}-{VLAN_MAX}")
             elif name == "port" and not 1 <= normalized <= 65535:
                 error(resource, "'port' must be within 1-65535")
+            elif name == "days-valid" and not 1 <= normalized <= DAYS_VALID_MAX:
+                error(resource, f"'days-valid' must be within 1-{DAYS_VALID_MAX}")
         if not missing and not bad:
             key = key_of(spec, config)
             if key is not None:

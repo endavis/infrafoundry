@@ -6,8 +6,16 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.mikrotik.client import RouterOSAPIError, RouterOSConnectionError
+from infrafoundry.providers.mikrotik.settings import MikroTikSettings
 
-from .conftest import FakeRouterOS, converged_wan_edge, manager_for, resource
+from .conftest import (
+    FakeRouterOS,
+    bootstrap_https,
+    converged_wan_edge,
+    manager_for,
+    resource,
+    with_https_services,
+)
 
 BVLAN = "interface.bridge.vlan"
 
@@ -215,3 +223,59 @@ def test_update_resource_is_never_applied_or_destroyed(
     assert manager.destroy("test", only).success
     assert wan_edge.writes() == []
     assert not any(c[0] in ("POST", "EXECUTE") for c in wan_edge.calls)
+
+
+HTTP_SETTINGS = MikroTikSettings(
+    api_url="http://192.0.2.2", username="admin", password="pw-example"
+)
+
+
+def test_https_bootstrap_plans_applies_and_converges(
+    factory: FakeRouterOS, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with_https_services(factory)
+    manager = manager_for(factory, monkeypatch, HTTP_SETTINGS)
+    plan = manager.plan("test", bootstrap_https())
+
+    assert plan.refusals == []
+    assert plan.counts == {"create": 1, "update": 2, "delete": 0}
+    text = "\n".join(plan.summary_lines())
+    assert "phase B" in text and "phase F" in text
+
+    result = manager.apply("test", plan)
+
+    assert result.success
+    assert [(w[0], w[1]) for w in factory.writes()] == [
+        ("PUT", "certificate"),
+        ("POST", "certificate/sign"),
+        ("PATCH", "ip/service/*41"),
+        ("PATCH", "ip/service/*42"),
+    ]
+    assert not manager.plan("test", bootstrap_https()).has_changes
+
+
+def test_sign_only_plan_counts_and_reports_an_update(
+    factory: FakeRouterOS, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with_https_services(factory)
+    factory.tables["certificate"] = [
+        {".id": "*9", "name": "bootstrap-https", "common-name": "router.example.com"}
+    ]
+    manager = manager_for(factory, monkeypatch, HTTP_SETTINGS)
+    plan = manager.plan("test", bootstrap_https()[:1])
+
+    assert plan.counts["update"] == 1 and plan.has_changes
+    assert "1 to sign" in "\n".join(plan.summary_lines())
+
+    result = manager.apply("test", plan)
+
+    assert [o.action for o in result.outcomes] == ["update"]
+
+
+def test_disabling_www_over_http_is_still_refused(
+    factory: FakeRouterOS, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with_https_services(factory)
+    manager = manager_for(factory, monkeypatch, HTTP_SETTINGS)
+    plan = manager.plan("test", [resource("ip.service", "www", disabled=True)])
+    assert plan.refusals

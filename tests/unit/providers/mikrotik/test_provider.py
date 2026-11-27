@@ -26,6 +26,7 @@ def test_resource_types(tmp_path: Path) -> None:
         "interface.vlan",
         "ip.address",
         "ip.dhcp-client",
+        "certificate",
         "ip.service",
         "system.package.update",
     ]
@@ -35,6 +36,7 @@ def test_dependencies_cover_every_type(tmp_path: Path) -> None:
     deps = _provider(tmp_path).get_dependencies()
     assert set(deps) == {*SPECS, UPDATE_TYPE}
     assert deps["interface.bridge.port"] == ["interface.bridge"]
+    assert deps["certificate"] == []
 
 
 def test_terraform_prefixes_match_runner_outcome_addresses(tmp_path: Path) -> None:
