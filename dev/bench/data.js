@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795808686554,
+  "lastUpdate": 1795809996540,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7566,6 +7566,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009091477702200911",
             "extra": "mean: 126.03185239891738 usec\nrounds: 8462"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "73963141465583037cd6c70fdf9fc77b39b56f46",
+          "message": "fix: add key-cert-sign so routeros can self-sign the bootstrap certificate (merges PR #1713, addresses #1712)\n\nRouterOS refuses /certificate sign with \"CA not found\" when the\ncertificate key-usage lacks key-cert-sign. Add it to the routeros-chr\nhttps bootstrap and the docs example, and reject a mikrotik certificate\nresource whose key-usage is set without it at validation time.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T20:05:16Z",
+          "tree_id": "f42d75decc97a776304181a6d361e5788622be68",
+          "url": "https://github.com/endavis/infrafoundry/commit/73963141465583037cd6c70fdf9fc77b39b56f46"
+        },
+        "date": 1795809995759,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 47.0948430674952,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003398213401238372",
+            "extra": "mean: 21.23374736734602 msec\nrounds: 49"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7740.4201200226435,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000013526719448092227",
+            "extra": "mean: 129.19195398880683 usec\nrounds: 8411"
           }
         ]
       }
