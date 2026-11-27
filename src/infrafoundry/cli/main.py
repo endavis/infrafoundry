@@ -227,6 +227,18 @@ def _get_orchestrator(
         pass
 
     try:
+        from infrafoundry.providers.ontap import OntapProvider
+
+        orchestrator.register_provider(
+            OntapProvider(
+                config_dir=config_manager.base_dir,
+                output_dir=root,
+            )
+        )
+    except ImportError:
+        pass
+
+    try:
         from infrafoundry.providers.acme import AcmeProvider
 
         orchestrator.register_provider(

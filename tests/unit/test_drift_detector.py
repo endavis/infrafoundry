@@ -422,6 +422,63 @@ class TestDirectRunnerDrift:
         assert _StubTerraformRunner.calls == ["opnsense"]
 
 
+@pytest.mark.unit
+class TestOntapDirectRunnerDrift:
+    """The ONTAP provider is drift-detected add-only through its direct runner (ADR-0042)."""
+
+    def _detector(self, tmp_path: Any, kinds: tuple[str, ...]) -> tuple[Any, Any, Any, Any]:
+        from infrafoundry.core.runners import OntapRestRunner, RunnerRegistry
+        from infrafoundry.providers.ontap import OntapProvider
+        from infrafoundry.providers.ontap.components.interface import Change, InterfaceDiff
+        from infrafoundry.providers.ontap.components.manager import OntapPlan
+
+        plan = OntapPlan()
+        plan.diff = InterfaceDiff(
+            changes=[Change(k, ("svm1", "lif1"), "lif1", "u1", {}, {}, ("address",)) for k in kinds]
+        )
+        provider = OntapProvider(tmp_path, tmp_path / "generated")
+        registry = RunnerRegistry()
+        registry.register(OntapRestRunner)
+        registry.register(_StubTerraformRunner, "terraform")
+        config_manager = MagicMock()
+        config_manager.load_environment.side_effect = FileNotFoundError
+        config_manager.get_all_resources_all_providers.return_value = [
+            SimpleNamespace(provider="ontap")
+        ]
+        events = MagicMock(spec=EventManager)
+        _StubTerraformRunner.calls = []
+        detector = DriftDetector(config_manager, registry, events, {"ontap": provider})
+        return detector, events, provider, (plan, OntapRestRunner)
+
+    def test_out_of_band_change_is_drift_and_terraform_is_skipped(self, tmp_path: Any) -> None:
+        detector, events, provider, (plan, runner_cls) = self._detector(tmp_path, ("update",))
+        with (
+            patch.object(provider, "rest_plan", return_value=plan) as rest_plan,
+            patch.object(runner_cls, "_load_resources", return_value=[]),
+        ):
+            results = detector.detect("lab")
+
+        assert results["ontap"]["has_changes"] is True
+        assert results["ontap"]["to_change"] == 1
+        assert provider._current_environment == "lab"
+        assert rest_plan.call_args.kwargs["add_only"] is True
+        assert _StubTerraformRunner.calls == []
+        emitted = [c.args[0] for c in events.emit_event.call_args_list]
+        assert EventType.DRIFT_DETECTED in emitted
+
+    def test_converged_cluster_reports_no_drift(self, tmp_path: Any) -> None:
+        detector, events, provider, (plan, runner_cls) = self._detector(tmp_path, ())
+        with (
+            patch.object(provider, "rest_plan", return_value=plan),
+            patch.object(runner_cls, "_load_resources", return_value=[]),
+        ):
+            results = detector.detect("lab")
+
+        assert results["ontap"]["has_changes"] is False
+        emitted = [c.args[0] for c in events.emit_event.call_args_list]
+        assert EventType.DRIFT_DETECTED not in emitted
+
+
 class _EnvProvider:
     """Provider stand-in that scopes ``terraform_dir`` like ``ProviderBase``."""
 

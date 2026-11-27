@@ -12,6 +12,7 @@ from infrafoundry.core.runners import (
     AnsibleRunner,
     HostRunner,
     MikroTikRestRunner,
+    OntapRestRunner,
     OpenTofuRunner,
     OpenWrtAnsibleRunner,
     OPNsenseDirectRunner,
@@ -74,6 +75,7 @@ class ProviderRegistryService:
         self.runner_registry.register(HostRunner)
         self.runner_registry.register(MikroTikRestRunner)
         self.runner_registry.register(QnapRestRunner)
+        self.runner_registry.register(OntapRestRunner)
         self.runner_registry.register(OpenWrtAnsibleRunner)
         self.runner_registry.register(TerraformRunner)
         self.runner_registry.register(OpenTofuRunner)

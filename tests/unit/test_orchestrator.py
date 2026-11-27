@@ -20,8 +20,14 @@ from infrafoundry.core.state import StateManager
 class TestOrchestratorInit:
     """Tests for Orchestrator initialization."""
 
-    def test_init_with_defaults(self, tmp_path: Path) -> None:
-        """Test initialization with default parameters."""
+    def test_init_with_defaults(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test initialization with default parameters.
+
+        Runs in a clean cwd: the default root resolves symlinks, and a worktree's
+        ``generated`` links to the main checkout's (#1716).
+        """
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("INFRAFOUNDRY_OUTPUT_DIR", raising=False)
         config_manager = Mock(spec=ConfigManager)
         config_manager.base_dir = tmp_path
 
@@ -30,7 +36,7 @@ class TestOrchestratorInit:
         )
 
         assert orchestrator.config_manager == config_manager
-        assert orchestrator.output_dir == Path.cwd() / "generated"
+        assert orchestrator.output_dir == tmp_path.resolve() / "generated"
         assert isinstance(orchestrator.state_manager, StateManager)
         assert isinstance(orchestrator.event_manager, EventManager)
         assert isinstance(orchestrator.policy_engine, PolicyEngine)

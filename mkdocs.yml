@@ -190,6 +190,7 @@ nav:
     - ADR-0039 QNAP switch VLANs and LACP groups are managed by the direct runner with a full-list membership model and fail-closed lock-out checks: decisions/0039-qnap-switch-vlans-and-lacp-groups-are-managed-by-the-direct-runner-with-a-full-list-membership-model-and-fail-closed-lock-out-checks.md
     - "ADR-0040 Per-device Let's Encrypt certificates are issued by InfraFoundry over ACME with Cloudflare DNS-01 and installed through an optional provider hook": decisions/0040-per-device-lets-encrypt-certificates-are-issued-by-infrafoundry-over-acme-with-cloudflare-dns-01-and-installed-through-an-optional-provider-hook.md
     - ADR-0041 Device web UIs are served by a Caddy reverse-proxy blueprint whose routes generate the Caddyfile and the internal DNS records: decisions/0041-device-web-uis-are-served-by-a-caddy-reverse-proxy-blueprint-whose-routes-generate-the-caddyfile-and-the-internal-dns-records.md
+    - ADR-0042 NetApp products are managed by sibling native providers over a shared pynetappfoundry service layer: decisions/0042-netapp-products-are-managed-by-sibling-native-providers-over-a-shared-pynetappfoundry-service-layer.md
     - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
     - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
     - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md
@@ -230,6 +231,7 @@ nav:
     - OCI: providers/oci.md
     - Kubernetes: providers/kubernetes.md
     - MikroTik: providers/mikrotik.md
+    - ONTAP: providers/ontap.md
     - OpenWrt: providers/openwrt.md
     - OPNsense: providers/opnsense.md
     - Proxmox: providers/proxmox.md

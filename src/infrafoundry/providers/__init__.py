@@ -7,6 +7,7 @@ from infrafoundry.providers.host import HostProvider
 from infrafoundry.providers.kubernetes import KubernetesProvider
 from infrafoundry.providers.mikrotik import MikroTikProvider
 from infrafoundry.providers.oci import OCIProvider
+from infrafoundry.providers.ontap import OntapProvider
 from infrafoundry.providers.openwrt import OpenWrtProvider
 from infrafoundry.providers.opnsense import OPNsenseProvider
 from infrafoundry.providers.proxmox import ProxmoxProvider
@@ -22,6 +23,7 @@ __all__ = [
     "MikroTikProvider",
     "OCIProvider",
     "OPNsenseProvider",
+    "OntapProvider",
     "OpenWrtProvider",
     "ProxmoxProvider",
     "QnapProvider",

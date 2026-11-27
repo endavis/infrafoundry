@@ -72,6 +72,9 @@ security = [
 socks = [
     "socksio>=1.0.0",
 ]
+netapp = [
+    "pynetappfoundry>=0.2.0",
+]
 
 [project.scripts]
 foundry = "infrafoundry.cli:foundry"
@@ -85,6 +88,7 @@ proxmox = "infrafoundry.providers.proxmox:register"
 openwrt = "infrafoundry.providers.openwrt:register"
 mikrotik = "infrafoundry.providers.mikrotik:register"
 qnap = "infrafoundry.providers.qnap:register"
+ontap = "infrafoundry.providers.ontap:register"
 
 [project.entry-points."infrafoundry.secrets"]
 env = "infrafoundry.secrets.backends.env:register"
