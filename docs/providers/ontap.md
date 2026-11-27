@@ -131,4 +131,13 @@ Only data LIFs. Cluster and node management LIFs, routes, broadcast domains, SVM
 
 ## Verification status
 
-The request paths and bodies are checked in unit tests against the real pynetappfoundry objects, with a small spec and no cluster. The first run against a live cluster, including the home port and node bodies, is recorded here by the maintainer after it happens.
+The request paths and bodies are checked in unit tests against the real pynetappfoundry objects, with a small spec and no cluster.
+
+**Live-verified** on an ONTAP 9.18.1 two-node simulator (#1373):
+
+- `infra doctor` connected through a pinned certificate.
+- A plan over the existing data LIFs, declared as they were, was clean, and warned about a LIF off its home port.
+- An `auto_revert` change planned as one update, and `infra apply` set it on the cluster.
+- A second apply was a no-op, and `infra drift detect` reported no drift.
+
+Not yet run live: the home port and node PATCH bodies, `absent` deletes, and the pin-mismatch message.
