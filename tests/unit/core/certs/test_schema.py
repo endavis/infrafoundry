@@ -86,7 +86,7 @@ def test_server_name_is_required_when_every_name_is_a_wildcard() -> None:
         ("owner", "root;rm"),
         ("reload", "systemctl reload caddy"),
         ("reload", ["ok", ""]),
-        ("provider", "oci"),
+        ("provider", "opnsense"),
         ("sudo", "yes"),
     ],
 )

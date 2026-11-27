@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import re
+import shlex
 import socket
 import ssl
+import subprocess  # nosec B404  # runs ssh with list args
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -13,13 +15,18 @@ from typing import Any
 from infrafoundry.core.certs.keys import der_sha256
 from infrafoundry.core.certs.models import CertificateInstallError, CertificateSchemaError
 from infrafoundry.core.provider import ResourceConfig
+from infrafoundry.core.ssh_host_keys import FIX_HINT, host_key_config, known_hosts_value
 
-SUPPORTED_TARGET_PROVIDERS = ("host",)
+SUPPORTED_TARGET_PROVIDERS = ("host", "proxmox", "oci")
+TARGET_RESOURCE_TYPES = {"host": "host", "proxmox": "vm", "oci": "instance"}
 VERIFY_WINDOW_SECONDS = 30.0
 
 _PATH_RE = re.compile(r"^/[A-Za-z0-9._/@+:-]+$")
 _MODE_RE = re.compile(r"^[0-7]{3,4}$")
 _ACCOUNT_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+_JUMPHOST_RE = re.compile(r"^[A-Za-z0-9._@:-]+$")
+_ADDRESS_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
+_JUMP_OPTS = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=10"]
 _TARGET_KEYS = frozenset(
     {
         "provider",
@@ -40,6 +47,9 @@ _TARGET_KEYS = frozenset(
 Fetch = Callable[[str, int, str], bytes]
 """``(address, port, server_name) -> DER`` of the certificate the endpoint serves."""
 
+JumpFetch = Callable[[str, str, int, str], bytes]
+"""``(jumphost, address, port, server_name) -> DER`` fetched from the jump host."""
+
 
 @dataclass(frozen=True)
 class TargetEndpoint:
@@ -49,6 +59,9 @@ class TargetEndpoint:
     port: int = 22
     user: str | None = None
     key_file: str | None = None
+    jumphost: str | None = None
+    known_hosts: tuple[str, ...] = ()
+    host_key_alias: str | None = None
 
 
 @dataclass(frozen=True)
@@ -194,11 +207,14 @@ def resolve_target(
         CertificateSchemaError: If the target is invalid or names no such resource.
     """
     target = parse_target(raw, names)
+    resource_type = TARGET_RESOURCE_TYPES[target.provider]
     host = next(
         (
             r
             for r in resources
-            if r.provider == target.provider and r.type == "host" and r.name == target.resource
+            if r.provider == target.provider
+            and r.type == resource_type
+            and r.name == target.resource
         ),
         None,
     )
@@ -206,6 +222,8 @@ def resolve_target(
         raise CertificateSchemaError(
             f"target {target.provider} resource '{target.resource}' is not declared"
         )
+    if resource_type != "host":
+        return CertificateTarget(**{**target.__dict__, "endpoint": _pinned_endpoint(host)})
     config = host.config or {}
     endpoint = TargetEndpoint(
         address=str(config.get("address", "")),
@@ -216,6 +234,90 @@ def resolve_target(
     if not endpoint.address or endpoint.address.startswith("-"):
         raise CertificateSchemaError(f"target host '{target.resource}' has no usable address")
     return CertificateTarget(**{**target.__dict__, "endpoint": endpoint})
+
+
+def _pinned_endpoint(resource: ResourceConfig) -> TargetEndpoint:
+    """Build a VM's or instance's endpoint from its pinned host key and package variables."""
+    name = resource.name
+    try:
+        spec = host_key_config(resource)
+    except ValueError as exc:
+        raise CertificateSchemaError(
+            f"target '{name}' has an invalid ssh_host_key ({exc}); {FIX_HINT}"
+        ) from None
+    if spec is None:
+        raise CertificateSchemaError(
+            f"target '{name}' has no ssh_host_key, so its SSH host key cannot be checked; "
+            f"{FIX_HINT}"
+        )
+    if not _ADDRESS_RE.fullmatch(spec.address) or spec.address.startswith("-"):
+        raise CertificateSchemaError(f"target '{name}' has no usable ssh_host_key.address")
+    pinned = tuple(line for line in known_hosts_value([resource]).split(";") if line)
+    if not pinned:
+        raise CertificateSchemaError(
+            f"target '{name}' has no pinned SSH host key in its package secrets; {FIX_HINT}"
+        )
+    variables = resource.package_variables or {}
+    jumphost = str(variables.get("jumphost", "") or "").strip()
+    if jumphost and (jumphost.startswith("-") or not _JUMPHOST_RE.fullmatch(jumphost)):
+        raise CertificateSchemaError(f"target '{name}' has an unusable jumphost")
+    user = str(variables.get("ssh_user", "") or "").strip() or (
+        jumphost.split("@", 1)[0] if "@" in jumphost else ""
+    )
+    if not user:
+        raise CertificateSchemaError(
+            f"target '{name}' needs the package variable ssh_user (or a user@ in jumphost)"
+        )
+    if user.startswith("-") or not _ACCOUNT_RE.fullmatch(user):
+        raise CertificateSchemaError(f"target '{name}' has an unusable ssh_user")
+    return TargetEndpoint(
+        address=spec.address,
+        port=22,
+        user=user,
+        key_file=None,
+        jumphost=jumphost or None,
+        known_hosts=pinned,
+        host_key_alias=name,
+    )
+
+
+def fetch_served_der_via_jumphost(
+    jumphost: str,
+    address: str,
+    port: int,
+    server_name: str,
+    run: Callable[..., Any] = subprocess.run,
+) -> bytes:
+    """Fetch the leaf certificate an endpoint serves, through the jump host (strict ssh).
+
+    Needs ``openssl`` on the jump host.
+
+    Raises:
+        OSError: If ssh or openssl fails, or no certificate comes back.
+    """
+    host = f"[{address}]" if ":" in address else address
+    remote = (
+        f"openssl s_client -connect {shlex.quote(f'{host}:{port}')} "
+        f"-servername {shlex.quote(server_name)} </dev/null 2>/dev/null "
+        "| openssl x509 -outform PEM"
+    )
+    result = run(
+        ["ssh", *_JUMP_OPTS, jumphost, remote],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise OSError(f"fetching through the jump host failed (exit {result.returncode})")
+    match = re.search(
+        r"-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----",
+        str(result.stdout or ""),
+        re.DOTALL,
+    )
+    if match is None:
+        raise OSError("the endpoint presented no certificate")
+    return ssl.PEM_cert_to_DER_cert(match.group(0))
 
 
 def fetch_served_der(address: str, port: int, server_name: str) -> bytes:
@@ -243,6 +345,7 @@ def verify_served(
     expected_sha256: str,
     *,
     fetch: Fetch = fetch_served_der,
+    jump_fetch: JumpFetch = fetch_served_der_via_jumphost,
     sleep: Callable[[float], None] = time.sleep,
     monotonic: Callable[[], float] = time.monotonic,
     window: float = VERIFY_WINDOW_SECONDS,
@@ -254,6 +357,7 @@ def verify_served(
         target: A resolved target with ``verify`` set.
         expected_sha256: SHA-256 of the leaf certificate's DER.
         fetch: Fetches the served DER; replaced in tests.
+        jump_fetch: Fetches the served DER through the jump host (targets with a jumphost).
         sleep: Sleep function.
         monotonic: Clock for the retry window.
         window: Seconds to keep retrying.
@@ -268,9 +372,16 @@ def verify_served(
     last = "no attempt was made"
     while True:
         try:
-            served = der_sha256(
-                fetch(target.endpoint.address, target.verify_port, target.verify_server_name)
-            )
+            if target.endpoint.jumphost:
+                der = jump_fetch(
+                    target.endpoint.jumphost,
+                    target.endpoint.address,
+                    target.verify_port,
+                    target.verify_server_name,
+                )
+            else:
+                der = fetch(target.endpoint.address, target.verify_port, target.verify_server_name)
+            served = der_sha256(der)
             if served == expected_sha256:
                 return
             last = "it serves a different certificate"

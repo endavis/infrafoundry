@@ -28,6 +28,8 @@ Package SSH connections to long-lived hosts check the host key against your own 
 | Proxmox template image customization (`local-exec` ssh to the node) | Your `known_hosts` |
 | Ansible runs for the `host` and `oci` providers (`host_key_checking = True`) | Your `known_hosts` |
 | `infra doctor` jumphost preflight, SSH from the jumphost to a deployed VM | The keys the package pins in `ssh_known_hosts` |
+| `foundry certs` install to a VM or instance: the jump hop | Your `known_hosts` |
+| `foundry certs` install to a VM or instance: the VM itself | The keys the package pins |
 
 The preflight skips a deployed VM that has no pinned key and prints a `foundry secrets host-keys --env <env>` hint. See [Blueprint VM host keys](../decisions/0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md).
 

@@ -4,6 +4,8 @@ import copy
 from pathlib import Path
 from typing import Any, ClassVar, override
 
+from infrafoundry.core.certs.install import CertificateTarget
+from infrafoundry.core.certs.ssh_installer import SshCertificateInstaller
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import ConfigurationError, SchemaValidationError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
@@ -72,7 +74,25 @@ class OCIProvider(
         # Used by get_terraform_env_vars to resolve resource-level
         # ``terraform_secrets`` references into TF_VAR_* env vars.
         self._last_terraform_resources: list[ResourceConfig] = []
+        self._certificate_installer = SshCertificateInstaller()
         self._setup_template_environment()
+
+    def install_certificate(
+        self, target: CertificateTarget, cert_pem: str, chain_pem: str, key_pem: str
+    ) -> None:
+        """Install an ACME certificate and key on a VM over SSH, then reload (#1682).
+
+        Args:
+            target: The resolved install target, with the VM's pinned SSH endpoint.
+            cert_pem: The leaf certificate.
+            chain_pem: The intermediate chain (may be empty).
+            key_pem: The private key. Never logged.
+
+        Raises:
+            CertificateInstallError: If the install fails or the reload fails (the previous
+                files are restored). The message holds no key material.
+        """
+        self._certificate_installer.install(target, cert_pem, chain_pem, key_pem)
 
     @override
     def validate_config(self, config: dict[str, Any]) -> bool:

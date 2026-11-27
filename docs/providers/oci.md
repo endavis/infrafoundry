@@ -406,6 +406,12 @@ The generated `ansible.cfg` sets `host_key_checking = True`: each target's host 
 | `VM.Standard.E5.Flex` | AMD | No |
 | `VM.Standard3.Flex` | Intel | No |
 
+## Install Target for Certificates
+
+An instance can receive a Let's Encrypt certificate issued by the [ACME provider](acme.md): a `certificate` resource names it as its `target` with `provider: oci` and `resource: <instance name>`. The target block is the one shown for a [Proxmox VM](proxmox.md#install-target-for-certificates).
+
+The instance needs an `ssh_host_key` block with its `address` (an OCI `ssh_host_key` needs a `tailscale` block) and a public key pinned by `foundry secrets host-keys --env <env>`, plus the package variable `ssh_user`. Instances are normally reached directly over the tailnet, so no `jumphost` is set: the SSH connection is direct and strict, and the instance is checked against the pinned key in a temporary mode 0600 `known_hosts` file that is removed afterwards (through `HostKeyAlias`). With a `jumphost` set, the install and the verification go through it as described for [Proxmox VMs](proxmox.md#install-target-for-certificates), which needs `openssl` on the jumphost. Nothing falls back to an unchecked connection: an instance without a pinned key fails before any order is placed, with the `foundry secrets host-keys` hint.
+
 ## Dependencies
 
 Resources are created in dependency order:

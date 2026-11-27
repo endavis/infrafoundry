@@ -11,7 +11,18 @@ tags:
 
 The `acme` provider declares certificates for your devices. `foundry certs issue` orders each one from Let's Encrypt with the DNS-01 challenge on Cloudflare, keeps the certificate and its key SOPS-encrypted in the package that declares it, installs it on the target and checks that the target serves it. Nothing is exposed to the internet: DNS-01 needs only a DNS record, not an inbound connection. The decisions and the rejected alternatives are in [ADR-0040](../decisions/0040-per-device-lets-encrypt-certificates-are-issued-by-infrafoundry-over-acme-with-cloudflare-dns-01-and-installed-through-an-optional-provider-hook.md).
 
-`infra apply` never issues a certificate. The provider writes an empty `terraform {}` block; only `foundry certs` talks to the CA and rewrites the encrypted files. What is covered today: issue, install and unattended renewal on a [`host`](host.md#install-target-for-certificates). VM targets are a separate change.
+`infra apply` never issues a certificate. The provider writes an empty `terraform {}` block; only `foundry certs` talks to the CA and rewrites the encrypted files. What is covered today: issue, install and unattended renewal on a [`host`](host.md#install-target-for-certificates), a [Proxmox `vm`](proxmox.md#install-target-for-certificates) and an [OCI `instance`](oci.md#install-target-for-certificates).
+
+A VM target names the VM instead of a host. Its SSH host key must be pinned first with `foundry secrets host-keys`:
+
+```yaml
+target:
+  provider: proxmox
+  resource: app-01
+  fullchain_path: /etc/ssl/infrafoundry/app.fullchain.pem
+  key_path: /etc/ssl/infrafoundry/app.key
+  reload: [systemctl, reload, caddy]
+```
 
 ## Settings
 
@@ -170,12 +181,10 @@ The unit needs the SOPS age key and SSH access to the targets, as an interactive
 
 Writes are atomic (`sops set` on a copy, then a rename), and no plaintext key ever touches disk or a command line. `acme_certificates` never reaches package variables, script environments or templates.
 
-## Not covered yet
-
-- Install targets other than a `host` (Proxmox VMs and OCI instances).
-
 ## Related
 
 - [Host provider](host.md#install-target-for-certificates)
+- [Proxmox provider](proxmox.md#install-target-for-certificates)
+- [OCI provider](oci.md#install-target-for-certificates)
 - [ADR-0040](../decisions/0040-per-device-lets-encrypt-certificates-are-issued-by-infrafoundry-over-acme-with-cloudflare-dns-01-and-installed-through-an-optional-provider-hook.md)
 - [CLI reference: certs](../usage/cli-reference.md#certs-group-foundry-certs)
