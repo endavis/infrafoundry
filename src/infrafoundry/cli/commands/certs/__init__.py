@@ -5,6 +5,7 @@ from __future__ import annotations
 import click
 
 from .issue import issue
+from .renew import renew
 from .status import status
 
 
@@ -15,5 +16,6 @@ def certs() -> None:
 
 certs.add_command(status)
 certs.add_command(issue)
+certs.add_command(renew)
 
 __all__ = ["certs"]

@@ -24,6 +24,7 @@ from infrafoundry.core.certs.propagation import doh_resolver
 from infrafoundry.core.certs.schema import raw_settings_problems, settings_from_mapping
 from infrafoundry.core.certs.service import CertificateService
 from infrafoundry.core.certs.store import SecretsWriter
+from infrafoundry.core.events.types import EventType
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.state.models import DeploymentStatus, ResourceState
 from infrafoundry.secrets.environment import resolved_provider_settings
@@ -108,6 +109,7 @@ def build_service(
     default_renew_days: int,
     *,
     record: bool,
+    command: str = "certs issue",
 ) -> CertificateService:
     """Build the service for an environment."""
     return CertificateService(
@@ -117,17 +119,27 @@ def build_service(
         providers=dict(orchestrator.providers),
         default_renew_days=default_renew_days,
         verify=deps.verify,
-        record_state=_state_recorder(orchestrator, env) if record else None,
+        record_state=_state_recorder(orchestrator, env, command) if record else None,
         now=deps.now,
+        emit=_event_emitter(orchestrator, env),
     )
 
 
-def _state_recorder(
+def _event_emitter(
     orchestrator: Orchestrator, env: str
+) -> Callable[[EventType, dict[str, Any]], None]:
+    def emit(event: EventType, data: dict[str, Any]) -> None:
+        orchestrator.event_manager.emit_event(event, env, data)
+
+    return emit
+
+
+def _state_recorder(
+    orchestrator: Orchestrator, env: str, command: str
 ) -> Callable[[ResourceConfig, dict[str, Any]], None]:
     def record(resource: ResourceConfig, config: dict[str, Any]) -> None:
         manager = orchestrator.state_manager
-        deployment = manager.create_deployment(env, "certs issue")
+        deployment = manager.create_deployment(env, command)
         manager.track_resource(
             deployment,
             env,

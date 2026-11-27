@@ -204,6 +204,7 @@ Key commands (`foundry` via `uv run foundry ...`):
 **Certs group (`certs`):**
 - `certs status --env <name>` – show the state of the declared Let's Encrypt certificates
 - `certs issue --env <name> [NAME...] [--force]` – issue and install the certificates that are missing, due or not installed
+- `certs renew --env <name> [NAME...] [--dry-run]` – unattended renewal of the certificates that are due, never issued or not installed
 
 **Policy group (`policy`):**
 - `policy list` – list available infrastructure policies
