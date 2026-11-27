@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 from pathlib import Path
 
@@ -12,6 +11,7 @@ from rich.table import Table
 from infrafoundry.core.audit.models import AuditStatus
 from infrafoundry.core.events.types import EventType
 from infrafoundry.core.orchestrator import Orchestrator
+from infrafoundry.core.paths import output_root
 
 from ...decorators import with_orchestrator
 from ...utils import console
@@ -106,7 +106,7 @@ def rename_env(
             "Back it up with pg_dump, then re-run with --no-backup."
         )
 
-    generated_root = Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated"))
+    generated_root = output_root()
     old_dir = generated_root / env
     new_dir = generated_root / to_env
     if not no_move_generated:

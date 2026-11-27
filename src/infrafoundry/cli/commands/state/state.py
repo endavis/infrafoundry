@@ -8,6 +8,7 @@ from pathlib import Path
 import click
 
 from infrafoundry.core.orchestrator import Orchestrator
+from infrafoundry.core.paths import output_root
 
 from ...decorators import with_orchestrator
 from ...utils import console, raise_cli_error
@@ -158,9 +159,7 @@ def state_backup(
         console.success(f"State database backed up to: {db_backup_path}")
 
         if include_generated:
-            generated_dir = (
-                Path.cwd() / "generated"
-            )  # Assume generated is in current working directory
+            generated_dir = output_root()
             if generated_dir.exists():
                 generated_backup_name = f"infrafoundry_generated_{timestamp}.tar.gz"
                 generated_backup_path = output_path / generated_backup_name

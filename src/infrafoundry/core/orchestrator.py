@@ -35,6 +35,7 @@ from infrafoundry.core.orchestrator_workflows import (
     ValidationOrchestrator,
     find_managed_only_providers,
 )
+from infrafoundry.core.paths import output_root
 from infrafoundry.core.policy import PolicyEngine, PolicyViolation
 from infrafoundry.core.policy_checker import PolicyChecker
 from infrafoundry.core.protocols import HasSnippetStrictness
@@ -88,7 +89,7 @@ class Orchestrator:
 
         Args:
             config_manager: Configuration manager instance
-            output_dir: Directory for generated files (defaults to ./generated)
+            output_dir: Directory for generated files (defaults to ``output_root()``)
             state_manager: State manager instance (creates default if None)
             event_manager: Event manager instance (creates default if None)
             policy_dir: Directory containing policy files (defaults to ./policies)
@@ -96,7 +97,7 @@ class Orchestrator:
             strict_config: Configuration for strict-mode safeguards
         """
         self.config_manager = config_manager
-        self.output_dir = output_dir or Path.cwd() / "generated"
+        self.output_dir = output_dir or output_root()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.console = Console()
         self.strict_config = strict_config or OrchestratorStrictConfig()

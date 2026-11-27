@@ -36,7 +36,7 @@ export INFRAFOUNDRY_CONFIG_REPO=/path/to/my-infrastructure-config
 # ============================================================================
 
 # Output directory for generated Terraform/Ansible files
-# Default: ./generated (relative to framework directory)
+# Default: ./generated. A relative value resolves against the current directory.
 # export INFRAFOUNDRY_OUTPUT_DIR=/path/to/custom/output
 # export INFRAFOUNDRY_OUTPUT_DIR="${INFRAFOUNDRY_CONFIG_REPO}/generated"
 

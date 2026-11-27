@@ -813,6 +813,28 @@ rebuildable = ["app_home", "*_data"]
 
 See [ADR-9031](../decisions/9031-a-project-adds-rebuildable-names-for-worktree-removal-in-pyprojecttoml.md) for why the setting lives under `[tool.pyproject-template]`.
 
+### Project shared names
+
+A project can name directories that every worktree must share with the main checkout, such as
+a directory holding local state. `doit worktree` makes each one a symlink to the main checkout's
+directory. List them in the **main checkout's** `pyproject.toml`:
+
+```toml
+[tool.pyproject-template.worktree]
+shared = ["generated"]
+```
+
+- Names follow the `rebuildable` rules (one path part, none of `tmp`, `agents`, `checkpoints`,
+  `.envrc.local`), and `.git` and `.venv` are refused too.
+- The target is created in the main checkout when missing. A name that is tracked, or that is a
+  file in the main checkout, is skipped with a warning.
+- `.gitignore` must ignore the link by its own name (`/generated`, not only `generated/`, which
+  matches directories). A link that `git check-ignore` does not report as ignored is removed
+  again with a warning, so `git add -A` never commits an absolute path.
+- Removing the worktree deletes only the link, and the link is not reported as a leftover. A real
+  directory of that name in a worktree, or a link to anywhere else, still keeps the worktree.
+- A malformed setting only warns: the worktree is already made, without links.
+
 **Options:**
 - `--pr`: PR number to merge (defaults to PR for current branch)
 - `--delete-branch`: Delete the source branch after merge (default: `true`)
@@ -1334,7 +1356,10 @@ doit worktree --branch=feat/42-add-export
    with no upstream, so `doit pr` pushes it
 3. Runs `uv sync --all-extras --dev` inside the worktree with `VIRTUAL_ENV` unset, so the worktree
    gets its own `.venv` and the main checkout's is left alone
-4. Prints how to work there, and how to merge its PR so that the worktree is removed
+4. Links each project shared name (see [Project shared names](#project-shared-names)) in the
+   worktree to the main checkout's, so `generated/` and its Terraform state are the main
+   checkout's
+5. Prints how to work there, and how to merge its PR so that the worktree is removed
 
 **Working in a worktree:**
 - Run everything through `uv run` (for example `uv run doit check`), which uses the worktree's

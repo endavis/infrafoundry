@@ -27,8 +27,10 @@ from rich.console import Console
 
 from tools.doit.git import (
     _is_rebuildable,
+    _link_shared,
     _main_checkout,
     _project_rebuildable,
+    _project_shared,
     _worktree_mounts,
     remove_merged_worktree,
     task_bump,
@@ -1003,3 +1005,183 @@ class TestWorktreeMounts:
         assert "Unmount these first" in out
         assert f"  {mount}" in out.splitlines()
         assert f"  git worktree remove {path}" in out.splitlines()
+
+
+SHARED = '[tool.pyproject-template.worktree]\nshared = ["generated"]\n'
+
+
+class TestProjectShared:
+    """`_project_shared` reads the names a worktree links to the main checkout (#1716)."""
+
+    @staticmethod
+    def _read(tmp_path: Path, text: str | None) -> tuple[str, ...]:
+        pyproject = tmp_path / "pyproject.toml"
+        if text is not None:
+            pyproject.write_text(text, encoding="utf-8")
+        return _project_shared(pyproject)
+
+    @pytest.mark.parametrize("text", [None, "", "[tool.pyproject-template.worktree]\n"])
+    def test_absent_setting_is_empty(self, tmp_path: Path, text: str | None) -> None:
+        assert self._read(tmp_path, text) == ()
+
+    def test_valid_list_is_returned(self, tmp_path: Path) -> None:
+        assert self._read(tmp_path, SHARED) == ("generated",)
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            '[tool.pyproject-template.worktree]\nshared = "generated"\n',
+            '[tool.pyproject-template.worktree]\nshared = ["a/b"]\n',
+            *(
+                f'[tool.pyproject-template.worktree]\nshared = ["{n}"]\n'
+                for n in ("tmp", "*", ".envrc.local", ".git", ".venv")
+            ),
+        ],
+    )
+    def test_malformed_or_forbidden_raises(self, tmp_path: Path, text: str) -> None:
+        with pytest.raises(ValueError, match=r"shared"):
+            self._read(tmp_path, text)
+
+
+class TestLinkShared:
+    """`doit worktree` links shared names to the main checkout, with real git (#1716)."""
+
+    BRANCH = "feat/1-add-export"
+
+    @staticmethod
+    def _link(root: Path, path: Path) -> str:
+        output = io.StringIO()
+        _link_shared(root, path, Console(file=output, width=200))
+        return output.getvalue()
+
+    @staticmethod
+    def _ignore(repo: Path, line: str) -> None:
+        with (repo / ".gitignore").open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+        _git(repo, "add", ".gitignore")
+        _git(repo, "commit", "-q", "-m", "ignore")
+
+    def test_link_is_made_and_writes_reach_the_main_checkout(self, main_checkout: Path) -> None:
+        (main_checkout / "pyproject.toml").write_text(SHARED, encoding="utf-8")
+        self._ignore(main_checkout, "/generated")
+        path, _ = _add_worktree(main_checkout, self.BRANCH)
+
+        self._link(main_checkout, path)
+
+        assert (path / "generated").is_symlink()
+        (path / "generated" / "state.tf").write_text("x", encoding="utf-8")
+        assert (main_checkout / "generated" / "state.tf").read_text(encoding="utf-8") == "x"
+        assert "generated" not in _git(path, "status", "--porcelain")
+
+    def test_no_setting_means_no_link(self, main_checkout: Path) -> None:
+        path, _ = _add_worktree(main_checkout, self.BRANCH)
+
+        self._link(main_checkout, path)
+
+        assert not (path / "generated").exists()
+
+    def test_name_not_ignored_is_unlinked_with_a_warning(self, main_checkout: Path) -> None:
+        (main_checkout / "pyproject.toml").write_text(SHARED, encoding="utf-8")
+        path, _ = _add_worktree(main_checkout, self.BRANCH)
+
+        out = self._link(main_checkout, path)
+
+        assert not (path / "generated").is_symlink()
+        assert "does not ignore" in out
+
+    def test_tracked_name_is_skipped(self, main_checkout: Path) -> None:
+        (main_checkout / "pyproject.toml").write_text(SHARED, encoding="utf-8")
+        self._ignore(main_checkout, "/generated")
+        path, _ = _add_worktree(main_checkout, self.BRANCH)
+        (path / "generated").mkdir()
+        (path / "generated" / "f").write_text("x", encoding="utf-8")
+        _git(path, "add", "-f", "generated/f")
+
+        out = self._link(main_checkout, path)
+
+        assert not (path / "generated").is_symlink()
+        assert "not linked" in out
+
+    def test_file_in_main_checkout_is_skipped(self, main_checkout: Path) -> None:
+        (main_checkout / "pyproject.toml").write_text(SHARED, encoding="utf-8")
+        self._ignore(main_checkout, "/generated")
+        (main_checkout / "generated").write_text("x", encoding="utf-8")
+        path, _ = _add_worktree(main_checkout, self.BRANCH)
+
+        out = self._link(main_checkout, path)
+
+        assert not (path / "generated").exists()
+        assert "not a directory" in out
+
+    def test_malformed_setting_warns_and_links_nothing(self, main_checkout: Path) -> None:
+        (main_checkout / "pyproject.toml").write_text(
+            '[tool.pyproject-template.worktree]\nshared = ["tmp"]\n', encoding="utf-8"
+        )
+        path, _ = _add_worktree(main_checkout, self.BRANCH)
+
+        out = self._link(main_checkout, path)
+
+        assert "no shared links made" in out
+        assert not (path / "tmp").is_symlink()
+
+
+class TestRemoveMergedWorktreeShared:
+    """Removing a worktree drops its shared link and keeps the target (#1716)."""
+
+    BRANCH = "feat/1-add-export"
+
+    @staticmethod
+    def _remove(path: Path, branch: str, merged_head: str) -> str:
+        output = io.StringIO()
+        remove_merged_worktree(path, branch, merged_head, Console(file=output, width=200))
+        return output.getvalue()
+
+    @pytest.fixture
+    def shared_worktree(self, main_checkout: Path) -> tuple[Path, str]:
+        (main_checkout / "pyproject.toml").write_text(SHARED, encoding="utf-8")
+        with (main_checkout / ".gitignore").open("a", encoding="utf-8") as fh:
+            fh.write("/generated\n")
+        _git(main_checkout, "add", ".gitignore")
+        _git(main_checkout, "commit", "-q", "-m", "ignore")
+        path, head = _add_worktree(main_checkout, self.BRANCH)
+        output = io.StringIO()
+        _link_shared(main_checkout, path, Console(file=output, width=200))
+        return path, head
+
+    def test_link_is_removed_and_target_survives(
+        self, main_checkout: Path, shared_worktree: tuple[Path, str]
+    ) -> None:
+        path, head = shared_worktree
+        (main_checkout / "generated" / "state.tf").write_text("x", encoding="utf-8")
+
+        self._remove(path, self.BRANCH, head)
+
+        assert not path.exists()
+        assert (main_checkout / "generated" / "state.tf").read_text(encoding="utf-8") == "x"
+
+    def test_real_directory_keeps_the_worktree(
+        self, main_checkout: Path, shared_worktree: tuple[Path, str]
+    ) -> None:
+        path, head = shared_worktree
+        (path / "generated").unlink()
+        (path / "generated").mkdir()
+        (path / "generated" / "terraform.tfstate").write_text("s", encoding="utf-8")
+
+        out = self._remove(path, self.BRANCH, head)
+
+        assert path.exists()
+        assert "terraform.tfstate" in out
+
+    def test_foreign_link_keeps_the_worktree(
+        self, main_checkout: Path, shared_worktree: tuple[Path, str], tmp_path: Path
+    ) -> None:
+        path, head = shared_worktree
+        other = tmp_path / "other"
+        other.mkdir()
+        (path / "generated").unlink()
+        (path / "generated").symlink_to(other, target_is_directory=True)
+
+        out = self._remove(path, self.BRANCH, head)
+
+        assert path.exists()
+        assert "!! generated" in out

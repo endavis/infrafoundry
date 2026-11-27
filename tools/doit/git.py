@@ -47,6 +47,9 @@ _REBUILDABLE_IGNORED = (
 # rejected, which also catches broad patterns such as `*` and `t*` (#1238).
 _PROTECTED_NAMES = ("tmp", "agents", "checkpoints", ".envrc.local")
 
+# Names a project may not share with the main checkout by symlink (#1716).
+_NEVER_SHARED = (".git", ".venv")
+
 # Where Linux lists the mounts of this process. A module constant so tests can
 # point it at a fake file (#1212).
 _MOUNTINFO = Path("/proc/self/mountinfo")
@@ -171,17 +174,17 @@ def worktree_for_branch(branch: str) -> Path | None:
     return None
 
 
-def _project_rebuildable(pyproject: Path) -> tuple[str, ...]:
-    """Return the extra rebuildable names *pyproject* lists, or ``()`` when it lists none.
+def _read_worktree_names(pyproject: Path, setting: str) -> tuple[str, ...]:
+    """Return the names listed under ``[tool.pyproject-template.worktree].<setting>``.
 
-    Read from ``[tool.pyproject-template.worktree].rebuildable`` (#1238). A missing
-    file, table or key means ``()``.
+    A missing file, table or key means ``()``. Each name must be one non-empty path part
+    that matches none of ``_PROTECTED_NAMES``.
 
     Raises:
         ValueError: The file is not valid TOML, or the setting is not a list of
             acceptable names. The message names the file and the key.
     """
-    key = "[tool.pyproject-template.worktree].rebuildable"
+    key = f"[tool.pyproject-template.worktree].{setting}"
     try:
         with pyproject.open("rb") as fh:
             data = tomllib.load(fh)
@@ -197,9 +200,9 @@ def _project_rebuildable(pyproject: Path) -> tuple[str, ...]:
         table = table.get(part, {})
     if not isinstance(table, dict):
         raise ValueError(f"{pyproject}: [tool.pyproject-template.worktree] is not a table")
-    if "rebuildable" not in table:
+    if setting not in table:
         return ()
-    names = table["rebuildable"]
+    names = table[setting]
     if not isinstance(names, list):
         raise ValueError(f"{pyproject}: {key} must be a list of names")
     for name in names:
@@ -215,12 +218,54 @@ def _project_rebuildable(pyproject: Path) -> tuple[str, ...]:
     return tuple(names)
 
 
-def _worktree_leftovers(worktree: Path, extra: tuple[str, ...] = ()) -> list[str]:
+def _project_rebuildable(pyproject: Path) -> tuple[str, ...]:
+    """Return the extra rebuildable names *pyproject* lists, or ``()`` when it lists none.
+
+    Read from ``[tool.pyproject-template.worktree].rebuildable`` (#1238).
+
+    Raises:
+        ValueError: See ``_read_worktree_names``.
+    """
+    return _read_worktree_names(pyproject, "rebuildable")
+
+
+def _project_shared(pyproject: Path) -> tuple[str, ...]:
+    """Return the names a worktree links to the main checkout, or ``()`` when none (#1716).
+
+    Read from ``[tool.pyproject-template.worktree].shared``. ``.git`` and ``.venv`` are
+    rejected as well: a link there would break the worktree or share its environment.
+
+    Raises:
+        ValueError: See ``_read_worktree_names``, or a name is ``.git`` or ``.venv``.
+    """
+    names = _read_worktree_names(pyproject, "shared")
+    for name in names:
+        if name in _NEVER_SHARED:
+            raise ValueError(
+                f"{pyproject}: [tool.pyproject-template.worktree].shared: {name!r} "
+                "cannot be shared with the main checkout"
+            )
+    return names
+
+
+def _is_shared_link(worktree: Path, root: Path, name: str) -> bool:
+    """Return whether *worktree*/*name* is a symlink to the main checkout's *name*."""
+    link = worktree / name
+    return link.is_symlink() and link.resolve() == (root / name).resolve()
+
+
+def _worktree_leftovers(
+    worktree: Path,
+    extra: tuple[str, ...] = (),
+    shared: tuple[str, ...] = (),
+    root: Path | None = None,
+) -> list[str]:
     """Return the ``git status`` lines for files that removing *worktree* would affect.
 
     ``git worktree remove`` refuses modified and untracked files, and deletes
     ignored ones. So every line counts, except ignored files that can be rebuilt,
-    which includes the project's *extra* names.
+    which includes the project's *extra* names. A *shared* name that is a symlink to
+    *root*'s own is not a leftover: removing the worktree deletes only the link (#1716).
     """
     status = subprocess.run(
         ["git", "-C", str(worktree), "status", "--porcelain", "--ignored"],
@@ -231,6 +276,13 @@ def _worktree_leftovers(worktree: Path, extra: tuple[str, ...] = ()) -> list[str
     leftovers = []
     for line in status.stdout.splitlines():
         entry = line[3:]
+        if (
+            line.startswith("!! ")
+            and root is not None
+            and entry.rstrip("/") in shared
+            and _is_shared_link(worktree, root, entry.rstrip("/"))
+        ):
+            continue
         if line.startswith("!! ") and _is_rebuildable(PurePosixPath(entry.rstrip("/")).name, extra):
             continue
         if line.startswith("!! ") and entry.endswith("/"):
@@ -389,11 +441,12 @@ def remove_merged_worktree(worktree: Path, branch: str, merged_head: str, consol
     inside = Path.cwd().resolve().is_relative_to(worktree.resolve())
     try:
         extra = _project_rebuildable(root / "pyproject.toml")
+        shared = _project_shared(root / "pyproject.toml")
     except ValueError as exc:
         console.print(verbatim(f"Left {worktree} in place. {exc}", "yellow"), soft_wrap=True)
         _print_manual_removal(root, worktree, branch, merged_head, console)
         return
-    leftovers = _worktree_leftovers(worktree, extra)
+    leftovers = _worktree_leftovers(worktree, extra, shared, root)
     mounts = _worktree_mounts(worktree)
     if inside or leftovers or mounts:
         if inside:
@@ -459,6 +512,51 @@ def _warn_branch_moved(branch: str, tip: str, merged_head: str, console: Console
     )
 
 
+def _link_shared(root: Path, path: Path, console: Console) -> None:
+    """Link each project-shared name in the new worktree *path* to the main checkout (#1716).
+
+    The target is made when missing. A name that is tracked, or that is not a directory in
+    the main checkout, is skipped with a warning. A link that ``git check-ignore`` does not
+    report as ignored is removed again, so ``git add -A`` can never commit an absolute path.
+    A malformed setting only warns: the worktree itself is already made.
+    """
+    try:
+        names = _project_shared(root / "pyproject.toml")
+    except ValueError as exc:
+        console.print(verbatim(f"Warning: no shared links made. {exc}", "yellow"))
+        return
+    for name in names:
+        target = root / name
+        link = path / name
+        tracked = subprocess.run(
+            ["git", "-C", str(path), "ls-files", "--error-unmatch", "--", name],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if tracked.returncode == 0 or link.exists() or link.is_symlink():
+            console.print(verbatim(f"Warning: {name} is tracked or exists; not linked.", "yellow"))
+            continue
+        if target.exists() and not target.is_dir():
+            console.print(verbatim(f"Warning: {target} is not a directory; not linked.", "yellow"))
+            continue
+        target.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(target, target_is_directory=True)
+        ignored = subprocess.run(
+            ["git", "-C", str(path), "check-ignore", "-q", "--", name],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if ignored.returncode != 0:
+            link.unlink()
+            console.print(
+                verbatim(f"Warning: .gitignore does not ignore /{name}; link removed.", "yellow")
+            )
+            continue
+        console.print(verbatim(f"Linked {link} -> {target}", "green"))
+
+
 def task_worktree() -> dict[str, Any]:
     """Create a git worktree in ``worktrees/<branch>`` with its own environment.
 
@@ -519,6 +617,7 @@ def task_worktree() -> dict[str, Any]:
             console.print(verbatim(f"git worktree add failed: {(e.stderr or '').strip()}", "red"))
             sys.exit(1)
         console.print(verbatim(f"Created {path} on {branch}, from origin/main.", "green"))
+        _link_shared(root, path, console)
 
         env = {key: value for key, value in os.environ.items() if key != "VIRTUAL_ENV"}
         # A user-set relative UV_CACHE_DIR is resolved here, before uv runs in the

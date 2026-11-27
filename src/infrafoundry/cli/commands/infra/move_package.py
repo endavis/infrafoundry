@@ -1,8 +1,5 @@
 """Move a package between environments."""
 
-import os
-from pathlib import Path
-
 import click
 
 from infrafoundry.core.exceptions import (
@@ -12,6 +9,7 @@ from infrafoundry.core.exceptions import (
     PackageNotFoundError,
 )
 from infrafoundry.core.package_mover import PackageMover
+from infrafoundry.core.paths import output_root
 
 from ...utils import console, raise_cli_error
 
@@ -49,7 +47,7 @@ def move_package(
         # If config_dir already ends with /envs, go up one level.
         repo_root = config_dir.parent if config_dir.name == "envs" else config_dir
 
-        generated_dir = Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated"))
+        generated_dir = output_root()
 
         mover = PackageMover(config_dir=repo_root, generated_dir=generated_dir)
 

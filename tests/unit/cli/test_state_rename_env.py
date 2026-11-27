@@ -306,3 +306,22 @@ def test_failed_move_leaves_database_renamed(
     assert entry.request_metadata is not None
     assert entry.request_metadata["generated_moved"] is False
     assert "permission denied" in (entry.message or "")
+
+
+def test_relative_output_dir_is_resolved_against_the_current_directory(
+    manager: StateManager,
+    config_dir: Path,
+    backup_dir: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "rel" / "old").mkdir(parents=True)
+    (tmp_path / "rel" / "old" / "main.tf").write_text("x")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("INFRAFOUNDRY_OUTPUT_DIR", "rel")
+    _seed(manager, "old")
+
+    result = _run(config_dir, "--yes", "--backup-dir", str(backup_dir))
+
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "rel" / "new" / "main.tf").exists()

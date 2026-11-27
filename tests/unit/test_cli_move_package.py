@@ -136,3 +136,38 @@ def test_package_not_found_error(cli_runner: CliRunner, tmp_path: Path) -> None:
 
     assert result.exit_code != 0
     assert "not found" in result.output.lower() or "Error" in result.output
+
+
+def test_relative_output_dir_is_made_absolute(
+    cli_runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A relative INFRAFOUNDRY_OUTPUT_DIR reaches PackageMover as an absolute path (#1716)."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("INFRAFOUNDRY_OUTPUT_DIR", "rel")
+    with patch("infrafoundry.cli.commands.infra.move_package.PackageMover") as mover_cls:
+        mover_cls.return_value.execute.return_value = {
+            "dry_run": True,
+            "actions": [],
+            "source_path": "s",
+            "target_path": "t",
+            "provider": "p",
+            "state_addresses": [],
+        }
+        cli_runner.invoke(
+            main,
+            [
+                "-c",
+                str(tmp_path),
+                "infra",
+                "move-package",
+                "--env",
+                "a",
+                "--package",
+                "p",
+                "--to-env",
+                "b",
+                "--dry-run",
+            ],
+        )
+
+    assert mover_cls.call_args.kwargs["generated_dir"] == (tmp_path / "rel").resolve()

@@ -88,6 +88,8 @@ terraform.tfvars
 
 # Generated files
 generated/
+# A symlink named generated (made by `doit worktree`) is not matched by the line above.
+/generated
 output/
 site/
 *.log
