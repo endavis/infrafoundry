@@ -598,3 +598,8 @@ typeCheckingMode = "basic"
 useLibraryCodeForTypes = true
 reportMissingImports = true
 reportMissingTypeStubs = false
+
+# `doit worktree` links these names in a new worktree to the main checkout's own, so a
+# worktree sees the Terraform state under generated/ (#1716, ADR-9031).
+[tool.pyproject-template.worktree]
+shared = ["generated"]

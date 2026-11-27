@@ -11,6 +11,7 @@ from rich.console import Console
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.events import EventManager
 from infrafoundry.core.orchestrator import Orchestrator, OrchestratorStrictConfig
+from infrafoundry.core.paths import output_root
 
 # Load environment variables
 load_dotenv()
@@ -81,11 +82,14 @@ def _get_orchestrator(
     # Create event manager with config repo path for script handler resolution
     event_manager = EventManager(config_base_dir=config_repo.resolve()) if config_repo else None
 
+    root = output_root()
+
     # Create orchestrator (SecretManager is created per-operation now)
     orchestrator = Orchestrator(
         config_manager,
         event_manager=event_manager,
         strict_config=strict_config,
+        output_dir=root,
         policy_dir=config_repo / "policies" if config_repo else None,
     )
 
@@ -96,7 +100,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             ProxmoxProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -108,7 +112,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             OCIProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -120,7 +124,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             OPNsenseProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -132,7 +136,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             KubernetesProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -144,7 +148,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             EsxiProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -156,7 +160,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             TailscaleProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -168,7 +172,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             AWSProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -180,7 +184,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             HostProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -192,7 +196,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             MikroTikProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -204,7 +208,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             OpenWrtProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -216,7 +220,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             QnapProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -228,7 +232,7 @@ def _get_orchestrator(
         orchestrator.register_provider(
             AcmeProvider(
                 config_dir=config_manager.base_dir,
-                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+                output_dir=root,
             )
         )
     except ImportError:
@@ -302,7 +306,7 @@ def _show_welcome(ctx: click.Context) -> None:
     console.print()
     console.print("[bold]Environment Variables:[/bold]")
     console.print("  INFRAFOUNDRY_CONFIG_REPO    Path to configuration repository")
-    console.print("  INFRAFOUNDRY_OUTPUT_DIR     Output directory (default: generated)")
+    console.print("  INFRAFOUNDRY_OUTPUT_DIR     Generated files root (default: ./generated)")
     console.print("  INFRAFOUNDRY_STRICT_MODE    Fail on missing secrets/snippets")
     console.print()
     console.print("Run [cyan]foundry --help[/cyan] for all commands")

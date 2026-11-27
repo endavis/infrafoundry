@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
@@ -10,6 +9,7 @@ from rich.table import Table
 
 from infrafoundry.cli.decorators import with_orchestrator
 from infrafoundry.cli.utils import console
+from infrafoundry.core.paths import output_root
 from infrafoundry.core.security import ScanResult, ScanSeverity, SecurityScanner
 
 if TYPE_CHECKING:
@@ -95,10 +95,10 @@ def security(
         console.status(f"Using Checkov {version}")
 
     # Determine scan directory (generated configs)
-    generated_dir = Path("generated") / env
+    generated_dir = output_root() / env
     if not generated_dir.exists():
         console.error(f"Generated directory not found: {generated_dir}")
-        console.info("Run 'infra plan --env {env}' first to generate configurations.")
+        console.info(f"Run 'infra plan --env {env}' first to generate configurations.")
         sys.exit(1)
 
     console.status(f"Scanning {generated_dir}...")
