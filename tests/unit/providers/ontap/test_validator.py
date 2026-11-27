@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -47,7 +49,9 @@ def test_missing_spec_is_a_finding_that_names_the_path(tmp_path: Path) -> None:
     OntapValidator(env, report).validate_offline([lif()])
     [check] = [c for c in report.results if c.check_name == "ontap_spec"]
     assert str(tmp_path / "ontap" / "all.json") in check.message
-    assert "raw.githubusercontent.com" in check.message
+    urls = re.findall(r"https://\S+", check.message)
+    assert urls, check.message
+    assert urlparse(urls[0].rstrip(".,)")).hostname == "raw.githubusercontent.com"
 
 
 def test_plaintext_secret_and_missing_env_secret_are_findings(spec_dir: Path) -> None:
