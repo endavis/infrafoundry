@@ -26,10 +26,9 @@ MAX_NAMES = 100
 
 DEFAULT_PROPAGATION_TIMEOUT = 180
 DEFAULT_PROPAGATION_INTERVAL = 5
-DEFAULT_DOH_URLS = (
-    "https://cloudflare-dns.com/dns-query",
-    "https://dns.google/resolve",
-)
+# Off by default: a public resolver queried before the record exists can cache the negative
+# answer and then fail the check long after the authoritative nameservers serve the value.
+DEFAULT_DOH_URLS: tuple[str, ...] = ()
 
 #: Comment carried by every TXT record InfraFoundry creates, followed by the certificate name.
 RECORD_COMMENT = "infrafoundry-acme"

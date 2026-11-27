@@ -59,6 +59,11 @@ class FakeSession:
         self.records: dict[str, dict[str, str]] = {}
         self.requests: list[tuple[str, str]] = []
         self.tokens: set[str] = set()
+        self.nameserver_queries: list[tuple[str, str]] = []
+
+    def nameserver_query(self, host: str, name: str) -> set[str]:
+        self.nameserver_queries.append((host, name))
+        return {r["content"] for r in self.records.values() if r["name"] == name}
 
     def request(self, method: str, url: str, **kwargs: Any) -> Reply:
         self.requests.append((method, url))
@@ -74,6 +79,14 @@ class FakeSession:
         return Reply(200, {"Answer": answers})
 
     def _cloudflare(self, method: str, url: str, kwargs: dict[str, Any]) -> Reply:
+        if method == "GET" and urlsplit(url).path.endswith(f"/zones/{ZONE}"):
+            return Reply(
+                200,
+                {
+                    "success": True,
+                    "result": {"name_servers": ["ns1.example.com", "ns2.example.com"]},
+                },
+            )
         if method == "POST":
             record_id = f"rec-{len(self.records) + 1}"
             self.records[record_id] = dict(kwargs["json"])
@@ -140,6 +153,7 @@ class Harness:
         deps = _common.CertsDeps(
             acme_client=lambda s: self.acme,
             session=lambda: self.session,
+            nameserver_query=self.session.nameserver_query,
             writer=lambda: self.writer,  # type: ignore[arg-type,return-value]
             verify=lambda target, sha: self.events.append("verify"),
             sleep=lambda s: None,
@@ -187,6 +201,27 @@ def test_the_dns_records_are_cleaned_up_and_the_token_only_goes_in_the_header() 
     assert h.session.records == {}
     assert h.session.tokens == {f"Bearer {TOKEN}"}
     assert not any(TOKEN in url for _, url in h.session.requests)
+
+
+def test_by_default_the_authoritative_nameservers_are_asked_and_no_doh_request_is_made() -> None:
+    h = Harness()
+    result = h.run("issue", "--env", "dev")
+    assert result.exit_code == 0
+    assert h.session.nameserver_queries
+    assert {host for host, _ in h.session.nameserver_queries} == {
+        "ns1.example.com",
+        "ns2.example.com",
+    }
+    assert all(urlsplit(url).hostname == "api.cloudflare.com" for _, url in h.session.requests)
+
+
+def test_a_configured_doh_resolver_is_asked_only_after_the_record_exists() -> None:
+    h = Harness(settings={**SETTINGS, "doh": ["https://doh.example.com/dns-query"]})
+    result = h.run("issue", "--env", "dev")
+    assert result.exit_code == 0
+    methods = [(m, urlsplit(u).hostname) for m, u in h.session.requests]
+    first_doh = methods.index(("GET", "doh.example.com"))
+    assert ("POST", "api.cloudflare.com") in methods[:first_doh]
 
 
 def test_no_secret_reaches_the_output_even_when_the_install_fails() -> None:

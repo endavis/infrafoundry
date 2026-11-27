@@ -36,6 +36,7 @@ class CertificateIssuer:
         resolvers: Sequence[Resolver],
         settings: AcmeSettings,
         *,
+        extra_resolvers: Sequence[Resolver] = (),
         sleep: Callable[[float], None] = time.sleep,
         monotonic: Callable[[], float] = time.monotonic,
         now: Callable[[], datetime] | None = None,
@@ -47,6 +48,8 @@ class CertificateIssuer:
             dns: DNS host holding the zone.
             resolvers: Resolvers that must see the TXT records before the CA is asked.
             settings: The ACME settings.
+            extra_resolvers: Resolvers polled only after every primary resolver sees every
+                value, each stage with the full propagation timeout.
             sleep: Sleep function for the propagation poll.
             monotonic: Clock for the propagation poll.
             now: Wall clock; replaced in tests.
@@ -54,6 +57,7 @@ class CertificateIssuer:
         self._acme = acme
         self._dns = dns
         self._resolvers = resolvers
+        self._extra_resolvers = extra_resolvers
         self._settings = settings
         self._sleep = sleep
         self._monotonic = monotonic
@@ -99,15 +103,18 @@ class CertificateIssuer:
                 created.append(record_id)
                 values.setdefault(challenge.record_name, set()).add(challenge.record_value)
             for name, expected in values.items():
-                wait_for_txt(
-                    name,
-                    expected,
-                    self._resolvers,
-                    timeout=self._settings.propagation_timeout,
-                    interval=self._settings.propagation_interval,
-                    sleep=self._sleep,
-                    monotonic=self._monotonic,
-                )
+                for stage in (self._resolvers, self._extra_resolvers):
+                    if not stage:
+                        continue
+                    wait_for_txt(
+                        name,
+                        expected,
+                        stage,
+                        timeout=self._settings.propagation_timeout,
+                        interval=self._settings.propagation_interval,
+                        sleep=self._sleep,
+                        monotonic=self._monotonic,
+                    )
             for challenge in order.challenges:
                 self._acme.answer(order, challenge)
             fullchain = self._acme.finalize(order, FINALIZE_TIMEOUT)

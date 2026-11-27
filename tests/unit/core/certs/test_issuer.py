@@ -167,3 +167,84 @@ def test_ensure_account_returns_a_new_record_when_the_uri_changes() -> None:
     issuer, acme, _ = build()
     record = issuer.ensure_account(AccountRecord("KEY", None))
     assert record.uri == acme.account_uri
+
+
+def test_the_extra_stage_is_polled_only_after_the_authoritative_stage_passes() -> None:
+    acme, dns, clock = FakeAcme(), FakeCloudflare(), Clock()
+    polls = {"primary": 0, "extra_first": -1}
+    primary = dns.resolver()
+
+    def authoritative(name: str) -> set[str]:
+        polls["primary"] += 1
+        return primary(name) if polls["primary"] >= 3 else set()
+
+    poisoned = {"flag": False}
+
+    def doh(name: str) -> set[str]:
+        if polls["extra_first"] < 0:
+            polls["extra_first"] = polls["primary"]
+            poisoned["flag"] = polls["primary"] < 3
+        return set() if poisoned["flag"] else primary(name)
+
+    issuer = CertificateIssuer(
+        acme,
+        dns,
+        [authoritative],
+        settings(propagation_timeout=20, propagation_interval=2),
+        extra_resolvers=[doh],
+        sleep=clock.sleep,
+        monotonic=clock.monotonic,
+    )
+    issued = issuer.issue(spec(("example.com",)))
+    assert issued.info.names
+    assert polls["extra_first"] >= 3
+
+
+def test_putting_both_resolvers_in_one_stage_loses_the_race() -> None:
+    # The regression's revert check: with no staging, the early DoH query poisons the answer.
+    acme, dns, clock = FakeAcme(), FakeCloudflare(), Clock()
+    primary = dns.resolver()
+    state = {"n": 0, "poisoned": False, "asked": False}
+
+    def authoritative(name: str) -> set[str]:
+        state["n"] += 1
+        return primary(name) if state["n"] >= 3 else set()
+
+    def doh(name: str) -> set[str]:
+        if not state["asked"]:
+            state["asked"] = True
+            state["poisoned"] = state["n"] < 3
+        return set() if state["poisoned"] else primary(name)
+
+    issuer = CertificateIssuer(
+        acme,
+        dns,
+        [authoritative, doh],
+        settings(propagation_timeout=20, propagation_interval=2),
+        sleep=clock.sleep,
+        monotonic=clock.monotonic,
+    )
+    with pytest.raises(DnsError):
+        issuer.issue(spec(("example.com",)))
+
+
+def test_without_extras_only_the_primary_is_polled() -> None:
+    issuer, _, _ = build()
+    assert issuer.issue(spec()).info.names
+
+
+def test_an_extra_stage_that_never_sees_the_record_fails_and_cleans_up() -> None:
+    acme, dns, clock = FakeAcme(), FakeCloudflare(), Clock()
+    issuer = CertificateIssuer(
+        acme,
+        dns,
+        [dns.resolver()],
+        settings(propagation_timeout=10, propagation_interval=2),
+        extra_resolvers=[dns.resolver(visible=False)],
+        sleep=clock.sleep,
+        monotonic=clock.monotonic,
+    )
+    with pytest.raises(DnsError):
+        issuer.issue(spec())
+    assert dns.records == {}
+    assert acme.answered == []
