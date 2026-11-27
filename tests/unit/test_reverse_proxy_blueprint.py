@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from infrafoundry.core.certs.install import parse_target, resolve_target
 from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
@@ -79,9 +80,21 @@ def test_example_merges_defaults_and_overrides(loader: PackageLoader) -> None:
     assert variables["ip_address"] == "192.0.2.70"
     assert variables["cores"] == 2
     assert variables["memory"] == 1024
-    assert variables["disk_size"] == 16
+    assert variables["disk_size"] == 32
     assert variables["template_vmid"] == 900
     assert variables["cert_dir"] == "/etc/ssl/infrafoundry"
+
+
+def _blueprint_default(name: str, var: str) -> int:
+    data = yaml.safe_load((REPO_ROOT / "blueprints" / name / "blueprint.yaml").read_text())
+    return int(next(v["default"] for v in data["inputs"] if v["name"] == var))
+
+
+def test_default_disk_size_covers_ubuntu_template_disk() -> None:
+    """Proxmox cannot shrink a cloned disk, so the default must not undercut the template."""
+    assert _blueprint_default("reverse-proxy", "disk_size") >= _blueprint_default(
+        "ubuntu-template", "disk_size"
+    )
 
 
 def test_example_renders_vm_dhcp_dns_and_certificate(loader: PackageLoader) -> None:

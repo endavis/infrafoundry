@@ -42,7 +42,7 @@ variables:
 | `certificate_key_type` | `ec-p256` | `ec-p256` or `rsa-2048` |
 | `cert_dir` | `/etc/ssl/infrafoundry` | Where `proxy.fullchain.pem` and `proxy.key` go on the VM |
 | `template_vmid`, `template_node` | `900`, `node1` | Ubuntu template to clone |
-| `cores`, `memory`, `disk_size` | `2`, `1024`, `16` | VM size; `cores` must be at least 2 |
+| `cores`, `memory`, `disk_size` | `2`, `1024`, `32` | VM size; `cores` must be at least 2; `disk_size` must be at least the template's disk (Proxmox cannot shrink a disk) |
 | `bridge`, `vlan_tag`, `mac_address` | `vmbr0`, `10`, empty | Network |
 | `jumphost`, `ssh_user` | empty, `ansible` | SSH access |
 | `extra_tags`, `cloud_init_snippets_storage`, `balloon` | | Optional VM settings |

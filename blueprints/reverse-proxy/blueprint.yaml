@@ -59,7 +59,8 @@ inputs:
     description: "Minimum memory in MiB the host may shrink the VM to; 0 keeps the provider default"
     default: 0
   - name: disk_size
-    default: 16
+    description: "Disk size in GiB; must be at least the size of the cloned template's disk, because Proxmox cannot shrink a disk (the recommended Ubuntu template is 32 GiB)"
+    default: 32
 
   # --- Network ---
   - name: bridge
