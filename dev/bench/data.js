@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795784222653,
+  "lastUpdate": 1795785483527,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7186,6 +7186,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000008158556113697546",
             "extra": "mean: 76.56670282411147 usec\nrounds: 14022"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "415176393ae46ca2ed5d9f5d9bac16a81b7a3f5b",
+          "message": "fix: check acme propagation at the zone's authoritative nameservers (merges PR #1693, addresses #1692)\n\nThe DNS-01 propagation check polled public DNS-over-HTTPS resolvers right\nafter creating the TXT record. A query that reached a resolver before the\nrecord was served cached the negative answer for the zone's SOA negative\nTTL, so every later poll within the timeout failed.\n\n- Query every authoritative nameserver of the zone directly (recursion off,\n  UDP with a TCP retry on truncation) with a small stdlib DNS client\n  (core/certs/dns_wire.py); all nameservers must serve every value.\n- Look the nameservers up with CloudflareDns.name_servers() (GET /zones/<id>).\n- Make DoH an opt-in later stage, off by default, polled only after the\n  authoritative stage passes.\n- Document the change, the zone-read token requirement and outbound DNS;\n  amend ADR-0040.\n\nAddresses #1692\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T13:16:35Z",
+          "tree_id": "504d508b791ad5757da4c6b162f1eae9af638a4c",
+          "url": "https://github.com/endavis/infrafoundry/commit/415176393ae46ca2ed5d9f5d9bac16a81b7a3f5b"
+        },
+        "date": 1795785482525,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 58.29306454805033,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005916041248105749",
+            "extra": "mean: 17.1546994098365 msec\nrounds: 61"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 11209.383873032588,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000012623755592440854",
+            "extra": "mean: 89.21096924923671 usec\nrounds: 12455"
           }
         ]
       }
