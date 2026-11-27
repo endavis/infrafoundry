@@ -290,3 +290,45 @@ def host_resource(name: str = "proxy-01", **config: Any) -> ResourceConfig:
 def have_tool(name: str) -> bool:
     """Whether an executable is on PATH."""
     return shutil.which(name) is not None
+
+
+PUBLIC = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+
+
+def vm_resource(
+    name: str = "app-01",
+    *,
+    provider: str = "proxmox",
+    rtype: str = "vm",
+    jumphost: str | None = "jump.example.com",
+    ssh_user: str | None = "deploy",
+    public: str | None = PUBLIC,
+    address: str = "192.0.2.20",
+    pinned_block: bool = True,
+) -> ResourceConfig:
+    """A VM or instance resource with a pinned SSH host key in its package secrets."""
+    variables: dict[str, Any] = {}
+    if jumphost is not None:
+        variables["jumphost"] = jumphost
+    if ssh_user is not None:
+        variables["ssh_user"] = ssh_user
+    secrets: dict[str, Any] = (
+        {"ssh_host_keys": {name: {"ed25519_public": public}}} if public else {}
+    )
+    return ResourceConfig(
+        name=name,
+        type=rtype,
+        provider=provider,
+        config={"ssh_host_key": {"address": address}} if pinned_block else {},
+        package_name="apps",
+        package_path="apps",
+        package_variables=variables,
+        package_secrets=secrets,
+    )
+
+
+def vm_target(resource: ResourceConfig) -> dict[str, Any]:
+    """A ``config.target`` mapping that names *resource*."""
+    target = dict(certificate_resource().config["target"])
+    target.update(provider=resource.provider, resource=resource.name)
+    return target

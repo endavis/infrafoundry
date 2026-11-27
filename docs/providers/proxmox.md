@@ -465,6 +465,29 @@ foundry provider proxmox export --env prod --output ./exported --resource-type v
       place under `envs/{env}/proxmox/` and drive through `infra plan`
       / `infra apply`. Use it for migration.
 
+## Install Target for Certificates
+
+A VM can receive a Let's Encrypt certificate issued by the [ACME provider](acme.md): a `certificate` resource names it as its `target` with `provider: proxmox` and `resource: <vm name>`.
+
+```yaml
+target:
+  provider: proxmox
+  resource: app-01
+  fullchain_path: /etc/ssl/infrafoundry/app.fullchain.pem
+  key_path: /etc/ssl/infrafoundry/app.key
+  reload: [systemctl, reload, caddy]
+  verify: {port: 443, server_name: app.example.com}
+```
+
+The VM needs:
+
+- an `ssh_host_key` block with its `address` and a public key pinned by `foundry secrets host-keys --env <env>` (see [Blueprint VM host keys](../decisions/0032-blueprint-vms-get-pre-generated-ssh-host-keys-that-scripts-pin.md));
+- the package variables `ssh_user` (or a `user@` in `jumphost`) and, when the VM is not reachable from the workstation, `jumphost`.
+
+The install reaches the VM through the jumphost with two nested, strict SSH connections. The first checks the jumphost against your `~/.ssh/known_hosts` (see [SSH Host Key Checking](../guides/ssh-host-key-checking.md)). The second runs from the jumphost, using the jumphost's agent keys, and checks the VM against the key pinned in the package's `secrets.yaml` (through `HostKeyAlias`, with a temporary mode 0600 file that is removed afterwards). Nothing falls back to an unchecked connection: a VM without a pinned key fails before any order is placed, with the `foundry secrets host-keys` hint. The certificate and key travel on standard input, never on a command line; the files, backup, reload and rollback behave as for a [host](host.md#install-target-for-certificates).
+
+Verification fetches the served certificate through the jumphost with `openssl s_client`, so `openssl` must be installed on the jumphost.
+
 ## Related
 
 - ADR: [0005-provider-cli-extensibility](../decisions/0005-provider-cli-extensibility.md)

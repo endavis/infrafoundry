@@ -5,6 +5,8 @@ import shlex
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, ClassVar, cast, override
 
+from infrafoundry.core.certs.install import CertificateTarget
+from infrafoundry.core.certs.ssh_installer import SshCertificateInstaller
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import SchemaValidationError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
@@ -93,7 +95,25 @@ class ProxmoxProvider(
         # generate_terraform and read by the VM template.
         self._clone_template_deps: dict[str, str] = {}
         # Use TemplateRendererMixin to set up Jinja2 environment
+        self._certificate_installer = SshCertificateInstaller()
         self._setup_template_environment()
+
+    def install_certificate(
+        self, target: CertificateTarget, cert_pem: str, chain_pem: str, key_pem: str
+    ) -> None:
+        """Install an ACME certificate and key on a VM over SSH, then reload (#1682).
+
+        Args:
+            target: The resolved install target, with the VM's pinned SSH endpoint.
+            cert_pem: The leaf certificate.
+            chain_pem: The intermediate chain (may be empty).
+            key_pem: The private key. Never logged.
+
+        Raises:
+            CertificateInstallError: If the install fails or the reload fails (the previous
+                files are restored). The message holds no key material.
+        """
+        self._certificate_installer.install(target, cert_pem, chain_pem, key_pem)
 
     @override
     def validate_config(self, config: dict[str, Any]) -> bool:

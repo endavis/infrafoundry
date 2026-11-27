@@ -10,10 +10,13 @@ and never asks.
 from __future__ import annotations
 
 import contextlib
+import os
 import re
 import shlex
 import subprocess  # nosec B404  # runs ssh with list args
-from collections.abc import Callable
+import tempfile
+from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import Any
 
 from infrafoundry.core.certs.install import CertificateTarget, TargetEndpoint
@@ -61,30 +64,43 @@ class SshCertificateInstaller:
         if endpoint is None:
             raise CertificateInstallError(f"target '{target.resource}' has no SSH endpoint")
         files = _files(target, cert_pem, chain_pem, key_pem)
-        try:
-            for path, content, _mode in files:
+        with _known_hosts_file(endpoint) as known_hosts:
+            try:
+                for path, content, _mode in files:
+                    self._ssh(
+                        endpoint,
+                        target,
+                        f"umask 077; cat > {shlex.quote(path + NEW_SUFFIX)}",
+                        content,
+                        f"writing {path}",
+                        key_pem,
+                        known_hosts,
+                    )
                 self._ssh(
                     endpoint,
                     target,
-                    f"umask 077; cat > {shlex.quote(path + NEW_SUFFIX)}",
-                    content,
-                    f"writing {path}",
+                    _finalize_script(target, files),
+                    None,
+                    "installing",
                     key_pem,
+                    known_hosts,
                 )
-            self._ssh(
-                endpoint, target, _finalize_script(target, files), None, "installing", key_pem
-            )
-        except CertificateInstallError:
-            self._remove_new(endpoint, target, [p for p, _, _ in files], key_pem)
-            raise
+            except CertificateInstallError:
+                self._remove_new(endpoint, target, [p for p, _, _ in files], key_pem, known_hosts)
+                raise
 
     def _remove_new(
-        self, endpoint: TargetEndpoint, target: CertificateTarget, paths: list[str], key_pem: str
+        self,
+        endpoint: TargetEndpoint,
+        target: CertificateTarget,
+        paths: list[str],
+        key_pem: str,
+        known_hosts: Path | None,
     ) -> None:
         script = "rm -f " + " ".join(shlex.quote(p + NEW_SUFFIX) for p in paths)
         # The original error is the one to report.
         with contextlib.suppress(CertificateInstallError):
-            self._ssh(endpoint, target, script, None, "cleaning up", key_pem)
+            self._ssh(endpoint, target, script, None, "cleaning up", key_pem, known_hosts)
 
     def _ssh(
         self,
@@ -94,22 +110,10 @@ class SshCertificateInstaller:
         stdin: str | None,
         what: str,
         key_pem: str,
+        known_hosts: Path | None,
     ) -> None:
         remote = f"{'sudo -n ' if target.sudo else ''}sh -c {shlex.quote(script)}"
-        argv = [
-            "ssh",
-            "-o",
-            "BatchMode=yes",
-            *STRICT_HOST_KEY_ARGS,
-            "-o",
-            "ConnectTimeout=10",
-            "-p",
-            str(endpoint.port),
-        ]
-        if endpoint.key_file:
-            argv += ["-i", endpoint.key_file, "-o", "IdentitiesOnly=yes"]
-        destination = f"{endpoint.user}@{endpoint.address}" if endpoint.user else endpoint.address
-        argv += [destination, remote]
+        argv = _argv(endpoint, remote, known_hosts)
         try:
             result = self._run(
                 argv,
@@ -134,13 +138,71 @@ class SshCertificateInstaller:
             raise CertificateInstallError(
                 f"the reload on '{target.resource}' failed; the previous certificate was restored"
             )
-        hint = host_key_hint(stderr, endpoint.address)
+        alias = endpoint.host_key_alias
+        if alias and alias in stderr and host_key_hint(stderr, alias):
+            hint: str | None = _pinned_key_hint(alias)
+        else:
+            hint = host_key_hint(stderr, endpoint.jumphost or endpoint.address)
         lines = _scrub(stderr, key_pem).strip().splitlines()
         detail = hint or (lines[-1] if lines else "")
         raise CertificateInstallError(
             f"{what} on '{target.resource}' failed (exit {result.returncode})"
             + (f": {detail}" if detail else "")
         )
+
+
+@contextlib.contextmanager
+def _known_hosts_file(endpoint: TargetEndpoint) -> Iterator[Path | None]:
+    """Yield a 0600 file of the pinned lines for a direct target, else ``None``; removed after."""
+    if not endpoint.known_hosts or endpoint.jumphost:
+        yield None
+        return
+    with tempfile.TemporaryDirectory(prefix="infrafoundry-kh-") as directory:
+        path = Path(directory) / "known_hosts"
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(endpoint.known_hosts) + "\n")
+        yield path
+
+
+def _argv(endpoint: TargetEndpoint, remote: str, known_hosts: Path | None) -> list[str]:
+    """Build the ssh argv; unchanged from the plain host form without a pin or jumphost."""
+    base = ["ssh", "-o", "BatchMode=yes", *STRICT_HOST_KEY_ARGS, "-o", "ConnectTimeout=10"]
+    if endpoint.jumphost:
+        return [*base, endpoint.jumphost, _jump_remote(endpoint, remote)]
+    argv = [*base, "-p", str(endpoint.port)]
+    if known_hosts is not None:
+        argv += ["-o", f"UserKnownHostsFile={known_hosts}", "-o", "GlobalKnownHostsFile=/dev/null"]
+    if endpoint.host_key_alias:
+        argv += ["-o", f"HostKeyAlias={endpoint.host_key_alias}"]
+    if endpoint.key_file:
+        argv += ["-i", endpoint.key_file, "-o", "IdentitiesOnly=yes"]
+    destination = f"{endpoint.user}@{endpoint.address}" if endpoint.user else endpoint.address
+    return [*argv, destination, remote]
+
+
+def _jump_remote(endpoint: TargetEndpoint, remote: str) -> str:
+    """The script run on the jump host: stage the pinned keys, then ssh strictly to the VM."""
+    q = shlex.quote
+    lines = " ".join(q(line) for line in endpoint.known_hosts)
+    destination = f"{endpoint.user}@{endpoint.address}" if endpoint.user else endpoint.address
+    alias = q(endpoint.host_key_alias or endpoint.address)
+    return (
+        "kh=$(mktemp) && trap 'rm -f \"$kh\"' EXIT && "
+        f"printf '%s\\n' {lines} >\"$kh\" && "
+        "ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "
+        '-o UserKnownHostsFile="$kh" -o GlobalKnownHostsFile=/dev/null '
+        f"-o HostKeyAlias={alias} -o ConnectTimeout=10 -p {endpoint.port} "
+        f"{q(destination)} {q(remote)}"
+    )
+
+
+def _pinned_key_hint(name: str) -> str:
+    return (
+        f"The host key presented by '{name}' does not match the key pinned in its package's "
+        f"secrets.yaml, so the connection was refused. Run 'foundry secrets host-keys "
+        f"--env <env>' (add '--regenerate {name}' after a rebuild)."
+    )
 
 
 def _scrub(text: str, key_pem: str) -> str:
