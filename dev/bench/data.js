@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795800515348,
+  "lastUpdate": 1795806933751,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7490,6 +7490,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000016014256608748183",
             "extra": "mean: 65.21388524888184 usec\nrounds: 16819"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7ce9b488f5d0e67de7a5f4346e87cd764271a9a5",
+          "message": "feat: install let's encrypt certificates on proxmox nodes (merges PR #1708, addresses #1705)\n\n* feat: install let's encrypt certificates on proxmox nodes\n\nAdd `kind: node` to the proxmox certificate target. The certificate is\ninstalled through the node API (POST /nodes/{node}/certificates/custom)\ninstead of SSH and verified with a TLS handshake on port 8006. Existing\nvm targets are unchanged. Documents the Sys.Modify permission and the\nmulti-node case.\n\nAddresses #1705\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* docs: use generic node names in proxmox node certificate examples and tests\n\nAddresses #1705\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* docs: use generic node names in proxmox node certificate tests\n\nAddresses #1705\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T19:14:16Z",
+          "tree_id": "d87255b51cbb292d09b606d65d6c98a790031d96",
+          "url": "https://github.com/endavis/infrafoundry/commit/7ce9b488f5d0e67de7a5f4346e87cd764271a9a5"
+        },
+        "date": 1795806932683,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 96.50261065053026,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0005576260417158251",
+            "extra": "mean: 10.362413962264194 msec\nrounds: 106"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 15640.004288583455,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005127976346332986",
+            "extra": "mean: 63.93860139347647 usec\nrounds: 17654"
           }
         ]
       }
