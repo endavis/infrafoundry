@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795787819151,
+  "lastUpdate": 1795793920934,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7262,6 +7262,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010888752431929918",
             "extra": "mean: 130.14828899922384 usec\nrounds: 8263"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cd3e94922c86f77b280abeaeed279cd853770be3",
+          "message": "feat: add a caddy reverse-proxy blueprint for device web uis (merges PR #1696, addresses #1689)\n\n- New `reverse-proxy` blueprint: one Proxmox VM (2 vCPU / 1 GB default,\n  fewer than 2 vCPUs rejected) running Caddy with automatic HTTPS off.\n- Routes are a blueprint input. One list renders the Caddyfile (validated\n  per route: label, backend URL, self-signed backends, Host handling,\n  source-network limits) and one Unbound host override per route, so the\n  two cannot drift; the override description carries the route summary so\n  `infra plan` shows route changes.\n- An after_apply handler renders the Caddyfile, connects over the pinned,\n  jumphost-aware SSH channel, runs `caddy validate`, and installs and\n  reloads only when the file changed.\n- An optional ACME certificate (#1682) in the same package targets the VM,\n  owned by caddy, and reloads Caddy on renewal.\n- Example package, guide (docs/guides/reverse-proxy.md), ADR-0041; split DNS\n  for tailnet clients is documented and tracked in #1695.\n\nAddresses #1689\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T15:37:38Z",
+          "tree_id": "4f1e6e90b1644e386c0e3bf4f3433c8c496904fe",
+          "url": "https://github.com/endavis/infrafoundry/commit/cd3e94922c86f77b280abeaeed279cd853770be3"
+        },
+        "date": 1795793920192,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 68.20944358781145,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0007759548114876308",
+            "extra": "mean: 14.660726541664578 msec\nrounds: 72"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 12776.728438062886,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009376192837906955",
+            "extra": "mean: 78.267297050857 usec\nrounds: 13937"
           }
         ]
       }
