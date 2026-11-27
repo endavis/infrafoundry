@@ -182,8 +182,8 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
   initialization {
     datastore_id = "{{ vm.config.cloud_init_datastore | default((vm.config.disk.storage if vm.config.disk is defined else 'local-lvm')) }}"
 
-    {% if vm.config.cloud_init_user_data is not defined and vm.config.ipconfig is defined %}
-    # Network configuration via ip_config (only when NOT using custom user-data)
+    {% if vm.config.ipconfig is defined %}
+    # Network configuration via ip_config (rendered once, with or without custom user-data)
     ip_config {
       {% if 'dhcp' in vm.config.ipconfig %}
       ipv4 {
@@ -219,17 +219,6 @@ resource "proxmox_virtual_environment_vm" "{{ vm.config.name | replace('-', '_')
     {% if vm.config.cloud_init_user_data is defined or vm.config.tailscale_module_config is defined %}
     # Cloud-init user-data (from snippet merge or Tailscale module)
     user_data_file_id = proxmox_virtual_environment_file.cloud_init_user_data_{{ vm.name | replace('-', '_') }}.id
-    {% endif %}
-
-    {% if vm.config.ipconfig is defined and (vm.config.cloud_init_user_data is defined or vm.config.tailscale_module_config is defined) %}
-    # IP configuration alongside custom user-data
-    ip_config {
-      {% if 'dhcp' in vm.config.ipconfig %}
-      ipv4 {
-        address = "dhcp"
-      }
-      {% endif %}
-    }
     {% endif %}
 
     {% if vm.config.cloud_init_dns is defined %}

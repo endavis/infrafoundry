@@ -304,3 +304,67 @@ class TestTemplateRendering:
         content = provider.render_template("proxmox/vms.tf.j2", {"vms": [processed]})
         assert "ip_config {" in content
         assert 'address = "dhcp"' in content
+
+
+class TestIpConfigRenderedOnce:
+    """The VM's initialization block holds exactly one ip_config (#1703)."""
+
+    @staticmethod
+    def _render(provider: ProxmoxProvider, **config: Any) -> str:
+        vm = _make_vm(**config)
+        processed = provider._process_cloud_init_snippets(vm)
+        processed = provider._normalize_vm_config(processed)
+        return provider.render_template("proxmox/vms.tf.j2", {"vms": [processed]})
+
+    @staticmethod
+    def _assert_static(content: str) -> None:
+        assert content.count("ip_config {") == 1
+        assert 'address = "192.0.2.10/24"' in content
+        assert 'gateway = "192.0.2.1"' in content
+
+    def test_static_ipconfig(self, provider: ProxmoxProvider) -> None:
+        """Plain static ipconfig renders one block with address and gateway."""
+        content = self._render(provider, ipconfig="ip=192.0.2.10/24,gw=192.0.2.1")
+        self._assert_static(content)
+
+    def test_static_ipconfig_with_user_data(
+        self, provider: ProxmoxProvider, snippet_dir: Path
+    ) -> None:
+        """Static ipconfig is kept alongside cloud_init_user_data."""
+        _write_snippet(snippet_dir, "users/admin", "users:\n  - name: admin\n")
+        content = self._render(
+            provider,
+            cloud_init_snippets=["users/admin"],
+            ipconfig="ip=192.0.2.10/24,gw=192.0.2.1",
+        )
+        assert "user_data_file_id" in content
+        self._assert_static(content)
+
+    def test_static_ipconfig_with_tailscale(self, provider: ProxmoxProvider) -> None:
+        """Static ipconfig is kept alongside the tailscale module user-data."""
+        content = self._render(
+            provider,
+            tailscale={"auth": {"auth_key_secret": "tailscale.auth_key"}},
+            ipconfig="ip=192.0.2.10/24,gw=192.0.2.1",
+        )
+        assert "user_data_file_id" in content
+        self._assert_static(content)
+
+    def test_dhcp_ipconfig_with_tailscale(self, provider: ProxmoxProvider) -> None:
+        """DHCP plus tailscale (no user_data) renders a single dhcp ip_config."""
+        content = self._render(
+            provider,
+            tailscale={"auth": {"auth_key_secret": "tailscale.auth_key"}},
+            ipconfig="ip=dhcp",
+        )
+        assert content.count("ip_config {") == 1
+        assert content.count('address = "dhcp"') == 1
+
+    def test_dhcp_ipconfig_with_user_data(
+        self, provider: ProxmoxProvider, snippet_dir: Path
+    ) -> None:
+        """DHCP plus user_data stays one dhcp ip_config."""
+        _write_snippet(snippet_dir, "users/admin", "users:\n  - name: admin\n")
+        content = self._render(provider, cloud_init_snippets=["users/admin"], ipconfig="ip=dhcp")
+        assert content.count("ip_config {") == 1
+        assert content.count('address = "dhcp"') == 1
