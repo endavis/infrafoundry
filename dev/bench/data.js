@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795806933751,
+  "lastUpdate": 1795808686554,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7528,6 +7528,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000005127976346332986",
             "extra": "mean: 63.93860139347647 usec\nrounds: 17654"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f7a7d0b41a477142156a5a78c5474dd161273bf8",
+          "message": "feat: bootstrap https on routeros devices with a self-signed certificate (merges PR #1711, addresses #1710)\n\nAdd a mikrotik `certificate` resource type that creates and signs a\nself-signed certificate, so ip.service can enable www-ssl and api-ssl\nbefore the first ACME certificate install. Signing is its own step, a\nsigned certificate is never patched, and three guards keep a switch\nfrom locking InfraFoundry out. The routeros-chr blueprint gains an\nopt-in https_bootstrap input, and the docs give the www -> https ->\nLet's Encrypt order.\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T19:43:23Z",
+          "tree_id": "b070d858ae4d8ac438c78f7ab3c360a1700fbe04",
+          "url": "https://github.com/endavis/infrafoundry/commit/f7a7d0b41a477142156a5a78c5474dd161273bf8"
+        },
+        "date": 1795808685492,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 47.54147549521407,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00014816703061294758",
+            "extra": "mean: 21.034265124999507 msec\nrounds: 48"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7934.5021196291655,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000009091477702200911",
+            "extra": "mean: 126.03185239891738 usec\nrounds: 8462"
           }
         ]
       }
