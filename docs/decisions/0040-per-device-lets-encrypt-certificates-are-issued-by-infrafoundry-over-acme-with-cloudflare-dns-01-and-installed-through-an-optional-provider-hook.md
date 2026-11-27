@@ -46,6 +46,7 @@ InfraFoundry already stores per-package secrets in SOPS files ([ADR-0032](0032-b
 
 ## Related Issues
 
+- [#1689](https://github.com/endavis/infrafoundry/issues/1689) reverse-proxy blueprint to serve device web uis under the user's domain, the first Proxmox VM install target
 - [#1692](https://github.com/endavis/infrafoundry/issues/1692) acme propagation check can be defeated by cached negative dns answers
 - [#1682](https://github.com/endavis/infrafoundry/issues/1682) issue and renew per-device Let's Encrypt certificates with Cloudflare DNS-01
 

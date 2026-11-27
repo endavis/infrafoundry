@@ -313,6 +313,7 @@ inputs:
 - [InfraFoundry CLI Reference](../usage/cli-reference.md)
 - [Configuration Guide](overview.md)
 - [YAML-Only Configuration](yaml-only-config.md)
+- [Reverse Proxy for Device Web UIs](../guides/reverse-proxy.md): a blueprint that generates DNS, a Caddyfile and a certificate from one route list
 
 ## Troubleshooting
 

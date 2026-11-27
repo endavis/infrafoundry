@@ -1,0 +1,28 @@
+# Let's Encrypt certificate for the proxy, installed on the VM for Caddy (ADR-0040).
+# Emitted only when certificate_names is set: a package without the acme provider enabled
+# must not get an acme resource. The key lands in this package's secrets.yaml.
+{% if certificate_names %}
+resources:
+  - provider: acme
+    type: certificate
+    name: "{{ vm_name }}-cert"
+    config:
+      names: {{ certificate_names | tojson }}
+      key_type: "{{ certificate_key_type }}"
+      target:
+        provider: proxmox
+        resource: "{{ vm_name }}"
+        fullchain_path: "{{ cert_dir }}/proxy.fullchain.pem"
+        key_path: "{{ cert_dir }}/proxy.key"
+        owner: caddy
+        group: caddy
+        cert_mode: "0644"
+        key_mode: "0600"
+        sudo: true
+        reload: ["systemctl", "reload", "caddy"]
+        verify:
+          port: 443
+          server_name: "{{ (routes | first | default({'name': ''})).name | required('reverse-proxy: certificate_names needs at least one route') }}.{{ dns_domain }}"
+{% else %}
+resources: []
+{% endif %}
