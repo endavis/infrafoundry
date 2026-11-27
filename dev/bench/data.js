@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795812077433,
+  "lastUpdate": 1795813759580,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7680,6 +7680,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000007892541872927739",
             "extra": "mean: 126.3188773528016 usec\nrounds: 8341"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c6a206eb370c5b14f767a4713f17966a490c8900",
+          "message": "fix: honour infrafoundry_output_dir everywhere and share generated with worktrees (merges PR #1717, addresses #1716)\n\nOne helper, infrafoundry.core.paths.output_root(), now decides the generated\nroot. It reads INFRAFOUNDRY_OUTPUT_DIR (unset, empty or whitespace means\n\"generated\"), expands ~ and makes the value absolute once. Every code path\nuses it:\n\n- the provider registrations in cli/main.py\n- the orchestrator, which now gets output_dir, and its default\n- infra security\n- state backup --include-generated\n- infra move-package\n- state rename-env\n\ninfra security, state backup and the orchestrator's default used to ignore\nthe variable.\n\ndoit worktree links each name in [tool.pyproject-template.worktree].shared\nfrom the new worktree to the main checkout. With shared = [\"generated\"], a\nworktree uses the main checkout's generated/ and its Terraform state, with\nno env var or direnv, so agent shells and uv run see it too. A name is\nlinked only when .gitignore ignores it, so the absolute link can never be\ncommitted; .gitignore gains /generated. Removing a merged worktree drops\nthe link and keeps its target, while a real generated/ directory still\nkeeps the worktree. The tools/doit change is recorded as a template\ndivergence.\n\nAlso fixes the infra security message that printed a literal {env}.\n\nAddresses #1716\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T21:08:19Z",
+          "tree_id": "f592734b02f1013b62d37662868216a6195c2257",
+          "url": "https://github.com/endavis/infrafoundry/commit/c6a206eb370c5b14f767a4713f17966a490c8900"
+        },
+        "date": 1795813758795,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 57.07348861523023,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0006979412262730847",
+            "extra": "mean: 17.521269932203637 msec\nrounds: 59"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10974.362028464197,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0000057309671342345335",
+            "extra": "mean: 91.12146996848661 usec\nrounds: 12054"
           }
         ]
       }
