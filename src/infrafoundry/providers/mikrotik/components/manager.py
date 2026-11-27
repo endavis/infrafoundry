@@ -300,7 +300,11 @@ class MikroTikManager:
             read("certificate")
             read("ip.service")
             certs = check_certificate_changes(
-                plan.diffs, live, scheme=settings.scheme, verify_ssl=settings.verify_ssl
+                plan.diffs,
+                live,
+                scheme=settings.scheme,
+                verify_ssl=settings.verify_ssl,
+                validating=settings.tls_server_name is not None and settings.scheme == "https",
             )
             plan.refusals.extend(certs.refusals)
             plan.warnings.extend(certs.warnings)

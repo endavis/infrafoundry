@@ -4,7 +4,7 @@ The switch-over runs in separate applies, each one safe on its own: create and s
 a certificate while ``www`` still carries the connection, point ``www-ssl`` and
 ``api-ssl`` at it, move ``api_url`` to ``https``, and only then optionally disable
 ``www`` (``ordering.check_service_changes`` already refuses that while ``api_url``
-is ``http``). Three guards keep one apply from breaking that order:
+is ``http``). Four guards keep one apply from breaking that order:
 
 * a service may only name a certificate that exists signed after the plan, because
   RouterOS accepts the name and then fails the TLS handshake;
@@ -12,7 +12,11 @@ is ``http``). Three guards keep one apply from breaking that order:
   in an earlier apply;
 * with ``api_url`` on ``https`` and ``verify_ssl`` on, ``www-ssl`` is not pointed at
   a certificate this plan creates, because a self-signed certificate cannot validate
-  and the next connection would fail.
+  and the next connection would fail;
+* with a validating client, ``www-ssl`` and ``api-ssl`` do not move off a certificate
+  ``foundry certs issue`` installed (``infrafoundry-<slug>-<sha prefix>``): the name
+  changes on every renewal and the client checks the CA chain, so a self-signed
+  certificate would lock InfraFoundry out.
 
 Everything here is a function of its arguments; no client is involved.
 """
@@ -22,12 +26,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from ..schema import SIGN_FIELD
+from .certificate import is_installed_certificate_name
 from .diff import CREATE, DELETE, SIGN, UPDATE, TypeDiff
 from .ordering import LiveState, PathCheck
 
 _CERTIFICATE = "certificate"
 _SERVICE = "ip.service"
 _WWW_SSL = "www-ssl"
+_API_SSL = "api-ssl"
 
 
 def _signed_after_plan(diffs: Mapping[str, TypeDiff], live: LiveState) -> tuple[set[str], set[str]]:
@@ -50,6 +56,7 @@ def check_certificate_changes(
     *,
     scheme: str,
     verify_ssl: bool,
+    validating: bool = False,
 ) -> PathCheck:
     """Refuse certificate and service changes that would lock InfraFoundry out.
 
@@ -58,6 +65,7 @@ def check_certificate_changes(
         live: Live rows per type (``certificate`` and ``ip.service`` are read).
         scheme: ``http`` or ``https`` from ``api_url``.
         verify_ssl: Whether the client verifies the device certificate.
+        validating: Whether the client validates the CA chain of an installed certificate.
 
     Returns:
         Refusal reasons (empty when safe) and warnings.
@@ -68,6 +76,22 @@ def check_certificate_changes(
         if change.kind != UPDATE or "certificate" not in change.changed:
             continue
         name = str(change.key[0])
+        if validating and name in (_WWW_SSL, _API_SSL):
+            current = next(
+                (
+                    str(row.get("certificate") or "")
+                    for row in live.get(_SERVICE, [])
+                    if row.get("name") == name
+                ),
+                "",
+            )
+            if current and is_installed_certificate_name(current):
+                check.refusals.append(
+                    f"ip.service '{name}' would move off the installed certificate "
+                    f"'{current}' that `foundry certs issue` manages; remove `certificate:` "
+                    "from this service (the name changes on every renewal)"
+                )
+                continue
         cert = str(change.after.get("certificate") or "")
         if not cert:
             continue

@@ -83,3 +83,63 @@ def test_refuses_new_self_signed_certificate_on_verified_https() -> None:
 def test_accepts_the_same_with_verification_off_or_http() -> None:
     assert _check(bootstrap_https()[:2], _live(), scheme="https", verify_ssl=False) == []
     assert _check(bootstrap_https()[:2], _live(), scheme="http", verify_ssl=True) == []
+
+
+_INSTALLED = "infrafoundry-router-0123456789ab"
+
+
+def _installed_live(service: str = "www-ssl", cert: str = _INSTALLED) -> dict[str, Any]:
+    row = {".id": "*41", "name": service, "port": "443", "certificate": cert}
+    return {"certificate": [{**_CERT, "name": cert}], "ip/service": [row]}
+
+
+def _moving(service: str, **fields: Any) -> list[ResourceConfig]:
+    return [resource("ip.service", service, certificate="old", **fields)]
+
+
+def _check_validating(
+    res: list[ResourceConfig], live: dict[str, Any], *, validating: bool
+) -> list[str]:
+    desired = desired_from_resources(res)
+    diff = compute_type_diff(
+        SPECS["ip.service"], desired, live["ip/service"], add_only=False, managed_keys=None
+    )
+    full = {t: live.get(spec.path, []) for t, spec in SPECS.items()}
+    live_certs = {**full, "certificate": [dict(_CERT), *full.get("certificate", [])]}
+    return check_certificate_changes(
+        {"ip.service": diff},
+        live_certs,
+        scheme="https",
+        verify_ssl=True,
+        validating=validating,
+    ).refusals
+
+
+def test_refuses_www_ssl_moving_off_an_installed_certificate_when_validating() -> None:
+    (message,) = _check_validating(_moving("www-ssl"), _installed_live(), validating=True)
+    assert _INSTALLED in message and "www-ssl" in message and "certificate:" in message
+
+
+def test_refuses_api_ssl_moving_off_an_installed_certificate_when_validating() -> None:
+    live = _installed_live("api-ssl")
+    (message,) = _check_validating(_moving("api-ssl"), live, validating=True)
+    assert "api-ssl" in message
+
+
+def test_allows_the_move_when_not_validating() -> None:
+    assert _check_validating(_moving("www-ssl"), _installed_live(), validating=False) == []
+
+
+def test_allows_the_move_off_a_certificate_infrafoundry_did_not_install() -> None:
+    live = _installed_live(cert="old")
+    assert _check_validating(_moving("www-ssl"), live, validating=True) == []
+
+
+def test_allows_the_move_for_another_service() -> None:
+    live = _installed_live("ssh")
+    assert _check_validating(_moving("ssh"), live, validating=True) == []
+
+
+def test_allows_a_non_certificate_field_change() -> None:
+    res = [resource("ip.service", "www-ssl", certificate=_INSTALLED, port=8443)]
+    assert _check_validating(res, _installed_live(), validating=True) == []
