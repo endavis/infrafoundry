@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795619048271,
+  "lastUpdate": 1795781025757,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7110,6 +7110,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000068964656059640535",
             "extra": "mean: 92.45534157845891 usec\nrounds: 12088"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "320548690957dd05a72e7fba7db867a60a40a28a",
+          "message": "feat: issue let's encrypt certificates and install them on hosts (merges PR #1690, addresses #1682)\n\n* feat: issue let's encrypt certificates and install them on hosts\n\nAdd an ACME issuer to InfraFoundry (PR 1 of 3 for #1682, ADR-0040).\n\n- acme provider with a certificate resource, declared in a package.\n  Names are per-name by default and wildcards are allowed; key type\n  ec-p256 or rsa-2048. Schema checks run offline in plan, apply and\n  doctor.\n- core/certs: an ACME client built on the acme library, Cloudflare\n  DNS-01 (TXT records tagged and always removed, stale ones cleaned\n  up), propagation checked over DNS-over-HTTPS, and atomic SOPS storage\n  of the certificate in the package's secrets.yaml and of the account\n  key in the environment's.\n- An optional InstallsCertificate provider hook. host implements it\n  over SSH: files written next to their target, swapped into place,\n  then the reload runs; a failed reload restores the old files. An\n  optional TLS check confirms the served leaf.\n- foundry certs status and foundry certs issue. issue holds the\n  environment lock and continues past a failure, and a stored but\n  uninstalled certificate gets an install-only retry.\n- acme_certificates are kept out of template variables, like\n  ssh_host_keys.\n\nNew runtime dependencies: acme and cryptography.\n\nVerified against Let's Encrypt staging: a certificate was issued with\nDNS-01 and installed and checked on a host, and the challenge records\nwere removed. The live run found the naive-deadline bug fixed here.\n\nAddresses #1682\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: address ci findings on acme certificates\n\n- Pin the verify probe's TLS context to TLS 1.2 or newer (CodeQL).\n- Match the Cloudflare host by parsed hostname in the CLI test fake (CodeQL).\n- Drop nosec comments for B101, which bandit skips, and in a test file\n  bandit never reads (test_security_triage_skill).\n\nAddresses #1682\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T12:02:41Z",
+          "tree_id": "e72cd37286c9d2be037f7470f9747aa4dc6869fe",
+          "url": "https://github.com/endavis/infrafoundry/commit/320548690957dd05a72e7fba7db867a60a40a28a"
+        },
+        "date": 1795781025199,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 56.191376590394924,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00015493308347733678",
+            "extra": "mean: 17.796324999998934 msec\nrounds: 57"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 10812.543818772852,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000005656941803857316",
+            "extra": "mean: 92.48517432722811 usec\nrounds: 11335"
           }
         ]
       }
