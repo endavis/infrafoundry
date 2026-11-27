@@ -18,7 +18,7 @@ KEY = "-----BEGIN " + "PRIVATE KEY-----\nSENTINEL-NOT-A-REAL-KEY\n-----END " + "
 
 def client(nodes: list[str] | None = None) -> MagicMock:
     mock = MagicMock()
-    mock.get_json.return_value = {"data": [{"node": n} for n in (nodes or ["node1", "pve2"])]}
+    mock.get_json.return_value = {"data": [{"node": n} for n in (nodes or ["node1", "node2"])]}
     mock.post_json.return_value = {"data": None}
     return mock
 
@@ -39,7 +39,7 @@ def test_an_empty_chain_posts_the_leaf_alone() -> None:
 
 
 def test_an_unknown_node_fails_before_any_post() -> None:
-    api = client(["pve2"])
+    api = client(["node2"])
     with pytest.raises(CertificateInstallError, match="'node1' is not in the cluster"):
         install_node_certificate(api, "node1", "C", "", KEY)
     api.post_json.assert_not_called()
