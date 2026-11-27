@@ -359,6 +359,131 @@ class TestDns:
             "tailscale_dns_s",
         }
 
+    def test_split_valid(self) -> None:
+        report = ValidationReport()
+        DnsValidator(report).validate(
+            _ctx(
+                [
+                    res(
+                        "a",
+                        "dns_split_nameservers",
+                        domain="example.com",
+                        nameservers=["192.0.2.53", "2001:db8::53"],
+                        import_id="example.com",
+                    ),
+                    res(
+                        "b",
+                        "dns_split_nameservers",
+                        domain="example.net",
+                        nameservers=["192.0.2.1"],
+                    ),
+                ]
+            )
+        )
+        assert not _errors(report)
+
+    def test_split_invalid(self) -> None:
+        good = ["192.0.2.53"]
+        report = ValidationReport()
+        DnsValidator(report).validate(
+            _ctx(
+                [
+                    res("nodomain", "dns_split_nameservers", nameservers=good),
+                    res("empty", "dns_split_nameservers", domain="", nameservers=good),
+                    res("num", "dns_split_nameservers", domain=5, nameservers=good),
+                    res("bang", "dns_split_nameservers", domain="bad_domain!", nameservers=good),
+                    res("dot", "dns_split_nameservers", domain="example.org.", nameservers=good),
+                    res(
+                        "long",
+                        "dns_split_nameservers",
+                        domain=("a" * 60 + ".") * 5 + "com",
+                        nameservers=good,
+                    ),
+                    res("nons", "dns_split_nameservers", domain="a.example.com", nameservers=[]),
+                    res("nolist", "dns_split_nameservers", domain="b.example.com", nameservers="x"),
+                    res(
+                        "host",
+                        "dns_split_nameservers",
+                        domain="c.example.com",
+                        nameservers=["dns.example.com"],
+                    ),
+                    res(
+                        "dupaddr",
+                        "dns_split_nameservers",
+                        domain="d.example.com",
+                        nameservers=["192.0.2.1", "192.0.2.1"],
+                    ),
+                    res(
+                        "imp",
+                        "dns_split_nameservers",
+                        domain="e.example.com",
+                        nameservers=good,
+                        import_id="other.example.com",
+                    ),
+                ]
+            )
+        )
+        assert _errors(report) == {
+            f"tailscale_dns_{n}"
+            for n in (
+                "nodomain",
+                "empty",
+                "num",
+                "bang",
+                "dot",
+                "long",
+                "nons",
+                "nolist",
+                "host",
+                "dupaddr",
+                "imp",
+            )
+        }
+
+    def test_split_duplicate_domain_ignores_case(self) -> None:
+        report = ValidationReport()
+        DnsValidator(report).validate(
+            _ctx(
+                [
+                    res(
+                        "a",
+                        "dns_split_nameservers",
+                        domain="Example.com",
+                        nameservers=["192.0.2.1"],
+                    ),
+                    res(
+                        "b",
+                        "dns_split_nameservers",
+                        domain="example.COM",
+                        nameservers=["192.0.2.2"],
+                    ),
+                ]
+            )
+        )
+        assert _errors(report) == {"tailscale_dns_split_duplicate_domain_example.com"}
+
+    def test_split_is_not_a_singleton(self) -> None:
+        report = ValidationReport()
+        NamingValidator(report).validate(
+            _ctx(
+                [
+                    res(
+                        "a",
+                        "dns_split_nameservers",
+                        domain="example.com",
+                        nameservers=["192.0.2.1"],
+                    ),
+                    res(
+                        "b",
+                        "dns_split_nameservers",
+                        domain="example.net",
+                        nameservers=["192.0.2.2"],
+                    ),
+                ]
+            )
+        )
+        assert not {e for e in _errors(report) if e.startswith("tailscale_singleton_")}
+
     def test_ignores_other_types(self) -> None:
         report = ValidationReport()
         DnsValidator(report).validate(_ctx([res("k", "tailnet_key")]))

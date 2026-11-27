@@ -212,6 +212,61 @@ class TestDns:
         assert "magic_dns = true" in text
         assert 'search_paths = ["example.com"]' in text
 
+    def test_split_nameservers(self, oauth_env: TailscaleProvider) -> None:
+        text = _generate(
+            oauth_env,
+            res(
+                "internal-split",
+                "dns_split_nameservers",
+                domain="example.com",
+                nameservers=["192.0.2.53", "2001:db8::53"],
+            ),
+        )["dns.tf"]
+        assert 'resource "tailscale_dns_split_nameservers" "internal_split" {' in text
+        assert 'domain      = "example.com"' in text
+        assert 'nameservers = ["192.0.2.53", "2001:db8::53"]' in text
+
+    def test_split_alongside_the_other_dns_types(self, oauth_env: TailscaleProvider) -> None:
+        text = _generate(
+            oauth_env,
+            res("ns", "dns_nameservers", nameservers=["192.0.2.53"]),
+            res("prefs", "dns_preferences", magic_dns=True),
+            res("paths", "dns_search_paths", search_paths=["example.com"]),
+            res("sp", "dns_split_nameservers", domain="example.net", nameservers=["192.0.2.54"]),
+        )["dns.tf"]
+        for rtype in (
+            "tailscale_dns_nameservers",
+            "tailscale_dns_preferences",
+            "tailscale_dns_search_paths",
+            "tailscale_dns_split_nameservers",
+        ):
+            assert f'resource "{rtype}"' in text
+
+    def test_split_import_id_yields_import_block(self, oauth_env: TailscaleProvider) -> None:
+        text = _generate(
+            oauth_env,
+            res(
+                "internal-split",
+                "dns_split_nameservers",
+                domain="example.com",
+                nameservers=["192.0.2.53"],
+                import_id="example.com",
+            ),
+        )["dns.tf"]
+        assert (
+            "import {\n  to = tailscale_dns_split_nameservers.internal_split\n"
+            '  id = "example.com"\n}'
+        ) in text
+
+    def test_two_split_domains_render_two_blocks(self, oauth_env: TailscaleProvider) -> None:
+        text = _generate(
+            oauth_env,
+            res("a", "dns_split_nameservers", domain="example.com", nameservers=["192.0.2.53"]),
+            res("b", "dns_split_nameservers", domain="example.net", nameservers=["192.0.2.54"]),
+        )["dns.tf"]
+        assert text.count('resource "tailscale_dns_split_nameservers"') == 2
+        assert 'domain      = "example.net"' in text
+
     def test_no_dns_file_without_dns_resources(self, oauth_env: TailscaleProvider) -> None:
         assert "dns.tf" not in _generate(oauth_env, res("main", "acl", policy=POLICY))
 

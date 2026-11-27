@@ -66,7 +66,7 @@ After that, every apply renders the Caddyfile again, validates it with `caddy va
 
 ## DNS
 
-Each route adds an Unbound host override in the environment's OPNsense, resolving `<name>.<dns_domain>` to the proxy. No public record is created. Clients on a tailnet need a split-DNS route for the domain to the internal resolver. That route is set outside InfraFoundry; managing it is tracked in [#1695](https://github.com/endavis/infrafoundry/issues/1695).
+Each route adds an Unbound host override in the environment's OPNsense, resolving `<name>.<dns_domain>` to the proxy. No public record is created. Clients on a tailnet need a split-DNS route for the domain to the internal resolver. Manage that route with a [`dns_split_nameservers`](../providers/tailscale.md#dns_split_nameservers) resource.
 
 ## Firewall
 

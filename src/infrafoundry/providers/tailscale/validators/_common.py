@@ -8,6 +8,9 @@ from typing import Any
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 
 TAG_RE = re.compile(r"^tag:\S+$")
+_DOMAIN_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+DOMAIN_RE = re.compile(rf"^{_DOMAIN_LABEL}(?:\.{_DOMAIN_LABEL})*$")
+MAX_DOMAIN_LENGTH = 253
 TF_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 
 

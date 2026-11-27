@@ -16,3 +16,10 @@ resource "tailscale_dns_search_paths" "{{ r.name | to_terraform_name }}" {
 }
 
 {% endfor %}
+{% for r in split_nameservers %}
+resource "tailscale_dns_split_nameservers" "{{ r.name | to_terraform_name }}" {
+  domain      = {{ r.config.domain | hcl_string }}
+  nameservers = {{ r.config.nameservers | map('string') | hcl_list }}
+}
+
+{% endfor %}

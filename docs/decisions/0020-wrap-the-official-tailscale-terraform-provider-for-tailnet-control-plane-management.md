@@ -39,6 +39,7 @@ Alternatives rejected:
 ## Amendments
 
 - `build_terraform_env_vars` resolves settings `secret://` URIs by default and the `resolve_secret_uris` flag is removed (#1594, [ADR-0034](0034-a-bitwarden-secret-backend-resolves-through-the-bw-cli-with-private-per-run-cli-state.md)).
+- `dns_split_nameservers` is exposed (#1695). The 0.29.3 provider documentation lists a conflict only between `tailscale_dns_configuration` and the four granular DNS resources, so split nameservers can be used alongside the three DNS types; the Decision text above, which grouped it with `dns_configuration`, is superseded on that point. `dns_configuration` stays unsupported. See [Tailscale Provider](../providers/tailscale.md).
 
 ## Related Issues
 
@@ -46,6 +47,7 @@ Alternatives rejected:
 - Issue #787: OPNsense os-tailscale plugin (the node side)
 - Issue #1349: keep tags on destroy for tagged nodes
 - Issue #1536: `oauth_client` resource and consuming its credentials from another provider (see ADR-0029)
+- Issue #1695: tailnet split DNS routes
 
 ## Related Documentation
 
