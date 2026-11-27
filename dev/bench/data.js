@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795798693576,
+  "lastUpdate": 1795799991424,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7414,6 +7414,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.0000049269862192476314",
             "extra": "mean: 76.04371965564073 usec\nrounds: 13940"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cb9b315be8dd46c1dc9df183617db230c4de69aa",
+          "message": "docs: document the reverse-proxy first-deployment order and agent requirement (merges PR #1706, addresses #1700)\n\ndocs: document reverse-proxy first-deployment order and ssh agent requirement\n\nGive the five-step first deployment, explain why the first certificate\nverify fails, record the decision not to avoid the extra round, and\ndocument the jump-host SSH agent requirement for applies and renewals.\n\nAddresses #1700\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T17:18:44Z",
+          "tree_id": "b4d5cc297c824156cdc6faaa11b9eceba8fd767f",
+          "url": "https://github.com/endavis/infrafoundry/commit/cb9b315be8dd46c1dc9df183617db230c4de69aa"
+        },
+        "date": 1795799990584,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 75.71292546766196,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003526375468776883",
+            "extra": "mean: 13.207784454546191 msec\nrounds: 77"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 14054.611636371741,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000004365306081400161",
+            "extra": "mean: 71.15102329915068 usec\nrounds: 15580"
           }
         ]
       }
