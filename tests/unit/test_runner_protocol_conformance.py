@@ -29,6 +29,7 @@ from infrafoundry.core.provider import ProviderBase
 from infrafoundry.core.runners.ansible_runner import AnsibleRunner
 from infrafoundry.core.runners.host_runner import HostRunner
 from infrafoundry.core.runners.mikrotik_rest_runner import MikroTikRestRunner
+from infrafoundry.core.runners.ontap_rest_runner import OntapRestRunner
 from infrafoundry.core.runners.opentofu_runner import OpenTofuRunner
 from infrafoundry.core.runners.openwrt_ansible_runner import OpenWrtAnsibleRunner
 from infrafoundry.core.runners.opnsense_direct_runner import OPNsenseDirectRunner
@@ -48,6 +49,7 @@ PlanCapable = (
     | MikroTikRestRunner
     | OpenWrtAnsibleRunner
     | QnapRestRunner
+    | OntapRestRunner
 )
 DestroyCapable = (
     TerraformRunner
@@ -57,6 +59,7 @@ DestroyCapable = (
     | HostRunner
     | OpenWrtAnsibleRunner
     | QnapRestRunner
+    | OntapRestRunner
 )
 
 
@@ -90,7 +93,8 @@ def _as_drift_detectable(
     | OpenTofuRunner
     | MikroTikRestRunner
     | OpenWrtAnsibleRunner
-    | QnapRestRunner,
+    | QnapRestRunner
+    | OntapRestRunner,
 ) -> DriftDetectable:
     """Return the runner typed as ``DriftDetectable``; mypy rejects this if one drifts."""
     return runner
@@ -107,6 +111,7 @@ ALL_RUNNERS = [
     MikroTikRestRunner,
     OpenWrtAnsibleRunner,
     QnapRestRunner,
+    OntapRestRunner,
 ]
 DESTROY_RUNNERS = [
     TerraformRunner,
@@ -116,6 +121,7 @@ DESTROY_RUNNERS = [
     HostRunner,
     OpenWrtAnsibleRunner,
     QnapRestRunner,
+    OntapRestRunner,
 ]
 
 
@@ -169,6 +175,12 @@ def test_qnap_rest_runner_dispatches_managed_set_and_is_state_aware() -> None:
 
 def test_qnap_rest_runner_is_drift_detectable() -> None:
     assert isinstance(_as_drift_detectable(QnapRestRunner()), DriftDetectable)
+
+
+def test_ontap_rest_runner_dispatches_managed_set_and_is_drift_detectable() -> None:
+    runner = OntapRestRunner()
+    assert isinstance(runner, DispatchesManagedSet)
+    assert isinstance(_as_drift_detectable(runner), DriftDetectable)
 
 
 def test_openwrt_ansible_runner_dispatches_managed_set_and_is_drift_detectable() -> None:
