@@ -11,11 +11,13 @@ from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..schema import DesiredObject, ResourceSpec, key_of, normalize_value
+from ..schema import SIGN_FIELD, DesiredObject, ResourceSpec, key_of, normalize_value
 
 CREATE = "create"
 UPDATE = "update"
 DELETE = "delete"
+SIGN = "sign"
+_CERTIFICATE = "certificate"
 
 
 @dataclass(frozen=True)
@@ -143,6 +145,27 @@ def compute_type_diff(
             )
             continue
         differing = changed_fields(spec, obj.fields, current)
+        if spec.updatable is not None:
+            immutable = [n for n in differing if n not in spec.updatable]
+            if immutable:
+                diff.warnings.append(
+                    f"{spec.type_name} '{_label(obj.key)}' differs in {', '.join(immutable)}, "
+                    "which RouterOS cannot change in place; set 'absent: true' and recreate "
+                    "it under a new name"
+                )
+            differing = [n for n in differing if n in spec.updatable]
+        if spec.type_name == _CERTIFICATE and not str(current.get(SIGN_FIELD, "")).strip():
+            diff.changes.append(
+                Change(
+                    SIGN,
+                    spec.type_name,
+                    obj.key,
+                    obj.resource_name,
+                    current.get(".id"),
+                    current,
+                    dict(obj.fields),
+                )
+            )
         if differing:
             diff.changes.append(
                 Change(

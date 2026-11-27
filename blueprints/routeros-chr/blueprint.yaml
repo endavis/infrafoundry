@@ -65,6 +65,11 @@ inputs:
     type: integer
     default: 2
 
+  - name: https_bootstrap
+    description: "Create and sign a self-signed bootstrap-https certificate and enable www-ssl/api-ssl with it; www stays on"
+    type: boolean
+    default: false
+
   - name: boot_timeout
     description: "Seconds to wait for the first login prompt on the serial console"
     type: integer

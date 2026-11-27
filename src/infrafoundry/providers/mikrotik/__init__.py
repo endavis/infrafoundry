@@ -72,6 +72,7 @@ class MikroTikProvider(
             "interface.vlan": ["interface.bridge"],
             "ip.address": ["interface.vlan"],
             "ip.dhcp-client": ["interface.vlan"],
+            "certificate": [],
             "ip.service": [],
             UPDATE_TYPE: [],
         }

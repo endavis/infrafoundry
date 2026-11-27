@@ -86,3 +86,39 @@ def test_stops_at_the_first_error(
     assert result.failed == steps[1]
     assert result.connection_lost is lost
     assert [c[1] for c in factory.writes()] == ["interface/bridge", "interface/vlan"]
+
+
+def test_create_then_sign_posts_the_created_id(factory: FakeRouterOS) -> None:
+    steps = [
+        _step("create", "certificate", "c1", **{"name": "c1", "common-name": "x"}),
+        _step("sign", "certificate", "c1"),
+    ]
+
+    result = execute_steps(factory, steps)
+
+    assert result.success
+    assert [c[:2] for c in factory.writes()] == [
+        ("PUT", "certificate"),
+        ("POST", "certificate/sign"),
+    ]
+    assert factory.writes()[1][2] == {"number": "*100"}
+    assert factory.tables["certificate"][0]["fingerprint"]
+
+
+def test_sign_with_a_live_id_uses_it(factory: FakeRouterOS) -> None:
+    factory.tables["certificate"] = [{".id": "*9", "name": "c1"}]
+
+    result = execute_steps(factory, [_step("sign", "certificate", "c1", "*9")])
+
+    assert result.success
+    assert factory.writes() == [("POST", "certificate/sign", {"number": "*9"})]
+
+
+def test_failed_sign_stops_the_run_after_the_create(factory: FakeRouterOS) -> None:
+    factory.errors[("POST", "certificate/sign")] = RouterOSAPIError("boom")
+    create = _step("create", "certificate", "c1", name="c1", **{"common-name": "x"})
+    sign = _step("sign", "certificate", "c1")
+
+    result = execute_steps(factory, [create, sign])
+
+    assert result.failed == sign and result.completed == [create]

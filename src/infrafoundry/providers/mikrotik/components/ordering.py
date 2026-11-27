@@ -5,7 +5,8 @@ order of changes decides whether the operator keeps the management connection.
 The phases are:
 
 * A: disable ``vlan-filtering`` on bridges going on to off
-* B: creates in dependency order, bridge VLAN membership widened to old and new,
+* B: creates in dependency order, certificate signing (a created or unsigned
+  certificate is signed right after its create), bridge VLAN membership widened to old and new,
   port PVID updates on bridges whose filtering is off at that moment
 * C: enable ``vlan-filtering`` on bridges going off to on
 * D: narrowing: exact bridge VLAN membership, PVID updates on filtering bridges,
@@ -34,7 +35,7 @@ from ..schema import (
     parse_vlan_ids,
     to_rest_value,
 )
-from .diff import CREATE, DELETE, UPDATE, Change, TypeDiff
+from .diff import CREATE, DELETE, SIGN, UPDATE, Change, TypeDiff
 
 PHASES = "ABCDEF"
 PHASE_TITLES = {
@@ -52,6 +53,7 @@ _BVLAN = "interface.bridge.vlan"
 _VLAN = "interface.vlan"
 _ADDR = "ip.address"
 _SERVICE = "ip.service"
+_CERTIFICATE = "certificate"
 _MEMBER_FIELDS = ("tagged", "untagged")
 
 LiveState = Mapping[str, list[dict[str, str]]]
@@ -220,6 +222,8 @@ def order_changes(
             fields = change.after
             if change.kind == DELETE:
                 add("E", change, {})
+            elif change.kind == SIGN:
+                add("B", change, {}, "sign")
             elif type_name == _SERVICE:
                 add("F", change, _body(spec, fields, change.changed))
             elif change.kind == CREATE:
@@ -230,6 +234,8 @@ def order_changes(
                         "C", change, {"vlan-filtering": "yes"}, "enable vlan-filtering", kind=UPDATE
                     )
                 add("B", change, body)
+                if type_name == _CERTIFICATE:
+                    add("B", change, {}, "sign", kind=SIGN)
             elif type_name == _BRIDGE:
                 rest = [n for n in change.changed if n != "vlan-filtering"]
                 if "vlan-filtering" in change.changed:

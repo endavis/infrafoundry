@@ -1,4 +1,5 @@
 {
+  "certificate": [],
   "interface": [
     {".id": "*1", "name": "ether1", "type": "ether", "disabled": "false", "dynamic": "false"},
     {".id": "*2", "name": "ether2", "type": "ether", "disabled": "false", "dynamic": "false"},

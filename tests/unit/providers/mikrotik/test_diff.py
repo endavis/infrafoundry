@@ -5,6 +5,7 @@ from typing import Any
 from infrafoundry.providers.mikrotik.components.diff import (
     CREATE,
     DELETE,
+    SIGN,
     UPDATE,
     compute_type_diff,
 )
@@ -137,3 +138,49 @@ def test_absent_is_suppressed_when_add_only() -> None:
 def test_builtin_row_never_deleted() -> None:
     live = [{".id": "*1", "name": "br0", "builtin": "true"}]
     assert _diff("interface.bridge", [], live, managed={("br0",)}).is_empty
+
+
+_SIGNED = "AA:" * 31 + "AA"
+
+
+def _cert(**live: str) -> dict[str, str]:
+    return {".id": "*9", "name": "c1", "common-name": "router.example.com", **live}
+
+
+def _cert_res(**config: Any) -> Any:
+    return resource("certificate", "c1", **{"common-name": "router.example.com", **config})
+
+
+def test_missing_certificate_is_a_create() -> None:
+    diff = _diff("certificate", [_cert_res()], [])
+    assert [(c.kind, c.key) for c in diff.changes] == [(CREATE, ("c1",))]
+
+
+def test_signed_certificate_with_equal_fields_is_clean() -> None:
+    assert _diff("certificate", [_cert_res()], [_cert(fingerprint=_SIGNED)]).is_empty
+
+
+def test_unsigned_certificate_plans_a_sign_with_its_id() -> None:
+    (change,) = _diff("certificate", [_cert_res()], [_cert()]).changes
+    assert (change.kind, change.live_id) == (SIGN, "*9")
+
+
+def test_different_common_name_is_a_warning_not_a_change() -> None:
+    res = _cert_res(**{"common-name": "other.example.com"})
+    diff = _diff("certificate", [res], [_cert(fingerprint=_SIGNED)])
+    assert diff.is_empty
+    assert "common-name" in diff.warnings[0] and "other.example.com" not in diff.warnings[0]
+
+
+def test_different_comment_is_an_update() -> None:
+    diff = _diff("certificate", [_cert_res(comment="new")], [_cert(fingerprint=_SIGNED)])
+    (change,) = diff.changes
+    assert (change.kind, change.changed) == (UPDATE, ("comment",))
+
+
+def test_undeclared_certificate_is_kept_unless_managed() -> None:
+    live = [_cert(fingerprint=_SIGNED)]
+    kept = _diff("certificate", [], live, managed=set())
+    assert kept.is_empty and kept.unmanaged == ["c1"]
+    gone = _diff("certificate", [], live, managed={("c1",)})
+    assert [c.kind for c in gone.changes] == [DELETE]

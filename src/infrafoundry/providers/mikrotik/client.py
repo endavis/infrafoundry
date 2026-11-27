@@ -53,6 +53,10 @@ class RouterOSWriter(RouterOSReader, Protocol):
         """Create a row under a REST path and return it (with its ``.id``)."""
         ...
 
+    def post(self, path: str, body: dict[str, Any] | None = None) -> Any:
+        """Call an action endpoint under a REST path and return the decoded reply."""
+        ...
+
     def patch(self, path: str, row_id: str, body: dict[str, str]) -> dict[str, str]:
         """Update the row ``row_id`` under a REST path and return it."""
         ...

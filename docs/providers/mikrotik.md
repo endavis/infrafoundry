@@ -57,6 +57,7 @@ The resource type with `.` replaced by `/` is the REST path. YAML field names ar
 | `interface.vlan` | `/rest/interface/vlan` | `name` |
 | `ip.address` | `/rest/ip/address` | `address` (CIDR); moving it to another interface is an update |
 | `ip.dhcp-client` | `/rest/ip/dhcp-client` | `interface` |
+| `certificate` | `/rest/certificate` | `name`; created and signed (self-signed), only `comment` changes in place, see [From `www` to HTTPS](#from-www-to-https-and-a-lets-encrypt-certificate) |
 | `ip.service` | `/rest/ip/service` | `name`; update only, never created or deleted |
 | `system.package.update` | `/rest/system/package/update` | one per environment; never applied, see [RouterOS and RouterBOARD Updates](#routeros-and-routerboard-updates) |
 
@@ -135,7 +136,7 @@ A bridge with `vlan-filtering` on drops traffic it has no VLAN entry for. The RE
 | Phase | What runs |
 |-------|-----------|
 | A | Disable `vlan-filtering` on bridges going from on to off |
-| B | Creates in dependency order; bridge VLAN membership widened to old and new; port PVID updates on bridges whose filtering is off at that moment |
+| B | Creates in dependency order; signing of created or unsigned certificates (right after the create); bridge VLAN membership widened to old and new; port PVID updates on bridges whose filtering is off at that moment |
 | C | Enable `vlan-filtering` on bridges going from off to on |
 | D | Narrowing: exact bridge VLAN membership, PVID updates on filtering bridges, other updates |
 | E | Deletes in reverse dependency order |
@@ -152,10 +153,40 @@ Changes that touch the live management path sort last within D and E. The plan p
 - a management bridge that filters with no port whose `pvid` matches the bridge's;
 - the `ip.service` the provider connects through (`www` for http, `www-ssl` for https) disabled, or moved off the `api_url` port. A change to its `address` list only warns.
 
+- an `ip.service` naming a `certificate` that will not exist signed after the plan;
+- a `certificate` deleted while a live `ip.service` still uses it (switch the service in an earlier apply);
+- `www-ssl` moved to a certificate the plan creates while `api_url` is `https` with `verify_ssl` on (a self-signed certificate cannot validate).
+
 If the host cannot be resolved and the plan touches bridge, VLAN or address types, the plan refuses.
 
 !!! tip "Keep console access"
     The first apply on a device should be done with console or MAC-level access available. The refusals cover the cases the plan can see; they cannot see a firewall rule or a path outside this provider's types.
+
+## From `www` to HTTPS and a Let's Encrypt certificate
+
+A new device serves REST on `www` (plain HTTP). The `certificate` type creates a self-signed certificate on the device and signs it, so `www-ssl` and `api-ssl` can serve with it. The create is one `PUT /rest/certificate`, the signing a second step, `POST /rest/certificate/sign`. A declared certificate that exists but is unsigned (a run that stopped between the two) plans a lone signing step, so the next apply finishes it. RouterOS cannot change a signed certificate's subject or key: a difference in any field but `comment` is a warning, never a write. Set `absent: true` and recreate it under a new name.
+
+```yaml
+resources:
+  - {type: certificate, name: bootstrap-https, common-name: router.example.com, key-usage: [digital-signature, key-encipherment, tls-server], days-valid: 365}
+  - {type: ip.service, name: www-ssl, certificate: bootstrap-https, disabled: false}
+  - {type: ip.service, name: api-ssl, certificate: bootstrap-https, disabled: false}
+```
+
+The order below never cuts the connection that applies the change:
+
+1. With `api_url: http://192.0.2.2`, declare the certificate and the two services as above, leave `www` alone and apply. `www` still carries the connection.
+2. Confirm HTTPS answers (`curl -sk -o /dev/null -w '%{http_code}' https://192.0.2.2/rest/system/resource` prints `401`), then run `infra doctor`.
+3. Switch `api_url` to `https://192.0.2.2` with `verify_ssl: false`, then run `infra doctor` and `infra plan` (clean).
+4. Install the Let's Encrypt certificate (#1683), set `verify_ssl: true` and point `www-ssl` and `api-ssl` at the installed certificate.
+5. Optionally disable `www`, which the plan allows once `api_url` is `https`.
+
+**Why `verify_ssl: false`, and no pin.** The bootstrap certificate lives only until the Let's Encrypt certificate replaces it, and a pin would have to be redone at that replacement. The state it replaces is plain HTTP with basic auth, so unverified TLS is still better. Revert `verify_ssl` to `true` after step 4.
+
+**Timeout.** Signing blocks the REST call while the device generates the key; raise `timeout` for large keys.
+
+!!! warning "Not yet live-verified"
+    The field names of the create, the `sign` call with `number` set to the row's `.id`, and a non-empty `fingerprint` marking a signed row are taken from the RouterOS manuals and have not been checked on a device. The live check of #1683 verifies them.
 
 ## Apply and Destroy
 
@@ -245,7 +276,7 @@ The `routeros-chr` blueprint (`blueprints/routeros-chr/`) builds a disposable
 RouterOS Cloud Hosted Router on Proxmox, so the provider can be tried without a
 real switch. It imports MikroTik's `.img.zip` image, attaches a management NIC
 (`ether1`) and trunk NICs (`ether2`..), and bootstraps the VM over its serial
-console: admin password, optional static address, and the `www` service.
+console: admin password, optional static address, and the `www` service. With `https_bootstrap: true` it also creates and signs a self-signed `bootstrap-https` certificate and enables `www-ssl` and `api-ssl` with it (`www` stays on); see [From `www` to HTTPS](#from-www-to-https-and-a-lets-encrypt-certificate).
 `infra destroy` removes the VM. The bootstrap is verified against a RouterOS
 7.25.1 CHR; the blueprint README lists what was checked.
 
@@ -260,7 +291,7 @@ provider_settings:
 ```
 
 The bootstrap enables `www` (plain HTTP) because `www-ssl` needs a certificate
-on the box. `infra doctor` warns about plaintext HTTP; that is expected for a
+on the box; `https_bootstrap: true` adds one. `infra doctor` warns about plaintext HTTP; that is expected for a
 disposable test VM. CHR's free licence caps throughput, which is enough for API
 testing. See `blueprints/routeros-chr/README.md` for the variables.
 

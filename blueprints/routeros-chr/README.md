@@ -31,8 +31,11 @@ the REST service enabled.
      `mgmt_ip`/`mgmt_prefix`, plus a default route via `mgmt_gateway` and
      `/ip dns set servers=` from `mgmt_dns` (a comma-separated list sets several),
      each only when set;
-   - runs `/ip service set www disabled=no` (plain HTTP; `www-ssl` needs a
-     certificate on the box).
+   - runs `/ip service set www disabled=no` (plain HTTP). With `https_bootstrap`
+     true it then creates and signs a self-signed `bootstrap-https` certificate
+     (common name: the VM name) and enables `www-ssl` and `api-ssl` with it;
+     `www` stays on. Without it, `www-ssl` stays off because it needs a
+     certificate on the box.
 
    No reboot is needed. With `mgmt_ip` set, the handler then waits until
    `http://<mgmt_ip>/rest/system/resource` answers 401 to a request with no
@@ -82,7 +85,14 @@ See `blueprint.yaml`. Required: `vm_name`, `vmid`, `target_node`, `pve_host`.
 Everything else has a default: `image_source` (CHR 7.25.1 `.img.zip`),
 `image_sha256`, `memory` 512, `cores` 1, `mgmt_bridge` `vmbr0`, `mgmt_vlan` 0,
 `mgmt_ip` empty, `mgmt_prefix` 24, `mgmt_gateway` empty, `mgmt_dns` empty (needs `mgmt_ip`), `trunk_bridge`
-`vmbr1`, `trunk_nics` 2, `boot_timeout` 300.
+`vmbr1`, `trunk_nics` 2, `https_bootstrap` false, `boot_timeout` 300.
+
+`https_bootstrap: true` also probes `https://<mgmt_ip>/rest/system/resource`
+(with `curl -k`, no credentials) after the HTTP probe. The certificate is
+self-signed, so the environment's `mikrotik` settings need `verify_ssl: false`
+to use it, until a Let's Encrypt certificate replaces it. The switch-over from
+`www` to `www-ssl` is described in the
+[MikroTik provider docs](../../docs/providers/mikrotik.md).
 
 ## Verified on a live CHR
 
@@ -103,6 +113,10 @@ Checked against RouterOS 7.25.1 CHR on Proxmox VE 9 (#1485):
 - With `mgmt_dns` set (#1666), `/ip dns` lists that server after the bootstrap
   and the RouterOS update check resolves the vendor's server (checked with a
   single server, #1665).
+
+Not yet live-verified: the `https_bootstrap` path (the `/certificate add` and
+`sign` commands, `www-ssl` and `api-ssl` serving the certificate, and the HTTPS
+readiness probe). It will be checked with the #1683 live check.
 
 Not checked: whether `ether1` has a DHCP client before the bootstrap removes
 it (`remove [find ...]` succeeds either way), and which NIC maps to which
