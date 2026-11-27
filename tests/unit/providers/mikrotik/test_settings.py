@@ -1,11 +1,15 @@
 """Tests for MikroTik settings loading."""
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+from infrafoundry.core.certs.models import LETSENCRYPT_PRODUCTION, LETSENCRYPT_STAGING
 from infrafoundry.core.config.models import EnvironmentConfig
+from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.providers.mikrotik.settings import (
     MikroTikSettings,
     MikroTikSettingsError,
@@ -117,3 +121,57 @@ def test_upgrade_timeout_rejected_without_the_value(value: object) -> None:
         settings_from_mapping(_mapping(upgrade_timeout=value))
     assert "upgrade_timeout" in str(caught.value)
     assert str(value) not in str(caught.value) or str(value) in ("1", "True")
+
+
+def _load_with(resources: list[ResourceConfig]) -> MikroTikSettings:
+    env = _env({"api_url": "https://192.0.2.2", "username": "admin", "password": PASSWORD})
+    with patch("infrafoundry.providers.mikrotik.settings.ConfigManager") as manager:
+        manager.return_value.load_environment.return_value = env
+        manager.return_value.get_all_resources_all_providers.return_value = resources
+        return load_settings(Path("."), "test")
+
+
+def _installed_cert() -> ResourceConfig:
+    sha = "ab" * 32
+    return ResourceConfig(
+        name="router-cert",
+        type="certificate",
+        provider="acme",
+        config={
+            "names": ["router.example.com"],
+            "target": {"provider": "mikrotik", "resource": "edge-services"},
+        },
+        package_secrets={
+            "acme_certificates": {
+                "router-cert": {
+                    "sha256": sha,
+                    "installed_sha256": sha,
+                    "directory": LETSENCRYPT_PRODUCTION,
+                    "not_after": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
+                }
+            }
+        },
+    )
+
+
+def test_no_certificate_resource_leaves_the_settings_unchanged() -> None:
+    assert _load_with([]).tls_server_name is None
+
+
+def test_an_installed_production_certificate_sets_the_server_name() -> None:
+    assert _load_with([_installed_cert()]).tls_server_name == "router.example.com"
+
+
+def test_a_staging_certificate_leaves_the_settings_unchanged() -> None:
+    cert = _installed_cert()
+    assert cert.package_secrets is not None
+    cert.package_secrets["acme_certificates"]["router-cert"]["directory"] = LETSENCRYPT_STAGING
+    assert _load_with([cert]).tls_server_name is None
+
+
+def test_unloadable_resources_keep_verify_ssl_only() -> None:
+    env = _env({"api_url": "https://192.0.2.2", "username": "admin", "password": PASSWORD})
+    with patch("infrafoundry.providers.mikrotik.settings.ConfigManager") as manager:
+        manager.return_value.load_environment.return_value = env
+        manager.return_value.get_all_resources_all_providers.side_effect = InfraFoundryError("x")
+        assert load_settings(Path("."), "test").tls_server_name is None

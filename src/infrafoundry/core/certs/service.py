@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -325,7 +325,7 @@ class CertificateService:
         issuer: CertificateIssuer,
         resources: Sequence[ResourceConfig],
     ) -> CertOutcome:
-        target = resolve_target(spec.target, spec.names, resources)
+        target = replace(resolve_target(spec.target, spec.names, resources), env=self._env)
         action: Action = "skipped"
         if needs_issue:
             issued = issuer.issue(spec)

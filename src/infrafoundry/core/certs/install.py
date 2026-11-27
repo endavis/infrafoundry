@@ -17,11 +17,19 @@ from infrafoundry.core.certs.models import CertificateInstallError, CertificateS
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.ssh_host_keys import FIX_HINT, host_key_config, known_hosts_value
 
-SUPPORTED_TARGET_PROVIDERS = ("host", "proxmox", "oci")
-TARGET_RESOURCE_TYPES = {"host": "host", "proxmox": "vm", "oci": "instance"}
+SUPPORTED_TARGET_PROVIDERS = ("host", "proxmox", "oci", "mikrotik")
+TARGET_RESOURCE_TYPES = {
+    "host": "host",
+    "proxmox": "vm",
+    "oci": "instance",
+    "mikrotik": "ip.service",
+}
 TARGET_KINDS = {"proxmox": ("vm", "node")}
 """Optional ``target.kind`` values per provider; absent means the provider's default kind."""
 NODE_VERIFY_PORT = 8006
+_PATHLESS_TARGET_PROVIDERS = frozenset({"mikrotik"})
+"""Providers that install through their own API: no file paths, no SSH endpoint."""
+_PATHLESS_KEYS = frozenset({"provider", "resource", "verify"})
 VERIFY_WINDOW_SECONDS = 30.0
 
 _PATH_RE = re.compile(r"^/[A-Za-z0-9._/@+:-]+$")
@@ -100,6 +108,8 @@ class CertificateTarget:
     verify_server_name: str | None = None
     endpoint: TargetEndpoint | None = None
     kind: str | None = None
+    env: str | None = None
+    """Environment name, set by the service; API installers read their settings with it."""
 
 
 def target_problems(raw: Any, names: Iterable[str], where: str) -> list[str]:
@@ -112,6 +122,8 @@ def target_problems(raw: Any, names: Iterable[str], where: str) -> list[str]:
     """
     if not isinstance(raw, dict):
         return [f"{where} is required and must be a mapping"]
+    if raw.get("provider") in _PATHLESS_TARGET_PROVIDERS:
+        return _pathless_problems(raw, list(names), where)
     problems: list[str] = []
     unknown = sorted(set(raw) - _TARGET_KEYS)
     if unknown:
@@ -190,6 +202,22 @@ def _node_target_problems(raw: dict[str, Any], names: list[str], where: str) -> 
     return problems
 
 
+def _pathless_problems(raw: dict[str, Any], names: list[str], where: str) -> list[str]:
+    """Problems of a target for a provider that installs through its API (only ``verify``)."""
+    problems: list[str] = []
+    unknown = sorted(set(raw) - _PATHLESS_KEYS)
+    if unknown:
+        problems.append(f"{where} has unknown keys: {', '.join(map(str, unknown))}")
+    if not isinstance(raw.get("resource"), str) or not raw.get("resource"):
+        problems.append(f"{where}.resource must name the target resource")
+    verify = raw.get("verify")
+    if verify is not None:
+        problems.extend(_verify_problems(verify, names, f"{where}.verify"))
+    elif all(n.startswith("*.") for n in names):
+        problems.append(f"{where}.verify.server_name is required when every name is a wildcard")
+    return problems
+
+
 def _verify_problems(verify: Any, names: list[str], where: str) -> list[str]:
     if not isinstance(verify, dict):
         return [f"{where} must be a mapping"]
@@ -242,6 +270,17 @@ def parse_target(raw: dict[str, Any], names: Iterable[str]) -> CertificateTarget
         server_name = verify.get("server_name") or next(
             (n for n in name_list if not n.startswith("*.")), None
         )
+    if raw["provider"] in _PATHLESS_TARGET_PROVIDERS:
+        explicit = verify.get("port") if isinstance(verify, dict) else None
+        return CertificateTarget(
+            provider=str(raw["provider"]),
+            resource=str(raw["resource"]),
+            key_path="",
+            verify_port=int(explicit) if explicit is not None else None,
+            verify_server_name=(
+                server_name or next((n for n in name_list if not n.startswith("*.")), None)
+            ),
+        )
     return CertificateTarget(
         provider=str(raw["provider"]),
         resource=str(raw["resource"]),
@@ -291,6 +330,8 @@ def resolve_target(
         raise CertificateSchemaError(
             f"target {target.provider} resource '{target.resource}' is not declared"
         )
+    if target.provider in _PATHLESS_TARGET_PROVIDERS:
+        return target
     if resource_type != "host":
         return CertificateTarget(**{**target.__dict__, "endpoint": _pinned_endpoint(host)})
     config = host.config or {}

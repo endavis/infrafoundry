@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from infrafoundry.core.certs.target_lookup import installed_server_name
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.secrets.environment import resolved_provider_settings
@@ -33,6 +34,13 @@ class MikroTikSettings:
     verify_ssl: bool = True
     timeout: int = DEFAULT_TIMEOUT
     upgrade_timeout: int = DEFAULT_UPGRADE_TIMEOUT
+    tls_server_name: str | None = None
+    """Host name to validate the device's certificate against.
+
+    Set by ``load_settings`` only once the device holds an installed Let's Encrypt production
+    certificate (#1683); the client then checks the CA chain and this name, whatever
+    ``verify_ssl`` says. ``None`` keeps ``verify_ssl`` as the only switch.
+    """
 
     @property
     def scheme(self) -> str:
@@ -124,4 +132,10 @@ def load_settings(config_dir: Path, env_name: str) -> MikroTikSettings:
             f"No provider_settings.mikrotik found for environment '{env_name}'"
         )
     resolved = resolved_provider_settings(env_config, PROVIDER_NAME) or {}
-    return settings_from_mapping(resolved)
+    settings = settings_from_mapping(resolved)
+    try:
+        resources = ConfigManager(config_dir).get_all_resources_all_providers(env_name)
+    except InfraFoundryError:
+        return settings  # resource errors surface where resources are loaded; keep verify_ssl
+    server_name = installed_server_name(resources, PROVIDER_NAME)
+    return replace(settings, tls_server_name=server_name) if server_name else settings

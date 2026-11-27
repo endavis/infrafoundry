@@ -186,6 +186,7 @@ Writes are atomic (`sops set` on a copy, then a rename), and no plaintext key ev
 - [Host provider](host.md#install-target-for-certificates)
 - [Proxmox provider](proxmox.md#install-target-for-certificates)
 - [OCI provider](oci.md#install-target-for-certificates)
+- [MikroTik provider](mikrotik.md#install-target-for-certificates)
 - [Reverse Proxy for Device Web UIs](../guides/reverse-proxy.md): the first consumer, a Caddy VM that serves device UIs with this certificate
 - [ADR-0040](../decisions/0040-per-device-lets-encrypt-certificates-are-issued-by-infrafoundry-over-acme-with-cloudflare-dns-01-and-installed-through-an-optional-provider-hook.md)
 - [CLI reference: certs](../usage/cli-reference.md#certs-group-foundry-certs)

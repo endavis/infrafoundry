@@ -52,9 +52,11 @@ InfraFoundry already stores per-package secrets in SOPS files ([ADR-0032](0032-b
 - [#1692](https://github.com/endavis/infrafoundry/issues/1692) acme propagation check can be defeated by cached negative dns answers
 - [#1705](https://github.com/endavis/infrafoundry/issues/1705) install let's encrypt certificates on proxmox nodes
 - [#1682](https://github.com/endavis/infrafoundry/issues/1682) issue and renew per-device Let's Encrypt certificates with Cloudflare DNS-01
+- [#1683](https://github.com/endavis/infrafoundry/issues/1683) install let's encrypt certificates on mikrotik routeros devices
 
 ## Related Documentation
 
 - [ACME provider](../providers/acme.md)
 - [Host provider](../providers/host.md)
+- [MikroTik provider](../providers/mikrotik.md#install-target-for-certificates)
 - [CLI reference](../usage/cli-reference.md)

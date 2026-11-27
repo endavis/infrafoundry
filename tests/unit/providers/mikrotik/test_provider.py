@@ -1,13 +1,19 @@
 """Tests for the MikroTik provider."""
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
-from infrafoundry.core.protocols import ValidatesOffline
+import pytest
+
+from infrafoundry.core.certs.install import CertificateTarget
+from infrafoundry.core.certs.models import CertificateInstallError
+from infrafoundry.core.protocols import InstallsCertificate, ValidatesOffline
 from infrafoundry.core.validation import ValidationReport
 from infrafoundry.providers.mikrotik import MikroTikProvider
 from infrafoundry.providers.mikrotik.components.update import UPDATE_TYPE
 from infrafoundry.providers.mikrotik.schema import SPECS
+from infrafoundry.providers.mikrotik.settings import MikroTikSettings, MikroTikSettingsError
 
 from .conftest import make_env, resource
 
@@ -142,3 +148,42 @@ def test_register_exposes_cli_hook() -> None:
     metadata = register()
     assert metadata.name == "mikrotik" and metadata.cli_registration is register_cli
     assert UPDATE_TYPE in metadata.resource_types
+
+
+def _target(env: str | None = "test") -> Any:
+    return CertificateTarget(
+        provider="mikrotik",
+        resource="edge-services",
+        key_path="",
+        verify_server_name="router.example.com",
+        env=env,
+    )
+
+
+def test_the_provider_installs_certificates(tmp_path: Path) -> None:
+    provider = _provider(tmp_path)
+    assert isinstance(provider, InstallsCertificate)
+    settings = MikroTikSettings("https://192.0.2.2", "admin", "pw-example")
+    with (
+        patch("infrafoundry.providers.mikrotik.load_settings", return_value=settings) as load,
+        patch("infrafoundry.providers.mikrotik.RouterOSCertificateInstaller") as installer,
+    ):
+        provider.install_certificate(_target(), "leaf", "chain", "key")
+
+    load.assert_called_once_with(tmp_path, "test")
+    installer.assert_called_once_with(settings)
+    installer.return_value.install.assert_called_once_with(_target(), "leaf", "chain", "key")
+
+
+def test_the_install_needs_an_environment(tmp_path: Path) -> None:
+    with pytest.raises(CertificateInstallError, match="environment"):
+        _provider(tmp_path).install_certificate(_target(None), "leaf", "chain", "key")
+
+
+def test_unusable_settings_fail_the_install_without_secrets(tmp_path: Path) -> None:
+    error = MikroTikSettingsError("provider_settings.mikrotik is missing: password")
+    with (
+        patch("infrafoundry.providers.mikrotik.load_settings", side_effect=error),
+        pytest.raises(CertificateInstallError, match="missing: password"),
+    ):
+        _provider(tmp_path).install_certificate(_target(), "leaf", "chain", "key")

@@ -1,10 +1,11 @@
 """Tests for the RouterOS REST client."""
 
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
+from requests.adapters import HTTPAdapter
 
 from infrafoundry.providers.mikrotik.client import (
     RouterOSAPIError,
@@ -182,3 +183,55 @@ def test_post_error_status_and_transport_failure() -> None:
         pytest.raises(RouterOSConnectionError),
     ):
         client.post("system/reboot")
+
+
+VALIDATED = MikroTikSettings(
+    "https://192.0.2.2", "admin", PASSWORD, verify_ssl=False, tls_server_name="router.example.com"
+)
+
+
+def test_without_a_server_name_the_session_is_unchanged() -> None:
+    client = RouterOSClient(SETTINGS)
+
+    assert client._session.verify is False
+    assert "https://192.0.2.2" not in client._session.adapters
+
+
+def test_a_server_name_forces_chain_and_host_name_checks() -> None:
+    client = RouterOSClient(VALIDATED)
+
+    assert client._session.verify is True
+    adapter = cast(
+        HTTPAdapter, client._session.get_adapter("https://192.0.2.2/rest/system/resource")
+    )
+    kwargs = adapter.poolmanager.connection_pool_kw
+    assert kwargs["server_hostname"] == "router.example.com"
+    assert kwargs["assert_hostname"] == "router.example.com"
+
+
+def test_other_hosts_keep_the_default_adapter() -> None:
+    client = RouterOSClient(VALIDATED)
+
+    adapter = cast(HTTPAdapter, client._session.get_adapter("https://198.51.100.9/rest/x"))
+    assert "server_hostname" not in adapter.poolmanager.connection_pool_kw
+
+
+def test_a_validation_failure_explains_the_recovery() -> None:
+    client = RouterOSClient(VALIDATED)
+    with (
+        patch.object(requests.Session, "request", side_effect=requests.exceptions.SSLError("x")),
+        pytest.raises(RouterOSConnectionError, match="failed validation") as exc,
+    ):
+        client.get("system/resource")
+
+    assert "/ip service set" in str(exc.value)
+    assert PASSWORD not in str(exc.value)
+
+
+def test_an_ssl_error_without_validation_keeps_the_plain_message() -> None:
+    client = RouterOSClient(SETTINGS)
+    with (
+        patch.object(requests.Session, "request", side_effect=requests.exceptions.SSLError("x")),
+        pytest.raises(RouterOSConnectionError, match="SSLError"),
+    ):
+        client.get("system/resource")
