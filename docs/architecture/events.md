@@ -124,7 +124,10 @@ Categorized event types for different lifecycle phases and operations.
    - `POLICY_VIOLATION`
    - `POLICY_CHECK_PASSED`
 
-7. **Validation Events** - Configuration validation
+7. **Certificate Events** - `foundry certs` (payloads never carry key material or a token)
+   - `CERTIFICATE_ISSUED`, `CERTIFICATE_INSTALLED`, `CERTIFICATE_FAILED`
+
+8. **Validation Events** - Configuration validation
    - `VALIDATION_STARTED`
    - `VALIDATION_COMPLETED`
    - `VALIDATION_FAILED`

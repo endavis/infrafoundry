@@ -78,6 +78,15 @@ class CloudflareDns:
             raise DnsError(self._scrub(f"Cloudflare {method} failed (HTTP {status}){detail}"))
         return body
 
+    def verify_access(self) -> None:
+        """Check that the token can read this zone's DNS records (a read-only call).
+
+        Raises:
+            DnsError: If Cloudflare refuses the token or the zone. The message never carries
+                the token or the zone id.
+        """
+        self._call("GET", "", params={"type": "TXT", "per_page": 1})
+
     def add_txt(self, name: str, value: str, comment: str) -> str:
         """Create a TXT record carrying ``comment`` and return its id."""
         body = self._call(

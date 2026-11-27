@@ -84,6 +84,11 @@ class EventType(StrEnum):
     STATE_ENV_RENAMED = "state_env_renamed"
     STATE_RECONCILED = "state_reconciled"
 
+    # Certificates (foundry certs); payloads never carry key material or a token
+    CERTIFICATE_ISSUED = "certificate_issued"
+    CERTIFICATE_INSTALLED = "certificate_installed"
+    CERTIFICATE_FAILED = "certificate_failed"
+
 
 class HandlerType(StrEnum):
     """Types of event handlers."""

@@ -11,7 +11,7 @@ tags:
 
 The `acme` provider declares certificates for your devices. `foundry certs issue` orders each one from Let's Encrypt with the DNS-01 challenge on Cloudflare, keeps the certificate and its key SOPS-encrypted in the package that declares it, installs it on the target and checks that the target serves it. Nothing is exposed to the internet: DNS-01 needs only a DNS record, not an inbound connection. The decisions and the rejected alternatives are in [ADR-0040](../decisions/0040-per-device-lets-encrypt-certificates-are-issued-by-infrafoundry-over-acme-with-cloudflare-dns-01-and-installed-through-an-optional-provider-hook.md).
 
-`infra apply` never issues a certificate. The provider writes an empty `terraform {}` block; only `foundry certs` talks to the CA and rewrites the encrypted files. What is covered today: issue and install on a [`host`](host.md#install-target-for-certificates). Unattended renewal and VM targets are separate changes.
+`infra apply` never issues a certificate. The provider writes an empty `terraform {}` block; only `foundry certs` talks to the CA and rewrites the encrypted files. What is covered today: issue, install and unattended renewal on a [`host`](host.md#install-target-for-certificates). VM targets are a separate change.
 
 ## Settings
 
@@ -92,6 +92,8 @@ foundry certs status --env prod              # reads the encrypted store only
 foundry certs issue --env prod               # every certificate that is missing, due or not installed
 foundry certs issue --env prod proxy-cert    # only this one
 foundry certs issue --env prod --force       # issue again even when the stored one is current
+foundry certs renew --env prod               # unattended: only what is due, never issued or not installed
+foundry certs renew --env prod --dry-run     # report what would be done; no lock, no network
 ```
 
 `issue` holds the environment lock (a long run keeps it alive), processes certificates one at a time and continues past a failure. For each one the order is: issue, write the encrypted entry, install, verify, record `installed_sha256`, record a state row. A certificate that is stored but not installed gets an install-only retry the next time, so a failed install never costs a second order from the CA.
@@ -105,6 +107,58 @@ foundry certs issue --env prod --force       # issue again even when the stored 
 
 The encrypted store changes in your config repo: commit it after a run.
 
+### Renewing unattended
+
+`renew` is the command for a timer. It processes the certificates `issue` would without `--force`: those with the renewal window or fewer days left, never issued, declared with other names, key type or directory than the stored one, or stored but not installed (an install-only retry). It differs from `issue` on purpose:
+
+- There is no `--force`: an unattended run never orders a certificate that is current.
+- When nothing is due it prints nothing, takes no lock, contacts nothing and exits `0`, so a daily timer is cheap and quiet. Only certificates that were acted on or failed are printed.
+- `--dry-run` prints what would be done (`would issue` or `would install`, with the reason), takes no lock and contacts no CA, DNS host or target. It exits `1` only when a declaration is invalid.
+- A held lock exits `75` instead of waiting (unless `--lock-timeout` is set), so the next run retries.
+
+Example systemd units. `SuccessExitStatus=75` keeps a held lock from marking the unit failed:
+
+```ini
+# /etc/systemd/system/foundry-certs-renew.service
+[Unit]
+Description=Renew InfraFoundry certificates
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/infrafoundry
+Environment=INFRAFOUNDRY_CONFIG_REPO=/opt/infrafoundry-config
+ExecStart=/usr/local/bin/foundry certs renew --env prod
+SuccessExitStatus=75
+```
+
+```ini
+# /etc/systemd/system/foundry-certs-renew.timer
+[Unit]
+Description=Daily InfraFoundry certificate renewal
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Or with cron (no output means nothing was due; cron mails any output):
+
+```cron
+17 3 * * * cd /opt/infrafoundry && INFRAFOUNDRY_CONFIG_REPO=/opt/infrafoundry-config foundry certs renew --env prod
+```
+
+The unit needs the SOPS age key and SSH access to the targets, as an interactive run does. Renewed certificates change the encrypted store, so commit the config repo from your own routine.
+
+### Plan warning, doctor check and events
+
+- `infra plan` prints a warning for each certificate that is due, expired, never issued, unreadable or not installed. It reads the encrypted store offline and never fails the plan.
+- `infra doctor` checks that the Cloudflare token can read the zone's DNS records (one read-only call). A failure names the HTTP status, never the token or the zone id.
+- `foundry certs` publishes `CERTIFICATE_ISSUED` and `CERTIFICATE_INSTALLED` per certificate and `CERTIFICATE_FAILED` on a failure, to the event bus handlers configured for the environment. The payload holds the certificate name, its names, expiry and SHA-256 fingerprint (and the error text on failure), never a key or the token.
+
 ## Where things are stored
 
 | What | Where |
@@ -117,8 +171,7 @@ Writes are atomic (`sops set` on a copy, then a rename), and no plaintext key ev
 
 ## Not covered yet
 
-- Unattended renewal (`certs renew`), plan warnings for due certificates, certificate events and timer units.
-- Install targets other than a `host`.
+- Install targets other than a `host` (Proxmox VMs and OCI instances).
 
 ## Related
 

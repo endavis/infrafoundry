@@ -60,6 +60,7 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | Install the vendor's latest QNAP switch firmware | `foundry provider qnap upgrade --env <env> [--yes]` |
 | Show the state of the declared Let's Encrypt certificates | `foundry certs status --env <env>` |
 | Issue and install Let's Encrypt certificates | `foundry certs issue --env <env> [NAME...] [--force]` |
+| Renew Let's Encrypt certificates unattended | `foundry certs renew --env <env> [NAME...] [--dry-run]` |
 | Generate JSON schemas for IDE | `foundry config schema export` |
 | Migrate existing infra to config | `foundry config migrate --env <env> --provider opnsense --component <comp>` |
 | Plan changes | `foundry infra plan --env <env>` |
@@ -892,7 +893,7 @@ foundry state audit verify 123
 
 ## Certs Group (`foundry certs`)
 
-Per-device Let's Encrypt certificates declared as `certificate` resources of the [ACME provider](../providers/acme.md). Both commands read the settings from `provider_settings.acme`.
+Per-device Let's Encrypt certificates declared as `certificate` resources of the [ACME provider](../providers/acme.md). The commands read the settings from `provider_settings.acme`.
 
 ### `certs status`
 
@@ -919,6 +920,21 @@ foundry certs issue --env prod --force
 **Options:** `-e/--env TEXT` (required), `--force` (issue again even when current), `--lock-timeout INTEGER` (default: 0, fail fast)
 
 **Exit codes:** `0` ok, `1` a certificate failed, `2` usage error, `75` the environment lock is held.
+
+### `certs renew`
+
+The unattended run for a systemd timer or cron. Processes the certificates that are due, never issued, declared differently from the stored one, or stored but not installed (an install-only retry). Unlike `issue` it has no `--force`, and when nothing is due it prints nothing, takes no lock and exits `0`. `--dry-run` reports what would be done without taking the lock or contacting the CA, DNS host or target. See [Renewing unattended](../providers/acme.md#renewing-unattended) for timer units.
+
+```bash
+foundry certs renew --env prod
+foundry certs renew --env prod --dry-run
+```
+
+**Arguments:** `NAME...` (certificate names; all when omitted)
+
+**Options:** `-e/--env TEXT` (required), `--dry-run`, `--lock-timeout INTEGER` (default: 0, fail fast)
+
+**Exit codes:** `0` ok, `1` a certificate failed (or, with `--dry-run`, a declaration is invalid), `2` usage error, `75` the environment lock is held.
 
 ---
 

@@ -34,6 +34,7 @@ from infrafoundry.core.certs.models import (
 )
 from infrafoundry.core.certs.schema import parse_spec
 from infrafoundry.core.certs.store import SecretsWriter
+from infrafoundry.core.events.types import EventType
 from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.protocols import InstallsCertificate
 from infrafoundry.core.provider import ResourceConfig
@@ -45,6 +46,7 @@ SECRETS_FILENAME = "secrets.yaml"
 Action = Literal["issued", "installed", "skipped", "failed"]
 StateRecorder = Callable[[ResourceConfig, dict[str, Any]], None]
 Verifier = Callable[[CertificateTarget, str], None]
+Emitter = Callable[[EventType, dict[str, Any]], None]
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,15 @@ class CertOutcome:
     name: str
     action: Action
     message: str
+
+
+@dataclass(frozen=True)
+class CertPlan:
+    """What a run would do for one certificate (``renew --dry-run``, plan notes)."""
+
+    name: str
+    action: Literal["issue", "install", "error"]
+    reason: str
 
 
 def certificate_resources(resources: Sequence[ResourceConfig]) -> list[ResourceConfig]:
@@ -94,6 +105,7 @@ class CertificateService:
         verify: Verifier | None = None,
         record_state: StateRecorder | None = None,
         now: Callable[[], datetime] | None = None,
+        emit: Emitter | None = None,
     ) -> None:
         """Initialize the service.
 
@@ -108,6 +120,7 @@ class CertificateService:
                 by default.
             record_state: Records an ``ACTIVE`` state row (no key material in its config).
             now: Wall clock; replaced in tests.
+            emit: Publishes ``CERTIFICATE_*`` events; payloads carry no key or token.
         """
         self._env = env
         self._envs_dir = envs_dir
@@ -117,39 +130,69 @@ class CertificateService:
         self._verify: Verifier = verify or (lambda target, sha: verify_served(target, sha))
         self._record_state = record_state
         self._now = now or (lambda: datetime.now(UTC))
+        self._emitter = emit
 
     # -- status -------------------------------------------------------------------------
 
     def status(self, resources: Sequence[ResourceConfig]) -> list[CertStatus]:
         """Report the state of each declared certificate. Reads only; no network."""
-        result: list[CertStatus] = []
-        for resource in certificate_resources(resources):
-            names = tuple(resource.config.get("names") or ())
-            package = resource.package_path or "-"
-            entry = _stored_entry(resource)
-            if entry is None:
-                result.append(CertStatus(resource.name, package, names, "not issued"))
-                continue
+        return certificate_statuses(resources, self._default_renew, self._now())
+
+    def plan(
+        self,
+        resources: Sequence[ResourceConfig],
+        *,
+        directory: str,
+        only: Sequence[str] = (),
+    ) -> list[CertPlan]:
+        """List what ``renew`` would do: certificates that are missing, due or not installed.
+
+        Reads only: no lock, no CA, no DNS, no target. Certificates that need nothing are
+        left out.
+
+        Raises:
+            CertificateError: If a name in ``only`` is not declared.
+        """
+        chosen = self._choose(resources, only)
+        plans: list[CertPlan] = []
+        for resource in chosen:
             try:
-                info = describe(str(entry.get("cert_pem", "")))
-            except CertificateError:
-                result.append(CertStatus(resource.name, package, names, "invalid"))
+                spec = parse_spec(resource)
+            except InfraFoundryError as exc:
+                plans.append(CertPlan(resource.name, "error", str(exc)))
                 continue
-            days = (info.not_after - self._now()).days
-            window = int(resource.config.get("renew_before_days") or self._default_renew)
-            installed = entry.get("installed_sha256") == info.sha256
-            if days < 0:
-                state = "expired"
-            elif days <= window:
-                state = "due"
-            elif not installed:
-                state = "not installed"
-            else:
-                state = "valid"
-            result.append(
-                CertStatus(resource.name, package, names, state, info.not_after, days, installed)
-            )
-        return result
+            entry = _stored_entry(resource)
+            reason = self._issue_reason(spec, entry, directory)
+            if reason:
+                plans.append(CertPlan(resource.name, "issue", reason))
+            elif entry is not None and entry.get("installed_sha256") != entry.get("sha256"):
+                plans.append(CertPlan(resource.name, "install", "stored but not installed"))
+        return plans
+
+    def renew(
+        self,
+        resources: Sequence[ResourceConfig],
+        issuer: CertificateIssuer,
+        account: AccountRecord | None,
+        *,
+        directory: str,
+        directory_id: str,
+        only: Sequence[str] = (),
+    ) -> list[CertOutcome]:
+        """Process what is due, never issued or not installed; the unattended entry point.
+
+        The selection is that of ``issue`` without ``force``: a current, installed
+        certificate is never ordered again.
+        """
+        return self.issue(
+            resources,
+            issuer,
+            account,
+            directory=directory,
+            directory_id=directory_id,
+            only=only,
+            force=False,
+        )
 
     # -- issue --------------------------------------------------------------------------
 
@@ -181,11 +224,7 @@ class CertificateService:
         Raises:
             CertificateError: If a name in ``only`` is not declared.
         """
-        declared = certificate_resources(resources)
-        unknown = sorted(set(only) - {r.name for r in declared})
-        if unknown:
-            raise CertificateError(f"no certificate named: {', '.join(unknown)}")
-        chosen = [r for r in declared if not only or r.name in only]
+        chosen = self._choose(resources, only)
         outcomes: list[CertOutcome] = []
         current_account = account
         for resource in chosen:
@@ -201,25 +240,59 @@ class CertificateService:
             except (InfraFoundryError, OSError) as exc:
                 logger.warning("certificate '%s' failed: %s", resource.name, exc)
                 outcomes.append(CertOutcome(resource.name, "failed", str(exc)))
+                self._emit(
+                    EventType.CERTIFICATE_FAILED,
+                    {"certificate": resource.name, "error": str(exc)},
+                )
         return outcomes
+
+    @staticmethod
+    def _choose(resources: Sequence[ResourceConfig], only: Sequence[str]) -> list[ResourceConfig]:
+        declared = certificate_resources(resources)
+        unknown = sorted(set(only) - {r.name for r in declared})
+        if unknown:
+            raise CertificateError(f"no certificate named: {', '.join(unknown)}")
+        return [r for r in declared if not only or r.name in only]
+
+    def _emit(self, event: EventType, data: dict[str, Any]) -> None:
+        """Publish an event. A failing subscriber never fails a certificate run."""
+        if self._emitter is None:
+            return
+        try:
+            self._emitter(event, data)
+        except Exception as exc:
+            logger.warning("event %s handler failed: %s", event.value, exc.__class__.__name__)
 
     def _needs_issue(
         self, spec: CertificateSpec, entry: dict[str, Any] | None, directory: str
     ) -> bool:
+        return self._issue_reason(spec, entry, directory) is not None
+
+    def _issue_reason(
+        self, spec: CertificateSpec, entry: dict[str, Any] | None, directory: str
+    ) -> str | None:
+        """Why the certificate must be ordered again, or ``None`` when the stored one is fine."""
         if entry is None:
-            return True
+            return "never issued"
         try:
             info = describe(str(entry.get("cert_pem", "")))
         except CertificateError:
-            return True
+            return "the stored certificate is unreadable"
+        days = (info.not_after - self._now()).days
         window = spec.renew_before_days or self._default_renew
-        return (
-            (info.not_after - self._now()).days <= window
-            or set(info.names) != set(spec.names)
-            or entry.get("key_type") != spec.key_type
-            or entry.get("directory") != directory
-            or not entry.get("key_pem")
-        )
+        if days < 0:
+            return "expired"
+        if days <= window:
+            return f"due: {days} days left, renewing within {window}"
+        if set(info.names) != set(spec.names):
+            return "the declared names changed"
+        if entry.get("key_type") != spec.key_type:
+            return "the declared key type changed"
+        if entry.get("directory") != directory:
+            return "the ACME directory changed"
+        if not entry.get("key_pem"):
+            return "the stored private key is missing"
+        return None
 
     def _ensure_account(
         self, issuer: CertificateIssuer, account: AccountRecord | None, directory_id: str
@@ -259,6 +332,7 @@ class CertificateService:
             entry = _entry_from(issued)
             self._write_entry(resource, entry)
             action = "issued"
+            self._emit(EventType.CERTIFICATE_ISSUED, _event_data(resource, entry))
         assert entry is not None  # set above or present
         sha = str(entry.get("sha256", ""))
         if entry.get("installed_sha256") != sha:
@@ -272,6 +346,7 @@ class CertificateService:
             entry = {**entry, "installed_sha256": sha}
             self._write_entry(resource, entry)
             action = action if action == "issued" else "installed"
+            self._emit(EventType.CERTIFICATE_INSTALLED, _event_data(resource, entry))
         if action == "skipped":
             return CertOutcome(resource.name, "skipped", "up to date and installed")
         self._record(resource, spec, entry)
@@ -309,6 +384,50 @@ class CertificateService:
                 },
             },
         )
+
+
+def _event_data(resource: ResourceConfig, entry: dict[str, Any]) -> dict[str, Any]:
+    """Event payload: public facts only, never ``key_pem`` or a token."""
+    return {
+        "certificate": resource.name,
+        "names": list(entry.get("names") or ()),
+        "not_after": entry.get("not_after"),
+        "sha256": entry.get("sha256"),
+    }
+
+
+def certificate_statuses(
+    resources: Sequence[ResourceConfig], default_renew_days: int, now: datetime
+) -> list[CertStatus]:
+    """Report the state of each declared certificate from the encrypted store. No network."""
+    result: list[CertStatus] = []
+    for resource in certificate_resources(resources):
+        names = tuple(resource.config.get("names") or ())
+        package = resource.package_path or "-"
+        entry = _stored_entry(resource)
+        if entry is None:
+            result.append(CertStatus(resource.name, package, names, "not issued"))
+            continue
+        try:
+            info = describe(str(entry.get("cert_pem", "")))
+        except CertificateError:
+            result.append(CertStatus(resource.name, package, names, "invalid"))
+            continue
+        days = (info.not_after - now).days
+        window = int(resource.config.get("renew_before_days") or default_renew_days)
+        installed = entry.get("installed_sha256") == info.sha256
+        if days < 0:
+            state = "expired"
+        elif days <= window:
+            state = "due"
+        elif not installed:
+            state = "not installed"
+        else:
+            state = "valid"
+        result.append(
+            CertStatus(resource.name, package, names, state, info.not_after, days, installed)
+        )
+    return result
 
 
 def _entry_from(issued: IssuedCertificate) -> dict[str, Any]:
