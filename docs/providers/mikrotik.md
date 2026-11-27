@@ -45,6 +45,8 @@ provider_settings:
 
 `api_url` may use `http`: RouterOS can serve REST on `www` without TLS. Basic-auth credentials then travel in plaintext, so `infra doctor` warns.
 
+`verify_ssl` is the only certificate switch until the device holds an installed Let's Encrypt production certificate that InfraFoundry put there (see [Install target for certificates](#install-target-for-certificates)). From then on the client always checks the CA chain (the `certifi` bundle `requests` uses) and the host name of that certificate, whatever `verify_ssl` says. The device is still reached at the `api_url` address, which may be an IP literal: the name checked is the certificate's `verify.server_name` (or its first plain name). A certificate from the staging directory or a custom directory cannot pass CA validation, so it never changes the client.
+
 ## Supported Resources
 
 The resource type with `.` replaced by `/` is the REST path. YAML field names are the RouterOS names.
@@ -265,6 +267,29 @@ Verified read-only against a RouterOS 7.25 device: `GET system/package/update` (
 **Verified live on a RouterOS 7.25.1 CHR (#1665):** `foundry provider mikrotik upgrade` took the CHR from 7.25.1 to 7.25.2 in one run of about 15 seconds. `POST system/package/update/install` installed the release and rebooted the device once (the log shows `installed system-7.25.2` and `router rebooted by api`). The command saw it go down and come back, verified the version and re-planned "up to date (7.25.2)". The "up to date" status string is `System is already up to date`. `POST system/package/update/set {"channel": ...}` returns `[]` and the channel reads back changed. On a CHR, `GET system/routerboard` returns API 400 (`no such command or directory`), which the command treats as "no RouterBOARD firmware" and skips stage 2.
 
 **Not yet verified:** `POST system/routerboard/upgrade` and `POST system/reboot`, which need RouterBOARD hardware; a CHR has neither. The first run on a hardware switch exercises them. The command ignores the replies of the write calls apart from their HTTP status and proves each stage by polling and re-reading the versions, so a different reply shape cannot report a failed stage as a success.
+
+## Install target for certificates
+
+A `certificate` resource of the [ACME provider](acme.md) can target the device. InfraFoundry uploads the PEM files over REST, imports them, assigns the certificate to `api-ssl` and `www-ssl`, checks that the device serves it, and deletes the certificate it installed before.
+
+```yaml
+# envs/lab/acme/router/certificate.yaml
+certificate:
+  - name: router-cert
+    names: [router.example.com]
+    target:
+      provider: mikrotik
+      resource: edge-services              # an ip.service resource of the environment
+      verify: {server_name: router.example.com}   # port defaults to the api_url port
+```
+
+The target takes only `provider`, `resource` and `verify` (`port`, `server_name`): there are no file paths, SSH keys or reload commands. `resource` names a declared `ip.service` resource, which only proves the device is in the configuration; both `api-ssl` and `www-ssl` get the certificate. Do not set `certificate` on the `ip.service` resources themselves, or the next `infra apply` plans to change it back. `server_name` is required when every name is a wildcard; the check connects to the `api_url` address and sends this name.
+
+The order never removes the working certificate first: upload, import, check that the imported certificate holds its private key, rename it to `infrafoundry-<resource>-<first 12 hex of its SHA-256>`, delete the uploaded files (the key file is the sensitive one), switch `api-ssl` then `www-ssl`, verify the served certificate, and only then delete earlier `infrafoundry-<resource>-*` certificates that no service uses. A RouterOS error while switching restores the previous certificates and deletes the imported ones. When `www-ssl` restarts and drops the connection, the install carries on to the check. Other certificates on the device are never touched. If the check fails, the error names the new and the previous certificate and the console command that restores the previous one (`/ip service set api-ssl,www-ssl certificate=<previous>`).
+
+The `api_url` must be `https`: an `http` URL is refused, because the private key would cross the network in plaintext. After the install of a production certificate, InfraFoundry reads `system/resource` with the validating client once; if that fails the certificate is not recorded as installed and the client stays on `verify_ssl`, so a bad installation cannot lock later runs out.
+
+RouterOS imports the key and certificate together; the first live run on a router exercises the import of an EC key and the `file` upload, which are verified only against a fake device so far.
 
 ## Doctor
 

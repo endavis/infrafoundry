@@ -511,3 +511,57 @@ def test_verify_served_fetches_a_node_on_port_8006() -> None:
 
     verify_served(target, der_sha256(der), fetch=fetch)
     assert seen == [("node1.example.com", 8006, "node1.example.com")]
+
+
+def mikrotik_target(**over: Any) -> dict[str, Any]:
+    return {"provider": "mikrotik", "resource": "edge-services", **over}
+
+
+def mikrotik_resource(name: str = "edge-services") -> ResourceConfig:
+    return ResourceConfig(
+        name=name, type="ip.service", provider="mikrotik", config={"name": "www-ssl"}
+    )
+
+
+def test_a_mikrotik_target_needs_no_paths() -> None:
+    assert target_problems(mikrotik_target(), ["router.example.com"], "t") == []
+    assert (
+        target_problems(mikrotik_target(verify={"port": 8443}), ["router.example.com"], "t") == []
+    )
+
+
+def test_a_mikrotik_target_rejects_ssh_keys_and_unknown_ones() -> None:
+    problems = target_problems(
+        mikrotik_target(key_path="/etc/key", reload=["x"], bogus=1), ["router.example.com"], "t"
+    )
+    assert any("unknown keys" in p and "key_path" in p for p in problems)
+
+
+def test_a_mikrotik_target_with_only_wildcards_needs_a_server_name() -> None:
+    assert target_problems(mikrotik_target(), ["*.example.com"], "t")
+    assert not target_problems(
+        mikrotik_target(verify={"server_name": "router.example.com"}), ["*.example.com"], "t"
+    )
+
+
+def test_a_mikrotik_target_always_has_a_server_name_and_no_forced_port() -> None:
+    target = parse_target(mikrotik_target(), ["*.example.com", "router.example.com"])
+    assert (target.verify_server_name, target.verify_port, target.key_path) == (
+        "router.example.com",
+        None,
+        "",
+    )
+    assert (
+        parse_target(mikrotik_target(verify={"port": 8443}), ["a.example.com"]).verify_port == 8443
+    )
+
+
+def test_a_mikrotik_target_resolves_without_an_endpoint() -> None:
+    target = resolve_target(mikrotik_target(), ["router.example.com"], [mikrotik_resource()])
+    assert target.endpoint is None
+    assert target.env is None
+
+
+def test_a_mikrotik_target_needs_its_ip_service_resource() -> None:
+    with pytest.raises(CertificateSchemaError, match="not declared"):
+        resolve_target(mikrotik_target(), ["router.example.com"], [mikrotik_resource("other")])

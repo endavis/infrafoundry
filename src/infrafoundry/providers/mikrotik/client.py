@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 import requests
+from requests.adapters import HTTPAdapter
 
 from infrafoundry.core.exceptions import InfraFoundryError
 
@@ -66,8 +67,38 @@ class RouterOSWriter(RouterOSReader, Protocol):
         ...
 
 
+class _ServerNameAdapter(HTTPAdapter):
+    """Send SNI and check the certificate's host name against a fixed name, not the URL host.
+
+    The device is reached by an address (often an IP literal) while its Let's Encrypt
+    certificate names a DNS name.
+    """
+
+    def __init__(self, server_name: str) -> None:
+        self._server_name = server_name
+        super().__init__()
+
+    def init_poolmanager(
+        self, connections: int, maxsize: int, block: bool = False, **pool_kwargs: Any
+    ) -> None:
+        """Create the pool manager with the fixed server name for SNI and host name checks."""
+        super().init_poolmanager(
+            connections,
+            maxsize,
+            block=block,
+            server_hostname=self._server_name,
+            assert_hostname=self._server_name,
+            **pool_kwargs,
+        )
+
+
 class RouterOSClient:
-    """REST client over a ``requests.Session`` with HTTP basic auth."""
+    """REST client over a ``requests.Session`` with HTTP basic auth.
+
+    ``verify_ssl`` alone decides certificate checking, except once the device holds an
+    installed Let's Encrypt production certificate (``settings.tls_server_name``, #1683):
+    then the CA chain and that host name are always checked.
+    """
 
     def __init__(self, settings: MikroTikSettings) -> None:
         """Initialize the client.
@@ -80,6 +111,12 @@ class RouterOSClient:
         self._session = requests.Session()
         self._session.auth = (settings.username, settings.password)
         self._session.verify = settings.verify_ssl
+        self._validated = settings.tls_server_name is not None and settings.scheme == "https"
+        if self._validated and settings.tls_server_name:
+            self._session.verify = True
+            self._session.mount(
+                settings.api_url.rstrip("/"), _ServerNameAdapter(settings.tls_server_name)
+            )
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         """Send one request and return the decoded JSON body (``None`` for an empty body).
@@ -91,6 +128,18 @@ class RouterOSClient:
         url = self._base + path.strip("/")
         try:
             response = self._session.request(method, url, timeout=self._timeout, **kwargs)
+        except requests.exceptions.SSLError as exc:
+            if self._validated:
+                raise RouterOSConnectionError(
+                    f"The certificate RouterOS presented at {self._base} failed validation "
+                    "(CA chain or host name). If the installed certificate is wrong or "
+                    "expired, restore a working one on the device console, for example "
+                    "'/ip service set api-ssl,www-ssl certificate=<name>', then run "
+                    "'foundry certs issue' again."
+                ) from exc
+            raise RouterOSConnectionError(
+                f"Could not reach RouterOS at {self._base}: {type(exc).__name__}"
+            ) from exc
         except requests.RequestException as exc:
             raise RouterOSConnectionError(
                 f"Could not reach RouterOS at {self._base}: {type(exc).__name__}"

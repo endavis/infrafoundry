@@ -386,3 +386,9 @@ def test_status_honours_a_per_certificate_window() -> None:
     rig = Rig()
     cert = certificate_resource(stored=stored_entry(rig, days=40), renew_before_days=45)
     assert rig.service().status([cert])[0].state == "due"
+
+
+def test_the_target_reaches_the_provider_with_the_environment_name() -> None:
+    rig = Rig()
+    rig.issue(resources(certificate_resource()))
+    assert rig.host.installed[0][0].env == "prod"

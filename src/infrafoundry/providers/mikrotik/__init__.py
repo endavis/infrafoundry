@@ -13,6 +13,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, override
 
+from infrafoundry.core.certs.install import CertificateTarget
+from infrafoundry.core.certs.models import CertificateInstallError
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
@@ -24,6 +26,7 @@ from infrafoundry.core.provider_mixins import (
 from infrafoundry.core.validation import ValidationReport
 
 from .client import RouterOSClient
+from .components.certificate import RouterOSCertificateInstaller
 from .components.manager import MikroTikApplyResult, MikroTikManager, MikroTikPlan
 from .components.update import (
     UPDATE_ADDRESS_PREFIX,
@@ -51,6 +54,30 @@ class MikroTikProvider(
         """Initialize the MikroTik provider."""
         super().__init__("mikrotik", config_dir, output_dir)
         self._setup_template_environment()
+
+    def install_certificate(
+        self, target: CertificateTarget, cert_pem: str, chain_pem: str, key_pem: str
+    ) -> None:
+        """Install an ACME certificate on the device over REST and verify it (#1683).
+
+        Args:
+            target: The resolved install target; ``env`` names the environment whose
+                ``provider_settings.mikrotik`` reach the device.
+            cert_pem: The leaf certificate.
+            chain_pem: The intermediate chain (may be empty).
+            key_pem: The private key. Never logged.
+
+        Raises:
+            CertificateInstallError: If the install fails, the ``api_url`` is not https or the
+                environment is unknown. The message holds no key material.
+        """
+        if not target.env:
+            raise CertificateInstallError("the install target carries no environment name")
+        try:
+            settings = load_settings(self.config_dir, target.env)
+        except InfraFoundryError as exc:
+            raise CertificateInstallError(f"mikrotik settings are unusable: {exc}") from None
+        RouterOSCertificateInstaller(settings).install(target, cert_pem, chain_pem, key_pem)
 
     @override
     def validate_config(self, config: dict[str, Any]) -> bool:
