@@ -214,3 +214,11 @@ def test_after_apply_handler_carries_the_routes(loader: PackageLoader) -> None:
     assert json.loads(env["RP_ALLOWED"]) == []
     assert env["RP_IP"] == "192.0.2.70"
     assert env["RP_DOMAIN"] == "example.com"
+
+
+def test_vm_carries_the_reservation_address_for_ip_tags(loader: PackageLoader) -> None:
+    """The VM lists the reserved address so it is tagged with it (#1699)."""
+    resources, _events, variables = _example(loader)
+
+    vm = next(r for r in resources if r.type == "vm")
+    assert vm.config["ip_addresses"] == [variables["ip_address"]] == ["192.0.2.70"]

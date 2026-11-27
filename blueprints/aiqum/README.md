@@ -280,6 +280,7 @@ After a successful deploy:
   for host stability; the install scripts do not check memory. With `0` the VM
   keeps its balloon device (it returns freed pages to the host) but is never
   shrunk. See [Memory ballooning](../../docs/providers/proxmox.md#memory-ballooning).
+- The VM is also tagged with its reserved `ip_address` (#1699).
 - The default tags (`ontap`, `aiqum`) and `cloud_init_snippets` are recipe-level
   metadata baked into the blueprint. Additional tags can be appended via `extra_tags`.
 - Events live at the top of `blueprint.yaml` (not embedded in `vm.yaml`)

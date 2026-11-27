@@ -478,3 +478,13 @@ def test_aiqum_cert_export_renders_into_outputs(tmp_path: Path) -> None:
         "source": variables["aiqum_cert_export"],
         "dest": variables["aiqum_cert_export"],
     }
+
+
+def test_aiqum_vm_carries_the_reservation_address_for_ip_tags(loader: PackageLoader) -> None:
+    """The VM lists the reserved address so it is tagged with it (#1699)."""
+    resources, _events, _variables = loader.load_package(
+        PACKAGE_DIR, provider="proxmox", env_name="dev"
+    )
+
+    vm = next(r for r in resources if r.provider == "proxmox" and r.type == "vm")
+    assert vm.config["ip_addresses"] == ["198.51.100.50"]

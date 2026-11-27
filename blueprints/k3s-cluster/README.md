@@ -220,7 +220,7 @@ k3s-cluster/
     k3s-kubeconfig-mode/   # owner-only node kubeconfig (OCI variant)
   providers/
     proxmox/
-      vm.yaml              # Proxmox VM resource template
+      vm.yaml              # Proxmox VM resource template (each VM tagged with its IP)
       dhcp.yaml            # OPNsense DHCP reservation template
     oci/
       instance.yaml        # OCI compute instance template

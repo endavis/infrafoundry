@@ -554,3 +554,17 @@ def test_k3s_kubeconfig_mode_handler_env_renders_for_the_example(loader: Package
         "K3S_JUMPHOST": "ansible@ansible.example.com",
         "K3S_KNOWN_HOSTS": "",
     }
+
+
+def test_proxmox_k3s_cluster_vms_carry_their_addresses_for_ip_tags(
+    loader: PackageLoader,
+) -> None:
+    """Each VM lists its reserved address so it is tagged with it (#1699)."""
+    resources, _events, _variables = loader.load_package(
+        PACKAGE_DIR, provider="proxmox", env_name="dev"
+    )
+
+    vms = {r.name: r.config for r in resources if r.type == "vm"}
+    assert vms["k3s-dev-server"]["ip_addresses"] == ["192.0.2.80"]
+    assert vms["k3s-dev-agent-1"]["ip_addresses"] == ["192.0.2.81"]
+    assert vms["k3s-dev-agent-2"]["ip_addresses"] == ["192.0.2.82"]

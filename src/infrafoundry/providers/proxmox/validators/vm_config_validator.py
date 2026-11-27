@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import re
 from typing import Any, override
 
@@ -9,6 +10,18 @@ from infrafoundry.core.protocols import SpecializedValidator
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
 from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 from infrafoundry.providers.proxmox.validators.import_id import import_id_problems
+
+
+def _is_ipv4(value: object) -> bool:
+    """Whether ``value`` is a string holding an IPv4 address."""
+    if not isinstance(value, str):
+        return False
+    try:
+        ipaddress.IPv4Address(value.strip())
+    except ValueError:
+        return False
+    return True
+
 
 # Known valid values for advisory warnings
 KNOWN_CPU_TYPES = frozenset(
@@ -84,6 +97,38 @@ class VMConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
             self._validate_disk_size(name, config)
             self._validate_import_id(name, resource.import_id, config)
             self._validate_agent_timeout(name, config)
+            self._validate_ip_tags(name, config)
+            self._validate_ip_addresses(name, config)
+
+    def _validate_ip_addresses(self, name: str, config: dict[str, Any]) -> None:
+        """Error if ip_addresses is not a list of IPv4 addresses."""
+        if "ip_addresses" not in config:
+            return
+        value = config["ip_addresses"]
+        valid = isinstance(value, list) and all(_is_ipv4(a) for a in value)
+        if valid:
+            return
+        self.report.add_check(
+            check_name=f"proxmox_vm_{name}_ip_addresses",
+            passed=False,
+            message=(
+                f"VM '{name}': ip_addresses '{value}' is invalid. Must be a list of IPv4 addresses."
+            ),
+            level=ValidationLevel.ERROR,
+        )
+
+    def _validate_ip_tags(self, name: str, config: dict[str, Any]) -> None:
+        """Error if ip_tags is not a boolean."""
+        if "ip_tags" not in config or isinstance(config["ip_tags"], bool):
+            return
+        self.report.add_check(
+            check_name=f"proxmox_vm_{name}_ip_tags",
+            passed=False,
+            message=(
+                f"VM '{name}': ip_tags '{config['ip_tags']}' is invalid. Must be true or false."
+            ),
+            level=ValidationLevel.ERROR,
+        )
 
     def _validate_agent_timeout(self, name: str, config: dict[str, Any]) -> None:
         """Error if agent_timeout is not a duration string or the agent is not enabled."""

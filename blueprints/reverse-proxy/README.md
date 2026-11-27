@@ -62,7 +62,7 @@ or a literal value; set `insecure` for backends with a self-signed certificate.
 
 ## What gets created
 
-- a Proxmox VM (tag `reverse-proxy`) and an OPNsense Kea DHCP reservation;
+- a Proxmox VM (tag `reverse-proxy`, plus its reserved `ip_address` as a tag) and an OPNsense Kea DHCP reservation;
 - one Unbound host override per route (`<vm_name>-<route>`), whose description summarizes the route;
 - an acme `certificate` (`<vm_name>-cert`) targeting the VM, when `certificate_names` is set;
 - an `after_apply` handler (`reverse-proxy-config`) that renders the Caddyfile, validates it on

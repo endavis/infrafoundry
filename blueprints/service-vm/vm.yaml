@@ -32,5 +32,6 @@ vms:
 {% if import_id %}
     import_id: "{{ import_id }}"
 {% endif %}
+    ip_addresses: ["{{ ip_address }}"]
     tags: {{ tags | tojson }}
     onboot: {{ onboot }}

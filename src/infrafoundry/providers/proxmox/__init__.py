@@ -1,5 +1,7 @@
 """Proxmox provider for InfraFoundry."""
 
+import copy
+import ipaddress
 import os
 import shlex
 from pathlib import Path, PurePosixPath
@@ -52,6 +54,74 @@ def _customized_image_filename(filename: str) -> str:
 def _imports_disk(vm: ResourceConfig) -> bool:
     """Whether a VM is built by importing a disk (an OVA or a raw image) over SSH."""
     return "ova_source" in vm.config or "disk_image_source" in vm.config
+
+
+def _ipconfig_ipv4(ipconfig: object) -> str | None:
+    """Return the static IPv4 address of a Proxmox ``ipconfig`` string, without the prefix.
+
+    ``ip=192.0.2.10/24,gw=192.0.2.1`` gives ``192.0.2.10``. ``dhcp``, ``manual``, an IPv6-only
+    string, an invalid address or a non-string gives ``None``.
+    """
+    if not isinstance(ipconfig, str):
+        return None
+    for part in ipconfig.split(","):
+        key, _, value = part.strip().partition("=")
+        if key != "ip":
+            continue
+        address = value.split("/", 1)[0].strip()
+        try:
+            return str(ipaddress.IPv4Address(address))
+        except ValueError:
+            return None
+    return None
+
+
+def _ipv4_literal(value: object) -> str | None:
+    """Return ``value`` as a normalised IPv4 address, or ``None`` for anything else."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return str(ipaddress.IPv4Address(value.strip()))
+    except ValueError:
+        return None
+
+
+def _known_ipv4_addresses(config: dict[str, Any]) -> list[str]:
+    """Collect the VM's known IPv4 addresses, deduplicated, in source order.
+
+    Sources: the static ``ipconfig`` address and the ``ip_addresses`` list (a DHCP reservation
+    the VM's own settings do not show).
+    """
+    found: list[str] = []
+    static = _ipconfig_ipv4(config.get("ipconfig"))
+    if static is not None:
+        found.append(static)
+    listed = config.get("ip_addresses")
+    if isinstance(listed, list):
+        found.extend(a for a in map(_ipv4_literal, listed) if a is not None)
+    return list(dict.fromkeys(found))
+
+
+def _with_ip_tags(vm: ResourceConfig) -> ResourceConfig:
+    """Add the VM's known IPv4 addresses to its ``tags`` (#1699).
+
+    The tags are bare dotted addresses, merged with the user's tags without duplicates and sorted
+    (Proxmox stores tags sorted). A VM without a known IPv4 address, with ``ip_tags: false`` or
+    with non-list ``tags`` is returned unchanged.
+    """
+    config = vm.config
+    if config.get("ip_tags") is False:
+        return vm
+    addresses = _known_ipv4_addresses(config)
+    if not addresses:
+        return vm
+    tags = config.get("tags")
+    if tags is not None and not isinstance(tags, list):
+        return vm
+    merged = sorted({str(t) for t in tags or []} | set(addresses))
+    result = copy.deepcopy(vm)
+    result.config["tags"] = merged
+    return result
 
 
 def _raise_host_key_problems(vm: ResourceConfig, cloud_init: dict[Any, Any] | None) -> None:
@@ -345,6 +415,7 @@ class ProxmoxProvider(
             else:
                 processed = self._process_cloud_init_snippets(vm)
                 processed = self._normalize_vm_config(processed)
+                processed = _with_ip_tags(processed)
                 regular_vms.append(processed)
 
         if regular_vms:

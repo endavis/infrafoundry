@@ -92,7 +92,8 @@ foundry infra apply --env <env> --package my-service
 
 - **Proxmox VM** (`proxmox.vm`, name `{{ vm_name }}`): cloned from the
   template, attached to `bridge`/`vlan_tag`, MAC pinned to `mac_address`,
-  tagged with `tags`, optionally carrying `cloud_init_snippets` and the
+  tagged with `tags` and, through `ip_addresses`, with the reserved
+  `ip_address`, optionally carrying `cloud_init_snippets` and the
   `HOSTNAME` cloud-init variable.
 - **DHCP reservation** (`opnsense.kea_reservation`, name `{{ vm_name }}`):
   binds `ip_address` to `mac_address` on the `dhcp_subnet`, with
