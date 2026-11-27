@@ -15,6 +15,8 @@ from typing import Any, override
 
 import yaml
 
+from infrafoundry.core.certs.install import CertificateTarget
+from infrafoundry.core.certs.ssh_installer import SshCertificateInstaller
 from infrafoundry.core.config.models import EnvironmentConfig
 from infrafoundry.core.exceptions import SchemaValidationError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
@@ -59,6 +61,7 @@ class HostProvider(
         """Initialize the host provider."""
         super().__init__("host", config_dir, output_dir)
         self._last_hosts: list[ResourceConfig] = []
+        self._certificate_installer = SshCertificateInstaller()
         self._setup_template_environment()
 
     @override
@@ -223,6 +226,23 @@ class HostProvider(
                 playbooks.append(str((self.repo_root / playbook).resolve()))
             runs.append(HostRun(host.name, tuple(playbooks), ref, enrollment))
         return runs
+
+    def install_certificate(
+        self, target: CertificateTarget, cert_pem: str, chain_pem: str, key_pem: str
+    ) -> None:
+        """Install an ACME certificate and key on a host over SSH, then reload (#1682).
+
+        Args:
+            target: The resolved install target, with the host's SSH endpoint.
+            cert_pem: The leaf certificate.
+            chain_pem: The intermediate chain (may be empty).
+            key_pem: The private key. Never logged.
+
+        Raises:
+            CertificateInstallError: If the install fails or the reload fails (the previous
+                files are restored). The message holds no key material.
+        """
+        self._certificate_installer.install(target, cert_pem, chain_pem, key_pem)
 
     def resolve_tailscale_auth(self, ref: str) -> str:
         """Return the secret a ``tailscale:`` auth reference points at.

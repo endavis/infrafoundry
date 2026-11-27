@@ -27,6 +27,8 @@ dependencies = [
     "azure-keyvault-secrets>=4.11.0",
     "packaging>=24.0",
     "defusedxml>=0.7.1",
+    "acme>=5.10.0",
+    "cryptography>=47.0.0",
 ]
 
 [project.optional-dependencies]

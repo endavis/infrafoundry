@@ -201,6 +201,10 @@ Key commands (`foundry` via `uv run foundry ...`):
 - `secrets rotate --env <name>` – rotate encryption keys
 - `secrets host-keys --env <name>` – record the SSH host keys blueprint scripts pin for their VMs
 
+**Certs group (`certs`):**
+- `certs status --env <name>` – show the state of the declared Let's Encrypt certificates
+- `certs issue --env <name> [NAME...] [--force]` – issue and install the certificates that are missing, due or not installed
+
 **Policy group (`policy`):**
 - `policy list` – list available infrastructure policies
 

@@ -58,6 +58,8 @@ InfraFoundry commands are organized into six domain groups plus two top-level ut
 | Install the vendor's latest GL.iNet firmware | `foundry provider openwrt upgrade --env <env> [--device <name>] [--yes]` |
 | Install the latest MikroTik RouterOS of the declared channel | `foundry provider mikrotik upgrade --env <env> [--yes]` |
 | Install the vendor's latest QNAP switch firmware | `foundry provider qnap upgrade --env <env> [--yes]` |
+| Show the state of the declared Let's Encrypt certificates | `foundry certs status --env <env>` |
+| Issue and install Let's Encrypt certificates | `foundry certs issue --env <env> [NAME...] [--force]` |
 | Generate JSON schemas for IDE | `foundry config schema export` |
 | Migrate existing infra to config | `foundry config migrate --env <env> --provider opnsense --component <comp>` |
 | Plan changes | `foundry infra plan --env <env>` |
@@ -885,6 +887,38 @@ foundry state audit verify 123
 - `list` -- `-e/--env TEXT`, `-u/--user TEXT`, `-a/--action TEXT`, `--since TEXT`, `--until TEXT`, `-n/--limit INTEGER` (default: 50), `--format [text|json]`
 - `export` -- `-o/--output FILE` (required), `-f/--format [json|csv]`, `-e/--env TEXT`, `-u/--user TEXT`, `-a/--action TEXT`, `--since TEXT`, `--until TEXT`
 - `verify <entry-id>`
+
+---
+
+## Certs Group (`foundry certs`)
+
+Per-device Let's Encrypt certificates declared as `certificate` resources of the [ACME provider](../providers/acme.md). Both commands read the settings from `provider_settings.acme`.
+
+### `certs status`
+
+Show each declared certificate: its state (`not issued`, `valid`, `due`, `expired`, `not installed`, `invalid`), expiry and whether it is installed. Reads the encrypted store only; it contacts no CA, DNS host or device.
+
+```bash
+foundry certs status --env prod
+```
+
+**Options:** `-e/--env TEXT` (required)
+
+### `certs issue`
+
+Issue and install the certificates that are missing, due, issued for other names or another directory, or stored but not installed. Holds the environment lock, processes certificates one at a time and continues past a failure. A stored certificate that was never installed gets an install-only retry. Commit the config repo afterwards: the encrypted store changed.
+
+```bash
+foundry certs issue --env prod
+foundry certs issue --env prod proxy-cert
+foundry certs issue --env prod --force
+```
+
+**Arguments:** `NAME...` (certificate names; all when omitted)
+
+**Options:** `-e/--env TEXT` (required), `--force` (issue again even when current), `--lock-timeout INTEGER` (default: 0, fail fast)
+
+**Exit codes:** `0` ok, `1` a certificate failed, `2` usage error, `75` the environment lock is held.
 
 ---
 

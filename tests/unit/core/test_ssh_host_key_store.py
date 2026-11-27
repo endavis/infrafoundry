@@ -246,3 +246,11 @@ class TestPlan:
         resource = _resource("vm", _recorded("vm"))
         (planned,) = plan_actions([resource], lambda _r: True, ["vm"])
         assert "deployed" in planned.reason
+
+
+def test_ensure_secrets_file_accepts_initial_content(tmp_path: Path) -> None:
+    path = tmp_path / "secrets.yaml"
+    run = FakeRun(stdout="encrypted: true\n")
+
+    assert ensure_secrets_file(path, tmp_path, run, initial="acme: {}\n") is True
+    assert run.calls[0][1]["input"] == "acme: {}\n"

@@ -23,6 +23,7 @@ import jinja2
 import jinja2.meta
 import yaml
 
+from infrafoundry.core.certs.models import CERTS_VARIABLE
 from infrafoundry.core.config.filters import create_jinja2_env
 from infrafoundry.core.config.inventory_generator import InventoryGenerator
 from infrafoundry.core.config.manifest_utils import extract_inventory_block
@@ -53,6 +54,9 @@ if TYPE_CHECKING:
     from infrafoundry.core.config.blueprint_resolver import BlueprintResolver
 
 logger = logging.getLogger(__name__)
+
+#: Package secret variables that hold private keys and never merge into manifest variables.
+_RESERVED_SECRETS = frozenset({HOST_KEYS_VARIABLE, CERTS_VARIABLE})
 
 # Map of dotted resource-type paths → declared YAML leaf shape under the
 # nested ``opnsense:`` namespace (#793 per ADR-0016).
@@ -494,9 +498,10 @@ class PackageLoader:
             secret_vars = secrets_data.get("variables", {})
             package_secrets = copy.deepcopy(secret_vars) if secret_vars else {}
             if secret_vars:
-                # ``ssh_host_keys`` holds private host keys (#1581): only ``package_secrets``
-                # keeps it, so it never reaches variables, script env or Jinja contexts.
-                mergeable = {k: v for k, v in secret_vars.items() if k != HOST_KEYS_VARIABLE}
+                # ``ssh_host_keys`` holds private host keys (#1581) and ``acme_certificates``
+                # private certificate keys (#1682): only ``package_secrets`` keeps them, so
+                # they never reach variables, script env or Jinja contexts.
+                mergeable = {k: v for k, v in secret_vars.items() if k not in _RESERVED_SECRETS}
                 manifest.variables.update(mergeable)
                 logger.info(
                     "Loaded %d secret variable(s) from %s",
