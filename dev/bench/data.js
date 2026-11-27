@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795796962751,
+  "lastUpdate": 1795798129793,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7338,6 +7338,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000020564296107048276",
             "extra": "mean: 129.61571028250611 usec\nrounds: 8315"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cae7fdf9baf8f81016417495aeaedc5071a963c7",
+          "message": "fix: default reverse-proxy disk_size to 32 GiB (merges PR #1702, addresses #1697)\n\nProxmox cannot shrink a cloned disk, so the 16 GiB default failed\nagainst the 32 GiB Ubuntu template and left the VM tainted. Raise the\ndefault to match the template and document the constraint. A test\nkeeps the default no smaller than the ubuntu-template blueprint's.\n\nAddresses #1697\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T16:47:32Z",
+          "tree_id": "5c73c29adc48642e518e42e4f89122c99e1f9060",
+          "url": "https://github.com/endavis/infrafoundry/commit/cae7fdf9baf8f81016417495aeaedc5071a963c7"
+        },
+        "date": 1795798129241,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 43.068086901340656,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00032633812270679906",
+            "extra": "mean: 23.21904853333226 msec\nrounds: 45"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7771.181838827978,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010175076532861718",
+            "extra": "mean: 128.68055602605952 usec\nrounds: 8264"
           }
         ]
       }
