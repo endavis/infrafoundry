@@ -307,3 +307,13 @@ def test_status_without_certificates() -> None:
     result = Harness(resources=[host_resource()]).run("status", "--env", "dev")
     assert result.exit_code == 0
     assert "No certificate resources" in result.output
+
+
+def test_build_service_sets_the_environment_on_providers_that_have_it() -> None:
+    orchestrator = MagicMock()
+    orchestrator.config_manager.base_dir = Path("/cfg/envs")
+    with_env = MagicMock()
+    without_env = object()
+    orchestrator.providers = {"proxmox": with_env, "host": without_env}
+    _common.build_service(orchestrator, "dev", MagicMock(), 30, record=False)
+    with_env.set_environment.assert_called_once_with("dev")

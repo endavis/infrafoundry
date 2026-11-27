@@ -19,6 +19,9 @@ from infrafoundry.core.ssh_host_keys import FIX_HINT, host_key_config, known_hos
 
 SUPPORTED_TARGET_PROVIDERS = ("host", "proxmox", "oci")
 TARGET_RESOURCE_TYPES = {"host": "host", "proxmox": "vm", "oci": "instance"}
+TARGET_KINDS = {"proxmox": ("vm", "node")}
+"""Optional ``target.kind`` values per provider; absent means the provider's default kind."""
+NODE_VERIFY_PORT = 8006
 VERIFY_WINDOW_SECONDS = 30.0
 
 _PATH_RE = re.compile(r"^/[A-Za-z0-9._/@+:-]+$")
@@ -26,6 +29,18 @@ _MODE_RE = re.compile(r"^[0-7]{3,4}$")
 _ACCOUNT_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
 _JUMPHOST_RE = re.compile(r"^[A-Za-z0-9._@:-]+$")
 _ADDRESS_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
+_NODE_NAME_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+_NODE_REJECTED_KEYS = (
+    "cert_path",
+    "fullchain_path",
+    "key_path",
+    "owner",
+    "group",
+    "cert_mode",
+    "key_mode",
+    "sudo",
+    "reload",
+)
 _JUMP_OPTS = ["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=10"]
 _TARGET_KEYS = frozenset(
     {
@@ -41,6 +56,8 @@ _TARGET_KEYS = frozenset(
         "sudo",
         "reload",
         "verify",
+        "kind",
+        "address",
     }
 )
 
@@ -82,6 +99,7 @@ class CertificateTarget:
     verify_port: int | None = None
     verify_server_name: str | None = None
     endpoint: TargetEndpoint | None = None
+    kind: str | None = None
 
 
 def target_problems(raw: Any, names: Iterable[str], where: str) -> list[str]:
@@ -101,6 +119,12 @@ def target_problems(raw: Any, names: Iterable[str], where: str) -> list[str]:
     provider = raw.get("provider")
     if provider not in SUPPORTED_TARGET_PROVIDERS:
         problems.append(f"{where}.provider must be one of: {', '.join(SUPPORTED_TARGET_PROVIDERS)}")
+    kind = raw.get("kind")
+    if kind is not None and kind not in TARGET_KINDS.get(str(provider), ()):
+        allowed = ", ".join(TARGET_KINDS.get(str(provider), ())) or "none for this provider"
+        problems.append(f"{where}.kind must be one of: {allowed}")
+    if kind == "node" and provider == "proxmox":
+        return problems + _node_target_problems(raw, list(names), where)
     if not isinstance(raw.get("resource"), str) or not raw.get("resource"):
         problems.append(f"{where}.resource must name the target resource")
     if not (raw.get("cert_path") or raw.get("fullchain_path")):
@@ -133,6 +157,36 @@ def target_problems(raw: Any, names: Iterable[str], where: str) -> list[str]:
     verify = raw.get("verify")
     if verify is not None:
         problems.extend(_verify_problems(verify, list(names), f"{where}.verify"))
+    return problems
+
+
+def _node_target_problems(raw: dict[str, Any], names: list[str], where: str) -> list[str]:
+    """Problems of a Proxmox node target: installed through the API, so no SSH or file keys."""
+    problems: list[str] = []
+    resource = raw.get("resource")
+    if not (isinstance(resource, str) and _NODE_NAME_RE.fullmatch(resource)):
+        problems.append(f"{where}.resource must be a Proxmox node name (a single host name label)")
+    rejected = sorted(k for k in _NODE_REJECTED_KEYS if k in raw)
+    if rejected:
+        problems.append(
+            f"{where} has keys that do not apply to a Proxmox node: {', '.join(rejected)}"
+        )
+    address = raw.get("address")
+    if address is not None and not (
+        isinstance(address, str) and _ADDRESS_RE.fullmatch(address) and not address.startswith("-")
+    ):
+        problems.append(f"{where}.address must be a host name or IP address")
+    verify = raw.get("verify")
+    if verify is None:
+        if address is None and names and all(n.startswith("*.") for n in names):
+            problems.append(
+                f"{where}.verify.server_name or {where}.address is required "
+                "when every name is a wildcard"
+            )
+    else:
+        problems.extend(
+            _verify_problems(verify, names if address is None else ["address"], f"{where}.verify")
+        )
     return problems
 
 
@@ -171,6 +225,18 @@ def parse_target(raw: dict[str, Any], names: Iterable[str]) -> CertificateTarget
     verify = raw.get("verify")
     port: int | None = None
     server_name: str | None = None
+    if raw.get("kind") == "node":
+        verify_map = verify if isinstance(verify, dict) else {}
+        return CertificateTarget(
+            provider=str(raw["provider"]),
+            resource=str(raw["resource"]),
+            key_path="",
+            verify_port=int(verify_map.get("port", NODE_VERIFY_PORT)),
+            verify_server_name=verify_map.get("server_name")
+            or next((n for n in name_list if not n.startswith("*.")), None)
+            or raw.get("address"),
+            kind="node",
+        )
     if isinstance(verify, dict):
         port = int(verify.get("port", 443))
         server_name = verify.get("server_name") or next(
@@ -207,6 +273,9 @@ def resolve_target(
         CertificateSchemaError: If the target is invalid or names no such resource.
     """
     target = parse_target(raw, names)
+    if target.kind == "node":
+        address = str(raw.get("address") or target.verify_server_name or "")
+        return CertificateTarget(**{**target.__dict__, "endpoint": TargetEndpoint(address=address)})
     resource_type = TARGET_RESOURCE_TYPES[target.provider]
     host = next(
         (

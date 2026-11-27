@@ -372,16 +372,19 @@ class CertificateService:
     ) -> None:
         if self._record_state is None:
             return
+        target: dict[str, Any] = {
+            "provider": spec.target.get("provider"),
+            "resource": spec.target.get("resource"),
+        }
+        if spec.target.get("kind"):
+            target["kind"] = spec.target["kind"]
         self._record_state(
             resource,
             {
                 "names": list(spec.names),
                 "not_after": entry["not_after"],
                 "sha256": entry["sha256"],
-                "target": {
-                    "provider": spec.target.get("provider"),
-                    "resource": spec.target.get("resource"),
-                },
+                "target": target,
             },
         )
 

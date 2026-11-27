@@ -45,3 +45,41 @@ def test_a_failure_surfaces_as_a_certificate_install_error(provider: ProxmoxProv
     provider._certificate_installer = SshCertificateInstaller(FakeRun(returncode=255))
     with pytest.raises(CertificateInstallError, match="failed"):
         provider.install_certificate(resolved(), "C", "", KEY)
+
+
+def node_target() -> CertificateTarget:
+    return resolve_target(
+        {"provider": "proxmox", "kind": "node", "resource": "node1"}, ["node1.example.com"], []
+    )
+
+
+def test_a_node_target_uses_the_api_and_never_ssh(
+    provider: ProxmoxProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from unittest.mock import MagicMock
+
+    run = FakeRun()
+    provider._certificate_installer = SshCertificateInstaller(run)
+    api = MagicMock()
+    api.get_json.return_value = {"data": [{"node": "node1"}]}
+    monkeypatch.setattr(provider, "_api_client", lambda: api)
+    provider.install_certificate(node_target(), "CERT\n", "CHAIN\n", KEY)
+    assert run.calls == []
+    endpoint, data = api.post_json.call_args.args
+    assert endpoint == "nodes/node1/certificates/custom"
+    assert data["key"] == KEY
+
+
+def test_a_node_target_without_credentials_fails(
+    provider: ProxmoxProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(provider, "_api_client", lambda: None)
+    with pytest.raises(CertificateInstallError, match="no Proxmox API credentials"):
+        provider.install_certificate(node_target(), "C", "", KEY)
+
+
+def test_a_vm_target_still_goes_over_ssh(provider: ProxmoxProvider) -> None:
+    run = FakeRun()
+    provider._certificate_installer = SshCertificateInstaller(run)
+    provider.install_certificate(resolved(), "C\n", "", KEY)
+    assert run.calls

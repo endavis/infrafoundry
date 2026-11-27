@@ -171,7 +171,10 @@ class ProxmoxProvider(
     def install_certificate(
         self, target: CertificateTarget, cert_pem: str, chain_pem: str, key_pem: str
     ) -> None:
-        """Install an ACME certificate and key on a VM over SSH, then reload (#1682).
+        """Install an ACME certificate and key on a VM over SSH, or on a node via the API.
+
+        A target with ``kind: node`` goes through the node API (#1705); any other target is a
+        VM reached over SSH, which reloads the service (#1682).
 
         Args:
             target: The resolved install target, with the VM's pinned SSH endpoint.
@@ -183,6 +186,19 @@ class ProxmoxProvider(
             CertificateInstallError: If the install fails or the reload fails (the previous
                 files are restored). The message holds no key material.
         """
+        if target.kind == "node":
+            from infrafoundry.core.certs.models import CertificateInstallError
+
+            from .node_certificate import install_node_certificate
+
+            client = self._api_client()
+            if client is None:
+                raise CertificateInstallError(
+                    f"no Proxmox API credentials in the environment config; cannot install a "
+                    f"certificate on node '{target.resource}'"
+                )
+            install_node_certificate(client, target.resource, cert_pem, chain_pem, key_pem)
+            return
         self._certificate_installer.install(target, cert_pem, chain_pem, key_pem)
 
     @override
@@ -871,6 +887,10 @@ class ProxmoxProvider(
             return [f"SDN dry-run skipped: {exc.message}"]
 
     def _sdn_dry_run_client(self) -> "ProxmoxClient | None":
+        """Build an API client from the environment settings, as the validator does."""
+        return self._api_client()
+
+    def _api_client(self) -> "ProxmoxClient | None":
         """Build an API client from the environment settings, as the validator does."""
         from infrafoundry.core.credential_override import resolve_settings
         from infrafoundry.secrets.environment import resolve_secret_settings

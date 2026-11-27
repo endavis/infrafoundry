@@ -398,3 +398,116 @@ def test_verify_uses_the_jump_fetch_only_with_a_jumphost() -> None:
     )
     verify_served(target, sha, fetch=direct, jump_fetch=jump)
     assert calls[-1] == "direct"
+
+
+# -- Proxmox node targets (#1705) ----------------------------------------------------------
+
+
+def node_target(**over: Any) -> dict[str, Any]:
+    raw: dict[str, Any] = {"provider": "proxmox", "kind": "node", "resource": "node1"}
+    raw.update(over)
+    return raw
+
+
+def test_a_node_target_defaults_to_port_8006_and_the_first_plain_name() -> None:
+    target = parse_target(node_target(), ["*.example.com", "node1.example.com"])
+    assert target.kind == "node"
+    assert target.verify_port == 8006
+    assert target.verify_server_name == "node1.example.com"
+
+
+def test_a_node_target_takes_an_explicit_verify_block() -> None:
+    raw = node_target(verify={"port": 8443, "server_name": "pve.example.net"})
+    target = parse_target(raw, ["node1.example.com"])
+    assert (target.verify_port, target.verify_server_name) == (8443, "pve.example.net")
+
+
+def test_a_node_needs_no_declared_resource_and_verifies_the_address() -> None:
+    raw = node_target(address="node1.example.com")
+    target = resolve_target(raw, ["*.example.com"], [])
+    assert target.endpoint is not None
+    assert target.endpoint.address == "node1.example.com"
+    assert target.endpoint.jumphost is None
+    assert target.verify_server_name == "node1.example.com"
+
+
+def test_a_node_without_address_verifies_the_server_name() -> None:
+    target = resolve_target(node_target(), ["node1.example.com"], [])
+    assert target.endpoint is not None
+    assert target.endpoint.address == "node1.example.com"
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"key_path": "/etc/pve/key.pem"},
+        {"cert_path": "/etc/pve/cert.pem"},
+        {"fullchain_path": "/etc/pve/chain.pem"},
+        {"reload": ["true"]},
+        {"sudo": True},
+        {"owner": "root"},
+        {"cert_mode": "0644"},
+    ],
+)
+def test_a_node_rejects_ssh_and_file_keys(extra: dict[str, Any]) -> None:
+    problems = target_problems(node_target(**extra), ["node1.example.com"], "target")
+    assert any("do not apply to a Proxmox node" in p for p in problems)
+
+
+@pytest.mark.parametrize("name", ["node1.example.com", "-pve", "pve 1", "", "a;b"])
+def test_a_node_name_must_be_one_host_label(name: str) -> None:
+    problems = target_problems(node_target(resource=name), ["node1.example.com"], "target")
+    assert any("node name" in p for p in problems)
+
+
+@pytest.mark.parametrize("address", ["-oProxyCommand=x", "a b", "pve;1", 5])
+def test_a_node_address_must_be_safe(address: Any) -> None:
+    problems = target_problems(node_target(address=address), ["node1.example.com"], "target")
+    assert any("address" in p for p in problems)
+
+
+def test_a_wildcard_only_node_needs_a_server_name_or_address() -> None:
+    assert any("wildcard" in p for p in target_problems(node_target(), ["*.example.com"], "target"))
+    assert not target_problems(
+        node_target(address="node1.example.com"), ["*.example.com"], "target"
+    )
+    raw = node_target(verify={"server_name": "node1.example.com"})
+    assert not target_problems(raw, ["*.example.com"], "target")
+
+
+def test_an_unknown_kind_is_rejected() -> None:
+    raw = node_target(kind="cluster")
+    assert any("kind must be one of: vm, node" in p for p in target_problems(raw, ["a"], "t"))
+
+
+@pytest.mark.parametrize("provider", ["host", "oci"])
+def test_kind_is_an_error_on_other_providers(provider: str) -> None:
+    raw = dict(raw_target(), provider=provider, kind="node")
+    assert any("kind must be one of" in p for p in target_problems(raw, ["a.example.com"], "t"))
+
+
+def test_kind_vm_equals_no_kind() -> None:
+    resource = vm_resource(provider="proxmox", rtype="vm")
+    plain = resolve_target(vm_target(resource), ["example.com"], [resource])
+    explicit = resolve_target({**vm_target(resource), "kind": "vm"}, ["example.com"], [resource])
+    assert explicit == plain
+    assert plain.kind is None
+
+
+def test_a_vm_still_needs_its_declared_resource() -> None:
+    resource = vm_resource(provider="proxmox", rtype="vm")
+    with pytest.raises(CertificateSchemaError, match="not declared"):
+        resolve_target(vm_target(resource), ["example.com"], [])
+
+
+def test_verify_served_fetches_a_node_on_port_8006() -> None:
+    target = resolve_target(node_target(), ["node1.example.com"], [])
+    der = b"node-certificate"
+    seen: list[tuple[str, int, str]] = []
+
+    def fetch(address: str, port: int, server_name: str) -> bytes:
+        seen.append((address, port, server_name))
+        return der
+
+    verify_served(target, der_sha256(der), fetch=fetch)
+    assert seen == [("node1.example.com", 8006, "node1.example.com")]

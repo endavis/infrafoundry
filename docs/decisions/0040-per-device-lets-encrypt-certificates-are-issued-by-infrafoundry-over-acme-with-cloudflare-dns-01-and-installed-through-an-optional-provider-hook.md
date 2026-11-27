@@ -35,6 +35,8 @@ InfraFoundry already stores per-package secrets in SOPS files ([ADR-0032](0032-b
     - It fails closed: with no pinned key the target does not resolve, before any ACME order, and no path uses `StrictHostKeyChecking=no` or `accept-new`.
     - A target behind a jumphost is verified through it with `openssl s_client` (so `openssl` must be on the jumphost). Direct targets keep the local TLS fetch.
 
+    A Proxmox node is an install target too (`kind: node`, #1705). It is installed through the node API (`POST /nodes/{node}/certificates/custom`) with the environment's API token, which needs `Sys.Modify` on `/nodes/{node}`, instead of SSH. The key goes only in the request body. Verification fetches the served certificate on port 8006.
+
     The operator documentation is in [Proxmox: Install Target for Certificates](../providers/proxmox.md#install-target-for-certificates) and [OCI: Install Target for Certificates](../providers/oci.md#install-target-for-certificates).
 
 ## Rationale
@@ -48,6 +50,7 @@ InfraFoundry already stores per-package secrets in SOPS files ([ADR-0032](0032-b
 
 - [#1689](https://github.com/endavis/infrafoundry/issues/1689) reverse-proxy blueprint to serve device web uis under the user's domain, the first Proxmox VM install target
 - [#1692](https://github.com/endavis/infrafoundry/issues/1692) acme propagation check can be defeated by cached negative dns answers
+- [#1705](https://github.com/endavis/infrafoundry/issues/1705) install let's encrypt certificates on proxmox nodes
 - [#1682](https://github.com/endavis/infrafoundry/issues/1682) issue and renew per-device Let's Encrypt certificates with Cloudflare DNS-01
 
 ## Related Documentation
