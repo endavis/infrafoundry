@@ -120,11 +120,17 @@ def build_service(
     command: str = "certs issue",
 ) -> CertificateService:
     """Build the service for an environment."""
+    providers = dict(orchestrator.providers)
+    for provider in providers.values():
+        # API-based installs (a Proxmox node) read the environment's credentials
+        set_environment = getattr(provider, "set_environment", None)
+        if callable(set_environment):
+            set_environment(env)
     return CertificateService(
         env=env,
         envs_dir=orchestrator.config_manager.base_dir,
         writer=deps.writer(),
-        providers=dict(orchestrator.providers),
+        providers=providers,
         default_renew_days=default_renew_days,
         verify=deps.verify,
         record_state=_state_recorder(orchestrator, env, command) if record else None,

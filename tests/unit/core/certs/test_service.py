@@ -318,6 +318,26 @@ def test_the_state_row_carries_no_key_material() -> None:
     assert "key" not in " ".join(config["target"])
 
 
+def test_the_state_row_target_carries_kind_only_when_set() -> None:
+    from types import SimpleNamespace
+
+    rig = Rig()
+    resource = certificate_resource()
+    entry = {"not_after": "x", "sha256": "y"}
+    node = SimpleNamespace(
+        names=["a.example.com"], target={"provider": "proxmox", "kind": "node", "resource": "pve1"}
+    )
+    rig.service()._record(resource, node, entry)  # type: ignore[arg-type]
+    assert rig.states[-1][1]["target"] == {
+        "provider": "proxmox",
+        "resource": "pve1",
+        "kind": "node",
+    }
+    plain = SimpleNamespace(names=["a.example.com"], target={"provider": "host", "resource": "h"})
+    rig.service()._record(resource, plain, entry)  # type: ignore[arg-type]
+    assert rig.states[-1][1]["target"] == {"provider": "host", "resource": "h"}
+
+
 def test_nothing_secret_reaches_outcomes_or_logs(caplog: pytest.LogCaptureFixture) -> None:
     rig = Rig()
     rig.host.error = CertificateInstallError("the reload failed")

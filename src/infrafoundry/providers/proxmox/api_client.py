@@ -138,6 +138,55 @@ class ProxmoxClient:
                 provider="proxmox",
             ) from e
 
+    def post_json(self, endpoint: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Make an authenticated POST with a form-encoded body and return parsed JSON.
+
+        The body can hold secrets (a private key), so no error carries the response text or the
+        request data.
+
+        Args:
+            endpoint: API endpoint path (appended to base URL)
+            data: Form fields to send
+
+        Returns:
+            Parsed JSON response as a dictionary
+
+        Raises:
+            AuthenticationError: On 401/403 responses
+            APIError: On other HTTP errors, connection errors, or JSON parse failures
+        """
+        url = f"{self.api_url}/{endpoint}"
+        try:
+            response = requests.post(
+                url,
+                headers=self.headers,
+                data=data,
+                verify=self.verify_ssl,
+                timeout=self.timeout,
+            )
+        except requests.exceptions.RequestException as e:
+            raise APIError(
+                f"Proxmox API request failed: {e.__class__.__name__}",
+                provider="proxmox",
+            ) from None
+
+        if response.status_code in (401, 403):
+            raise AuthenticationError(
+                "Proxmox authentication failed",
+                status_code=response.status_code,
+                provider="proxmox",
+            )
+        if not response.ok:
+            raise APIError(
+                f"Proxmox API request failed: {response.status_code}",
+                status_code=response.status_code,
+                provider="proxmox",
+            )
+        try:
+            return dict(response.json())
+        except (json.JSONDecodeError, ValueError):
+            raise APIError("Invalid JSON response from Proxmox", provider="proxmox") from None
+
     @property
     def base_url(self) -> str:
         """Return the API base URL."""

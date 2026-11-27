@@ -200,3 +200,60 @@ class TestBaseUrl:
     def test_returns_api_url(self, client: ProxmoxClient) -> None:
         """base_url property returns the API URL."""
         assert client.base_url == "https://proxmox.example.com:8006/api2/json"
+
+
+class TestPostJson:
+    """Tests for ProxmoxClient.post_json."""
+
+    @patch("infrafoundry.providers.proxmox.api_client.requests.post")
+    def test_success_sends_a_form_body(self, mock_post: MagicMock, client: ProxmoxClient) -> None:
+        mock_response = MagicMock()
+        mock_response.ok = True
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": None}
+        mock_post.return_value = mock_response
+
+        result = client.post_json("nodes/pve1/certificates/custom", {"key": "k"})
+
+        assert result == {"data": None}
+        mock_post.assert_called_once_with(
+            "https://proxmox.example.com:8006/api2/json/nodes/pve1/certificates/custom",
+            headers={"Authorization": "PVEAPIToken=user@pam!token=secret-value"},
+            data={"key": "k"},
+            verify=False,
+            timeout=10,
+        )
+
+    @pytest.mark.parametrize("status", [401, 403])
+    @patch("infrafoundry.providers.proxmox.api_client.requests.post")
+    def test_auth_failures(self, mock_post: MagicMock, client: ProxmoxClient, status: int) -> None:
+        mock_post.return_value = MagicMock(ok=False, status_code=status, text="SECRET-BODY")
+        with pytest.raises(AuthenticationError) as exc_info:
+            client.post_json("x", {})
+        assert exc_info.value.context["status_code"] == status
+        assert "SECRET-BODY" not in str(exc_info.value)
+
+    @patch("infrafoundry.providers.proxmox.api_client.requests.post")
+    def test_http_error_does_not_leak_the_response(
+        self, mock_post: MagicMock, client: ProxmoxClient
+    ) -> None:
+        mock_post.return_value = MagicMock(ok=False, status_code=500, text="SECRET-BODY")
+        with pytest.raises(APIError) as exc_info:
+            client.post_json("x", {})
+        assert exc_info.value.context["status_code"] == 500
+        assert "SECRET-BODY" not in str(exc_info.value)
+
+    @patch("infrafoundry.providers.proxmox.api_client.requests.post")
+    def test_connection_error(self, mock_post: MagicMock, client: ProxmoxClient) -> None:
+        mock_post.side_effect = requests.exceptions.ConnectionError("SECRET-URL")
+        with pytest.raises(APIError, match="request failed") as exc_info:
+            client.post_json("x", {})
+        assert "SECRET-URL" not in str(exc_info.value)
+
+    @patch("infrafoundry.providers.proxmox.api_client.requests.post")
+    def test_invalid_json(self, mock_post: MagicMock, client: ProxmoxClient) -> None:
+        response = MagicMock(ok=True, status_code=200)
+        response.json.side_effect = ValueError("bad")
+        mock_post.return_value = response
+        with pytest.raises(APIError, match="Invalid JSON"):
+            client.post_json("x", {})

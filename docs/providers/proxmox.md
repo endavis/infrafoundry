@@ -529,6 +529,25 @@ The install reaches the VM through the jumphost with two nested, strict SSH conn
 
 Verification fetches the served certificate through the jumphost with `openssl s_client`, so `openssl` must be installed on the jumphost.
 
+### Proxmox node target
+
+A Proxmox node itself (its web UI and API on port 8006) can receive a certificate too. Add `kind: node` and name the node; the install goes through the node API (`POST /nodes/{node}/certificates/custom`), not SSH, so the node needs no host key, jumphost or file paths.
+
+```yaml
+target:
+  provider: proxmox
+  kind: node
+  resource: pve1                 # the Proxmox node name
+  address: pve1.example.com      # optional: where to verify; defaults to verify.server_name
+  verify: {server_name: pve1.example.com}   # optional: the port defaults to 8006
+```
+
+- The node does not have to be declared as a resource; the name is checked against the cluster (`GET /nodes`) before anything is written.
+- The API token in the environment's provider settings needs the `Sys.Modify` privilege on `/nodes/{node}`.
+- The key goes only in the request body, never in Terraform state or in an error message.
+- The installed certificate replaces the node's `pveproxy` certificate and restarts the proxy; verification then fetches the served certificate on port 8006.
+- Each node of a cluster has its own certificate, so declare one `certificate` resource per node.
+
 ## Related
 
 - ADR: [0005-provider-cli-extensibility](../decisions/0005-provider-cli-extensibility.md)
