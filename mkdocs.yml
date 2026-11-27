@@ -189,6 +189,7 @@ nav:
     - "ADR-0038 QNAP switches are managed over the web UI's JSON API, with firmware upgraded by a provider command": decisions/0038-qnap-switches-are-managed-over-the-web-uis-json-api-with-firmware-upgraded-by-a-provider-command.md
     - ADR-0039 QNAP switch VLANs and LACP groups are managed by the direct runner with a full-list membership model and fail-closed lock-out checks: decisions/0039-qnap-switch-vlans-and-lacp-groups-are-managed-by-the-direct-runner-with-a-full-list-membership-model-and-fail-closed-lock-out-checks.md
     - "ADR-0040 Per-device Let's Encrypt certificates are issued by InfraFoundry over ACME with Cloudflare DNS-01 and installed through an optional provider hook": decisions/0040-per-device-lets-encrypt-certificates-are-issued-by-infrafoundry-over-acme-with-cloudflare-dns-01-and-installed-through-an-optional-provider-hook.md
+    - ADR-0041 Device web UIs are served by a Caddy reverse-proxy blueprint whose routes generate the Caddyfile and the internal DNS records: decisions/0041-device-web-uis-are-served-by-a-caddy-reverse-proxy-blueprint-whose-routes-generate-the-caddyfile-and-the-internal-dns-records.md
     - ADR-9001 uv: decisions/9001-use-uv-for-package-management.md
     - ADR-9002 doit: decisions/9002-use-doit-for-task-automation.md
     - ADR-9003 ruff: decisions/9003-use-ruff-for-linting-and-formatting.md
@@ -244,6 +245,7 @@ nav:
     - Device Config Collectors: guides/device-config-collectors.md
     - SSH Authentication: guides/ssh-authentication.md
     - SSH Host Key Checking: guides/ssh-host-key-checking.md
+    - Reverse Proxy for Device Web UIs: guides/reverse-proxy.md
     - Drift Detection: guides/drift-detection.md
     - Drift Remediation: guides/drift-remediation.md
     - CI/CD with Separate Config Repo: guides/ci-cd-with-separate-config-repo.md

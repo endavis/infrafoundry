@@ -398,6 +398,7 @@ pytest_add_cli_args_test_selection = [
     "tests/unit/secrets/",
     "tests/unit/test_aiqum_blueprint.py",
     "tests/unit/test_aiqum_initial_setup.py",
+    "tests/unit/test_reverse_proxy_blueprint.py",
     "tests/unit/test_backend_config.py",
     "tests/unit/test_blueprint_base_tags.py",
     "tests/unit/test_cli_infra_collect.py",

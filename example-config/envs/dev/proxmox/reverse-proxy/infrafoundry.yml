@@ -1,0 +1,42 @@
+# Reverse proxy — example consumer of the reverse-proxy blueprint.
+#
+# All deployment logic (VM, DHCP reservation, DNS host overrides, certificate, Caddyfile
+# handler) lives in blueprints/reverse-proxy/. This file only supplies the per-instance
+# values and the routes.
+#
+# See blueprints/reverse-proxy/README.md and docs/guides/reverse-proxy.md.
+#
+# Run: foundry infra apply --env dev --package reverse-proxy
+
+name: reverse-proxy
+description: "Caddy reverse proxy for device web UIs (example)"
+blueprint: reverse-proxy
+
+variables:
+  # --- VM placement ---
+  vm_name: reverse-proxy
+  vmid: 225
+  target_node: node1
+  disk_storage: local-lvm
+
+  # --- Network ---
+  ip_address: "192.0.2.70"
+  dhcp_subnet: my-subnet
+
+  # --- Routes: <name>.<dns_domain> -> backend ---
+  dns_domain: example.com
+  routes:
+    - name: nas
+      backend: "https://192.0.2.20:443"
+      insecure: true          # the backend serves a self-signed certificate
+    - name: switch
+      backend: "https://192.0.2.21"
+      insecure: true
+      host_header: upstream   # the UI checks the Host header
+      allow_from: ["192.0.2.0/24", "100.64.0.0/10"]
+
+  # --- Certificate (needs the acme provider enabled for the environment) ---
+  certificate_names: ["*.example.com"]
+
+  # --- SSH jumphost (for remote VM access) ---
+  jumphost: "ansible@jump.example.com"

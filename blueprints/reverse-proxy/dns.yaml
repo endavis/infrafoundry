@@ -1,0 +1,25 @@
+# Reverse proxy DNS host overrides: one OPNsense Unbound override per route, all pointing at
+# the proxy VM, so clients resolve <route>.<dns_domain> to the proxy. The description carries
+# a summary of the route, so a changed backend or option shows in `infra plan` as an in-place
+# update of that override (the plan stays offline; it never SSHes to the VM). Empty routes
+# give no resources. Outer names are templated for multi-instance safety.
+{% if routes %}
+resources:
+{% for route in routes %}
+{% set from_nets = route.allow_from | default([]) or allowed_networks %}
+{% set summary = "reverse-proxy " ~ vm_name ~ ": " ~ route.backend
+    ~ (" insecure" if route.insecure | default(false) else "")
+    ~ (" host=" ~ route.host_header if route.host_header | default("") else "")
+    ~ (" from=" ~ from_nets | join(",") if from_nets else "") %}
+  - provider: opnsense
+    type: unbound.host_overrides
+    name: "{{ vm_name }}-{{ route.name }}"
+    config:
+      hostname: "{{ route.name }}"
+      domain: "{{ dns_domain | required('reverse-proxy: dns_domain must be set') }}"
+      server: "{{ ip_address }}"
+      description: {{ summary[:255] | tojson }}
+{% endfor %}
+{% else %}
+resources: []
+{% endif %}

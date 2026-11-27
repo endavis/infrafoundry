@@ -1,0 +1,115 @@
+name: reverse-proxy
+description: "Caddy reverse proxy serving device web UIs under your domain (Proxmox VM)"
+version: "1.0.0"
+
+inputs:
+  # --- Required per-instance inputs (no default) ---
+  - name: vm_name
+    description: "Hostname and Proxmox VM name for the proxy VM"
+  - name: vmid
+    description: "Proxmox VM ID"
+    type: integer
+  - name: target_node
+    description: "Proxmox node to deploy the proxy VM onto"
+  - name: disk_storage
+    description: "Proxmox storage pool for the proxy VM disk"
+  - name: ip_address
+    description: "Static IPv4 address for the proxy VM (DHCP reservation)"
+  - name: dhcp_subnet
+    description: "OPNsense DHCP subnet identifier used for the reservation"
+  - name: dns_domain
+    description: "Domain the routes are served under; each route is <name>.<dns_domain>"
+
+  # --- Routes ---
+  - name: routes
+    description: >-
+      List of device web UIs to serve. Each entry: name (DNS label), backend
+      (http(s)://host[:port]), insecure (bool, skip backend TLS verification),
+      host_header ("" passes the client Host through, "upstream" sends the backend's own,
+      anything else is sent literally) and allow_from (list of CIDRs)
+    default: []
+  - name: allowed_networks
+    description: "CIDRs allowed to reach every route without its own allow_from; empty: no restriction"
+    default: []
+
+  # --- Certificate ---
+  - name: certificate_names
+    description: "Names for the Let's Encrypt certificate the proxy serves (e.g. a wildcard); empty: no certificate resource"
+    default: []
+  - name: certificate_key_type
+    description: "Key type of the certificate: ec-p256 or rsa-2048"
+    default: ec-p256
+  - name: cert_dir
+    description: "Directory on the VM that receives proxy.fullchain.pem and proxy.key"
+    default: /etc/ssl/infrafoundry
+
+  # --- VM hardware (minimum 2 vCPUs) ---
+  - name: template_vmid
+    description: "Standard ubuntu-template vmid"
+    default: 900
+  - name: template_node
+    description: "Proxmox node hosting the template"
+    default: node1
+  - name: cores
+    description: "vCPUs; at least 2"
+    default: 2
+  - name: memory
+    default: 1024
+  - name: balloon
+    description: "Minimum memory in MiB the host may shrink the VM to; 0 keeps the provider default"
+    default: 0
+  - name: disk_size
+    default: 16
+
+  # --- Network ---
+  - name: bridge
+    default: vmbr0
+  - name: vlan_tag
+    description: 'VLAN tag on the bridge. Empty: untagged (e.g. an SDN vnet)'
+    default: 10
+  - name: mac_address
+    description: "Empty: Proxmox auto-assigns"
+    default: ""
+
+  # --- SSH access ---
+  - name: jumphost
+    description: 'Empty: direct SSH. Set to e.g. "ansible@jump.example.com"'
+    default: ""
+  - name: ssh_user
+    default: ansible
+
+  # Extra Proxmox tags appended to the blueprint's default tags
+  - name: cloud_init_snippets_storage
+    description: "Proxmox storage for the cloud-init snippet file; empty: provider default"
+    default: ""
+  - name: extra_tags
+    default: []
+
+resources:
+  - vm.yaml
+  - dhcp.yaml
+  - dns.yaml
+  - cert.yaml
+
+events:
+  after_apply:
+    # Runs on every apply, so a route change reaches the VM. Workflow handlers get no
+    # package variables, so the values travel in env (as in the k3s-cluster blueprint).
+    - type: script
+      name: reverse-proxy-config
+      script: scripts/reverse-proxy-config.sh
+      description: "Render the Caddyfile from the routes, validate it and reload Caddy only on change"
+      timeout: 900
+      continue_on_error: true
+      # The events are rendered as JSON text, so the JSON lists are escaped twice (tojson, tojson,
+      # outer quotes cut) to survive it.
+      env:
+        RP_VM_NAME: "{{ vm_name }}"
+        RP_IP: "{{ ip_address }}"
+        RP_JUMPHOST: "{{ jumphost }}"
+        RP_SSH_USER: "{{ ssh_user }}"
+        RP_KNOWN_HOSTS: "{{ ssh_known_hosts }}"
+        RP_DOMAIN: "{{ dns_domain }}"
+        RP_CERT_DIR: "{{ cert_dir }}"
+        RP_ROUTES: "{{ (routes | tojson | tojson)[1:-1] }}"
+        RP_ALLOWED: "{{ (allowed_networks | tojson | tojson)[1:-1] }}"
