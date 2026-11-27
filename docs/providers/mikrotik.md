@@ -168,7 +168,7 @@ A new device serves REST on `www` (plain HTTP). The `certificate` type creates a
 
 ```yaml
 resources:
-  - {type: certificate, name: bootstrap-https, common-name: router.example.com, key-usage: [digital-signature, key-encipherment, tls-server], days-valid: 365}
+  - {type: certificate, name: bootstrap-https, common-name: router.example.com, key-usage: [digital-signature, key-encipherment, key-cert-sign, tls-server], days-valid: 365}
   - {type: ip.service, name: www-ssl, certificate: bootstrap-https, disabled: false}
   - {type: ip.service, name: api-ssl, certificate: bootstrap-https, disabled: false}
 ```

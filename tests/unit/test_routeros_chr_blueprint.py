@@ -248,6 +248,16 @@ def test_expect_script_bootstraps_https_after_enabling_www() -> None:
     assert "/ip service set www disabled=yes" not in script
 
 
+def test_expect_script_certificate_key_usage_allows_self_signing() -> None:
+    script = _expect_script(routeros_https_bootstrap=True)
+
+    add_line = next(
+        line for line in script.splitlines() if "/certificate add name=bootstrap-https" in line
+    )
+    usage = add_line.split("key-usage=")[1].split()[0].split(",")
+    assert "key-cert-sign" in usage
+
+
 def test_https_bootstrap_input_defaults_to_off(loaded: Any) -> None:
     _resources, _events, variables = loaded
     assert variables["https_bootstrap"] is False

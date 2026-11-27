@@ -387,6 +387,16 @@ def check_resources(resources: list[ResourceConfig]) -> list[SchemaFinding]:
                 error(resource, "'port' must be within 1-65535")
             elif name == "days-valid" and not 1 <= normalized <= DAYS_VALID_MAX:
                 error(resource, f"'days-valid' must be within 1-{DAYS_VALID_MAX}")
+            elif (
+                resource.type == "certificate"
+                and name == "key-usage"
+                and "key-cert-sign" not in normalized
+            ):
+                error(
+                    resource,
+                    "'key-usage' must include 'key-cert-sign': RouterOS cannot self-sign "
+                    "the certificate without it ('CA not found')",
+                )
         if not missing and not bad:
             key = key_of(spec, config)
             if key is not None:

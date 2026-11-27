@@ -174,6 +174,23 @@ def test_certificate_key_usage_normalizes_text_and_list_alike() -> None:
     )
 
 
+def test_certificate_key_usage_without_key_cert_sign_rejected() -> None:
+    res = resource("certificate", "c", **{"common-name": "x", "key-usage": ["tls-server"]})
+    text = _messages([res])
+    assert "certificate 'c'" in text
+    assert "must include 'key-cert-sign'" in text
+
+
+@pytest.mark.parametrize(
+    "usage", [["tls-server", "key-cert-sign"], "key-cert-sign,tls-server", None]
+)
+def test_certificate_key_usage_with_or_without_setting_accepted(usage: Any) -> None:
+    fields: dict[str, Any] = {"common-name": "x"}
+    if usage is not None:
+        fields["key-usage"] = usage
+    assert _messages([resource("certificate", "c", **fields)]) == ""
+
+
 def test_certificate_path_and_slug() -> None:
     spec = SPECS["certificate"]
     assert (spec.path, spec.slug) == ("certificate", "certificate")
