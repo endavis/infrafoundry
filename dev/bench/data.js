@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795785483527,
+  "lastUpdate": 1795787819151,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7224,6 +7224,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000012623755592440854",
             "extra": "mean: 89.21096924923671 usec\nrounds: 12455"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "583f041b7d574d259e4e8382df68c87caee6c05a",
+          "message": "feat: install acme certificates on proxmox vms and oci instances (merges PR #1694, addresses #1682)\n\n- Accept Proxmox `vm` and OCI `instance` resources as certificate targets.\n  The endpoint comes from the resource's `ssh_host_key` block and its\n  package's `ssh_user` and `jumphost` variables; the VM's pinned host key\n  from the package secrets is required, and a target without one fails\n  before any ACME order.\n- Through a jumphost, use a nested strict ssh: the jump hop is checked\n  against the operator's known_hosts, the VM against its pinned key via a\n  0600 temporary file and HostKeyAlias. A direct target gets the pinned key\n  in a local 0600 file. Never StrictHostKeyChecking=no or accept-new;\n  certificate and key travel on stdin only.\n- Verify the served certificate through the jumphost with openssl when the\n  VM is behind one.\n- Add install_certificate to the Proxmox and OCI providers.\n- Document the targets in the acme, proxmox, oci and host-key-checking docs;\n  amend ADR-0040.\n- test_target_fields_are_validated used oci as its invalid-provider example;\n  it now uses opnsense, which is still not a target (approved).\n\nAddresses #1682\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T13:55:43Z",
+          "tree_id": "cf1f248d8ea7108440c4c08608374ae6c4555d0e",
+          "url": "https://github.com/endavis/infrafoundry/commit/583f041b7d574d259e4e8382df68c87caee6c05a"
+        },
+        "date": 1795787818550,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 46.78677777354004,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0011599226321495823",
+            "extra": "mean: 21.37355995833386 msec\nrounds: 48"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7683.5431928418475,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010888752431929918",
+            "extra": "mean: 130.14828899922384 usec\nrounds: 8263"
           }
         ]
       }
