@@ -102,7 +102,12 @@ def bootstrap_https(name: str = "bootstrap-https") -> list[ResourceConfig]:
             name,
             **{
                 "common-name": "router.example.com",
-                "key-usage": ["digital-signature", "key-encipherment", "tls-server"],
+                "key-usage": [
+                    "digital-signature",
+                    "key-encipherment",
+                    "key-cert-sign",
+                    "tls-server",
+                ],
                 "days-valid": 365,
             },
         ),

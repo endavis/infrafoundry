@@ -117,7 +117,7 @@ run "/ip dns set servers={{ routeros_mgmt_dns }}"
 {% endif %}
 run "/ip service set www disabled=no"
 {% if routeros_https_bootstrap %}
-run "/certificate add name={{ routeros_https_cert_name }} common-name=\"{{ routeros_hostname }}\" key-usage=digital-signature,key-encipherment,tls-server days-valid=365"
+run "/certificate add name={{ routeros_https_cert_name }} common-name=\"{{ routeros_hostname }}\" key-usage=digital-signature,key-encipherment,key-cert-sign,tls-server days-valid=365"
 run "/certificate sign {{ routeros_https_cert_name }}"
 run "/ip service set www-ssl certificate={{ routeros_https_cert_name }} disabled=no"
 run "/ip service set api-ssl certificate={{ routeros_https_cert_name }} disabled=no"
