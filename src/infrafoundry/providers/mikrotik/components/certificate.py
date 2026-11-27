@@ -34,6 +34,12 @@ _PEM_RE = re.compile(r"-----BEGIN [A-Z ]+-----.*?-----END [A-Z ]+-----", re.DOTA
 _CERT_RE = re.compile(r"-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----", re.DOTALL)
 _SLUG_RE = re.compile(r"[^A-Za-z0-9_.-]")
 _SHA_LEN = 12
+_INSTALLED_NAME = re.compile(rf"^infrafoundry-.+-[0-9a-f]{{{_SHA_LEN}}}(-ca\d+)?$")
+
+
+def is_installed_certificate_name(name: str) -> bool:
+    """Return whether ``name`` follows the ``infrafoundry-<slug>-<sha prefix>`` scheme."""
+    return _INSTALLED_NAME.fullmatch(name) is not None
 
 
 class CertificateClient(RouterOSWriter, Protocol):

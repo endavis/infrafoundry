@@ -157,7 +157,8 @@ Changes that touch the live management path sort last within D and E. The plan p
 
 - an `ip.service` naming a `certificate` that will not exist signed after the plan;
 - a `certificate` deleted while a live `ip.service` still uses it (switch the service in an earlier apply);
-- `www-ssl` moved to a certificate the plan creates while `api_url` is `https` with `verify_ssl` on (a self-signed certificate cannot validate).
+- `www-ssl` moved to a certificate the plan creates while `api_url` is `https` with `verify_ssl` on (a self-signed certificate cannot validate);
+- `www-ssl` or `api-ssl` moved off an installed `infrafoundry-<target>-<sha prefix>` certificate while the client validates the CA chain (the name changes on every renewal, and a self-signed certificate would lock InfraFoundry out); remove `certificate:` from the service.
 
 If the host cannot be resolved and the plan touches bridge, VLAN or address types, the plan refuses.
 
@@ -180,15 +181,15 @@ The order below never cuts the connection that applies the change:
 1. With `api_url: http://192.0.2.2`, declare the certificate and the two services as above, leave `www` alone and apply. `www` still carries the connection.
 2. Confirm HTTPS answers (`curl -sk -o /dev/null -w '%{http_code}' https://192.0.2.2/rest/system/resource` prints `401`), then run `infra doctor`.
 3. Switch `api_url` to `https://192.0.2.2` with `verify_ssl: false`, then run `infra doctor` and `infra plan` (clean).
-4. Install the Let's Encrypt certificate (#1683), set `verify_ssl: true` and point `www-ssl` and `api-ssl` at the installed certificate.
+4. Run `foundry certs issue`. It imports the certificate as `infrafoundry-<target>-<sha prefix>` and points both `www-ssl` and `api-ssl` at it. Then remove `certificate:` from both `ip.service` resources: the name changes on every renewal, and the plan refuses to move a service off it. No `verify_ssl` change is needed: once an installed, unexpired production certificate exists, the client validates the CA chain and host name by itself.
 5. Optionally disable `www`, which the plan allows once `api_url` is `https`.
 
-**Why `verify_ssl: false`, and no pin.** The bootstrap certificate lives only until the Let's Encrypt certificate replaces it, and a pin would have to be redone at that replacement. The state it replaces is plain HTTP with basic auth, so unverified TLS is still better. Revert `verify_ssl` to `true` after step 4.
+**Why `verify_ssl: false`, and no pin.** The bootstrap certificate lives only until the Let's Encrypt certificate replaces it, and a pin would have to be redone at that replacement. The state it replaces is plain HTTP with basic auth, so unverified TLS is still better. After step 4 the client validates the installed certificate whatever `verify_ssl` says, so there is nothing to revert.
 
 **Timeout.** Signing blocks the REST call while the device generates the key; raise `timeout` for large keys.
 
-!!! warning "Not yet live-verified"
-    The field names of the create, the `sign` call with `number` set to the row's `.id`, and a non-empty `fingerprint` marking a signed row are taken from the RouterOS manuals and have not been checked on a device. The live check of #1683 verifies them.
+!!! note "Live-verified"
+    The create fields, the `sign` call with `number` set to the row's `.id`, and a non-empty `fingerprint` marking a signed row were verified on a RouterOS 7.25.1 CHR (#1714).
 
 ## Apply and Destroy
 
