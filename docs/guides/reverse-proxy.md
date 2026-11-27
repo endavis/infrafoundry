@@ -55,10 +55,20 @@ The order matters on the first deployment:
 
 1. `foundry secrets host-keys --env <env>` pins the VM's SSH host key.
 2. `foundry infra apply --env <env>` creates the VM and the DNS records, installs Caddy and the certificate directory. The Caddyfile step warns that the certificate files are missing; it is retried on the next apply.
-3. `foundry certs issue --env <env>` issues the certificate and installs it on the VM.
+3. `foundry certs issue --env <env>` issues the certificate and installs it on the VM. Its verify step on port 443 fails on this first run, which is expected.
 4. `foundry infra apply --env <env>` again writes the Caddyfile and reloads Caddy.
+5. `foundry certs issue --env <env>` once more. The install-only retry verifies the certificate and records it as installed.
 
-After that, every apply renders the Caddyfile again, validates it with `caddy validate`, and reloads Caddy only when it changed. A file that fails validation leaves the running configuration alone. Renewals (`foundry certs renew`) reload Caddy through the certificate's own `reload`.
+The first verify fails because Caddy has no site configuration until the certificate files exist, so nothing listens on port 443 with the certificate yet.
+
+!!! note "Decision (#1700)"
+    The blueprint does not avoid the extra round. The handler validates the Caddyfile with `caddy validate` before reloading, and a configuration that references missing certificate files fails validation, so the Caddyfile is only written once the files exist. Writing a placeholder or self-signed configuration first would change the blueprint's behaviour and is left to a separate issue.
+
+### SSH agent
+
+The proxy VM is reached through the host in the `jumphost` setting, using the SSH agent. When that key has a passphrase, load it into the agent (`ssh-add`) before every apply and before unattended `foundry certs renew` runs. Renewals fail when the agent holds no key.
+
+After that, every apply renders the Caddyfile again, validates it with `caddy validate`, and reloads Caddy only when it changed. A file that fails validation leaves the running configuration alone. Renewals (`foundry certs renew`) reload Caddy through the certificate's own `reload`, and need the jump-host key in the SSH agent (see above).
 
 ## Certificates
 

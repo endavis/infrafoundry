@@ -70,10 +70,29 @@ or a literal value; set `insecure` for backends with a self-signed certificate.
 
 ## First deployment
 
+The first deployment needs two applies and two `certs issue` runs, in this order:
+
 1. `foundry secrets host-keys --env <env>`
-2. `foundry infra apply --env <env>` (VM, DNS, Caddy; warns that certificate files are missing)
-3. `foundry certs issue --env <env>`
+2. `foundry infra apply --env <env>` (VM, DNS, Caddy; the handler warns that the certificate files are missing)
+3. `foundry certs issue --env <env>` (the certificate is issued and installed; its verify step on port 443 fails on this first run, which is expected)
 4. `foundry infra apply --env <env>` (writes the Caddyfile, reloads Caddy)
+5. `foundry certs issue --env <env>` again (the install-only retry verifies the certificate and records it as installed)
+
+The first verify fails because Caddy has no site configuration until the certificate files
+exist: the handler skips the Caddyfile while they are missing, so nothing listens on port 443
+with the certificate. Step 4 writes the Caddyfile, and step 5 then verifies successfully.
+
+**Decision (#1700):** the blueprint does not avoid the extra round. The handler validates the
+Caddyfile with `caddy validate` before reloading, and a configuration that references missing
+certificate files fails validation, so the Caddyfile is only written once the files exist.
+Writing a placeholder or self-signed configuration first would change the blueprint's
+behaviour and is left to a separate issue.
+
+### SSH agent
+
+The proxy VM is reached through the host in the `jumphost` setting, using the SSH agent. When
+that key has a passphrase, load it into the agent (`ssh-add`) before every apply and before
+unattended `foundry certs renew` runs. Renewals fail when the agent holds no key.
 
 ## Caddy version
 
