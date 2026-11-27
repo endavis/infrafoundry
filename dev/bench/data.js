@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795793920934,
+  "lastUpdate": 1795796962751,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7300,6 +7300,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000009376192837906955",
             "extra": "mean: 78.267297050857 usec\nrounds: 13937"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c56a4f079047653a21c690ef8e268976e16c2c97",
+          "message": "feat: manage tailnet split dns routes (merges PR #1701, addresses #1695)\n\n- Add a `dns_split_nameservers` tailscale resource type: one\n  `tailscale_dns_split_nameservers` per domain, alongside the existing\n  `dns_nameservers`, `dns_preferences` and `dns_search_paths` types.\n- Validate offline: domain syntax and length, IP-address nameservers\n  without duplicates, one route per domain (case-insensitive), and an\n  `import_id` equal to the domain so an existing route is adopted, not\n  replaced.\n- Keep `dns_configuration` unsupported. The provider's v0.29.3 docs list a\n  conflict only between it and the four granular DNS resources; correct\n  the old note that split nameservers conflicted with the other types\n  (provider reason string, docs, ADR-0020 amendment).\n- Document the type, the import of a route made in the admin console, and\n  link it from the reverse-proxy guide.\n- Two test_provider.py assertions that encoded the old exclusion are\n  updated (approved by the maintainer).\n\nAddresses #1695\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T16:27:56Z",
+          "tree_id": "6adf907bdf5bc2d7deccb9d9cc40e088140111a5",
+          "url": "https://github.com/endavis/infrafoundry/commit/c56a4f079047653a21c690ef8e268976e16c2c97"
+        },
+        "date": 1795796962286,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 46.30769907589206,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0003707168611670799",
+            "extra": "mean: 21.594681229165264 msec\nrounds: 48"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7715.114146428955,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000020564296107048276",
+            "extra": "mean: 129.61571028250611 usec\nrounds: 8315"
           }
         ]
       }
