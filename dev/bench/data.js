@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795809996540,
+  "lastUpdate": 1795810777141,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7604,6 +7604,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000013526719448092227",
             "extra": "mean: 129.19195398880683 usec\nrounds: 8411"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ff9f8aea2a781164336a16cc8cb300aeffb067a2",
+          "message": "feat: install let's encrypt certificates on mikrotik routeros devices (merges PR #1709, addresses #1683)\n\n* feat: install let's encrypt certificates on mikrotik routeros devices\n\nAdd the certificate install hook to the mikrotik provider: upload the PEM\nfiles over REST, import them, assign the certificate to api-ssl and\nwww-ssl, verify the served certificate, then remove the superseded\ninfrafoundry-installed one. Once a production certificate is installed\nfor a device, its REST client validates the CA chain and host name;\ndevices without a certificate target keep today's verify_ssl behaviour.\n\nAddresses #1683\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n* fix: require tls 1.2 when checking a served mikrotik certificate chain\n\nAddresses #1683\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T20:18:00Z",
+          "tree_id": "b1a41b0c319d1d6e0c4fa75bd81e01c8c71be0d5",
+          "url": "https://github.com/endavis/infrafoundry/commit/ff9f8aea2a781164336a16cc8cb300aeffb067a2"
+        },
+        "date": 1795810776082,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 47.260107338230355,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00021196611882457196",
+            "extra": "mean: 21.159494895837128 msec\nrounds: 48"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7907.737945300918,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000010131322553846403",
+            "extra": "mean: 126.45841414032171 usec\nrounds: 8345"
           }
         ]
       }
