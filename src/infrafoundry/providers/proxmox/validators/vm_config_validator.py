@@ -84,6 +84,20 @@ class VMConfigValidator(SpecializedValidator[ProxmoxConfigContext]):
             self._validate_disk_size(name, config)
             self._validate_import_id(name, resource.import_id, config)
             self._validate_agent_timeout(name, config)
+            self._validate_ip_tags(name, config)
+
+    def _validate_ip_tags(self, name: str, config: dict[str, Any]) -> None:
+        """Error if ip_tags is not a boolean."""
+        if "ip_tags" not in config or isinstance(config["ip_tags"], bool):
+            return
+        self.report.add_check(
+            check_name=f"proxmox_vm_{name}_ip_tags",
+            passed=False,
+            message=(
+                f"VM '{name}': ip_tags '{config['ip_tags']}' is invalid. Must be true or false."
+            ),
+            level=ValidationLevel.ERROR,
+        )
 
     def _validate_agent_timeout(self, name: str, config: dict[str, Any]) -> None:
         """Error if agent_timeout is not a duration string or the agent is not enabled."""

@@ -1,5 +1,7 @@
 """Proxmox provider for InfraFoundry."""
 
+import copy
+import ipaddress
 import os
 import shlex
 from pathlib import Path, PurePosixPath
@@ -52,6 +54,48 @@ def _customized_image_filename(filename: str) -> str:
 def _imports_disk(vm: ResourceConfig) -> bool:
     """Whether a VM is built by importing a disk (an OVA or a raw image) over SSH."""
     return "ova_source" in vm.config or "disk_image_source" in vm.config
+
+
+def _ipconfig_ipv4(ipconfig: object) -> str | None:
+    """Return the static IPv4 address of a Proxmox ``ipconfig`` string, without the prefix.
+
+    ``ip=192.0.2.10/24,gw=192.0.2.1`` gives ``192.0.2.10``. ``dhcp``, ``manual``, an IPv6-only
+    string, an invalid address or a non-string gives ``None``.
+    """
+    if not isinstance(ipconfig, str):
+        return None
+    for part in ipconfig.split(","):
+        key, _, value = part.strip().partition("=")
+        if key != "ip":
+            continue
+        address = value.split("/", 1)[0].strip()
+        try:
+            return str(ipaddress.IPv4Address(address))
+        except ValueError:
+            return None
+    return None
+
+
+def _with_ip_tags(vm: ResourceConfig) -> ResourceConfig:
+    """Add the VM's static IPv4 address to its ``tags`` (#1699).
+
+    The tag is the bare dotted address, merged with the user's tags without duplicates and sorted
+    (Proxmox stores tags sorted). A VM without a static IPv4 address, with ``ip_tags: false`` or
+    with non-list ``tags`` is returned unchanged.
+    """
+    config = vm.config
+    if config.get("ip_tags") is False:
+        return vm
+    address = _ipconfig_ipv4(config.get("ipconfig"))
+    if address is None:
+        return vm
+    tags = config.get("tags")
+    if tags is not None and not isinstance(tags, list):
+        return vm
+    merged = sorted({str(t) for t in tags or []} | {address})
+    result = copy.deepcopy(vm)
+    result.config["tags"] = merged
+    return result
 
 
 def _raise_host_key_problems(vm: ResourceConfig, cloud_init: dict[Any, Any] | None) -> None:
@@ -345,6 +389,7 @@ class ProxmoxProvider(
             else:
                 processed = self._process_cloud_init_snippets(vm)
                 processed = self._normalize_vm_config(processed)
+                processed = _with_ip_tags(processed)
                 regular_vms.append(processed)
 
         if regular_vms:
