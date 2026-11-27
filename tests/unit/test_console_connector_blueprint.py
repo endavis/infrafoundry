@@ -573,3 +573,13 @@ def test_readme_describes_the_balloon_raise() -> None:
     assert "installer's check is\n  unaffected" not in text
     assert "unaffected" not in text
     assert "pve_host" in text
+
+
+def test_vm_carries_the_reservation_address_for_ip_tags(loader: PackageLoader) -> None:
+    """The VM lists the reserved address so it is tagged with it (#1699)."""
+    resources, _events, _variables = loader.load_package(
+        PACKAGE_DIR, provider="proxmox", env_name="dev"
+    )
+
+    vm = next(r for r in resources if r.type == "vm")
+    assert vm.config["ip_addresses"] == ["192.0.2.51"]

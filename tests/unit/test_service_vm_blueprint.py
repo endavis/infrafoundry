@@ -126,6 +126,9 @@ def test_service_vm_vm_config_uses_merged_values(loader: PackageLoader) -> None:
     # Tags from the package override
     assert config["tags"] == ["infra", "web"]
 
+    # The reservation address, so the VM is tagged with it (#1699)
+    assert config["ip_addresses"] == ["192.0.2.60"]
+
 
 def test_service_vm_dhcp_config_uses_merged_values(loader: PackageLoader) -> None:
     """Rendered kea_reservation config uses per-instance values and lowercases

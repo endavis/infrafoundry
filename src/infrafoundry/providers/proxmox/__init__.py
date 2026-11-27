@@ -76,23 +76,49 @@ def _ipconfig_ipv4(ipconfig: object) -> str | None:
     return None
 
 
-def _with_ip_tags(vm: ResourceConfig) -> ResourceConfig:
-    """Add the VM's static IPv4 address to its ``tags`` (#1699).
+def _ipv4_literal(value: object) -> str | None:
+    """Return ``value`` as a normalised IPv4 address, or ``None`` for anything else."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return str(ipaddress.IPv4Address(value.strip()))
+    except ValueError:
+        return None
 
-    The tag is the bare dotted address, merged with the user's tags without duplicates and sorted
-    (Proxmox stores tags sorted). A VM without a static IPv4 address, with ``ip_tags: false`` or
+
+def _known_ipv4_addresses(config: dict[str, Any]) -> list[str]:
+    """Collect the VM's known IPv4 addresses, deduplicated, in source order.
+
+    Sources: the static ``ipconfig`` address and the ``ip_addresses`` list (a DHCP reservation
+    the VM's own settings do not show).
+    """
+    found: list[str] = []
+    static = _ipconfig_ipv4(config.get("ipconfig"))
+    if static is not None:
+        found.append(static)
+    listed = config.get("ip_addresses")
+    if isinstance(listed, list):
+        found.extend(a for a in map(_ipv4_literal, listed) if a is not None)
+    return list(dict.fromkeys(found))
+
+
+def _with_ip_tags(vm: ResourceConfig) -> ResourceConfig:
+    """Add the VM's known IPv4 addresses to its ``tags`` (#1699).
+
+    The tags are bare dotted addresses, merged with the user's tags without duplicates and sorted
+    (Proxmox stores tags sorted). A VM without a known IPv4 address, with ``ip_tags: false`` or
     with non-list ``tags`` is returned unchanged.
     """
     config = vm.config
     if config.get("ip_tags") is False:
         return vm
-    address = _ipconfig_ipv4(config.get("ipconfig"))
-    if address is None:
+    addresses = _known_ipv4_addresses(config)
+    if not addresses:
         return vm
     tags = config.get("tags")
     if tags is not None and not isinstance(tags, list):
         return vm
-    merged = sorted({str(t) for t in tags or []} | {address})
+    merged = sorted({str(t) for t in tags or []} | set(addresses))
     result = copy.deepcopy(vm)
     result.config["tags"] = merged
     return result

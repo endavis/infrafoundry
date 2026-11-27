@@ -8,7 +8,7 @@ import pytest
 
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.validation import ValidationLevel, ValidationReport
-from infrafoundry.providers.proxmox import ProxmoxProvider, _ipconfig_ipv4
+from infrafoundry.providers.proxmox import ProxmoxProvider, _ipconfig_ipv4, _with_ip_tags
 from infrafoundry.providers.proxmox.validators.context import ProxmoxConfigContext
 from infrafoundry.providers.proxmox.validators.vm_config_validator import VMConfigValidator
 
@@ -153,3 +153,46 @@ def test_non_bool_ip_tags_is_error(value: Any) -> None:
 
     assert len(errors) == 1
     assert "ip_tags" in errors[0]
+
+
+def test_dhcp_with_ip_addresses_renders_tag(tmp_path: Path) -> None:
+    rendered = _render(tmp_path, ipconfig="ip=dhcp", ip_addresses=["192.0.2.20"])
+
+    assert _tags_line(rendered) == 'tags = ["192.0.2.20"]'
+
+
+def _tagged(**config: Any) -> Any:
+    vm = ResourceConfig(name="vm1", type="vm", provider="proxmox", config=dict(config))
+    return _with_ip_tags(vm).config.get("tags")
+
+
+def test_ssh_host_key_address_gives_no_tag() -> None:
+    assert _tagged(ipconfig="ip=dhcp", ssh_host_key={"address": "198.51.100.5"}) is None
+
+
+def test_sources_dedupe_and_sort() -> None:
+    tags = _tagged(
+        ipconfig="ip=203.0.113.9/24",
+        ip_addresses=["192.0.2.20", "203.0.113.9"],
+        tags=["web", "192.0.2.20"],
+    )
+
+    assert tags == ["192.0.2.20", "203.0.113.9", "web"]
+
+
+def test_ip_addresses_opt_out(tmp_path: Path) -> None:
+    rendered = _render(tmp_path, ip_addresses=["192.0.2.20"], ip_tags=False)
+
+    assert _tags_line(rendered) is None
+
+
+def test_valid_ip_addresses_passes() -> None:
+    assert _errors(ip_addresses=["192.0.2.20", "198.51.100.1"]) == []
+
+
+@pytest.mark.parametrize("value", ["192.0.2.20", ["not-an-ip"], ["2001:db8::1"], [5], None])
+def test_invalid_ip_addresses_is_error(value: Any) -> None:
+    errors = _errors(ip_addresses=value)
+
+    assert len(errors) == 1
+    assert "ip_addresses" in errors[0]

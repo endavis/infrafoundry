@@ -250,6 +250,7 @@ other cluster, add it in the NetApp Console through the registered agent.
 
 ## Notes
 
+- The VM is also tagged with its reserved `ip_address` (#1699).
 - Default tags are `ontap` and `console-connector`; add more with `extra_tags`.
 - Events live in `blueprint.yaml`, because the shorthand `vms:` format does not
   extract per-resource events.

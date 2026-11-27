@@ -322,9 +322,13 @@ address. Those tags are not in the configuration, so a plan reports them as
 drift. InfraFoundry writes them itself instead, so the generated `tags` match
 what Proxmox holds. Disable the external script on the host.
 
-A regular VM whose `ipconfig` carries a static IPv4 address gets that address
-as a tag, merged with the VM's own `tags` without duplicates and sorted
-(Proxmox stores tags sorted):
+A regular VM gets every IPv4 address InfraFoundry knows for it as a tag,
+merged with the VM's own `tags` without duplicates and sorted (Proxmox stores
+tags sorted). The addresses come from, in order:
+
+1. a static `ipconfig` (`ip=<address>/<length>`);
+2. the optional `ip_addresses` list, for an address the VM's own network
+   settings do not show, such as a DHCP reservation.
 
 ```yaml
 vms:
@@ -333,11 +337,20 @@ vms:
     ipconfig: ip=192.0.2.10/24,gw=192.0.2.1
     tags: [web]          # renders ["192.0.2.10", "web"]
     ip_tags: false       # optional, opts the VM out
+
+  - name: app-02
+    target_node: node1
+    ipconfig: ip=dhcp
+    ip_addresses: [198.51.100.20]   # DHCP reservation, renders ["198.51.100.20"]
 ```
 
+The `service-vm`, `reverse-proxy`, `aiqum`, `console-connector` and
+`k3s-cluster` blueprints set `ip_addresses` to the reserved address of each VM.
+`ip_addresses` must be a list of IPv4 addresses; validation errors otherwise.
+
 - **Format**: the bare dotted address, without the prefix length.
-- **Not tagged**: `ip=dhcp` or no `ipconfig` (the address is unknown until
-  runtime), IPv6 addresses, NICs other than the one `ipconfig` describes,
+- **Not tagged**: a VM on plain DHCP with no `ip_addresses` (the address is
+  unknown until runtime), IPv6 addresses, NICs other than the one `ipconfig` describes,
   templates, LXC containers, and VMs imported from an OVA or disk image (their
   tags are part of the recreate triggers).
 - **Existing VMs**: the next plan shows a one-time in-place `tags` addition.
