@@ -305,3 +305,26 @@ def test_served_chain_validates_is_false_for_an_untrusted_certificate(
     monkeypatch.setattr("ssl.create_default_context", lambda: _Context())
 
     assert served_chain_validates("192.0.2.2", 443, "router.example.com") is False
+
+
+def test_served_chain_validation_requires_tls_1_2(monkeypatch: pytest.MonkeyPatch) -> None:
+    import ssl
+
+    contexts: list[ssl.SSLContext] = []
+    real = ssl.create_default_context
+
+    def _record() -> ssl.SSLContext:
+        ctx = real()
+        contexts.append(ctx)
+        return ctx
+
+    def _refuse(*args: object, **kwargs: object) -> object:
+        raise OSError("no network in unit tests")
+
+    monkeypatch.setattr("ssl.create_default_context", _record)
+    monkeypatch.setattr("socket.create_connection", _refuse)
+
+    with pytest.raises(OSError, match="no network"):
+        served_chain_validates("192.0.2.2", 443, "router.example.com")
+
+    assert contexts[0].minimum_version == ssl.TLSVersion.TLSv1_2

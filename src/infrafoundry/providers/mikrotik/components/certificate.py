@@ -64,6 +64,7 @@ def served_chain_validates(address: str, port: int, server_name: str) -> bool:
         OSError: If the endpoint cannot be reached.
     """
     context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     try:
         with (
             socket.create_connection((address, port), timeout=10) as sock,
