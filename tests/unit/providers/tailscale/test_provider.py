@@ -17,6 +17,7 @@ EXPECTED_TYPES = [
     "dns_nameservers",
     "dns_preferences",
     "dns_search_paths",
+    "dns_split_nameservers",
 ]
 
 
@@ -35,7 +36,7 @@ class TestMetadata:
 
     def test_unsupported_types_carry_a_reason(self, provider: TailscaleProvider) -> None:
         unsupported = provider.get_unsupported_resource_types()
-        assert set(unsupported) == {"dns_configuration", "dns_split_nameservers"}
+        assert set(unsupported) == {"dns_configuration"}
         assert all("must not be mixed" in reason for reason in unsupported.values())
         assert not set(unsupported) & set(provider.get_resource_types())
 
@@ -46,6 +47,7 @@ class TestMetadata:
         assert deps["device_tags"] == ["acl"]
         assert deps["device_subnet_routes"] == ["acl"]
         assert deps["acl"] == []
+        assert deps["dns_split_nameservers"] == []
 
     def test_validate_config_requires_name(self, provider: TailscaleProvider) -> None:
         assert provider.validate_config({"name": "x"})

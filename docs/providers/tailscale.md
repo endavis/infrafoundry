@@ -1,6 +1,6 @@
 ---
 title: "Tailscale Provider"
-description: "Manage a tailnet's ACL, auth keys, device routes and tags, and DNS with the official tailscale/tailscale Terraform provider"
+description: "Manage a tailnet's ACL, auth keys, device routes and tags, and DNS (including split DNS) with the official tailscale/tailscale Terraform provider"
 audience:
   - users
 tags:
@@ -9,7 +9,7 @@ tags:
 
 # Tailscale Provider
 
-The Tailscale provider manages the control plane of a tailnet: the ACL policy, auth keys, device subnet routes and tags, and DNS settings. It generates Terraform for the official [tailscale/tailscale](https://registry.terraform.io/providers/tailscale/tailscale/latest) provider and runs it through the standard Terraform runner.
+The Tailscale provider manages the control plane of a tailnet: the ACL policy, auth keys, device subnet routes and tags, and DNS settings including split-DNS routes. It generates Terraform for the official [tailscale/tailscale](https://registry.terraform.io/providers/tailscale/tailscale/latest) provider and runs it through the standard Terraform runner.
 
 !!! note "Node side versus control plane"
     This provider is the **control plane**. The `opnsense.tailscale.*` types ([OPNsense Resource Coverage](../development/opnsense-resource-coverage.md)) configure the `os-tailscale` plugin on a firewall, which is the **node side**. A subnet router needs both: the node advertises a route, and a `device_subnet_routes` resource here approves it. The two do not collide: the node types belong to provider `opnsense` and the types here to provider `tailscale`.
@@ -29,8 +29,9 @@ The Tailscale provider manages the control plane of a tailnet: the ACL policy, a
 | `dns_nameservers` | `tailscale_dns_nameservers` | Global nameservers (one per environment) |
 | `dns_preferences` | `tailscale_dns_preferences` | MagicDNS on or off (one per environment) |
 | `dns_search_paths` | `tailscale_dns_search_paths` | DNS search domains (one per environment) |
+| `dns_split_nameservers` | `tailscale_dns_split_nameservers` | Nameservers for one domain (split DNS), one per domain |
 
-`tailscale_dns_configuration` and `tailscale_dns_split_nameservers` are deliberately not exposed. They manage the same DNS settings as the three DNS types above, so the two families must not be mixed. DNS settings managed outside InfraFoundry with those resources conflict with the DNS types here too.
+`tailscale_dns_configuration` is deliberately not exposed. The provider's documentation for v0.29.3 says it manages the entirety of a tailnet's DNS configuration and conflicts with `tailscale_dns_nameservers`, `tailscale_dns_preferences`, `tailscale_dns_search_paths` and `tailscale_dns_split_nameservers`, and that they must not be used simultaneously. So do not combine the DNS types here with a `tailscale_dns_configuration` managed elsewhere (another Terraform root or tool). The four DNS types here may be combined with each other; the same documentation lists no conflict among them.
 
 Resource names must be unique across all Tailscale types, and must be valid Terraform names (letters, digits, `_` and `-`, not starting with a digit).
 
@@ -287,7 +288,29 @@ dns_search_paths:
     search_paths: [example.com]
 ```
 
-Each of these, and `acl`, may appear at most once per environment.
+Each of these, and `acl`, may appear at most once per environment. `dns_split_nameservers` is the exception: one resource per domain.
+
+### dns_split_nameservers
+
+```yaml
+dns_split_nameservers:
+  - name: internal-split
+    domain: example.com
+    nameservers: [192.0.2.53, "2001:db8::53"]
+    import_id: example.com
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `domain` | yes | The DNS name the route covers, without a trailing dot |
+| `nameservers` | yes | IPv4 or IPv6 addresses that resolve the domain; unordered, no repeats |
+| `import_id` | no | The domain of an existing route to adopt; must equal `domain` |
+
+- One resource per domain; domains must be unique (compared ignoring case).
+- Changing `domain` replaces the route, because the provider forces a new resource. `nameservers` is unordered.
+- To adopt a route made in the admin console, set `import_id` to its domain and declare the same nameservers. The first plan is expected to report one import and no change; later runs treat the import block as a no-op. This is not live-tested. An `import_id` that differs from `domain` is a validation error, because it would import another route and the next plan would replace it.
+- Removing the resource deletes the route from the tailnet.
+- Combining it with `dns_nameservers`, `dns_preferences` and `dns_search_paths` is allowed: the v0.29.3 provider documentation lists a conflict only for `tailscale_dns_configuration`. Coexistence was not live-tested.
 
 ## Instance `tailscale:` block
 

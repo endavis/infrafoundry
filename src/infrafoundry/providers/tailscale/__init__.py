@@ -50,7 +50,7 @@ _TAILSCALE_TFVARS_MAPPING: dict[str, str] = {
     )
 }
 
-_DNS_TYPES = ("dns_nameservers", "dns_preferences", "dns_search_paths")
+_DNS_TYPES = ("dns_nameservers", "dns_preferences", "dns_search_paths", "dns_split_nameservers")
 
 
 class TailscaleProvider(
@@ -134,6 +134,7 @@ class TailscaleProvider(
             "dns_nameservers",
             "dns_preferences",
             "dns_search_paths",
+            "dns_split_nameservers",
         ]
 
     @override
@@ -143,14 +144,14 @@ class TailscaleProvider(
 
     @override
     def get_unsupported_resource_types(self) -> dict[str, str]:
-        """Report the overlapping DNS resources as deliberately unsupported."""
+        """Report the DNS resource that conflicts with the granular ones as unsupported."""
         reason = (
-            "it manages the same tailnet DNS settings as dns_nameservers, dns_preferences "
-            "and dns_search_paths, and the two families must not be mixed"
+            "it manages the whole tailnet DNS configuration and the provider documents it as "
+            "conflicting with dns_nameservers, dns_preferences, dns_search_paths and "
+            "dns_split_nameservers; the two families must not be mixed"
         )
         return {
             "dns_configuration": f"tailscale_dns_configuration is not exposed: {reason}",
-            "dns_split_nameservers": f"tailscale_dns_split_nameservers is not exposed: {reason}",
         }
 
     @override
@@ -165,6 +166,7 @@ class TailscaleProvider(
             "dns_nameservers": [],
             "dns_preferences": [],
             "dns_search_paths": [],
+            "dns_split_nameservers": [],
         }
 
     @override
@@ -249,6 +251,7 @@ class TailscaleProvider(
                     "nameservers": resources_by_type.get("dns_nameservers", []),
                     "preferences": resources_by_type.get("dns_preferences", []),
                     "search_paths": resources_by_type.get("dns_search_paths", []),
+                    "split_nameservers": resources_by_type.get("dns_split_nameservers", []),
                 },
                 output_name="dns.tf",
             )
