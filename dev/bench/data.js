@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795810777141,
+  "lastUpdate": 1795812077433,
   "repoUrl": "https://github.com/endavis/infrafoundry",
   "entries": {
     "Benchmark": [
@@ -7642,6 +7642,44 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.000010131322553846403",
             "extra": "mean: 126.45841414032171 usec\nrounds: 8345"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "6662995+endavis@users.noreply.github.com",
+            "name": "Eric Davis",
+            "username": "endavis"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b02087745a941f5e0aa78317db0535eea58c12bf",
+          "message": "feat: refuse moving routeros tls services off an installed certificate (merges PR #1715, addresses #1714)\n\nThe REST route from www to HTTPS (certificate create and sign, www-ssl and\napi-ssl, api_url switch, Let's Encrypt install) was verified live on a\nRouterOS 7.25.1 CHR with no code change.\n\nThe live run showed that the bootstrap's certificate pin on www-ssl and\napi-ssl fights the install: foundry certs issue names the certificate\ninfrafoundry-<target>-<sha prefix> and points both services at it, so the\nnext apply would move them back to the self-signed certificate while the\nclient validates the CA chain, locking InfraFoundry out.\n\nWhile the client validates, the plan now refuses an ip.service update that\nmoves www-ssl or api-ssl off an installed infrafoundry- certificate. The\ndocs say to drop certificate: from both services after the install, no\nlonger ask for a verify_ssl change, and mark the REST calls live-verified.\n\nAddresses #1714\n\n\nClaude-Session: https://claude.ai/code/session_01NXu1satPZzcTqThwpZAogj\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-27T20:40:02Z",
+          "tree_id": "632df10c4c842c9c2dea4d003ec9a53fe8cc4aab",
+          "url": "https://github.com/endavis/infrafoundry/commit/b02087745a941f5e0aa78317db0535eea58c12bf"
+        },
+        "date": 1795812076432,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/test_bench_config.py::test_bench_config_load_environment",
+            "value": 48.13639821343059,
+            "unit": "iter/sec",
+            "range": "stddev: 0.00017535452208338397",
+            "extra": "mean: 20.77430046938969 msec\nrounds: 49"
+          },
+          {
+            "name": "tests/benchmarks/test_placeholder.py::test_import_time",
+            "value": 7916.473142862532,
+            "unit": "iter/sec",
+            "range": "stddev: 0.000007892541872927739",
+            "extra": "mean: 126.3188773528016 usec\nrounds: 8341"
           }
         ]
       }
