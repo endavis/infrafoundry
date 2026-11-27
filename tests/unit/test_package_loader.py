@@ -1680,3 +1680,77 @@ class TestSshHostKeys:
         )
 
         assert events["after_apply"][0]["env"]["K"] == variables["ssh_known_hosts"]
+
+
+_CERT_KEY_SENTINEL = "SENTINEL-NOT-A-REAL-CERT-KEY"
+
+
+@pytest.mark.unit
+class TestAcmeCertificates:
+    """``acme_certificates`` stays out of the variables, like ``ssh_host_keys`` (#1682)."""
+
+    _VM = "vm:\n  - name: node-1\n"
+
+    @staticmethod
+    def _secrets() -> str:
+        return yaml.dump(
+            {
+                "variables": {
+                    "other": "kept",
+                    "acme_certificates": {
+                        "proxy-cert": {"key_pem": _CERT_KEY_SENTINEL, "sha256": "abc"}
+                    },
+                }
+            }
+        )
+
+    def _load(self, temp_dir: Path, manifest: dict[str, Any]) -> tuple[Any, Any, Any]:
+        loader = PackageLoader(temp_dir)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "example-app",
+            manifest,
+            {"vm.yaml": self._VM, "secrets.yaml": self._secrets()},
+        )
+        return loader.load_package(pkg_dir, "proxmox", "dev")
+
+    def test_the_store_stays_out_of_variables_and_events_but_in_package_secrets(
+        self, temp_dir: Path
+    ) -> None:
+        manifest = {
+            "name": "example-app",
+            "resources": ["vm.yaml"],
+            "events": {"on_create": [{"type": "script", "env": {"X": "{{ other }}"}}]},
+        }
+        resources, events, variables = self._load(temp_dir, manifest)
+
+        assert "acme_certificates" not in variables
+        assert variables["other"] == "kept"
+        assert _CERT_KEY_SENTINEL not in repr(variables)
+        assert _CERT_KEY_SENTINEL not in repr(events)
+        stored = resources[0].package_secrets["acme_certificates"]["proxy-cert"]
+        assert stored["key_pem"] == _CERT_KEY_SENTINEL
+        assert _CERT_KEY_SENTINEL not in repr(resources[0])
+        assert _CERT_KEY_SENTINEL not in str(resources[0].model_dump())
+
+    def test_a_template_cannot_read_the_store(self, temp_dir: Path) -> None:
+        manifest = {"name": "example-app", "resources": ["vm.yaml"]}
+        loader = PackageLoader(temp_dir)
+        pkg_dir = _create_package(
+            temp_dir,
+            "dev",
+            "proxmox",
+            "example-app",
+            manifest,
+            {
+                "vm.yaml": (
+                    "vm:\n  - name: node-1\n"
+                    "    note: \"{{ acme_certificates | default('absent') }}\"\n"
+                ),
+                "secrets.yaml": self._secrets(),
+            },
+        )
+        resources, _, _ = loader.load_package(pkg_dir, "proxmox", "dev")
+        assert resources[0].config["note"] == "absent"

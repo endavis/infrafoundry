@@ -222,6 +222,18 @@ def _get_orchestrator(
     except ImportError:
         pass
 
+    try:
+        from infrafoundry.providers.acme import AcmeProvider
+
+        orchestrator.register_provider(
+            AcmeProvider(
+                config_dir=config_manager.base_dir,
+                output_dir=Path(os.getenv("INFRAFOUNDRY_OUTPUT_DIR", "generated")),
+            )
+        )
+    except ImportError:
+        pass
+
     return orchestrator
 
 
@@ -365,6 +377,7 @@ def foundry(
 
 
 # Import and register command groups
+from infrafoundry.cli.commands.certs import certs
 from infrafoundry.cli.commands.completion import completion
 from infrafoundry.cli.commands.config import config
 from infrafoundry.cli.commands.deps import deps
@@ -384,6 +397,7 @@ foundry.add_command(secrets)
 foundry.add_command(policy)
 foundry.add_command(provider)
 foundry.add_command(deps)
+foundry.add_command(certs)
 
 # Alias for backwards compatibility during development
 main = foundry

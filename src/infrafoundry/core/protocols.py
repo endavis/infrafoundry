@@ -23,6 +23,7 @@ from jinja2 import Template
 from infrafoundry.core.result_types import ApplyResult, DestroyResult, DriftInfo, PlanResult
 
 if TYPE_CHECKING:
+    from infrafoundry.core.certs.install import CertificateTarget
     from infrafoundry.core.config.models import EnvironmentConfig
     from infrafoundry.core.managed_set import ManagedResources
     from infrafoundry.core.provider import ProviderBase, ResourceConfig
@@ -367,6 +368,36 @@ class ValidatesOffline(Protocol):
             reference_resources: All of the provider's resources in the environment
             env_config: Environment configuration
             report: ValidationReport to add results to
+        """
+        ...
+
+
+@runtime_checkable
+class InstallsCertificate(Protocol):
+    """Protocol for providers that can install an ACME certificate on a device (#1682).
+
+    ``foundry certs issue`` calls ``install_certificate`` on the provider a certificate's
+    ``target`` names, then verifies what the device serves. It is optional: a provider that
+    does not implement it cannot be a target.
+    """
+
+    def install_certificate(
+        self,
+        target: "CertificateTarget",
+        cert_pem: str,
+        chain_pem: str,
+        key_pem: str,
+    ) -> None:
+        """Install the certificate and key on the device and reload its service.
+
+        Args:
+            target: The resolved install target.
+            cert_pem: The leaf certificate.
+            chain_pem: The intermediate chain (may be empty).
+            key_pem: The private key. Never log it.
+
+        Raises:
+            CertificateInstallError: If the install fails. The message holds no key material.
         """
         ...
 

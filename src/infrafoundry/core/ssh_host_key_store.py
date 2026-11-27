@@ -227,8 +227,10 @@ def fingerprint(public: str, run: Run = subprocess.run) -> str:
     return fields[1]
 
 
-def ensure_secrets_file(path: Path, cwd: Path, run: Run = subprocess.run) -> bool:
-    """Create an encrypted ``secrets.yaml`` with empty ``variables`` when it is missing.
+def ensure_secrets_file(
+    path: Path, cwd: Path, run: Run = subprocess.run, initial: str = "variables: {}\n"
+) -> bool:
+    """Create an encrypted ``secrets.yaml`` (empty ``variables`` by default) when it is missing.
 
     The file is encrypted with the creation rules that apply to its path (``.sops.yaml``).
     sops finds ``.sops.yaml`` from its working directory, so ``cwd`` is the config repo root.
@@ -237,6 +239,7 @@ def ensure_secrets_file(path: Path, cwd: Path, run: Run = subprocess.run) -> boo
         path: Path of the package's ``secrets.yaml``.
         cwd: Config repo root, used to find ``.sops.yaml``.
         run: ``subprocess.run`` or a stand-in.
+        initial: Plaintext YAML the new file starts with.
 
     Returns:
         True when the file was created.
@@ -257,7 +260,7 @@ def ensure_secrets_file(path: Path, cwd: Path, run: Run = subprocess.run) -> boo
         "yaml",
         "/dev/stdin",
     ]
-    encrypted = _run(run, argv, f"creating {path.name}", "variables: {}\n", cwd)
+    encrypted = _run(run, argv, f"creating {path.name}", initial, cwd)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(encrypted, encoding="utf-8")
     return True

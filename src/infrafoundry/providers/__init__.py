@@ -1,5 +1,6 @@
 """InfraFoundry Providers Package."""
 
+from infrafoundry.providers.acme import AcmeProvider
 from infrafoundry.providers.aws import AWSProvider
 from infrafoundry.providers.esxi import EsxiProvider
 from infrafoundry.providers.host import HostProvider
@@ -14,6 +15,7 @@ from infrafoundry.providers.tailscale import TailscaleProvider
 
 __all__ = [
     "AWSProvider",
+    "AcmeProvider",
     "EsxiProvider",
     "HostProvider",
     "KubernetesProvider",

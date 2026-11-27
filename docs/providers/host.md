@@ -81,6 +81,12 @@ The `tailscale:` block is the one the [cloud instances take](tailscale.md#instan
 - The auth secret is passed to that run in the `INFRAFOUNDRY_TAILSCALE_AUTH_KEY` environment variable. The playbook writes it to a mode 0600 temporary file on the host, passes it as `--auth-key=file:<path>`, and removes the file afterwards. It is never written to the inventory or to the controller's disk, and tasks that handle it use `no_log`.
 - On `infra destroy`, [tailnet device removal](tailscale.md#removing-the-tailnet-device-on-destroy) applies to the host like any other resource.
 
+## Install Target for Certificates
+
+A host can receive a Let's Encrypt certificate issued by the [ACME provider](acme.md): a `certificate` resource names it as its `target`. The host provider implements the optional install hook, so nothing needs configuring on the host resource beyond `address`, `ssh_user`, `ssh_port` and `ssh_private_key_file`, which the install reuses.
+
+The install is non-interactive and strict: SSH runs with `BatchMode=yes` and `StrictHostKeyChecking=yes`, so the host's key must be in your `~/.ssh/known_hosts` (see [SSH Host Key Checking](../guides/ssh-host-key-checking.md)). The certificate and key travel on standard input, never on a command line. Each file is written to `<path>.infrafoundry-new` under `umask 077`, given its owner and mode, and then one remote command backs up the old files, moves the new ones into place and runs the `reload` argv. If a move or the reload fails, the old files are restored, the reload runs again and the install reports the failure; the temporary files are removed either way. With `sudo: true` the remote commands run through `sudo -n`, which needs a passwordless rule on the host. Afterwards `foundry certs` connects to the `verify` port and compares the SHA-256 of the served certificate with the installed one.
+
 ## Destroy
 
 `foundry infra destroy --env prod -r vps-01` marks the host `DELETED` in the state database, fires its `on_destroy` handlers and removes its tailnet device. It never contacts the machine, and the machine, Tailscale on it and anything the playbooks installed stay as they are.
