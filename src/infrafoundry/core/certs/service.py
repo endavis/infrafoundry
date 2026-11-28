@@ -378,6 +378,8 @@ class CertificateService:
         }
         if spec.target.get("kind"):
             target["kind"] = spec.target["kind"]
+        if spec.target.get("svm"):
+            target["svm"] = spec.target["svm"]
         self._record_state(
             resource,
             {

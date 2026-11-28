@@ -158,3 +158,87 @@ def test_load_with_plaintext_secret_raises_before_resolving(tmp_path: Path) -> N
         with pytest.raises(OntapSettingsError, match="secret://"):
             load_settings(tmp_path, "test")
     resolve.assert_not_called()
+
+
+def _installed_cert(**target: Any) -> Any:
+    from datetime import UTC, datetime, timedelta
+
+    from infrafoundry.core.certs.models import LETSENCRYPT_PRODUCTION
+    from infrafoundry.core.provider import ResourceConfig
+
+    sha = "ab" * 32
+    return ResourceConfig(
+        name="cluster-cert",
+        type="certificate",
+        provider="acme",
+        config={
+            "names": ["cluster1.example.com"],
+            "target": {"provider": "ontap", "kind": "cluster", **target},
+        },
+        package_secrets={
+            "acme_certificates": {
+                "cluster-cert": {
+                    "sha256": sha,
+                    "installed_sha256": sha,
+                    "directory": LETSENCRYPT_PRODUCTION,
+                    "not_after": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
+                }
+            }
+        },
+    )
+
+
+def _load_with(resources: list[Any]) -> OntapSettings:
+    with (
+        patch.object(ontap_settings, "ConfigManager") as manager,
+        patch.object(ontap_settings, "resolved_provider_settings", return_value=dict(RESOLVED)),
+    ):
+        manager.return_value.load_environment.return_value = _env(dict(RAW_SETTINGS))
+        manager.return_value.get_all_resources_all_providers.return_value = resources
+        return load_settings(Path("."), "test")
+
+
+def test_an_installed_production_cluster_certificate_sets_the_server_name() -> None:
+    settings = _load_with([_installed_cert()])
+    assert settings.tls_server_name == "cluster1.example.com"
+    assert settings.connection_params().tls_server_name == "cluster1.example.com"
+    assert not settings.unverified
+
+
+def test_no_installed_certificate_leaves_the_settings_unchanged() -> None:
+    assert _load_with([]).tls_server_name is None
+
+
+def test_a_staging_expired_or_uninstalled_certificate_does_not_switch_the_client() -> None:
+    from infrafoundry.core.certs.models import LETSENCRYPT_STAGING
+
+    def entry(cert: Any) -> dict[str, Any]:
+        stored: dict[str, Any] = cert.package_secrets["acme_certificates"]["cluster-cert"]
+        return stored
+
+    staging = _installed_cert()
+    entry(staging)["directory"] = LETSENCRYPT_STAGING
+    expired = _installed_cert()
+    entry(expired)["not_after"] = "2020-01-01T00:00:00+00:00"
+    pending = _installed_cert()
+    entry(pending)["installed_sha256"] = ""
+    for cert in (staging, expired, pending):
+        assert _load_with([cert]).tls_server_name is None
+
+
+def test_an_svm_certificate_does_not_switch_the_cluster_client() -> None:
+    svm = _installed_cert(kind="svm", svm="svm1")
+    assert _load_with([svm]).tls_server_name is None
+
+
+def test_unloadable_resources_keep_the_pin() -> None:
+    from infrafoundry.core.exceptions import InfraFoundryError
+
+    with (
+        patch.object(ontap_settings, "ConfigManager") as manager,
+        patch.object(ontap_settings, "resolved_provider_settings", return_value=dict(RESOLVED)),
+    ):
+        manager.return_value.load_environment.return_value = _env(dict(RAW_SETTINGS))
+        manager.return_value.get_all_resources_all_providers.side_effect = InfraFoundryError("x")
+        loaded = load_settings(Path("."), "test")
+    assert loaded.tls_server_name is None and loaded.fingerprint == "ab" * 32

@@ -11,13 +11,16 @@ from __future__ import annotations
 
 import logging
 import re
-import socket
-import ssl
 from collections.abc import Callable
 from dataclasses import replace
 from typing import Any, Protocol
 
-from infrafoundry.core.certs.install import CertificateTarget, TargetEndpoint, verify_served
+from infrafoundry.core.certs.install import (
+    CertificateTarget,
+    TargetEndpoint,
+    served_chain_validates,
+    verify_served,
+)
 from infrafoundry.core.certs.keys import describe
 from infrafoundry.core.certs.models import CertificateError, CertificateInstallError
 from infrafoundry.core.exceptions import InfraFoundryError
@@ -26,6 +29,12 @@ from ..client import RouterOSAPIError, RouterOSClient, RouterOSConnectionError, 
 from ..settings import MikroTikSettings, management_host
 
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    "RouterOSCertificateInstaller",
+    "is_installed_certificate_name",
+    "served_chain_validates",
+]
 
 SERVICES = ("api-ssl", "www-ssl")
 """The RouterOS services that serve the installed certificate, in the order they are patched."""
@@ -54,31 +63,6 @@ Validates = Callable[[str, int, str], bool]
 """``(address, port, server_name) -> True`` when the served leaf passes default validation."""
 
 Verifier = Callable[[CertificateTarget, str], None]
-
-
-def served_chain_validates(address: str, port: int, server_name: str) -> bool:
-    """Return whether the endpoint's certificate passes the default TLS validation.
-
-    A Let's Encrypt production certificate does; a staging or custom-directory one does not.
-
-    Args:
-        address: Host or IP to connect to.
-        port: TCP port.
-        server_name: Host name for SNI and the host name check.
-
-    Raises:
-        OSError: If the endpoint cannot be reached.
-    """
-    context = ssl.create_default_context()
-    context.minimum_version = ssl.TLSVersion.TLSv1_2
-    try:
-        with (
-            socket.create_connection((address, port), timeout=10) as sock,
-            context.wrap_socket(sock, server_hostname=server_name),
-        ):
-            return True
-    except ssl.SSLCertVerificationError:
-        return False
 
 
 class RouterOSCertificateInstaller:

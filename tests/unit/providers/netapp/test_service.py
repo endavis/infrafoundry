@@ -12,7 +12,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import requests
@@ -26,6 +26,7 @@ from infrafoundry.providers._netapp import (
 from infrafoundry.providers._netapp.ontap import (
     ConnectionParams,
     OntapAPIError,
+    OntapCertificateService,
     OntapConnectionError,
     OntapSpecMissingError,
     connect_ontap,
@@ -43,6 +44,18 @@ SPEC: dict[str, Any] = {
         f"{LIF_PATH}/{{uuid}}": {"patch": {}, "delete": {}},
     }
 }
+CERT_PATH = "/security/certificates"
+SPEC["paths"].update(
+    {
+        CERT_PATH: {"get": {}, "post": {}},
+        f"{CERT_PATH}/{{uuid}}": {"delete": {}},
+        "/cluster/web": {"get": {}, "patch": {}},
+        "/svm/svms/{svm.uuid}/web": {"get": {}, "patch": {}},
+        "/svm/svms": {"get": {}},
+        "/cluster/jobs/{uuid}": {"get": {}},
+        "/cluster": {"get": {}},
+    }
+)
 ROW = {
     "uuid": "u1",
     "name": "lif1",
@@ -329,3 +342,191 @@ def test_the_install_hint_when_pynetappfoundry_is_absent(
         require_pynetappfoundry()
     with pytest.raises(NetAppDependencyError, match=r"infrafoundry\[netapp\]"):
         connect_ontap(_params(spec_file))
+
+
+def _certs(params: ConnectionParams, session: Any = None) -> OntapCertificateService:
+    """The real service, typed with the certificate calls the installer uses."""
+    return cast(OntapCertificateService, connect_ontap(params, session=session))
+
+
+# -- certificates (#1684) ----------------------------------------------------------------
+
+
+def test_certificate_calls_send_the_expected_requests(
+    spec_file: Path, session: FakeSession
+) -> None:
+    service = _certs(_params(spec_file), session=session)
+
+    session.responses = [(200, {"records": [{"uuid": "c1", "name": "n1"}]})]
+    assert service.find_certificate("n1", None) == {"uuid": "c1", "name": "n1"}
+    session.responses = [(200, {"records": []})]
+    assert service.find_certificate("n1", "svm1") is None
+    session.responses = [(200, {"records": [{"uuid": "c1"}]})]
+    assert service.list_server_certificates(None) == [{"uuid": "c1"}]
+    cluster_get, svm_get, list_get = (c[1] for c in session.calls)
+    assert (
+        "type=server" in cluster_get and "scope=cluster" in cluster_get and "name=n1" in cluster_get
+    )
+    assert "svm.name=svm1" in svm_get and "scope=cluster" not in svm_get
+    assert "public_certificate" in cluster_get and "intermediate" not in cluster_get
+    assert "name=" not in list_get
+
+    session.calls.clear()
+    session.responses = [(201, {"num_records": 1, "records": [{"uuid": "c2", "name": "n2"}]})]
+    uuid = service.install_certificate(
+        name="n2",
+        common_name="cluster1.example.com",
+        public_certificate="LEAF",
+        private_key="KEY-MARKER",
+        intermediates=["CHAIN"],
+        svm="svm1",
+    )
+    assert uuid == "c2"
+    ((method, url, body),) = session.calls
+    assert (method, url) == (
+        "POST",
+        "https://192.0.2.1/api/security/certificates?return_records=true",
+    )
+    assert body == {
+        "type": "server",
+        "name": "n2",
+        "common_name": "cluster1.example.com",
+        "public_certificate": "LEAF",
+        "private_key": "KEY-MARKER",
+        "intermediate_certificates": ["CHAIN"],
+        "svm": {"name": "svm1"},
+    }
+
+    session.calls.clear()
+    session.responses = [(200, {})]
+    service.delete_certificate("c2")
+    assert session.calls == [("DELETE", "https://192.0.2.1/api/security/certificates/c2", None)]
+
+
+def test_a_cluster_install_omits_the_svm_and_an_empty_chain(
+    spec_file: Path, session: FakeSession
+) -> None:
+    service = _certs(_params(spec_file), session=session)
+    session.responses = [(201, {"records": [{"uuid": "c2"}]})]
+    service.install_certificate(
+        name="n",
+        common_name="c",
+        public_certificate="L",
+        private_key="K",
+        intermediates=[],
+        svm=None,
+    )
+    body = session.calls[0][2]
+    assert "svm" not in body and "intermediate_certificates" not in body
+
+
+def test_the_web_service_binding_is_read_and_patched(spec_file: Path, session: FakeSession) -> None:
+    service = _certs(_params(spec_file), session=session)
+    session.responses = [(200, {"uuid": "x"}), (200, {"records": [{"name": "svm1", "uuid": "s1"}]})]
+    session.responses = [(200, {"records": [{"name": "svm1", "uuid": "s1"}]})]
+    assert service.svm_uuid("svm1") == "s1"
+    session.responses = [(200, {"certificate": {"uuid": "c1"}})]
+    assert service.web_certificate_uuid(None) == "c1"
+    session.responses = [(200, {"certificate": {"uuid": "c9"}})]
+    assert service.web_certificate_uuid("s1") == "c9"
+    session.calls.clear()
+
+    session.responses = [(200, {})]
+    service.bind_web_certificate("c1", None)
+    assert session.calls == [
+        ("PATCH", "https://192.0.2.1/api/cluster/web", {"certificate": {"uuid": "c1"}})
+    ]
+
+
+def test_an_unknown_svm_is_an_api_error(spec_file: Path, session: FakeSession) -> None:
+    service = _certs(_params(spec_file), session=session)
+    session.responses = [(200, {"records": []})]
+    with pytest.raises(OntapAPIError, match="no SVM 'svm9'"):
+        service.svm_uuid("svm9")
+
+
+def test_the_cluster_bind_does_not_poll_but_the_svm_bind_does(
+    spec_file: Path, session: FakeSession
+) -> None:
+    service = _certs(_params(spec_file), session=session)
+    job = {"job": {"uuid": JOB, "_links": {"self": {"href": f"/api/cluster/jobs/{JOB}"}}}}
+    session.responses = [(202, job)]
+    service.bind_web_certificate("c1", None)
+    assert [c[0] for c in session.calls] == ["PATCH"]
+
+    session.calls.clear()
+    session.responses = [(202, job), (200, {"uuid": JOB, "state": "success", "message": "ok"})]
+    service.bind_web_certificate("c1", "s1")
+    assert [c[0] for c in session.calls] == ["PATCH", "GET"]
+    assert session.calls[0][1] == "https://192.0.2.1/api/svm/svms/s1/web"
+
+
+def test_a_dropped_cluster_bind_is_a_connection_error_without_retries(
+    spec_file: Path, session: FakeSession
+) -> None:
+    service = _certs(_params(spec_file), session=session)
+    attempts: list[int] = []
+
+    def drop(*_a: Any, **_k: Any) -> Any:
+        attempts.append(1)
+        raise requests.ConnectionError("reset")
+
+    session.request = drop  # type: ignore[method-assign]
+    with pytest.raises(OntapConnectionError):
+        service.bind_web_certificate("c1", None)
+    assert len(attempts) == 1
+
+
+def test_the_private_key_never_reaches_logs_or_errors(
+    spec_file: Path, session: FakeSession, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG)
+    service = _certs(_params(spec_file), session=session)
+    session.responses = [(400, {"error": {"message": "Unsupported key type", "code": "52363366"}})]
+    with pytest.raises(OntapAPIError) as caught:
+        service.install_certificate(
+            name="n",
+            common_name="c",
+            public_certificate="LEAF-MARKER",
+            private_key="KEY-MARKER",
+            intermediates=[],
+            svm=None,
+        )
+    assert "Unsupported key type" in str(caught.value)
+    assert "KEY-MARKER" not in str(caught.value) and "KEY-MARKER" not in caplog.text
+
+
+def test_the_validating_mode_overrides_the_pin_the_bundle_and_the_opt_out(
+    spec_file: Path, tmp_path: Path
+) -> None:
+    from infrafoundry.core.tls_server_name import ServerNameAdapter
+
+    bundle = tmp_path / "ca.pem"
+    bundle.write_text("-----BEGIN CERTIFICATE-----\n")
+    for changes in (
+        {},
+        {"fingerprint": None, "verify_ssl": False},
+        {"fingerprint": None, "ca_bundle": bundle},
+    ):
+        service = _certs(_params(spec_file, tls_server_name="cluster1.example.com", **changes))
+        client = service._client  # type: ignore[attr-defined]
+        assert client.verify_ssl is True
+        adapter = client.session.get_adapter("https://192.0.2.1/api/cluster")
+        assert isinstance(adapter, ServerNameAdapter)
+        assert adapter.poolmanager.connection_pool_kw["assert_hostname"] == "cluster1.example.com"
+
+
+def test_a_validated_tls_failure_names_the_console_recovery(
+    spec_file: Path, session: FakeSession
+) -> None:
+    service = _certs(_params(spec_file, tls_server_name="cluster1.example.com"), session=session)
+
+    def bad(*_a: Any, **_k: Any) -> Any:
+        raise requests.exceptions.SSLError("certificate verify failed")
+
+    session.request = bad  # type: ignore[method-assign]
+    with pytest.raises(OntapConnectionError, match="cluster console"):
+        service.cluster_info()
+    pinned = _certs(_params(spec_file), session=session)
+    with pytest.raises(OntapConnectionError, match="check tls_fingerprint"):
+        pinned.cluster_info()

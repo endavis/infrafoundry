@@ -85,3 +85,18 @@ def test_other_providers_and_resources_are_ignored() -> None:
 
 def test_an_invalid_target_is_skipped() -> None:
     assert lookup(cert(names=["*.example.com"])) is None
+
+
+def test_the_kind_filter_ignores_a_target_of_another_kind() -> None:
+    resource = cert(provider="ontap")
+    resource.config["target"] = {"provider": "ontap", "kind": "svm", "svm": "svm1"}
+    resources = [resource]
+    assert installed_server_name(resources, "ontap", NOW, kind="cluster") is None
+    assert installed_server_name(resources, "ontap", NOW, kind="svm") == "router.example.com"
+    assert installed_server_name(resources, "ontap", NOW) == "router.example.com"
+
+
+def test_an_installed_cluster_target_needs_no_resource() -> None:
+    resource = cert(provider="ontap")
+    resource.config["target"] = {"provider": "ontap", "kind": "cluster"}
+    assert installed_server_name([resource], "ontap", NOW, kind="cluster") == "router.example.com"

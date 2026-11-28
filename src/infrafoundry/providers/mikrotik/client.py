@@ -10,9 +10,9 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 import requests
-from requests.adapters import HTTPAdapter
 
 from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.tls_server_name import ServerNameAdapter
 
 from .settings import MikroTikSettings
 
@@ -67,31 +67,6 @@ class RouterOSWriter(RouterOSReader, Protocol):
         ...
 
 
-class _ServerNameAdapter(HTTPAdapter):
-    """Send SNI and check the certificate's host name against a fixed name, not the URL host.
-
-    The device is reached by an address (often an IP literal) while its Let's Encrypt
-    certificate names a DNS name.
-    """
-
-    def __init__(self, server_name: str) -> None:
-        self._server_name = server_name
-        super().__init__()
-
-    def init_poolmanager(
-        self, connections: int, maxsize: int, block: bool = False, **pool_kwargs: Any
-    ) -> None:
-        """Create the pool manager with the fixed server name for SNI and host name checks."""
-        super().init_poolmanager(
-            connections,
-            maxsize,
-            block=block,
-            server_hostname=self._server_name,
-            assert_hostname=self._server_name,
-            **pool_kwargs,
-        )
-
-
 class RouterOSClient:
     """REST client over a ``requests.Session`` with HTTP basic auth.
 
@@ -115,7 +90,7 @@ class RouterOSClient:
         if self._validated and settings.tls_server_name:
             self._session.verify = True
             self._session.mount(
-                settings.api_url.rstrip("/"), _ServerNameAdapter(settings.tls_server_name)
+                settings.api_url.rstrip("/"), ServerNameAdapter(settings.tls_server_name)
             )
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:

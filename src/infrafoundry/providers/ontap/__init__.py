@@ -17,7 +17,10 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, override
 
+from infrafoundry.core.certs.install import CertificateTarget
+from infrafoundry.core.certs.models import CertificateInstallError
 from infrafoundry.core.config.models import EnvironmentConfig
+from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.provider import ProviderBase, ResourceConfig
 from infrafoundry.core.provider_mixins import (
     ResourceGrouperMixin,
@@ -26,8 +29,10 @@ from infrafoundry.core.provider_mixins import (
 )
 from infrafoundry.core.validation import ValidationReport
 
+from .components.certificate import OntapCertificateInstaller
 from .components.manager import OntapApplyResult, OntapManager, OntapPlan
 from .schema import SLUG, TYPE_NAME
+from .settings import load_settings
 from .validator import OntapValidator
 
 
@@ -40,6 +45,30 @@ class OntapProvider(
     """Provider for a NetApp ONTAP cluster, managed over the REST API."""
 
     renders_terraform_backend = False
+
+    def install_certificate(
+        self, target: CertificateTarget, cert_pem: str, chain_pem: str, key_pem: str
+    ) -> None:
+        """Install an ACME certificate on the cluster or an SVM over REST and verify it (#1684).
+
+        Args:
+            target: The resolved install target; ``env`` names the environment whose
+                ``provider_settings.ontap`` reach the cluster.
+            cert_pem: The leaf certificate.
+            chain_pem: The intermediate chain (may be empty).
+            key_pem: The private key. Never logged.
+
+        Raises:
+            CertificateInstallError: If the install fails or the environment is unknown. The
+                message holds no key material.
+        """
+        if not target.env:
+            raise CertificateInstallError("the install target carries no environment name")
+        try:
+            settings = load_settings(self.config_dir, target.env)
+        except InfraFoundryError as exc:
+            raise CertificateInstallError(f"ontap settings are unusable: {exc}") from None
+        OntapCertificateInstaller(settings).install(target, cert_pem, chain_pem, key_pem)
 
     def __init__(self, config_dir: Path, output_dir: Path) -> None:
         """Initialize the ONTAP provider."""

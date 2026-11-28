@@ -125,6 +125,42 @@ Create is read-first: a LIF is created only when the plan, built from a read of 
 
 Only data LIFs. Cluster and node management LIFs, routes, broadcast domains, SVMs, volumes and the other ONTAP objects are not managed by this provider yet. Creating the cluster from the console stays with Ansible.
 
+## Install target for certificates
+
+A `certificate` resource of the [ACME provider](acme.md) can target the cluster or one of its SVMs. InfraFoundry installs the leaf, key and intermediate chain over REST (`POST /api/security/certificates`), binds the certificate to the web service, checks that it is served, and then deletes the certificates it installed before. Install and renewal need `infrafoundry[netapp]` and the OpenAPI spec, like the rest of this provider.
+
+```yaml
+# envs/lab/acme/cluster/certificate.yaml
+certificate:
+  - name: cluster-cert
+    names: [cluster1.example.com]
+    target:
+      provider: ontap
+      kind: cluster                  # no resource: the cluster is provider_settings.ontap.host
+      verify: {server_name: cluster1.example.com}   # port defaults to 443
+  - name: svm-cert
+    names: [svm1.example.com]
+    target:
+      provider: ontap
+      kind: svm
+      svm: svm1
+      address: svm1-mgmt.example.com   # optional; defaults to the server name
+```
+
+- `kind` is required: `cluster` or `svm`. `resource` is rejected, and so are SSH, path and reload keys.
+- `verify.server_name` defaults to the first plain name and is required when every name is a wildcard (for `svm`, `address` can stand in). It is the name the served certificate is checked against.
+- **Names.** The certificate is stored as `infrafoundry-cluster-<sha12>` or `infrafoundry-svm-<svm>-<sha12>`, where `<sha12>` is the first 12 hex digits of the leaf's SHA-256. ONTAP needs a common name; InfraFoundry sends the subject's, or else the first DNS name.
+
+**Order.** The order is chosen so a failure cannot lock InfraFoundry out: install the certificate, bind it (`PATCH /api/cluster/web` or `/api/svm/svms/{svm.uuid}/web`), wait until the cluster answers on the new leaf, check what the management address serves, and only then delete the superseded certificates. Binding the cluster web service restarts it and drops the pinned session, so everything after the bind runs through a client pinned to the new leaf's SHA-256. If the check fails, the previous certificate is bound again and the new one deleted; if even that fails, the error names both certificates and says to restore a working one on the cluster console. A bind the cluster rejects deletes the new certificate. A bind that never takes effect within two minutes deletes it too, when the previous certificate is still in use.
+
+**What is never deleted.** Only `type: server` certificates of the same scope that follow the name scheme above and are not bound are removed. Trust anchors (`server_ca`), certificates you installed yourself, other SVMs' certificates and the certificate that is bound are never touched.
+
+**The client switch.** Once an installed, unexpired Let's Encrypt production certificate is recorded for a `cluster` target, every ONTAP client (plan, apply, doctor and the installer) validates the CA chain and that host name instead of `tls_fingerprint`, `ca_bundle` or `verify_ssl`. An `svm` certificate never changes the cluster client. A failed validation says to restore a working certificate on the console.
+
+**Staging.** A staging or custom-directory certificate cannot pass CA validation, so the client does not switch and a configured `tls_fingerprint` goes stale. After such an install the installer logs a warning: re-pin `tls_fingerprint` to the new certificate's SHA-256 fingerprint before the next plan or apply.
+
+**SVM targets.** The SVM binding does not touch the cluster management TLS, and the installer waits for the REST job. The SVM's own management LIF must carry the `management_https` service for the served-certificate check to reach it; a lab cluster with no such LIF can exercise this path in unit tests only.
+
 ## Checks
 
 `infra doctor` checks the settings, the secrets, the spec file, that the cluster answers (it reports the ONTAP version) and that the SVMs, nodes and ports your YAML names exist.

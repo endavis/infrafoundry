@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from infrafoundry.core.exceptions import InfraFoundryError
+from infrafoundry.core.tls_server_name import ServerNameAdapter
 from infrafoundry.providers._netapp import require_pynetappfoundry
 
 if TYPE_CHECKING:
@@ -59,6 +60,9 @@ class ConnectionParams:
     verify_ssl: bool | None
     timeout: int
     spec_file: Path
+    tls_server_name: str | None = None
+    """Validate the CA chain and this host name instead of the pin (an installed production
+    certificate, #1684); overrides ``fingerprint``, ``ca_bundle`` and ``verify_ssl``."""
 
 
 class OntapService(Protocol):
@@ -89,6 +93,56 @@ class OntapService(Protocol):
         ...
 
 
+class OntapCertificateService(Protocol):
+    """What the certificate installer needs from the cluster (#1684)."""
+
+    def cluster_info(self) -> dict[str, Any]:
+        """Return the cluster ``name`` and ``version`` record."""
+        ...
+
+    def find_certificate(self, name: str, svm: str | None) -> dict[str, Any] | None:
+        """Return the server certificate called ``name`` (``uuid``, ``name``,
+        ``public_certificate``) in the cluster scope or in ``svm``, else ``None``."""
+        ...
+
+    def list_server_certificates(self, svm: str | None) -> list[dict[str, Any]]:
+        """Return the ``type: server`` certificates of the cluster scope or of ``svm``."""
+        ...
+
+    def install_certificate(
+        self,
+        *,
+        name: str,
+        common_name: str,
+        public_certificate: str,
+        private_key: str,
+        intermediates: Sequence[str],
+        svm: str | None,
+    ) -> str:
+        """Install a server certificate and return its UUID."""
+        ...
+
+    def delete_certificate(self, uuid: str) -> None:
+        """Delete an installed certificate."""
+        ...
+
+    def svm_uuid(self, svm: str) -> str:
+        """Return the UUID of the SVM called ``svm``."""
+        ...
+
+    def web_certificate_uuid(self, svm_uuid: str | None) -> str | None:
+        """Return the UUID of the certificate the cluster (or SVM) web service uses."""
+        ...
+
+    def bind_web_certificate(self, certificate_uuid: str, svm_uuid: str | None) -> None:
+        """Make the cluster (or SVM) web service use the certificate.
+
+        The cluster web service restarts, which can drop the connection: that surfaces as
+        :class:`OntapConnectionError`. An SVM binding waits for its job.
+        """
+        ...
+
+
 def spec_hint(spec_file: Path) -> str:
     """Return the message that names the missing spec and where to download it (built offline)."""
     from pynetappfoundry import __version__
@@ -109,17 +163,22 @@ def spec_hint(spec_file: Path) -> str:
 class PynetappOntapService:
     """An :class:`OntapService` backed by a real ``ONTAPAPIClient``."""
 
-    def __init__(self, client: ONTAPAPIClient, config: Config, host: str) -> None:
+    def __init__(
+        self, client: ONTAPAPIClient, config: Config, host: str, *, validated: bool = False
+    ) -> None:
         """Initialize the service.
 
         Args:
             client: The pynetappfoundry client, built by :func:`connect_ontap`.
             config: The in-memory config the client was built with.
             host: The cluster address, for messages.
+            validated: True when the client validates the CA chain and host name (an installed
+                production certificate), which changes the TLS failure message.
         """
         self._client = client
         self._config = config
         self._host = host
+        self._validated = validated
 
     def _translate(self, exc: Exception) -> OntapError:
         """Map a library or HTTP exception to a service error without credentials."""
@@ -135,6 +194,13 @@ class PynetappOntapService:
             )
         if isinstance(exc, requests.HTTPError):
             return OntapAPIError(_http_message(exc))
+        if isinstance(exc, requests.exceptions.SSLError) and self._validated:
+            return OntapConnectionError(
+                f"The certificate '{self._host}' presented failed validation (CA chain or host "
+                "name). If the installed certificate is wrong or expired, select a working "
+                "server certificate for the web service on the cluster console (the "
+                "'security ssl' commands), then run 'foundry certs issue' again."
+            )
         if isinstance(exc, requests.exceptions.SSLError):
             return OntapConnectionError(
                 f"TLS verification of '{self._host}' failed: check tls_fingerprint, ca_bundle "
@@ -225,6 +291,143 @@ class PynetappOntapService:
             names.add(name)
         return names
 
+    # -- certificates (#1684) -------------------------------------------------------------
+
+    _CERT_FIELDS = "uuid,name,type,scope,svm.name,common_name,public_certificate"
+
+    def _certificates(self, **filters: str) -> list[dict[str, Any]]:
+        query = {"fields": self._CERT_FIELDS, "type": "server", **filters}
+        try:
+            response = self._client.get_all_records("/security/certificates", query_params=query)
+        except Exception as exc:
+            raise self._translate(exc) from None
+        return [r for r in response.get("records", []) if isinstance(r, dict)]
+
+    @staticmethod
+    def _scope_filter(svm: str | None) -> dict[str, str]:
+        return {"svm.name": svm} if svm else {"scope": "cluster"}
+
+    def find_certificate(self, name: str, svm: str | None) -> dict[str, Any] | None:
+        """Return the server certificate called ``name`` in the cluster scope or ``svm``."""
+        rows = self._certificates(name=name, **self._scope_filter(svm))
+        return rows[0] if rows else None
+
+    def list_server_certificates(self, svm: str | None) -> list[dict[str, Any]]:
+        """Return the ``type: server`` certificates of the cluster scope or of ``svm``."""
+        return self._certificates(**self._scope_filter(svm))
+
+    def install_certificate(
+        self,
+        *,
+        name: str,
+        common_name: str,
+        public_certificate: str,
+        private_key: str,
+        intermediates: Sequence[str],
+        svm: str | None,
+    ) -> str:
+        """Install a server certificate with its key and chain and return its UUID.
+
+        Request bodies are never logged, so the private key stays out of the logs.
+        """
+        body: dict[str, Any] = {
+            "type": "server",
+            "name": name,
+            "common_name": common_name,
+            "public_certificate": public_certificate,
+            "private_key": private_key,
+        }
+        if intermediates:
+            body["intermediate_certificates"] = list(intermediates)
+        if svm:
+            body["svm"] = {"name": svm}
+        try:
+            response = self._client.call_endpoint(
+                "/security/certificates",
+                method="POST",
+                query_params={"return_records": "true"},
+                body=body,
+            )
+            self._wait_if_job(response)
+        except Exception as exc:
+            raise self._translate(exc) from None
+        records = response.get("records") if isinstance(response, dict) else None
+        if records and isinstance(records[0], dict) and records[0].get("uuid"):
+            return str(records[0]["uuid"])
+        found = self.find_certificate(name, svm)
+        if found is None or not found.get("uuid"):
+            raise OntapAPIError("ONTAP accepted the certificate but did not return it")
+        return str(found["uuid"])
+
+    def delete_certificate(self, uuid: str) -> None:
+        """Delete an installed certificate."""
+        try:
+            response = self._client.call_endpoint(
+                "/security/certificates/{uuid}", method="DELETE", path_params={"uuid": uuid}
+            )
+            self._wait_if_job(response)
+        except Exception as exc:
+            raise self._translate(exc) from None
+
+    def svm_uuid(self, svm: str) -> str:
+        """Return the UUID of the SVM called ``svm``."""
+        try:
+            response = self._client.get_all_records(
+                "/svm/svms", query_params={"name": svm, "fields": "uuid,name"}
+            )
+        except Exception as exc:
+            raise self._translate(exc) from None
+        for record in response.get("records", []):
+            if record.get("name") == svm and record.get("uuid"):
+                return str(record["uuid"])
+        raise OntapAPIError(f"the cluster has no SVM '{svm}'")
+
+    def _web_path(self, svm_uuid: str | None) -> tuple[str, dict[str, Any] | None]:
+        if svm_uuid:
+            return "/svm/svms/{svm.uuid}/web", {"svm.uuid": svm_uuid}
+        return "/cluster/web", None
+
+    def web_certificate_uuid(self, svm_uuid: str | None) -> str | None:
+        """Return the UUID of the certificate the cluster (or SVM) web service uses."""
+        path, params = self._web_path(svm_uuid)
+        try:
+            response = self._client.call_endpoint(
+                path, path_params=params, query_params={"fields": "certificate.uuid"}
+            )
+        except Exception as exc:
+            raise self._translate(exc) from None
+        certificate = response.get("certificate") if isinstance(response, dict) else None
+        uuid = certificate.get("uuid") if isinstance(certificate, dict) else None
+        return str(uuid) if uuid else None
+
+    def bind_web_certificate(self, certificate_uuid: str, svm_uuid: str | None) -> None:
+        """Make the cluster (or SVM) web service use the certificate.
+
+        The cluster call is neither retried nor polled: the web service restarts on the new
+        certificate and the pinned session breaks. An SVM binding waits for its job.
+        """
+        from pynetappfoundry.core.models import RetryConfig
+
+        path, params = self._web_path(svm_uuid)
+        try:
+            response = self._client.call_endpoint(
+                path,
+                method="PATCH",
+                path_params=params,
+                body={"certificate": {"uuid": certificate_uuid}},
+                retry_config=RetryConfig(enabled=False),
+            )
+            if svm_uuid:
+                self._wait_if_job(response)
+        except Exception as exc:
+            raise self._translate(exc) from None
+
+    def _wait_if_job(self, response: Any) -> None:
+        if isinstance(response, dict) and "job" in response:
+            from pynetappfoundry.query.job import JobTracker
+
+            JobTracker.from_response(response, self._client).wait()
+
 
 def _http_message(exc: Exception) -> str:
     """Return ONTAP's error message of a failed request, else the status line."""
@@ -261,16 +464,21 @@ def connect_ontap(params: ConnectionParams, *, session: Session | None = None) -
 
     from ._adapter import InMemoryConfig, PinnedFingerprintStore
 
+    validated = params.tls_server_name is not None
     config = InMemoryConfig(
         cluster=params.host,
         username=params.username,
         password=params.password,
         spec_dir=params.spec_file.parent.parent,
         timeout=params.timeout,
-        trust=PinnedFingerprintStore(params.fingerprint),
-        verify=params.verify_ssl if params.fingerprint is None else None,
-        ca_bundle=str(params.ca_bundle) if params.ca_bundle else None,
+        trust=PinnedFingerprintStore(None if validated else params.fingerprint),
+        verify=True if validated else (params.verify_ssl if params.fingerprint is None else None),
+        ca_bundle=None if validated else (str(params.ca_bundle) if params.ca_bundle else None),
     )
     extra: dict[str, Any] = {} if session is None else {"session": session}
     client = ONTAPAPIClient(ClusterConfig(name=params.host, ip=params.host), config, **extra)
-    return PynetappOntapService(client, config, params.host)
+    if params.tls_server_name:
+        # The pinning adapter pins nothing when ``verify`` is not False; this one adds SNI
+        # and the host name check for the certificate's DNS name (the longest prefix wins).
+        client.session.mount(client.base_url, ServerNameAdapter(params.tls_server_name))
+    return PynetappOntapService(client, config, params.host, validated=validated)

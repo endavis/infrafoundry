@@ -565,3 +565,98 @@ def test_a_mikrotik_target_resolves_without_an_endpoint() -> None:
 def test_a_mikrotik_target_needs_its_ip_service_resource() -> None:
     with pytest.raises(CertificateSchemaError, match="not declared"):
         resolve_target(mikrotik_target(), ["router.example.com"], [mikrotik_resource("other")])
+
+
+# -- ONTAP targets (#1684) ------------------------------------------------------------------
+
+
+def ontap_target(**over: Any) -> dict[str, Any]:
+    return {"provider": "ontap", "kind": "cluster", **over}
+
+
+def test_a_minimal_ontap_cluster_target_is_valid() -> None:
+    assert target_problems(ontap_target(), ["cluster1.example.com"], "t") == []
+
+
+def test_an_ontap_svm_target_needs_the_svm() -> None:
+    names = ["svm1.example.com"]
+    assert target_problems({"provider": "ontap", "kind": "svm"}, names, "t")
+    assert target_problems({"provider": "ontap", "kind": "svm", "svm": "svm1"}, names, "t") == []
+
+
+def test_an_ontap_target_rejects_a_resource() -> None:
+    problems = target_problems(ontap_target(resource="x"), ["a.example.com"], "t")
+    assert any("resource does not apply" in p for p in problems)
+
+
+def test_an_ontap_target_needs_a_known_kind() -> None:
+    for raw in ({"provider": "ontap"}, {"provider": "ontap", "kind": "node"}):
+        problems = target_problems(raw, ["a.example.com"], "t")
+        assert any("must be one of: cluster, svm" in p for p in problems)
+
+
+def test_an_ontap_cluster_target_rejects_an_address_and_an_svm() -> None:
+    assert target_problems(ontap_target(address="192.0.2.5"), ["a.example.com"], "t")
+    assert target_problems(ontap_target(svm="svm1"), ["a.example.com"], "t")
+
+
+def test_an_ontap_target_rejects_ssh_and_path_keys() -> None:
+    problems = target_problems(
+        ontap_target(key_path="/etc/key", reload=["x"]), ["a.example.com"], "t"
+    )
+    assert any("unknown keys: key_path, reload" in p for p in problems)
+
+
+def test_an_ontap_svm_address_must_be_plain() -> None:
+    raw = {"provider": "ontap", "kind": "svm", "svm": "svm1", "address": "-oProxy"}
+    assert any("address must be" in p for p in target_problems(raw, ["a.example.com"], "t"))
+
+
+def test_an_ontap_target_with_only_wildcards_needs_a_server_name() -> None:
+    assert target_problems(ontap_target(), ["*.example.com"], "t")
+    assert (
+        target_problems(
+            ontap_target(verify={"server_name": "cluster1.example.com"}), ["*.example.com"], "t"
+        )
+        == []
+    )
+    svm = {"provider": "ontap", "kind": "svm", "svm": "svm1", "address": "svm1-mgmt.example.com"}
+    assert target_problems(svm, ["*.example.com"], "t") == []
+
+
+def test_an_ontap_target_defaults_port_and_server_name() -> None:
+    target = parse_target(ontap_target(), ["*.example.com", "cluster1.example.com"])
+    assert (target.verify_port, target.verify_server_name) == (443, "cluster1.example.com")
+    assert (target.kind, target.svm, target.provider) == ("cluster", None, "ontap")
+    explicit = parse_target(
+        ontap_target(verify={"port": 8443, "server_name": "gw.example.com"}), ["a.example.com"]
+    )
+    assert (explicit.verify_port, explicit.verify_server_name) == (8443, "gw.example.com")
+
+
+def test_an_ontap_cluster_target_resolves_without_a_resource_or_endpoint() -> None:
+    target = resolve_target(ontap_target(), ["cluster1.example.com"], [])
+    assert target.endpoint is None
+    assert target.kind == "cluster"
+
+
+def test_an_ontap_svm_target_resolves_to_its_address() -> None:
+    raw = {"provider": "ontap", "kind": "svm", "svm": "svm1", "address": "svm1-mgmt.example.com"}
+    target = resolve_target(raw, ["svm1.example.com"], [])
+    assert target.endpoint is not None
+    assert target.endpoint.address == "svm1-mgmt.example.com"
+    assert (target.svm, target.kind, target.verify_server_name) == (
+        "svm1",
+        "svm",
+        "svm1.example.com",
+    )
+    bare = resolve_target(
+        {"provider": "ontap", "kind": "svm", "svm": "svm1"}, ["svm1.example.com"], []
+    )
+    assert bare.endpoint is not None
+    assert bare.endpoint.address == "svm1.example.com"
+
+
+def test_the_proxmox_kind_message_is_unchanged() -> None:
+    raw = {"provider": "proxmox", "kind": "bogus", "resource": "x"}
+    assert any("kind must be one of: vm, node" in p for p in target_problems(raw, ["a"], "t"))
