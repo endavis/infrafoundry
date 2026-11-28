@@ -9,7 +9,10 @@ from unittest.mock import patch
 
 import pytest
 
+from infrafoundry.core.certs.install import CertificateTarget
+from infrafoundry.core.certs.models import CertificateInstallError
 from infrafoundry.providers.ontap import OntapProvider, register
+from infrafoundry.providers.ontap.settings import OntapSettingsError
 
 from .conftest import FakeOntapService, lif, record
 
@@ -81,3 +84,37 @@ def test_importing_the_provider_does_not_load_pynetappfoundry() -> None:
     )
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
     assert done.returncode == 0, done.stderr
+
+
+def _target(env: str | None = "test") -> CertificateTarget:
+    return CertificateTarget(
+        provider="ontap", resource="cluster", key_path="", kind="cluster", env=env
+    )
+
+
+def test_install_certificate_delegates_to_the_installer(tmp_path: Path) -> None:
+    provider = _provider(tmp_path)
+    settings = object()
+    with (
+        patch("infrafoundry.providers.ontap.load_settings", return_value=settings) as load,
+        patch("infrafoundry.providers.ontap.OntapCertificateInstaller") as installer,
+    ):
+        provider.install_certificate(_target(), "leaf", "chain", "key")
+
+    load.assert_called_once_with(tmp_path, "test")
+    installer.assert_called_once_with(settings)
+    installer.return_value.install.assert_called_once_with(_target(), "leaf", "chain", "key")
+
+
+def test_the_install_needs_an_environment(tmp_path: Path) -> None:
+    with pytest.raises(CertificateInstallError, match="environment"):
+        _provider(tmp_path).install_certificate(_target(None), "leaf", "chain", "key")
+
+
+def test_unusable_settings_fail_the_install_without_secrets(tmp_path: Path) -> None:
+    error = OntapSettingsError("provider_settings.ontap is missing: password")
+    with (
+        patch("infrafoundry.providers.ontap.load_settings", side_effect=error),
+        pytest.raises(CertificateInstallError, match="missing: password"),
+    ):
+        _provider(tmp_path).install_certificate(_target(), "leaf", "chain", "key")

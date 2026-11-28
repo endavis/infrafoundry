@@ -37,6 +37,8 @@ InfraFoundry already stores per-package secrets in SOPS files ([ADR-0032](0032-b
 
     A Proxmox node is an install target too (`kind: node`, #1705). It is installed through the node API (`POST /nodes/{node}/certificates/custom`) with the environment's API token, which needs `Sys.Modify` on `/nodes/{node}`, instead of SSH. The key goes only in the request body. Verification fetches the served certificate on port 8006.
 
+    A NetApp ONTAP cluster or SVM is an install target too (`provider: ontap`, `kind: cluster|svm`, #1684). The certificate, key and chain go in through `POST /api/security/certificates` and are bound through `PATCH /api/cluster/web` or `/api/svm/svms/{svm.uuid}/web`. Binding the cluster restarts its web service, so the installer finishes with a client pinned to the new leaf, rolls back to the previous certificate when the check fails, and deletes only the superseded certificates it named itself. The operator documentation is in [ONTAP: Install Target for Certificates](../providers/ontap.md#install-target-for-certificates).
+
     The operator documentation is in [Proxmox: Install Target for Certificates](../providers/proxmox.md#install-target-for-certificates) and [OCI: Install Target for Certificates](../providers/oci.md#install-target-for-certificates).
 
 ## Rationale
@@ -53,10 +55,12 @@ InfraFoundry already stores per-package secrets in SOPS files ([ADR-0032](0032-b
 - [#1705](https://github.com/endavis/infrafoundry/issues/1705) install let's encrypt certificates on proxmox nodes
 - [#1682](https://github.com/endavis/infrafoundry/issues/1682) issue and renew per-device Let's Encrypt certificates with Cloudflare DNS-01
 - [#1683](https://github.com/endavis/infrafoundry/issues/1683) install let's encrypt certificates on mikrotik routeros devices
+- [#1684](https://github.com/endavis/infrafoundry/issues/1684) install let's encrypt certificates on netapp ontap clusters
 
 ## Related Documentation
 
 - [ACME provider](../providers/acme.md)
 - [Host provider](../providers/host.md)
 - [MikroTik provider](../providers/mikrotik.md#install-target-for-certificates)
+- [ONTAP provider](../providers/ontap.md#install-target-for-certificates)
 - [CLI reference](../usage/cli-reference.md)

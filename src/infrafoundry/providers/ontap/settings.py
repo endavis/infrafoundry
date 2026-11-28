@@ -20,10 +20,11 @@ or the unsafe opt-out ``verify_ssl: false`` with no pin. Messages name keys, nev
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from infrafoundry.core.certs.target_lookup import installed_server_name
 from infrafoundry.core.config import ConfigManager
 from infrafoundry.core.exceptions import InfraFoundryError
 from infrafoundry.core.tls_pin import FINGERPRINT_HEX_LENGTH, normalize_fingerprint
@@ -65,11 +66,23 @@ class OntapSettings:
     verify_ssl: bool | None = None
     timeout: int = DEFAULT_TIMEOUT
     api_spec_dir: Path = field(default_factory=lambda: Path(DEFAULT_SPEC_DIR).expanduser())
+    tls_server_name: str | None = None
+    """Host name to validate the cluster's certificate against.
+
+    Set by ``load_settings`` only once the cluster holds an installed Let's Encrypt production
+    certificate (#1684); the client then checks the CA chain and this name, whatever the pin,
+    ``ca_bundle`` and ``verify_ssl`` say. ``None`` keeps those settings in charge.
+    """
 
     @property
     def unverified(self) -> bool:
         """True for the unsafe opt-out: no pin, no CA bundle and no chain validation."""
-        return self.fingerprint is None and self.ca_bundle is None and self.verify_ssl is not True
+        return (
+            self.fingerprint is None
+            and self.ca_bundle is None
+            and self.verify_ssl is not True
+            and self.tls_server_name is None
+        )
 
     @property
     def spec_file(self) -> Path:
@@ -87,6 +100,7 @@ class OntapSettings:
             verify_ssl=self.verify_ssl,
             timeout=self.timeout,
             spec_file=self.spec_file,
+            tls_server_name=self.tls_server_name,
         )
 
 
@@ -236,4 +250,10 @@ def load_settings(config_dir: Path, env_name: str) -> OntapSettings:
     if problems:
         raise OntapSettingsError("; ".join(problems))
     resolved = resolved_provider_settings(env_config, PROVIDER_NAME) or {}
-    return settings_from_mapping(resolved, config_dir=config_dir)
+    settings = settings_from_mapping(resolved, config_dir=config_dir)
+    try:
+        resources = ConfigManager(config_dir).get_all_resources_all_providers(env_name)
+    except InfraFoundryError:
+        return settings  # resource errors surface where resources are loaded; keep the pin
+    server_name = installed_server_name(resources, PROVIDER_NAME, kind="cluster")
+    return replace(settings, tls_server_name=server_name) if server_name else settings

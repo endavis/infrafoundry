@@ -23,7 +23,11 @@ from infrafoundry.core.provider import ResourceConfig
 
 
 def installed_server_name(
-    resources: Iterable[ResourceConfig], provider: str, now: datetime | None = None
+    resources: Iterable[ResourceConfig],
+    provider: str,
+    now: datetime | None = None,
+    *,
+    kind: str | None = None,
 ) -> str | None:
     """Return the host name of an installed, unexpired production certificate for ``provider``.
 
@@ -31,6 +35,8 @@ def installed_server_name(
         resources: Every resource of the environment.
         provider: The target provider's name.
         now: The current time; defaults to the wall clock.
+        kind: When set, only a target of this ``target.kind`` counts (an ONTAP SVM certificate
+            must not switch the cluster client).
 
     Returns:
         The ``verify.server_name`` (or first plain name) of the first ``certificate`` resource
@@ -50,6 +56,8 @@ def installed_server_name(
         try:
             parsed = parse_target(target, config.get("names") or ())
         except CertificateSchemaError:
+            continue
+        if kind is not None and parsed.kind != kind:
             continue
         if parsed.verify_server_name:
             return parsed.verify_server_name

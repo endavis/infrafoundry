@@ -17,19 +17,23 @@ from infrafoundry.core.certs.models import CertificateInstallError, CertificateS
 from infrafoundry.core.provider import ResourceConfig
 from infrafoundry.core.ssh_host_keys import FIX_HINT, host_key_config, known_hosts_value
 
-SUPPORTED_TARGET_PROVIDERS = ("host", "proxmox", "oci", "mikrotik")
+SUPPORTED_TARGET_PROVIDERS = ("host", "proxmox", "oci", "mikrotik", "ontap")
 TARGET_RESOURCE_TYPES = {
     "host": "host",
     "proxmox": "vm",
     "oci": "instance",
     "mikrotik": "ip.service",
 }
-TARGET_KINDS = {"proxmox": ("vm", "node")}
+TARGET_KINDS = {"proxmox": ("vm", "node"), "ontap": ("cluster", "svm")}
 """Optional ``target.kind`` values per provider; absent means the provider's default kind."""
 NODE_VERIFY_PORT = 8006
 _PATHLESS_TARGET_PROVIDERS = frozenset({"mikrotik"})
 """Providers that install through their own API: no file paths, no SSH endpoint."""
 _PATHLESS_KEYS = frozenset({"provider", "resource", "verify"})
+_ONTAP_KEYS = frozenset({"provider", "kind", "svm", "address", "verify"})
+ONTAP_CLUSTER_RESOURCE = "cluster"
+"""``CertificateTarget.resource`` of an ONTAP cluster target, which declares no resource."""
+_SVM_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,254}$")
 VERIFY_WINDOW_SECONDS = 30.0
 
 _PATH_RE = re.compile(r"^/[A-Za-z0-9._/@+:-]+$")
@@ -108,6 +112,8 @@ class CertificateTarget:
     verify_server_name: str | None = None
     endpoint: TargetEndpoint | None = None
     kind: str | None = None
+    svm: str | None = None
+    """The SVM of an ONTAP ``svm`` target."""
     env: str | None = None
     """Environment name, set by the service; API installers read their settings with it."""
 
@@ -124,6 +130,8 @@ def target_problems(raw: Any, names: Iterable[str], where: str) -> list[str]:
         return [f"{where} is required and must be a mapping"]
     if raw.get("provider") in _PATHLESS_TARGET_PROVIDERS:
         return _pathless_problems(raw, list(names), where)
+    if raw.get("provider") == "ontap":
+        return _ontap_problems(raw, list(names), where)
     problems: list[str] = []
     unknown = sorted(set(raw) - _TARGET_KEYS)
     if unknown:
@@ -202,6 +210,51 @@ def _node_target_problems(raw: dict[str, Any], names: list[str], where: str) -> 
     return problems
 
 
+def _ontap_problems(raw: dict[str, Any], names: list[str], where: str) -> list[str]:
+    """Problems of an ONTAP target: the cluster or one SVM, installed through the REST API."""
+    problems: list[str] = []
+    if "resource" in raw:
+        problems.append(
+            f"{where}.resource does not apply to an ONTAP target "
+            "(the cluster comes from provider_settings.ontap.host)"
+        )
+    unknown = sorted(set(raw) - _ONTAP_KEYS - {"resource"})
+    if unknown:
+        problems.append(f"{where} has unknown keys: {', '.join(map(str, unknown))}")
+    kind = raw.get("kind")
+    allowed = TARGET_KINDS["ontap"]
+    if kind not in allowed:
+        return [*problems, f"{where}.kind is required and must be one of: {', '.join(allowed)}"]
+    address = raw.get("address")
+    if kind == "cluster":
+        for key in ("svm", "address"):
+            if key in raw:
+                problems.append(f"{where}.{key} does not apply to a cluster target")
+        address = None
+    else:
+        svm = raw.get("svm")
+        if not (isinstance(svm, str) and _SVM_NAME_RE.fullmatch(svm)):
+            problems.append(f"{where}.svm must name the SVM")
+        if address is not None and not (
+            isinstance(address, str)
+            and _ADDRESS_RE.fullmatch(address)
+            and not address.startswith("-")
+        ):
+            problems.append(f"{where}.address must be a host name or IP address")
+    verify = raw.get("verify")
+    if verify is None:
+        if names and all(n.startswith("*.") for n in names) and address is None:
+            problems.append(
+                f"{where}.verify.server_name is required when every name is a wildcard"
+                + (" (or set address)" if kind == "svm" else "")
+            )
+    else:
+        problems.extend(
+            _verify_problems(verify, names if address is None else ["address"], f"{where}.verify")
+        )
+    return problems
+
+
 def _pathless_problems(raw: dict[str, Any], names: list[str], where: str) -> list[str]:
     """Problems of a target for a provider that installs through its API (only ``verify``)."""
     problems: list[str] = []
@@ -270,6 +323,19 @@ def parse_target(raw: dict[str, Any], names: Iterable[str]) -> CertificateTarget
         server_name = verify.get("server_name") or next(
             (n for n in name_list if not n.startswith("*.")), None
         )
+    if raw["provider"] == "ontap":
+        verify_map = verify if isinstance(verify, dict) else {}
+        return CertificateTarget(
+            provider="ontap",
+            resource=str(raw.get("svm") or ONTAP_CLUSTER_RESOURCE),
+            key_path="",
+            verify_port=int(verify_map.get("port", 443)),
+            verify_server_name=verify_map.get("server_name")
+            or next((n for n in name_list if not n.startswith("*.")), None)
+            or raw.get("address"),
+            kind=str(raw["kind"]),
+            svm=str(raw["svm"]) if raw.get("svm") else None,
+        )
     if raw["provider"] in _PATHLESS_TARGET_PROVIDERS:
         explicit = verify.get("port") if isinstance(verify, dict) else None
         return CertificateTarget(
@@ -313,6 +379,11 @@ def resolve_target(
     """
     target = parse_target(raw, names)
     if target.kind == "node":
+        address = str(raw.get("address") or target.verify_server_name or "")
+        return CertificateTarget(**{**target.__dict__, "endpoint": TargetEndpoint(address=address)})
+    if target.provider == "ontap":
+        if target.kind == "cluster":
+            return target
         address = str(raw.get("address") or target.verify_server_name or "")
         return CertificateTarget(**{**target.__dict__, "endpoint": TargetEndpoint(address=address)})
     resource_type = TARGET_RESOURCE_TYPES[target.provider]
@@ -428,6 +499,31 @@ def fetch_served_der_via_jumphost(
     if match is None:
         raise OSError("the endpoint presented no certificate")
     return ssl.PEM_cert_to_DER_cert(match.group(0))
+
+
+def served_chain_validates(address: str, port: int, server_name: str) -> bool:
+    """Return whether the endpoint's certificate passes the default TLS validation.
+
+    A Let's Encrypt production certificate does; a staging or custom-directory one does not.
+
+    Args:
+        address: Host or IP to connect to.
+        port: TCP port.
+        server_name: Host name for SNI and the host name check.
+
+    Raises:
+        OSError: If the endpoint cannot be reached.
+    """
+    context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    try:
+        with (
+            socket.create_connection((address, port), timeout=10) as sock,
+            context.wrap_socket(sock, server_hostname=server_name),
+        ):
+            return True
+    except ssl.SSLCertVerificationError:
+        return False
 
 
 def fetch_served_der(address: str, port: int, server_name: str) -> bytes:

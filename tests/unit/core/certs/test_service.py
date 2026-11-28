@@ -338,6 +338,23 @@ def test_the_state_row_target_carries_kind_only_when_set() -> None:
     assert rig.states[-1][1]["target"] == {"provider": "host", "resource": "h"}
 
 
+def test_the_state_row_target_carries_the_ontap_kind_and_svm() -> None:
+    from types import SimpleNamespace
+
+    rig = Rig()
+    entry = {"not_after": "x", "sha256": "y"}
+    svm = SimpleNamespace(
+        names=["a.example.com"], target={"provider": "ontap", "kind": "svm", "svm": "svm1"}
+    )
+    rig.service()._record(certificate_resource(), svm, entry)  # type: ignore[arg-type]
+    assert rig.states[-1][1]["target"] == {
+        "provider": "ontap",
+        "resource": None,
+        "kind": "svm",
+        "svm": "svm1",
+    }
+
+
 def test_nothing_secret_reaches_outcomes_or_logs(caplog: pytest.LogCaptureFixture) -> None:
     rig = Rig()
     rig.host.error = CertificateInstallError("the reload failed")
